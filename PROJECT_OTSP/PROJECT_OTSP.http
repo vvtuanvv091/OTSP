@@ -1,6 +1,0 @@
-@PROJECT_OTSP_HostAddress = http://localhost:5229
-
-GET {{PROJECT_OTSP_HostAddress}}/weatherforecast/
-Accept: application/json
-
-###
