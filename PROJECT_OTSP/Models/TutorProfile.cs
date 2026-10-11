@@ -1,0 +1,56 @@
+﻿using Microsoft.EntityFrameworkCore;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+using static PROJECT_OTSP.Models.Enums;
+
+namespace PROJECT_OTSP.Models
+{
+    // Hồ sơ gia sư
+    public class TutorProfile
+    {
+        // Khóa chính
+        [Key]
+        public int Id { get; set; }
+
+        // Giới thiệu bản thân, kinh nghiệm giảng dạy
+        public string? Introduction { get; set; }
+
+        // Học phí mỗi giờ (VNĐ), kiểu số nguyên không có phần thập phân
+        [Precision(18, 0)]
+        public decimal HourlyFee { get; set; }
+
+        // Trạng thái xác thực hồ sơ: Pending, Approved, Rejected
+        public VerificationStatus VerificationStatus { get; set; } = VerificationStatus.Pending;
+
+        // Điểm đánh giá trung bình (tính từ Review)
+        public double AverageRating { get; set; }
+
+        // Khóa ngoại tới tài khoản (1-1)
+        [Required]
+        [ForeignKey("User")]
+        public string UserId { get; set; } = "";
+        public ApplicationUser User { get; set; } = null!;
+
+        // Bằng cấp, chứng chỉ tải lên (1-N)
+        public ICollection<Qualification> Qualifications { get; set; } = new List<Qualification>();
+
+        // Các lần admin xác thực hồ sơ (1-N)
+        public ICollection<ProfileVerification> ProfileVerifications { get; set; } = new List<ProfileVerification>();
+
+        // Yêu cầu kết nối gửi tới gia sư (1-N)
+        public ICollection<ConnectionRequest> ConnectionRequests { get; set; } = new List<ConnectionRequest>();
+
+        // Lớp học gia sư đang dạy (1-N)
+        public ICollection<Classroom> Classrooms { get; set; } = new List<Classroom>();
+
+        // Tài liệu gia sư đã tải lên (1-N)
+        public ICollection<LearningDocument> LearningDocuments { get; set; } = new List<LearningDocument>();
+
+        // Đối soát doanh thu theo kỳ (1-N)
+        public ICollection<Reconciliation> Reconciliations { get; set; } = new List<Reconciliation>();
+
+        // Môn-cấp gia sư có thể dạy (N-N qua bảng TutorSubjectLevel)
+        public ICollection<TutorSubjectLevel> TutorSubjectLevels { get; set; } = new List<TutorSubjectLevel>();
+
+    }
+}
