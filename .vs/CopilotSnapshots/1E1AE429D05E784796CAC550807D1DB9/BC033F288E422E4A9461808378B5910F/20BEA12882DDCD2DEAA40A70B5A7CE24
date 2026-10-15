@@ -1,0 +1,336 @@
+﻿@using PROJECT_OTSP.Models
+@model TutorProfile
+@{
+    Layout = "/Views/Shared/_Layout.cshtml";
+    ViewData["Title"] = "Hồ sơ gia sư";
+    // ... phần còn lại giữ nguyên
+}
+@{
+    ViewData["Title"] = "Hồ sơ gia sư";
+
+    var avatarUrl = string.IsNullOrWhiteSpace(Model.User.AvatarUrl)
+        ? Url.Content("https://cdn-media.sforum.vn/storage/app/media/ctv_seo3/meme-meo-cuoi-5.jpg")
+        : Model.User.AvatarUrl;
+
+    var statusClass = Model.VerificationStatus switch
+    {
+        Enums.VerificationStatus.Approved => "bg-success-subtle text-success-emphasis",
+        Enums.VerificationStatus.Rejected => "bg-danger-subtle text-danger-emphasis",
+        _ => "bg-warning-subtle text-warning-emphasis"
+    };
+
+    var subjectCount = Model.TutorSubjects.Count();
+    var qualificationCount = Model.Qualifications.Count();
+}
+
+<style>
+    :root {
+        --brand: #2e7d6b;
+        --brand-dark: #1f5a4c;
+        --accent: #f4a261;
+        --soft: #f3f8f7;
+        --line: #e7eeed;
+    }
+
+    .page-banner {
+        background: linear-gradient(120deg, rgba(31, 90, 76, .95), rgba(46, 125, 107, .8));
+        color: #fff;
+        padding: 56px 0 90px;
+    }
+
+    .page-banner .breadcrumb-item,
+    .page-banner .breadcrumb-item a { color: #cfe9e3; text-decoration: none; }
+    .page-banner .breadcrumb-item.active { color: #fff; }
+
+    .profile-wrap { margin-top: -60px; }
+
+    .mentor-card {
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, .06);
+        background: #fff;
+    }
+
+    .profile-avatar {
+        width: 112px;
+        height: 112px;
+        object-fit: cover;
+        border-radius: 50%;
+        border: 4px solid #e3f1ee;
+    }
+
+    .fun-fact .num {
+        font-size: 2rem;
+        font-weight: 700;
+        color: var(--brand);
+        line-height: 1;
+    }
+
+    .section-title {
+        font-size: 1.05rem;
+        font-weight: 700;
+        color: var(--brand-dark);
+    }
+
+    .section-title::after {
+        content: "";
+        display: block;
+        width: 40px;
+        height: 3px;
+        background: var(--accent);
+        border-radius: 2px;
+        margin-top: .4rem;
+    }
+
+    .form-label {
+        color: #5b6b75;
+        font-size: .85rem;
+        font-weight: 600;
+        margin-bottom: .35rem;
+    }
+
+    .form-control,
+    .form-select {
+        border-color: #d9e4e1;
+        border-radius: .6rem;
+        min-height: 44px;
+    }
+
+    .form-control:focus {
+        border-color: var(--brand);
+        box-shadow: 0 0 0 .2rem rgba(46, 125, 107, .15);
+    }
+
+    .form-control[readonly] { background-color: var(--soft); }
+
+    .subject-chip {
+        display: inline-block;
+        padding: .4rem .85rem;
+        margin: .2rem;
+        border-radius: 999px;
+        background: #e3f1ee;
+        color: var(--brand-dark);
+        font-size: .85rem;
+        font-weight: 500;
+    }
+
+    .qual-item {
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 1rem 1.1rem;
+        transition: transform .25s, box-shadow .25s;
+    }
+
+    .qual-item:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 10px 24px rgba(0, 0, 0, .07);
+    }
+
+    .qual-icon {
+        width: 44px;
+        height: 44px;
+        border-radius: 12px;
+        background: #e3f1ee;
+        color: var(--brand);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.2rem;
+    }
+
+    .btn-brand {
+        background: var(--brand);
+        color: #fff;
+        border: none;
+        border-radius: 999px;
+        padding: .6rem 1.8rem;
+        font-weight: 600;
+    }
+
+    .btn-brand:hover { background: var(--brand-dark); color: #fff; }
+</style>
+
+<section class="page-banner">
+    <div class="container">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb mb-2">
+                <li class="breadcrumb-item"><a href="/">Trang chủ</a></li>
+                <li class="breadcrumb-item active" aria-current="page">Hồ sơ gia sư</li>
+            </ol>
+        </nav>
+        <h1 class="fw-bold mb-0">Hồ sơ gia sư</h1>
+        <p class="mb-0 mt-2 opacity-75">Cập nhật thông tin để học viên dễ tìm thấy và tin tưởng bạn hơn.</p>
+    </div>
+</section>
+
+<div class="container profile-wrap pb-5">
+
+    @if (TempData["Success"] is string success)
+    {
+        <div class="alert alert-success alert-dismissible fade show shadow-sm" role="alert">
+            @success
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Đóng"></button>
+        </div>
+    }
+
+    @if (TempData["Error"] is string error)
+    {
+        <div class="alert alert-danger alert-dismissible fade show shadow-sm" role="alert">
+            @error
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Đóng"></button>
+        </div>
+    }
+
+    <div class="row g-4">
+
+        <aside class="col-lg-4">
+            <div class="mentor-card p-4 text-center mb-4">
+                <img class="profile-avatar mb-3" src="@avatarUrl" alt="Ảnh đại diện gia sư" />
+
+                <h2 class="h5 fw-bold mb-2">@Model.User.FullName</h2>
+
+                <span class="badge rounded-pill px-3 py-2 @statusClass">
+                    @Model.VerificationStatus
+                </span>
+
+                <div class="small text-secondary mt-3">
+                    @if (Model.AverageRating > 0)
+                    {
+                        <span>⭐ @Model.AverageRating.ToString("0.0") / 5</span>
+                    }
+                    else
+                    {
+                        <span>Chưa có đánh giá</span>
+                    }
+                </div>
+            </div>
+
+            <div class="mentor-card p-4">
+                <div class="row text-center g-3">
+                    <div class="col-6 fun-fact">
+                        <div class="num">@subjectCount</div>
+                        <small class="text-secondary">Môn dạy</small>
+                    </div>
+                    <div class="col-6 fun-fact">
+                        <div class="num">@qualificationCount</div>
+                        <small class="text-secondary">Bằng cấp</small>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <main class="col-lg-8">
+            <form asp-action="UpdateProfile" method="post">
+
+                <section class="mentor-card p-4 mb-4">
+                    <h2 class="section-title mb-4">Thông tin cá nhân</h2>
+
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label for="DisplayName" class="form-label">Họ và tên</label>
+                            <input id="DisplayName" name="DisplayName" class="form-control"
+                                   value="@Model.User.FullName" maxlength="150" required />
+                        </div>
+
+                        <div class="col-md-6">
+                            <label for="Email" class="form-label">Email</label>
+                            <input id="Email" class="form-control" value="@Model.User.Email"  />
+                        </div>
+
+                        <div class="col-md-6">
+                            <label for="PhoneNumber" class="form-label">Số điện thoại</label>
+                            <input id="PhoneNumber" class="form-control"
+                                   value="@Model.User.PhoneNumber" />
+                        </div>
+
+                        <div class="col-md-6">
+                            <label for="DateOfBirth" class="form-label">Ngày sinh</label>
+                            <input id="DateOfBirth" type="date" class="form-control"
+                                   value="@(Model.User.DateOfBirth?.ToString("yyyy-MM-dd"))" readonly />
+                        </div>
+
+                        <div class="col-12">
+                            <label for="Address" class="form-label">Địa chỉ</label>
+                            <input id="Address" class="form-control"
+                                   value="@Model.User.Address" readonly />
+                        </div>
+                    </div>
+                </section>
+
+                <section class="mentor-card p-4 mb-4">
+                    <h2 class="section-title mb-4">Môn dạy và học phí</h2>
+
+                    <div class="mb-4">
+                        @if (Model.TutorSubjects.Any())
+                        {
+                            foreach (var item in Model.TutorSubjects)
+                            {
+                                <span class="subject-chip">
+                                    @item.Subject.Name · @item.GradeLevel.Name
+                                </span>
+                            }
+                        }
+                        else
+                        {
+                            <span class="text-secondary small">
+                                Bạn chưa thêm môn và cấp học giảng dạy.
+                            </span>
+                        }
+                    </div>
+
+                    <label for="HourlyFee" class="form-label">Học phí mỗi giờ</label>
+                    <div class="input-group">
+                        <input id="HourlyFee" class="form-control"
+                               value="@Model.HourlyFee.ToString("N0")" readonly />
+                        <span class="input-group-text">VNĐ/giờ</span>
+                    </div>
+                </section>
+
+                <section class="mentor-card p-4 mb-4">
+                    <h2 class="section-title mb-4">Giới thiệu bản thân</h2>
+
+                    <textarea id="Introduction" name="Introduction" class="form-control" rows="5"
+                              placeholder="Giới thiệu kinh nghiệm, phương pháp giảng dạy và môn học của bạn...">@Model.Introduction</textarea>
+                </section>
+
+                <section class="mentor-card p-4 mb-4">
+                    <h2 class="section-title mb-4">Bằng cấp / Chứng chỉ</h2>
+
+                    @if (Model.Qualifications.Any())
+                    {
+                        <div class="d-grid gap-3">
+                            @foreach (var qualification in Model.Qualifications)
+                            {
+                                <div class="qual-item d-flex justify-content-between align-items-center gap-3">
+                                    <div class="d-flex align-items-center gap-3">
+                                        <span class="qual-icon"><i class="bi bi-award"></i></span>
+                                        <div>
+                                            <div class="fw-semibold">@qualification.Title</div>
+                                            <small class="text-secondary">Trạng thái: @qualification.Status</small>
+                                        </div>
+                                    </div>
+
+                                    @if (!string.IsNullOrWhiteSpace(qualification.FileUrl))
+                                    {
+                                        <a class="btn btn-sm btn-outline-success rounded-pill px-3"
+                                           href="@qualification.FileUrl" target="_blank" rel="noopener">
+                                            Xem tệp
+                                        </a>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="text-secondary mb-0">Bạn chưa tải lên bằng cấp hoặc chứng chỉ.</p>
+                    }
+                </section>
+
+                <div class="d-flex justify-content-end">
+                    <button type="submit" class="btn btn-brand">Lưu hồ sơ</button>
+                </div>
+            </form>
+        </main>
+    </div>
+</div>

@@ -19,6 +19,9 @@ namespace PROJECT_OTSP.Models
 
         // Lịch học dạng văn bản
         public string? Schedule { get; set; }
+        // Môn và cấp của lớp nhóm, lưu dạng văn bản (trung tâm, sẽ thiết kế sau)
+        public string SubjectText { get; set; } = "";
+
 
         // Khóa ngoại tới trung tâm
         [ForeignKey("Center")]

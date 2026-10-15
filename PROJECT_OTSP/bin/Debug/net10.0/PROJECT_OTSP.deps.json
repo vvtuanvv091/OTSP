@@ -8,6 +8,7 @@
     ".NETCoreApp,Version=v10.0": {
       "PROJECT_OTSP/1.0.0": {
         "dependencies": {
+          "CloudinaryDotNet": "1.29.3",
           "Microsoft.AspNetCore.Diagnostics.EntityFrameworkCore": "10.0.12",
           "Microsoft.AspNetCore.Identity.EntityFrameworkCore": "10.0.12",
           "Microsoft.AspNetCore.Identity.UI": "10.0.12",
@@ -44,6 +45,17 @@
           "lib/net8.0/Azure.Identity.dll": {
             "assemblyVersion": "1.17.1.0",
             "fileVersion": "1.1700.125.56903"
+          }
+        }
+      },
+      "CloudinaryDotNet/1.29.3": {
+        "dependencies": {
+          "Newtonsoft.Json": "13.0.4"
+        },
+        "runtime": {
+          "lib/netstandard2.0/CloudinaryDotNet.dll": {
+            "assemblyVersion": "1.29.3.0",
+            "fileVersion": "1.29.3.0"
           }
         }
       },
@@ -1970,6 +1982,13 @@
       "sha512": "sha512-MSZkBrctcpiGxs9Cvr2VKKoN6qFLZlP3I6xuCWJ9iTgitI5Rgxtk5gfOSpXPZE3+CJmZ/mnqpQyGyjawFn5Vvg==",
       "path": "azure.identity/1.17.1",
       "hashPath": "azure.identity.1.17.1.nupkg.sha512"
+    },
+    "CloudinaryDotNet/1.29.3": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-C9UpTh7YoOrfeUXcdjnsEloTaWKTNeDgvMpWoGAOTkC6HOxPIbcQAiSGhoqPPT8scAKAFjrPzf89nyZkGvtoCg==",
+      "path": "cloudinarydotnet/1.29.3",
+      "hashPath": "cloudinarydotnet.1.29.3.nupkg.sha512"
     },
     "Humanizer/2.14.1": {
       "type": "package",

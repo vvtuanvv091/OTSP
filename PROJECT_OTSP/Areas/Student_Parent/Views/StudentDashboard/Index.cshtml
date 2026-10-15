@@ -1,0 +1,18 @@
+@{
+    ViewData["Title"] = "Khu vực học viên và phụ huynh";
+}
+
+<div class="student-dashboard section">
+    <div class="container">
+        <div class="student-dashboard-card">
+            <span class="student-dashboard-icon"><i class="bi bi-mortarboard-fill" aria-hidden="true"></i></span>
+            <p class="student-dashboard-eyebrow">OTSP · HỌC VIÊN &amp; PHỤ HUYNH</p>
+            <h1>Chào mừng, @User.Identity?.Name</h1>
+            <p>Đây là khu vực dành riêng cho học viên và phụ huynh. Bạn có thể bắt đầu bằng cách khám phá các gia sư phù hợp với nhu cầu học tập của mình.</p>
+            <div class="student-dashboard-actions">
+                <a class="btn-getstarted" asp-area="" asp-controller="Home" asp-action="Index" asp-fragment="courses">Khám phá gia sư <i class="bi bi-arrow-right" aria-hidden="true"></i></a>
+                <a class="student-dashboard-secondary" asp-area="Identity" asp-page="/Account/Manage/Index">Quản lý tài khoản</a>
+            </div>
+        </div>
+    </div>
+</div>

@@ -29,11 +29,6 @@ public class ConnectionRequest
     public int TutorId { get; set; }
     public TutorProfile Tutor { get; set; } = null!;
 
-    // Môn-cấp học học viên muốn học
-    [ForeignKey("SubjectLevel")]
-    public int SubjectLevelId { get; set; }
-    public SubjectLevel SubjectLevel { get; set; } = null!;
-
     // Kiểu học học viên muốn: 1-1 hoặc nhóm
     public ClassroomType PreferredType { get; set; } = ClassroomType.OneToOne;
 
@@ -43,4 +38,14 @@ public class ConnectionRequest
     public Classroom? Classroom { get; set; }
 
     public ICollection<TrialSchedule> TrialSchedules { get; set; } = new List<TrialSchedule>();
+    // Môn học (ví dụ: Toán)
+    [ForeignKey("Subject")]
+    public int SubjectId { get; set; }
+    public Subject Subject { get; set; } = null!;
+
+    // Cấp học (ví dụ: THCS)
+    [ForeignKey("GradeLevel")]
+    public int GradeLevelId { get; set; }
+    public GradeLevel GradeLevel { get; set; } = null!;
+
 }

@@ -1,43 +1,112 @@
-﻿using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using PROJECT_OTSP.Models;
 using static PROJECT_OTSP.Models.Enums;
 
 namespace PROJECT_OTSP.Data;
 
-// Tạo dữ liệu mẫu khi chạy ở môi trường phát triển.
-// Chạy an toàn nhiều lần: mỗi phần kiểm tra trước khi thêm.
+/// <summary>
+/// Quản lý việc nạp dữ liệu mẫu và dữ liệu khởi tạo ban đầu cho hệ thống.
+/// - SeedCoreDataAsync: Dữ liệu tối thiểu (Vai trò, Danh mục cơ bản, 3 tài khoản mặc định đại diện cho các vai trò).
+/// - ExtraSampleDataSeeder: 30 bộ dữ liệu phong phú phục vụ kiểm thử, được điều khiển qua cờ cấu hình 'SeedData:EnableBulkSampleData'.
+/// </summary>
 public static class DbSeeder
 {
-    public static async Task SeedAsync(IServiceProvider services)
+    public static async Task SeedAsync(IServiceProvider services, bool? forceBulk = null)
     {
+        var config = services.GetRequiredService<IConfiguration>();
+        var logger = services.GetRequiredService<ILoggerFactory>().CreateLogger("DbSeeder");
         var db = services.GetRequiredService<ApplicationDbContext>();
         var userManager = services.GetRequiredService<UserManager<ApplicationUser>>();
         var roleManager = services.GetRequiredService<RoleManager<ApplicationRole>>();
 
-        // 1. Vai trò (phải có trước khi gán cho tài khoản)
-        foreach (var ten in new[] { "Admin", "Tutor", "Student_Parent" })
+        // 1. Luôn bảo đảm dữ liệu cốt lõi (Core Data) tồn tại trên Neon
+        await SeedCoreDataAsync(db, userManager, roleManager, logger);
+
+        // 2. Dữ liệu mẫu số lượng lớn (Bulk Data)
+        var enableBulk = forceBulk ?? config.GetValue<bool>("SeedData:EnableBulkSampleData");
+        if (enableBulk)
         {
-            if (!await roleManager.RoleExistsAsync(ten))
-                await roleManager.CreateAsync(new ApplicationRole { Name = ten });
+            logger.LogInformation(">>> [DbSeeder] Cấu hình 'SeedData:EnableBulkSampleData' = true. Bắt đầu nạp dữ liệu mẫu đầy đủ lên Neon PostgreSQL...");
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            await ExtraSampleDataSeeder.SeedAsync(db, userManager, logger);
+            sw.Stop();
+            logger.LogInformation(">>> [DbSeeder] Đã nạp thành công toàn bộ dữ liệu mẫu lên Neon trong {Elapsed:F1}s! Bạn có thể tắt cờ 'SeedData:EnableBulkSampleData: false'.", sw.Elapsed.TotalSeconds);
+        }
+        else
+        {
+            logger.LogInformation("[DbSeeder] 'SeedData:EnableBulkSampleData' = false. Bỏ qua nạp dữ liệu mẫu số lượng lớn để tối ưu tốc độ khởi động.");
+        }
+    }
+
+    private static async Task SeedCoreDataAsync(
+        ApplicationDbContext db,
+        UserManager<ApplicationUser> userManager,
+        RoleManager<ApplicationRole> roleManager,
+        ILogger logger)
+    {
+        // 1. Vai trò cơ bản
+        var roleNames = new[] { "Admin", "Tutor", "Student_Parent" };
+        var existingRoleNames = await roleManager.Roles
+            .Where(r => r.Name != null && roleNames.Contains(r.Name))
+            .Select(r => r.Name!)
+            .ToListAsync();
+        foreach (var ten in roleNames.Except(existingRoleNames))
+        {
+            await roleManager.CreateAsync(new ApplicationRole { Name = ten });
         }
 
-        // 2. Danh mục môn-cấp học (không có khóa ngoại nên seed trước)
-        if (!await db.SubjectLevels.AnyAsync())
+        // 2. Danh mục môn học cơ bản
+        var monHoc = new[]
         {
-            db.SubjectLevels.AddRange(
-                new SubjectLevel { SubjectName = "Toán", GradeLevel = "THCS" },
-                new SubjectLevel { SubjectName = "Toán", GradeLevel = "THPT" },
-                new SubjectLevel { SubjectName = "Tiếng Anh", GradeLevel = "THPT" }
-            );
-            await db.SaveChangesAsync();
+            (Code: "TOAN", Name: "Toán"),
+            (Code: "TIENGANH", Name: "Tiếng Anh")
+        };
+        var subjectCodes = monHoc.Select(m => m.Code).ToArray();
+        var existingSubjectCodes = await db.Subjects
+            .Where(s => subjectCodes.Contains(s.Code))
+            .Select(s => s.Code)
+            .ToListAsync();
+        foreach (var m in monHoc.Where(m => !existingSubjectCodes.Contains(m.Code)))
+        {
+            db.Subjects.Add(new Subject { Code = m.Code, Name = m.Name });
         }
 
-        // 3. Tài khoản Admin
+        // 3. Danh mục cấp học cơ bản
+        var capHoc = new[]
+        {
+            (Code: "TH", Name: "Tiểu học"),
+            (Code: "THCS", Name: "Trung học cơ sở"),
+            (Code: "THPT", Name: "Trung học phổ thông")
+        };
+        var gradeLevelCodes = capHoc.Select(c => c.Code).ToArray();
+        var existingGradeLevelCodes = await db.GradeLevels
+            .Where(g => gradeLevelCodes.Contains(g.Code))
+            .Select(g => g.Code)
+            .ToListAsync();
+        foreach (var c in capHoc.Where(c => !existingGradeLevelCodes.Contains(c.Code)))
+        {
+            db.GradeLevels.Add(new GradeLevel { Code = c.Code, Name = c.Name });
+        }
+        await db.SaveChangesAsync();
+
+        // 4. Batch kiểm tra các tài khoản cốt lõi (Admin, Tutor, Student mặc định)
         const string adminEmail = "admin@otsp.local";
-        if (await userManager.FindByEmailAsync(adminEmail) == null)
+        const string tutorEmail = "tutor1@otsp.local";
+        const string studentEmail = "hocvien1@otsp.local";
+        var coreEmails = new[] { adminEmail, tutorEmail, studentEmail };
+
+        var existingCoreUsers = await userManager.Users
+            .Where(u => u.Email != null && coreEmails.Contains(u.Email))
+            .ToDictionaryAsync(u => u.Email!, StringComparer.OrdinalIgnoreCase);
+
+        // 4.1. Admin mặc định
+        if (!existingCoreUsers.TryGetValue(adminEmail, out var admin))
         {
-            var admin = new ApplicationUser
+            admin = new ApplicationUser
             {
                 UserName = adminEmail,
                 Email = adminEmail,
@@ -50,14 +119,14 @@ public static class DbSeeder
                 await userManager.AddToRoleAsync(admin, "Admin");
                 db.AdminProfiles.Add(new AdminProfile { UserId = admin.Id, Rank = "Quản trị cấp cao" });
                 await db.SaveChangesAsync();
+                logger.LogInformation("[DbSeeder] Đã khởi tạo tài khoản Admin mặc định: {Email}", adminEmail);
             }
         }
 
-        // 4. Gia sư mẫu (đã duyệt để hiện trong tìm kiếm)
-        const string tutorEmail = "tutor1@otsp.local";
-        if (await userManager.FindByEmailAsync(tutorEmail) == null)
+        // 4.2. Gia sư mẫu mặc định (Toán THCS)
+        if (!existingCoreUsers.TryGetValue(tutorEmail, out var tutorUser))
         {
-            var tutorUser = new ApplicationUser
+            tutorUser = new ApplicationUser
             {
                 UserName = tutorEmail,
                 Email = tutorEmail,
@@ -81,23 +150,23 @@ public static class DbSeeder
                 db.TutorProfiles.Add(tutor);
                 await db.SaveChangesAsync();
 
-                // Gán môn dạy: Toán THCS
-                var toanThcs = await db.SubjectLevels
-                    .FirstAsync(s => s.SubjectName == "Toán" && s.GradeLevel == "THCS");
-                db.TutorSubjectLevels.Add(new TutorSubjectLevel
+                var toan = await db.Subjects.FirstAsync(s => s.Code == "TOAN");
+                var thcs = await db.GradeLevels.FirstAsync(g => g.Code == "THCS");
+                db.TutorSubjects.Add(new TutorSubject
                 {
                     TutorId = tutor.Id,
-                    SubjectLevelId = toanThcs.Id
+                    SubjectId = toan.Id,
+                    GradeLevelId = thcs.Id
                 });
                 await db.SaveChangesAsync();
+                logger.LogInformation("[DbSeeder] Đã khởi tạo tài khoản Gia sư mặc định: {Email}", tutorEmail);
             }
         }
 
-        // 5. Học viên mẫu dưới 18 tuổi, có người giám hộ
-        const string studentEmail = "hocvien1@otsp.local";
-        if (await userManager.FindByEmailAsync(studentEmail) == null)
+        // 4.3. Học viên mẫu mặc định
+        if (!existingCoreUsers.TryGetValue(studentEmail, out var studentUser))
         {
-            var studentUser = new ApplicationUser
+            studentUser = new ApplicationUser
             {
                 UserName = studentEmail,
                 Email = studentEmail,
@@ -126,6 +195,7 @@ public static class DbSeeder
                     StudentProfileId = student.Id
                 });
                 await db.SaveChangesAsync();
+                logger.LogInformation("[DbSeeder] Đã khởi tạo tài khoản Học viên mặc định: {Email}", studentEmail);
             }
         }
     }

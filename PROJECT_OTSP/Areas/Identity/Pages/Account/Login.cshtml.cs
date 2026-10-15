@@ -13,19 +13,31 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.UI.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using PROJECT_OTSP.Data;
 using PROJECT_OTSP.Models;
+using PROJECT_OTSP.Services;
 
 namespace PROJECT_OTSP.Areas.Identity.Pages.Account;
 
+[AllowAnonymous]
 public class LoginModel : PageModel
 {
     private readonly SignInManager<ApplicationUser> _signInManager;
+    private readonly UserManager<ApplicationUser> _userManager;
+    private readonly ApplicationDbContext _dbContext;
     private readonly ILogger<LoginModel> _logger;
 
-    public LoginModel(SignInManager<ApplicationUser> signInManager, ILogger<LoginModel> logger)
+    public LoginModel(
+        SignInManager<ApplicationUser> signInManager,
+        UserManager<ApplicationUser> userManager,
+        ApplicationDbContext dbContext,
+        ILogger<LoginModel> logger)
     {
         _signInManager = signInManager;
+        _userManager = userManager;
+        _dbContext = dbContext;
         _logger = logger;
     }
 
@@ -105,22 +117,52 @@ public class LoginModel : PageModel
     public async Task<IActionResult> OnPostAsync(string? returnUrl = null)
     {
         returnUrl ??= Url.Content("~/");
+        ReturnUrl = returnUrl;
 
         ExternalLogins = (await _signInManager.GetExternalAuthenticationSchemesAsync()).ToList();
 
         if (ModelState.IsValid)
         {
-            // This doesn't count login failures towards account lockout
-            // To enable password failures to trigger account lockout, set lockoutOnFailure: true
-            var result = await _signInManager.PasswordSignInAsync(Input.Email, Input.Password, Input.RememberMe, lockoutOnFailure: false);
+            var normalizedEmail = _userManager.NormalizeEmail(Input.Email);
+            var normalizedUserName = _userManager.NormalizeName(Input.Email);
+
+            // Nạp thông tin User và danh sách Roles trong 1 truy vấn duy nhất,
+            // tránh phải gửi thêm round-trip lấy Roles sau khi đăng nhập thành công.
+            var accountInfo = await (from u in _dbContext.Users
+                                     where u.NormalizedUserName == normalizedUserName || u.NormalizedEmail == normalizedEmail
+                                     select new
+                                     {
+                                         User = u,
+                                         Roles = (from ur in _dbContext.UserRoles
+                                                  join r in _dbContext.Roles on ur.RoleId equals r.Id
+                                                  where ur.UserId == u.Id
+                                                  select r.Name!).ToList()
+                                     }).FirstOrDefaultAsync();
+
+            if (accountInfo is null)
+            {
+                ModelState.AddModelError(string.Empty, "Email hoặc mật khẩu không đúng.");
+                return Page();
+            }
+
+            var result = await _signInManager.PasswordSignInAsync(
+                accountInfo.User,
+                Input.Password,
+                Input.RememberMe,
+                lockoutOnFailure: false);
+
             if (result.Succeeded)
             {
                 _logger.LogInformation("User logged in.");
-                return LocalRedirect(returnUrl);
+                return LocalRedirect(RoleLandingPage.Resolve(returnUrl, accountInfo.Roles, Url.IsLocalUrl, Url.Content("~/")));
             }
             if (result.RequiresTwoFactor)
             {
-                return RedirectToPage("./LoginWith2fa", new { ReturnUrl = returnUrl, RememberMe = Input.RememberMe });
+                return RedirectToPage("./LoginWith2fa", new
+                {
+                    ReturnUrl = RoleLandingPage.Resolve(returnUrl, accountInfo.Roles, Url.IsLocalUrl, Url.Content("~/")),
+                    RememberMe = Input.RememberMe
+                });
             }
             if (result.IsLockedOut)
             {
@@ -129,7 +171,7 @@ public class LoginModel : PageModel
             }
             else
             {
-                ModelState.AddModelError(string.Empty, "Invalid login attempt.");
+                ModelState.AddModelError(string.Empty, "Email hoặc mật khẩu không đúng.");
                 return Page();
             }
         }
@@ -137,4 +179,5 @@ public class LoginModel : PageModel
         // If we got this far, something failed, redisplay form
         return Page();
     }
+
 }

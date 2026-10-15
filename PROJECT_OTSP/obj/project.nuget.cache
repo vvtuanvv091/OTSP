@@ -1,11 +1,12 @@
 {
   "version": 2,
-  "dgSpecHash": "l8lcqjTjARk=",
+  "dgSpecHash": "S98Jr/SJZwU=",
   "success": true,
   "projectFilePath": "C:\\tai_lieu_hoc_thuat_cua_tuan\\mauthietkephanmem\\OTSP\\PROJECT_OTSP\\PROJECT_OTSP.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\GIGABYTE\\.nuget\\packages\\azure.core\\1.50.0\\azure.core.1.50.0.nupkg.sha512",
     "C:\\Users\\GIGABYTE\\.nuget\\packages\\azure.identity\\1.17.1\\azure.identity.1.17.1.nupkg.sha512",
+    "C:\\Users\\GIGABYTE\\.nuget\\packages\\cloudinarydotnet\\1.29.3\\cloudinarydotnet.1.29.3.nupkg.sha512",
     "C:\\Users\\GIGABYTE\\.nuget\\packages\\humanizer\\2.14.1\\humanizer.2.14.1.nupkg.sha512",
     "C:\\Users\\GIGABYTE\\.nuget\\packages\\humanizer.core\\2.14.1\\humanizer.core.2.14.1.nupkg.sha512",
     "C:\\Users\\GIGABYTE\\.nuget\\packages\\humanizer.core.af\\2.14.1\\humanizer.core.af.2.14.1.nupkg.sha512",
@@ -158,6 +159,30 @@
       "warningLevel": 1,
       "filePath": "C:\\tai_lieu_hoc_thuat_cua_tuan\\mauthietkephanmem\\OTSP\\PROJECT_OTSP\\PROJECT_OTSP.csproj",
       "libraryId": "NuGet.Protocol",
+      "targetGraphs": [
+        "net10.0"
+      ]
+    },
+    {
+      "code": "NU1902",
+      "level": "Warning",
+      "message": "Package 'System.Security.Cryptography.Pkcs' 9.0.11 has a known moderate severity vulnerability, https://github.com/advisories/GHSA-2fmv-rv2c-59x7",
+      "projectPath": "C:\\tai_lieu_hoc_thuat_cua_tuan\\mauthietkephanmem\\OTSP\\PROJECT_OTSP\\PROJECT_OTSP.csproj",
+      "warningLevel": 1,
+      "filePath": "C:\\tai_lieu_hoc_thuat_cua_tuan\\mauthietkephanmem\\OTSP\\PROJECT_OTSP\\PROJECT_OTSP.csproj",
+      "libraryId": "System.Security.Cryptography.Pkcs",
+      "targetGraphs": [
+        "net10.0"
+      ]
+    },
+    {
+      "code": "NU1903",
+      "level": "Warning",
+      "message": "Package 'System.Security.Cryptography.Pkcs' 9.0.11 has a known high severity vulnerability, https://github.com/advisories/GHSA-846f-f764-76mx",
+      "projectPath": "C:\\tai_lieu_hoc_thuat_cua_tuan\\mauthietkephanmem\\OTSP\\PROJECT_OTSP\\PROJECT_OTSP.csproj",
+      "warningLevel": 1,
+      "filePath": "C:\\tai_lieu_hoc_thuat_cua_tuan\\mauthietkephanmem\\OTSP\\PROJECT_OTSP\\PROJECT_OTSP.csproj",
+      "libraryId": "System.Security.Cryptography.Pkcs",
       "targetGraphs": [
         "net10.0"
       ]

@@ -1,0 +1,741 @@
+﻿@* @{
+    ViewData["Title"] = "Kết nối gia sư và học viên";
+}
+
+<div class="main">
+
+    <!-- Hero Section -->
+    <section id="hero" class="hero section dark-background otsp-hero">
+
+      <img src="@Url.Content("~/assets/img/hero-bg.jpg")" alt="Học viên sẵn sàng bắt đầu hành trình học tập" data-aos="fade-in">
+
+      <div class="container">
+        <div class="otsp-hero-content">
+          <span class="otsp-hero-eyebrow" data-aos="fade-up">HỌC TẬP THEO CÁCH CỦA BẠN</span>
+          <h2 data-aos="fade-up" data-aos-delay="100">Học đúng người,<br><span>giỏi đúng cách.</span></h2>
+          <p data-aos="fade-up" data-aos-delay="200">Kết nối với gia sư phù hợp, học theo mục tiêu riêng và tiến bộ qua từng buổi học.</p>
+          <div class="otsp-hero-actions" data-aos="fade-up" data-aos-delay="300">
+            <a asp-controller="Portal" asp-action="Tutors" class="btn-get-started">Tìm gia sư <i class="bi bi-arrow-right" aria-hidden="true"></i></a>
+            <a asp-controller="Portal" asp-action="BecomeTutor" class="otsp-hero-secondary">Trở thành gia sư <i class="bi bi-arrow-up-right" aria-hidden="true"></i></a>
+          </div>
+          <div class="otsp-hero-trust" data-aos="fade-up" data-aos-delay="400">
+            <span><i class="bi bi-patch-check-fill" aria-hidden="true"></i> Hồ sơ gia sư được xác minh</span>
+            <span><i class="bi bi-calendar2-check" aria-hidden="true"></i> Lịch học linh hoạt</span>
+          </div>
+        </div>
+      </div>
+
+    </section><!-- /Hero Section -->
+
+    <!-- About Section -->
+    <section id="about" class="about section">
+
+      <div class="container">
+
+        <div class="row gy-4">
+
+          <div class="col-lg-6 order-1 order-lg-2" data-aos="fade-up" data-aos-delay="100">
+            <img src="assets/img/about.jpg" class="img-fluid" alt="Học viên học trực tuyến cùng gia sư">
+          </div>
+
+          <div class="col-lg-6 order-2 order-lg-1 content" data-aos="fade-up" data-aos-delay="200">
+            <h3>Tìm được gia sư phù hợp chỉ trong vài bước đơn giản</h3>
+            <p class="fst-italic">
+              Chúng tôi giúp học viên và phụ huynh dễ dàng tìm kiếm, so sánh và lựa chọn gia sư theo môn học, trình độ, mức học phí và lịch học mong muốn.
+            </p>
+            <ul>
+              <li><i class="bi bi-check-circle"></i> <span>Tìm kiếm và lọc gia sư theo môn học, cấp học, khu vực và mức học phí.</span></li>
+              <li><i class="bi bi-check-circle"></i> <span>Xem hồ sơ chi tiết, bằng cấp, kinh nghiệm và đánh giá thực tế từ học viên trước.</span></li>
+              <li><i class="bi bi-check-circle"></i> <span>Đặt lịch học, trao đổi trực tiếp với gia sư và theo dõi tiến độ học tập ngay trên hệ thống, đảm bảo quyền lợi cho cả hai bên.</span></li>
+            </ul>
+            <a asp-controller="Portal" asp-action="HowItWorks" class="read-more"><span>Xem thêm</span><i class="bi bi-arrow-right"></i></a>
+          </div>
+
+        </div>
+
+      </div>
+
+    </section><!-- /About Section -->
+
+    <!-- Counts Section -->
+    <section id="counts" class="section counts light-background">
+
+      <div class="container" data-aos="fade-up" data-aos-delay="100">
+
+        <div class="row gy-4">
+
+          <div class="col-lg-3 col-md-6">
+            <div class="stats-item text-center w-100 h-100">
+              <span data-purecounter-start="0" data-purecounter-end="1232" data-purecounter-duration="1" class="purecounter"></span>
+              <p>Học viên</p>
+            </div>
+          </div><!-- End Stats Item -->
+
+          <div class="col-lg-3 col-md-6">
+            <div class="stats-item text-center w-100 h-100">
+              <span data-purecounter-start="0" data-purecounter-end="64" data-purecounter-duration="1" class="purecounter"></span>
+              <p>Môn học</p>
+            </div>
+          </div><!-- End Stats Item -->
+
+          <div class="col-lg-3 col-md-6">
+            <div class="stats-item text-center w-100 h-100">
+              <span data-purecounter-start="0" data-purecounter-end="4200" data-purecounter-duration="1" class="purecounter"></span>
+              <p>Buổi học đã diễn ra</p>
+            </div>
+          </div><!-- End Stats Item -->
+
+          <div class="col-lg-3 col-md-6">
+            <div class="stats-item text-center w-100 h-100">
+              <span data-purecounter-start="0" data-purecounter-end="240" data-purecounter-duration="1" class="purecounter"></span>
+              <p>Gia sư</p>
+            </div>
+          </div><!-- End Stats Item -->
+
+        </div>
+
+      </div>
+
+    </section><!-- /Counts Section -->
+
+    <!-- Why Us Section -->
+    <section id="why-us" class="section why-us">
+
+      <div class="container">
+
+        <div class="row gy-4">
+
+          <div class="col-lg-4" data-aos="fade-up" data-aos-delay="100">
+            <div class="why-box">
+              <h3>Vì sao chọn GiaSưOnline?</h3>
+              <p>
+                GiaSưOnline là cầu nối tin cậy giữa học viên và gia sư. Mọi gia sư đều được hệ thống xác minh hồ sơ, học phí minh bạch, lịch học linh hoạt và có đầy đủ công cụ để hai bên trao đổi, theo dõi quá trình học tập một cách thuận tiện nhất.
+              </p>
+              <div class="text-center">
+                <a asp-controller="Portal" asp-action="HowItWorks" class="more-btn"><span>Tìm hiểu thêm</span> <i class="bi bi-chevron-right"></i></a>
+              </div>
+            </div>
+          </div><!-- End Why Box -->
+
+          <div class="col-lg-8 d-flex align-items-stretch">
+            <div class="row gy-4" data-aos="fade-up" data-aos-delay="200">
+
+              <div class="col-xl-4">
+                <div class="icon-box d-flex flex-column justify-content-center align-items-center">
+                  <i class="bi bi-patch-check"></i>
+                  <h4>Gia sư được xác minh</h4>
+                  <p>Hồ sơ, bằng cấp và kinh nghiệm của gia sư được quản trị viên kiểm duyệt trước khi hiển thị</p>
+                </div>
+              </div><!-- End Icon Box -->
+
+              <div class="col-xl-4" data-aos="fade-up" data-aos-delay="300">
+                <div class="icon-box d-flex flex-column justify-content-center align-items-center">
+                  <i class="bi bi-wallet2"></i>
+                  <h4>Học phí minh bạch</h4>
+                  <p>Mức học phí được niêm yết rõ ràng trên hồ sơ gia sư, không phát sinh chi phí ẩn</p>
+                </div>
+              </div><!-- End Icon Box -->
+
+              <div class="col-xl-4" data-aos="fade-up" data-aos-delay="400">
+                <div class="icon-box d-flex flex-column justify-content-center align-items-center">
+                  <i class="bi bi-calendar-check"></i>
+                  <h4>Lịch học linh hoạt</h4>
+                  <p>Đặt lịch, đổi lịch và theo dõi các buổi học trực tuyến dễ dàng ngay trên hệ thống</p>
+                </div>
+              </div><!-- End Icon Box -->
+
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
+    </section><!-- /Why Us Section -->
+
+    <!-- Features Section -->
+    <section id="features" class="features section">
+
+      <div class="container">
+
+        <div class="row gy-4">
+
+          <div class="col-lg-3 col-md-4" data-aos="fade-up" data-aos-delay="100">
+            <div class="features-item">
+              <i class="bi bi-calculator" style="color: #DB303A;"></i>
+              <h3><a asp-controller="Portal" asp-action="Subjects" class="stretched-link">Toán học</a></h3>
+            </div>
+          </div><!-- End Feature Item -->
+
+          <div class="col-lg-3 col-md-4" data-aos="fade-up" data-aos-delay="200">
+            <div class="features-item">
+              <i class="bi bi-lightning-charge" style="color: #DB303A;"></i>
+              <h3><a asp-controller="Portal" asp-action="Subjects" class="stretched-link">Vật lý</a></h3>
+            </div>
+          </div><!-- End Feature Item -->
+
+          <div class="col-lg-3 col-md-4" data-aos="fade-up" data-aos-delay="300">
+            <div class="features-item">
+              <i class="bi bi-droplet" style="color: #DB303A;"></i>
+              <h3><a asp-controller="Portal" asp-action="Subjects" class="stretched-link">Hóa học</a></h3>
+            </div>
+          </div><!-- End Feature Item -->
+
+          <div class="col-lg-3 col-md-4" data-aos="fade-up" data-aos-delay="400">
+            <div class="features-item">
+              <i class="bi bi-book" style="color: #DB303A;"></i>
+              <h3><a asp-controller="Portal" asp-action="Subjects" class="stretched-link">Ngữ văn</a></h3>
+            </div>
+          </div><!-- End Feature Item -->
+
+          <div class="col-lg-3 col-md-4" data-aos="fade-up" data-aos-delay="500">
+            <div class="features-item">
+              <i class="bi bi-translate" style="color: #DB303A;"></i>
+              <h3><a asp-controller="Portal" asp-action="Subjects" class="stretched-link">Tiếng Anh</a></h3>
+            </div>
+          </div><!-- End Feature Item -->
+
+          <div class="col-lg-3 col-md-4" data-aos="fade-up" data-aos-delay="600">
+            <div class="features-item">
+              <i class="bi bi-flower1" style="color: #DB303A;"></i>
+              <h3><a asp-controller="Portal" asp-action="Subjects" class="stretched-link">Sinh học</a></h3>
+            </div>
+          </div><!-- End Feature Item -->
+
+          <div class="col-lg-3 col-md-4" data-aos="fade-up" data-aos-delay="700">
+            <div class="features-item">
+              <i class="bi bi-hourglass-split" style="color: #DB303A;"></i>
+              <h3><a asp-controller="Portal" asp-action="Subjects" class="stretched-link">Lịch sử – Địa lý</a></h3>
+            </div>
+          </div><!-- End Feature Item -->
+
+          <div class="col-lg-3 col-md-4" data-aos="fade-up" data-aos-delay="800">
+            <div class="features-item">
+              <i class="bi bi-laptop" style="color: #DB303A;"></i>
+              <h3><a asp-controller="Portal" asp-action="Subjects" class="stretched-link">Tin học</a></h3>
+            </div>
+          </div><!-- End Feature Item -->
+
+          <div class="col-lg-3 col-md-4" data-aos="fade-up" data-aos-delay="900">
+            <div class="features-item">
+              <i class="bi bi-code-slash" style="color: #DB303A;"></i>
+              <h3><a asp-controller="Portal" asp-action="Subjects" class="stretched-link">Lập trình</a></h3>
+            </div>
+          </div><!-- End Feature Item -->
+
+          <div class="col-lg-3 col-md-4" data-aos="fade-up" data-aos-delay="1000">
+            <div class="features-item">
+              <i class="bi bi-globe" style="color: #DB303A;"></i>
+              <h3><a asp-controller="Portal" asp-action="Subjects" class="stretched-link">Ngoại ngữ khác</a></h3>
+            </div>
+          </div><!-- End Feature Item -->
+
+          <div class="col-lg-3 col-md-4" data-aos="fade-up" data-aos-delay="1100">
+            <div class="features-item">
+              <i class="bi bi-mortarboard" style="color: #DB303A;"></i>
+              <h3><a asp-controller="Portal" asp-action="Subjects" class="stretched-link">Luyện thi đại học</a></h3>
+            </div>
+          </div><!-- End Feature Item -->
+
+          <div class="col-lg-3 col-md-4" data-aos="fade-up" data-aos-delay="1200">
+            <div class="features-item">
+              <i class="bi bi-chat-heart" style="color: #DB303A;"></i>
+              <h3><a asp-controller="Portal" asp-action="Subjects" class="stretched-link">Kỹ năng mềm</a></h3>
+            </div>
+          </div><!-- End Feature Item -->
+
+        </div>
+
+      </div>
+
+    </section><!-- /Features Section -->
+
+    <!-- Courses Section -->
+    <section id="courses" class="courses section">
+
+      <!-- Section Title -->
+      <div class="container section-title" data-aos="fade-up">
+        <h2>Gia sư</h2>
+        <p>Gia sư nổi bật</p>
+      </div><!-- End Section Title -->
+
+      <div class="container">
+
+        <div class="row">
+
+          <div class="col-lg-4 col-md-6 d-flex align-items-stretch" data-aos="zoom-in" data-aos-delay="100">
+            <div class="course-item">
+              <img src="assets/img/course-1.jpg" class="img-fluid" alt="Lớp Toán 12">
+              <div class="course-content">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                  <p class="category">Toán học</p>
+                  <p class="price">150.000đ/giờ</p>
+                </div>
+
+                <h3><a asp-controller="Portal" asp-action="TutorDetail">Toán 12 – Luyện thi THPT Quốc gia</a></h3>
+                <p class="description">Hệ thống lại kiến thức trọng tâm, luyện đề theo cấu trúc mới nhất và xây dựng lộ trình ôn tập phù hợp với từng học viên.</p>
+                <div class="trainer d-flex justify-content-between align-items-center">
+                  <div class="trainer-profile d-flex align-items-center">
+                    <img src="assets/img/trainers/trainer-1-2.jpg" class="img-fluid" alt="">
+                    <a asp-controller="Portal" asp-action="TutorDetail" class="trainer-link">Minh Anh</a>
+                  </div>
+                  <div class="trainer-rank d-flex align-items-center">
+                    <i class="bi bi-person user-icon"></i>&nbsp;50
+                    &nbsp;&nbsp;
+                    <i class="bi bi-heart heart-icon"></i>&nbsp;65
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div> <!-- End Course Item-->
+
+          <div class="col-lg-4 col-md-6 d-flex align-items-stretch mt-4 mt-md-0" data-aos="zoom-in" data-aos-delay="200">
+            <div class="course-item">
+              <img src="assets/img/course-2.jpg" class="img-fluid" alt="Lớp IELTS">
+              <div class="course-content">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                  <p class="category">Tiếng Anh</p>
+                  <p class="price">250.000đ/giờ</p>
+                </div>
+
+                <h3><a asp-controller="Portal" asp-action="TutorDetail">IELTS 6.5+ cấp tốc</a></h3>
+                <p class="description">Luyện đủ 4 kỹ năng Nghe – Nói – Đọc – Viết, chữa bài chi tiết và mô phỏng thi thử cùng gia sư có chứng chỉ IELTS cao.</p>
+                <div class="trainer d-flex justify-content-between align-items-center">
+                  <div class="trainer-profile d-flex align-items-center">
+                    <img src="assets/img/trainers/trainer-2-2.jpg" class="img-fluid" alt="">
+                    <a asp-controller="Portal" asp-action="TutorDetail" class="trainer-link">Thu Hà</a>
+                  </div>
+                  <div class="trainer-rank d-flex align-items-center">
+                    <i class="bi bi-person user-icon"></i>&nbsp;35
+                    &nbsp;&nbsp;
+                    <i class="bi bi-heart heart-icon"></i>&nbsp;42
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div> <!-- End Course Item-->
+
+          <div class="col-lg-4 col-md-6 d-flex align-items-stretch mt-4 mt-lg-0" data-aos="zoom-in" data-aos-delay="300">
+            <div class="course-item">
+              <img src="assets/img/course-3.jpg" class="img-fluid" alt="Lớp lập trình Python">
+              <div class="course-content">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                  <p class="category">Lập trình</p>
+                  <p class="price">180.000đ/giờ</p>
+                </div>
+
+                <h3><a asp-controller="Portal" asp-action="TutorDetail">Lập trình Python cho người mới bắt đầu</a></h3>
+                <p class="description">Học từ nền tảng đến xây dựng dự án nhỏ, thực hành trực tiếp và được hỗ trợ giải đáp thắc mắc sau mỗi buổi học.</p>
+                <div class="trainer d-flex justify-content-between align-items-center">
+                  <div class="trainer-profile d-flex align-items-center">
+                    <img src="assets/img/trainers/trainer-3-2.jpg" class="img-fluid" alt="">
+                    <a asp-controller="Portal" asp-action="TutorDetail" class="trainer-link">Quốc Bảo</a>
+                  </div>
+                  <div class="trainer-rank d-flex align-items-center">
+                    <i class="bi bi-person user-icon"></i>&nbsp;20
+                    &nbsp;&nbsp;
+                    <i class="bi bi-heart heart-icon"></i>&nbsp;85
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div> <!-- End Course Item-->
+
+        </div>
+
+      </div>
+
+    </section><!-- /Courses Section -->
+
+    <!-- Trainers Index Section -->
+    <section id="trainers-index" class="section trainers-index">
+
+      <div class="container">
+
+        <div class="row">
+
+          <div class="col-lg-4 col-md-6 d-flex" data-aos="fade-up" data-aos-delay="100">
+            <div class="member">
+              <img src="assets/img/trainers/trainer-1.jpg" class="img-fluid" alt="Gia sư Nguyễn Minh Anh">
+              <div class="member-content">
+                <h4>Nguyễn Minh Anh</h4>
+                <span>Toán học – Vật lý</span>
+                <p>
+                  Giảng viên Sư phạm với hơn 5 năm kinh nghiệm luyện thi THPT Quốc gia, phương pháp dạy dễ hiểu và bám sát năng lực từng học viên.
+                </p>
+                <div class="social">
+                  <a href=""><i class="bi bi-twitter-x"></i></a>
+                  <a href=""><i class="bi bi-facebook"></i></a>
+                  <a href=""><i class="bi bi-instagram"></i></a>
+                  <a href=""><i class="bi bi-linkedin"></i></a>
+                </div>
+              </div>
+            </div>
+          </div><!-- End Team Member -->
+
+          <div class="col-lg-4 col-md-6 d-flex" data-aos="fade-up" data-aos-delay="200">
+            <div class="member">
+              <img src="assets/img/trainers/trainer-2.jpg" class="img-fluid" alt="Gia sư Trần Thu Hà">
+              <div class="member-content">
+                <h4>Trần Thu Hà</h4>
+                <span>Tiếng Anh – IELTS</span>
+                <p>
+                  Sở hữu chứng chỉ IELTS 8.0, từng giúp hơn 100 học viên đạt mục tiêu band điểm mong muốn chỉ sau 3–6 tháng ôn luyện.
+                </p>
+                <div class="social">
+                  <a href=""><i class="bi bi-twitter-x"></i></a>
+                  <a href=""><i class="bi bi-facebook"></i></a>
+                  <a href=""><i class="bi bi-instagram"></i></a>
+                  <a href=""><i class="bi bi-linkedin"></i></a>
+                </div>
+              </div>
+            </div>
+          </div><!-- End Team Member -->
+
+          <div class="col-lg-4 col-md-6 d-flex" data-aos="fade-up" data-aos-delay="300">
+            <div class="member">
+              <img src="assets/img/trainers/trainer-3.jpg" class="img-fluid" alt="Gia sư Lê Quốc Bảo">
+              <div class="member-content">
+                <h4>Lê Quốc Bảo</h4>
+                <span>Tin học – Lập trình</span>
+                <p>
+                  Kỹ sư phần mềm có kinh nghiệm thực tế, chuyên hướng dẫn học viên từ con số 0 làm quen với tư duy lập trình và xây dựng dự án.
+                </p>
+                <div class="social">
+                  <a href=""><i class="bi bi-twitter-x"></i></a>
+                  <a href=""><i class="bi bi-facebook"></i></a>
+                  <a href=""><i class="bi bi-instagram"></i></a>
+                  <a href=""><i class="bi bi-linkedin"></i></a>
+                </div>
+              </div>
+            </div>
+          </div><!-- End Team Member -->
+
+        </div>
+
+      </div>
+
+    </section><!-- /Trainers Index Section -->
+
+  </div> *@
+  @using System.Globalization
+@using PROJECT_OTSP.Dtos
+@using PROJECT_OTSP.Models
+@model HomeViewModel
+@{
+    ViewData["Title"] = "Kết nối gia sư và học viên";
+    var vi = CultureInfo.GetCultureInfo("vi-VN");
+}
+
+<div class="main otsp-home">
+
+    <!-- Hero -->
+    <section id="hero" class="hero section dark-background otsp-hero">
+        <img src="@Url.Content("~/assets/img/hero-bg.jpg")" alt="Học viên sẵn sàng bắt đầu hành trình học tập" data-aos="fade-in">
+        <div class="container">
+            <div class="otsp-hero-content">
+                <span class="otsp-hero-eyebrow" data-aos="fade-up">HỌC TẬP THEO CÁCH CỦA BẠN</span>
+                <h2 data-aos="fade-up" data-aos-delay="100">Học đúng người,<br><span>giỏi đúng cách.</span></h2>
+                <p data-aos="fade-up" data-aos-delay="200">Kết nối với gia sư phù hợp, học theo mục tiêu riêng và tiến bộ qua từng buổi học.</p>
+                <div class="otsp-hero-actions" data-aos="fade-up" data-aos-delay="300">
+                    <a asp-controller="Search" asp-action="Index" class="btn-get-started">Tìm gia sư <i class="bi bi-arrow-right" aria-hidden="true"></i></a>
+                    <a asp-controller="Account" asp-action="Register" class="otsp-hero-secondary">Trở thành gia sư <i class="bi bi-arrow-up-right" aria-hidden="true"></i></a>
+                </div>
+                <div class="otsp-hero-trust" data-aos="fade-up" data-aos-delay="400">
+                    <span><i class="bi bi-patch-check-fill" aria-hidden="true"></i> Hồ sơ gia sư được xác minh</span>
+                    <span><i class="bi bi-calendar2-check" aria-hidden="true"></i> Lịch học linh hoạt</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- About -->
+    <section id="about" class="about section">
+        <div class="container">
+            <div class="row gy-4 align-items-center">
+                <div class="col-lg-6 order-1 order-lg-2" data-aos="fade-up" data-aos-delay="100">
+                    <img src="@Url.Content("~/assets/img/about.jpg")" class="img-fluid rounded-4" alt="Học viên học trực tuyến cùng gia sư">
+                </div>
+                <div class="col-lg-6 order-2 order-lg-1 content" data-aos="fade-up" data-aos-delay="200">
+                    <h3>Tìm được gia sư phù hợp chỉ trong vài bước đơn giản</h3>
+                    <p class="fst-italic">
+                        Chúng tôi giúp học viên và phụ huynh dễ dàng tìm kiếm, so sánh và lựa chọn gia sư theo môn học, trình độ, mức học phí và lịch học mong muốn.
+                    </p>
+                    <ul>
+                        <li><i class="bi bi-check-circle"></i> <span>Tìm kiếm và lọc gia sư theo môn học, cấp học, khu vực và mức học phí.</span></li>
+                        <li><i class="bi bi-check-circle"></i> <span>Xem hồ sơ chi tiết, bằng cấp đã xác minh và đánh giá từ học viên trước.</span></li>
+                        <li><i class="bi bi-check-circle"></i> <span>Đặt lịch học, trao đổi trực tiếp với gia sư và theo dõi tiến độ ngay trên hệ thống.</span></li>
+                    </ul>
+                    <a href="#why-us" class="read-more"><span>Xem thêm</span><i class="bi bi-arrow-right"></i></a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Số liệu -->
+    <section id="counts" class="section counts light-background">
+        <div class="container" data-aos="fade-up" data-aos-delay="100">
+            <div class="row gy-4">
+                <div class="col-6 col-lg-3">
+                    <div class="stats-item text-center w-100 h-100">
+                        <span data-purecounter-start="0" data-purecounter-end="@Model.StudentCount" data-purecounter-duration="1" class="purecounter"></span>
+                        <p>Học viên</p>
+                    </div>
+                </div>
+                <div class="col-6 col-lg-3">
+                    <div class="stats-item text-center w-100 h-100">
+                        <span data-purecounter-start="0" data-purecounter-end="@Model.SubjectCount" data-purecounter-duration="1" class="purecounter"></span>
+                        <p>Môn học</p>
+                    </div>
+                </div>
+                <div class="col-6 col-lg-3">
+                    <div class="stats-item text-center w-100 h-100">
+                        <span data-purecounter-start="0" data-purecounter-end="@Model.CompletedSessionCount" data-purecounter-duration="1" class="purecounter"></span>
+                        <p>Buổi học đã diễn ra</p>
+                    </div>
+                </div>
+                <div class="col-6 col-lg-3">
+                    <div class="stats-item text-center w-100 h-100">
+                        <span data-purecounter-start="0" data-purecounter-end="@Model.TutorCount" data-purecounter-duration="1" class="purecounter"></span>
+                        <p>Gia sư</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Why us -->
+    <section id="why-us" class="section why-us">
+        <div class="container">
+            <div class="row gy-4">
+                <div class="col-12 col-lg-4" data-aos="fade-up" data-aos-delay="100">
+                    <div class="why-box h-100">
+                        <h3>Vì sao chọn GiaSưOnline?</h3>
+                        <p>
+                            GiaSưOnline là cầu nối tin cậy giữa học viên và gia sư. Hồ sơ gia sư được quản trị viên kiểm duyệt, học phí niêm yết rõ ràng, lịch học linh hoạt và đầy đủ công cụ để hai bên trao đổi.
+                        </p>
+                        <div class="text-center">
+                            <a href="#about" class="more-btn"><span>Tìm hiểu thêm</span> <i class="bi bi-chevron-right"></i></a>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-12 col-lg-8">
+                    <div class="row gy-4" data-aos="fade-up" data-aos-delay="200">
+                        <div class="col-12 col-md-4">
+                            <div class="icon-box h-100 d-flex flex-column justify-content-center align-items-center">
+                                <i class="bi bi-patch-check"></i>
+                                <h4>Gia sư được xác minh</h4>
+                                <p>Hồ sơ, bằng cấp và kinh nghiệm được quản trị viên kiểm duyệt trước khi hiển thị.</p>
+                            </div>
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <div class="icon-box h-100 d-flex flex-column justify-content-center align-items-center">
+                                <i class="bi bi-wallet2"></i>
+                                <h4>Học phí minh bạch</h4>
+                                <p>Mức học phí được niêm yết rõ ràng trên hồ sơ, không phát sinh chi phí ẩn.</p>
+                            </div>
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <div class="icon-box h-100 d-flex flex-column justify-content-center align-items-center">
+                                <i class="bi bi-calendar-check"></i>
+                                <h4>Lịch học linh hoạt</h4>
+                                <p>Đặt lịch, đổi lịch và theo dõi các buổi học trực tuyến ngay trên hệ thống.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Môn học và cấp học -->
+    <section id="features" class="features section">
+        <div class="container section-title" data-aos="fade-up">
+            <h2>Môn học</h2>
+            <p>Môn học và cấp học đang có gia sư</p>
+        </div>
+        <div class="container">
+            @if (Model.Subjects.Count == 0)
+            {
+                <p class="text-center text-body-secondary mb-0">Chưa có môn học nào.</p>
+            }
+            else
+            {
+                <div class="row gy-4">
+                    @for (var i = 0; i < Model.Subjects.Count; i++)
+                    {
+                        var s = Model.Subjects[i];
+                        <div class="col-6 col-md-4 col-lg-3" data-aos="fade-up" data-aos-delay="@(100 + i * 50)">
+                            <div class="features-item h-100 position-relative">
+                                <i class="bi @s.IconClass otsp-icon"></i>
+                                <h3 class="h5">
+                                    <a asp-controller="Search" asp-action="Index" asp-route-subjectId="@s.Id" class="stretched-link">@s.Name</a>
+                                </h3>
+                                <p class="small text-body-secondary mb-0">@s.TutorCount gia sư</p>
+                                @if (s.Grades.Count > 0)
+                                {
+                                    <div class="otsp-chips mt-2">
+                                        @foreach (var g in s.Grades)
+                                        {
+                                            <a asp-controller="Search" asp-action="Index"
+                                               asp-route-subjectId="@s.Id"
+                                               asp-route-gradeLevelId="@g.Id"
+                                               class="otsp-tag text-decoration-none position-relative"
+                                               style="z-index:2;">@g.Name</a>
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    </section>
+
+    <!-- Lớp học đang mở -->
+    <section id="courses" class="courses section">
+        <div class="container section-title" data-aos="fade-up">
+            <h2>Lớp học</h2>
+            <p>Lớp học đang mở</p>
+        </div>
+        <div class="container">
+            @if (Model.Classes.Count == 0)
+            {
+                <div class="text-center py-4">
+                    <p class="mb-3">Chưa có lớp học nào đang mở.</p>
+                    <a asp-controller="Search" asp-action="Index" class="btn btn-otsp">Tìm gia sư</a>
+                </div>
+            }
+            else
+            {
+                <div class="row gy-4">
+                    @for (var i = 0; i < Model.Classes.Count; i++)
+                    {
+                        var c = Model.Classes[i];
+                        <div class="col-12 col-md-6 col-lg-4 d-flex" data-aos="zoom-in" data-aos-delay="@(100 + i * 100)">
+                            <div class="course-item w-100">
+                                <div class="course-content d-flex flex-column h-100">
+                                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                                        <span class="otsp-tag">
+                                            <i class="bi @c.IconClass"></i>
+                                            <a asp-controller="Search" asp-action="Index"
+                                               asp-route-subjectId="@c.SubjectId"
+                                               asp-route-gradeLevelId="@c.GradeLevelId"
+                                               class="text-decoration-none text-reset">@c.SubjectName · @c.GradeName</a>
+                                        </span>
+                                        <span class="otsp-price">@c.Fee.ToString("N0", vi)đ</span>
+                                    </div>
+
+                                    <h3 class="h5">
+                                        <a asp-controller="Search" asp-action="Details" asp-route-id="@c.TutorId">@c.Name</a>
+                                    </h3>
+
+                                    @if (!string.IsNullOrEmpty(c.Description))
+                                    {
+                                        <p class="description otsp-clamp">@c.Description</p>
+                                    }
+
+                                    <div class="d-flex justify-content-between align-items-center small text-body-secondary mt-auto pt-2">
+                                        <span><i class="bi bi-person-fill"></i> @c.TutorName</span>
+                                        <span>
+                                            @(c.Type == ClassroomType.Group ? "Nhóm" : "1 kèm 1")
+                                            · @c.StudentCount/@c.MaxStudents học viên
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    </section>
+
+    <!-- Gia sư nổi bật -->
+    <section id="trainers-index" class="section trainers-index">
+        <div class="container section-title" data-aos="fade-up">
+            <h2>Gia sư</h2>
+            <p>Gia sư nổi bật</p>
+        </div>
+        <div class="container">
+            @if (Model.FeaturedTutors.Count == 0)
+            {
+                <div class="text-center py-4">
+                    <p class="mb-3">Chưa có gia sư nào được duyệt.</p>
+                    <a asp-controller="Account" asp-action="Register" class="btn btn-outline-otsp">Đăng ký làm gia sư</a>
+                </div>
+            }
+            else
+            {
+                <div class="row gy-4">
+                    @for (var i = 0; i < Model.FeaturedTutors.Count; i++)
+                    {
+                        var t = Model.FeaturedTutors[i];
+                        <div class="col-12 col-md-6 col-lg-4 d-flex" data-aos="fade-up" data-aos-delay="@(100 + i * 100)">
+                            <div class="member w-100">
+                                <div class="member-head">
+                                    @if (!string.IsNullOrEmpty(t.AvatarUrl))
+                                    {
+                                        <img src="@t.AvatarUrl" class="otsp-avatar otsp-avatar-lg" alt="@t.FullName" loading="lazy">
+                                    }
+                                    else
+                                    {
+                                        <div class="otsp-avatar otsp-avatar-lg" aria-hidden="true">@t.Initials</div>
+                                    }
+                                    <div class="min-w-0">
+                                        <h4 class="mb-1 text-truncate">@t.FullName</h4>
+                                        <span class="small text-body-secondary">
+                                            @(t.Teaching.Count > 0
+                                                ? $"{t.Teaching[0].SubjectName} · {t.Teaching[0].GradeName}"
+                                                : "Chưa có môn dạy")
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div class="member-content">
+                                    <p class="otsp-clamp">@(t.Introduction ?? "Gia sư chưa viết giới thiệu.")</p>
+
+                                    <div class="otsp-chips mb-2">
+                                        <span class="otsp-tag"><i class="bi bi-geo-alt"></i> @(t.Area ?? "Chưa cập nhật")</span>
+                                        <span class="otsp-tag">
+                                            @(t.TeachingFormat == TeachingFormat.Online ? "Trực tuyến"
+                                              : t.TeachingFormat == TeachingFormat.Offline ? "Trực tiếp"
+                                              : "Online & trực tiếp")
+                                        </span>
+                                        @if (t.VerifiedQualificationCount > 0)
+                                        {
+                                            <span class="otsp-tag"><i class="bi bi-patch-check-fill"></i> @t.VerifiedQualificationCount bằng cấp</span>
+                                        }
+                                    </div>
+
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <span class="otsp-price">@t.HourlyFee.ToString("N0", vi)đ/giờ</span>
+                                        <span class="small">
+                                            @if (t.AverageRating > 0)
+                                            {
+                                                <span>★ @t.AverageRating.ToString("0.0", CultureInfo.InvariantCulture)</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="text-body-secondary">Chưa có đánh giá</span>
+                                            }
+                                        </span>
+                                    </div>
+
+                                    <a asp-controller="Search" asp-action="Details" asp-route-id="@t.Id"
+                                       class="btn btn-sm btn-outline-otsp w-100 mt-3">Xem hồ sơ</a>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+
+                <div class="text-center mt-5">
+                    <a asp-controller="Search" asp-action="Index" class="btn btn-otsp">Xem tất cả gia sư</a>
+                </div>
+            }
+        </div>
+    </section>
+
+</div>

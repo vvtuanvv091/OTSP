@@ -1,172 +1,270 @@
-// Licensed to the .NET Foundation under one or more agreements.
-// The .NET Foundation licenses this file to you under the MIT license.
 
 #nullable disable
 
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.Identity.UI.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
-using Microsoft.AspNetCore.WebUtilities;
-using Microsoft.Extensions.Logging;
+using PROJECT_OTSP.Data;
 using PROJECT_OTSP.Models;
+using PROJECT_OTSP.Services;
+using System.ComponentModel.DataAnnotations;
+using static PROJECT_OTSP.Models.Enums;
 
-namespace PROJECT_OTSP.Areas.Identity.Pages.Account;
-
-public class RegisterModel : PageModel
+namespace PROJECT_OTSP.Areas.Identity.Pages.Account
 {
-    private readonly SignInManager<ApplicationUser> _signInManager;
-    private readonly UserManager<ApplicationUser> _userManager;
-    private readonly IUserStore<ApplicationUser> _userStore;
-    private readonly IUserEmailStore<ApplicationUser> _emailStore;
-    private readonly ILogger<RegisterModel> _logger;
-    private readonly IEmailSender _emailSender;
-
-    public RegisterModel(
-        UserManager<ApplicationUser> userManager,
-        IUserStore<ApplicationUser> userStore,
-        SignInManager<ApplicationUser> signInManager,
-        ILogger<RegisterModel> logger,
-        IEmailSender emailSender)
+    [AllowAnonymous]
+    public class RegisterModel : PageModel
     {
-        _userManager = userManager;
-        _userStore = userStore;
-        _emailStore = GetEmailStore();
-        _signInManager = signInManager;
-        _logger = logger;
-        _emailSender = emailSender;
-    }
+        // Tên vai trò phải trùng với dữ liệu seed trong DbSeeder
+        private const string RoleStudent = "Student_Parent";
+        private const string RoleTutor = "Tutor";
 
-    /// <summary>
-    ///     This API supports the ASP.NET Core Identity default UI infrastructure and is not intended to be used
-    ///     directly from your code. This API may change or be removed in future releases.
-    /// </summary>
-    [BindProperty]
-    public InputModel Input { get; set; } = default!;
+        private readonly UserManager<ApplicationUser> _userManager;
+        private readonly SignInManager<ApplicationUser> _signInManager;
+        private readonly RoleManager<ApplicationRole> _roleManager;
+        private readonly ApplicationDbContext _db;
+        private readonly ILogger<RegisterModel> _logger;
 
-    /// <summary>
-    ///     This API supports the ASP.NET Core Identity default UI infrastructure and is not intended to be used
-    ///     directly from your code. This API may change or be removed in future releases.
-    /// </summary>
-    public string? ReturnUrl { get; set; }
-
-    /// <summary>
-    ///     This API supports the ASP.NET Core Identity default UI infrastructure and is not intended to be used
-    ///     directly from your code. This API may change or be removed in future releases.
-    /// </summary>
-    public IList<AuthenticationScheme>? ExternalLogins { get; set; }
-
-    /// <summary>
-    ///     This API supports the ASP.NET Core Identity default UI infrastructure and is not intended to be used
-    ///     directly from your code. This API may change or be removed in future releases.
-    /// </summary>
-    public class InputModel
-    {
-        /// <summary>
-        ///     This API supports the ASP.NET Core Identity default UI infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
-        /// </summary>
-        [Required]
-        [EmailAddress]
-        [Display(Name = "Email")]
-        public string Email { get; set; } = default!;
-
-        /// <summary>
-        ///     This API supports the ASP.NET Core Identity default UI infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
-        /// </summary>
-        [Required]
-        [StringLength(100, ErrorMessage = "The {0} must be at least {2} and at max {1} characters long.", MinimumLength = 6)]
-        [DataType(DataType.Password)]
-        [Display(Name = "Password")]
-        public string Password { get; set; } = default!;
-
-        /// <summary>
-        ///     This API supports the ASP.NET Core Identity default UI infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
-        /// </summary>
-        [DataType(DataType.Password)]
-        [Display(Name = "Confirm password")]
-        [Compare("Password", ErrorMessage = "The password and confirmation password do not match.")]
-        public string? ConfirmPassword { get; set; }
-    }
-
-
-    public async Task OnGetAsync(string? returnUrl = null)
-    {
-        ReturnUrl = returnUrl;
-        ExternalLogins = (await _signInManager.GetExternalAuthenticationSchemesAsync()).ToList();
-    }
-
-    public async Task<IActionResult> OnPostAsync(string? returnUrl = null)
-    {
-        returnUrl ??= Url.Content("~/");
-        ExternalLogins = (await _signInManager.GetExternalAuthenticationSchemesAsync()).ToList();
-        if (ModelState.IsValid)
+        public RegisterModel(
+            UserManager<ApplicationUser> userManager,
+            SignInManager<ApplicationUser> signInManager,
+            RoleManager<ApplicationRole> roleManager,
+            ApplicationDbContext db,
+            ILogger<RegisterModel> logger)
         {
-            var user = CreateUser();
+            _userManager = userManager;
+            _signInManager = signInManager;
+            _roleManager = roleManager;
+            _db = db;
+            _logger = logger;
+        }
 
-            await _userStore.SetUserNameAsync(user, Input.Email, CancellationToken.None);
-            await _emailStore.SetEmailAsync(user, Input.Email, CancellationToken.None);
-            var result = await _userManager.CreateAsync(user, Input.Password);
+        [BindProperty]
+        public InputModel Input { get; set; } = new();
 
-            if (result.Succeeded)
+        public string ReturnUrl { get; set; }
+
+        public class InputModel
+        {
+            // ===== Vai trò =====
+            [Required(ErrorMessage = "Vui lòng chọn vai trò.")]
+            public string Role { get; set; } = RoleStudent;
+
+            // ===== Thông tin chung =====
+            [Required(ErrorMessage = "Vui lòng nhập họ và tên.")]
+            [StringLength(150)]
+            [Display(Name = "Họ và tên")]
+            public string FullName { get; set; }
+
+            [Required(ErrorMessage = "Vui lòng chọn ngày sinh.")]
+            [DataType(DataType.Date)]
+            [Display(Name = "Ngày sinh")]
+            public DateOnly? DateOfBirth { get; set; }
+
+            [Required(ErrorMessage = "Vui lòng nhập số điện thoại.")]
+            [RegularExpression(@"^(0|\+84)\d{9,10}$", ErrorMessage = "Số điện thoại không hợp lệ.")]
+            [Display(Name = "Số điện thoại")]
+            public string PhoneNumber { get; set; }
+
+            // ===== Người giám hộ (bắt buộc khi học viên dưới 18 tuổi, kiểm tra trong OnPost) =====
+            [StringLength(150)]
+            [Display(Name = "Họ tên người giám hộ")]
+            public string GuardianFullName { get; set; }
+
+            [StringLength(100)]
+            [Display(Name = "Liên hệ người giám hộ")]
+            public string GuardianContact { get; set; }
+
+            // ===== Riêng học viên =====
+            [Display(Name = "Môn học quan tâm")]
+            public string InterestedSubjects { get; set; }
+
+            [StringLength(200)]
+            [Display(Name = "Khu vực")]
+            public string Area { get; set; }
+
+            // ===== Riêng gia sư =====
+            [Range(0, 10000000, ErrorMessage = "Học phí phải từ 0 đến 10.000.000 VNĐ.")]
+            [Display(Name = "Học phí ")]
+            public decimal? HourlyFee { get; set; }
+
+            [Display(Name = "Giới thiệu")]
+            public string Introduction { get; set; }
+
+            // ===== Tài khoản =====
+            [Required(ErrorMessage = "Vui lòng nhập email.")]
+            [EmailAddress(ErrorMessage = "Email không hợp lệ.")]
+            [Display(Name = "Email")]
+            public string Email { get; set; }
+
+            [Required(ErrorMessage = "Vui lòng nhập mật khẩu.")]
+            [StringLength(100, ErrorMessage = "Mật khẩu phải có ít nhất {2} ký tự.", MinimumLength = 6)]
+            [DataType(DataType.Password)]
+            [Display(Name = "Mật khẩu")]
+            public string Password { get; set; }
+
+            [DataType(DataType.Password)]
+            [Display(Name = "Nhập lại mật khẩu")]
+            [Compare("Password", ErrorMessage = "Mật khẩu nhập lại không khớp.")]
+            public string ConfirmPassword { get; set; }
+
+            [Display(Name = "Đồng ý điều khoản")]
+            public bool AcceptTerms { get; set; }
+        }
+
+        public void OnGet(string returnUrl = null, string role = null)
+        {
+            ReturnUrl = returnUrl;
+            // /Identity/Account/Register?role=tutor để mở sẵn form gia sư
+            Input.Role = string.Equals(role, "tutor", StringComparison.OrdinalIgnoreCase)
+                ? RoleTutor
+                : RoleStudent;
+        }
+
+        public async Task<IActionResult> OnPostAsync(string returnUrl = null)
+        {
+            returnUrl ??= Url.Content("~/");
+            ReturnUrl = returnUrl;
+
+            // Chỉ cho đăng ký 2 vai trò này, tuyệt đối không cho tự chọn Admin
+            if (Input.Role != RoleStudent && Input.Role != RoleTutor)
+                ModelState.AddModelError("Input.Role", "Vai trò không hợp lệ.");
+
+            if (!Input.AcceptTerms)
+                ModelState.AddModelError("Input.AcceptTerms", "Bạn cần đồng ý điều khoản sử dụng.");
+
+            var age = CalculateAge(Input.DateOfBirth);
+            var isMinor = age.HasValue && age.Value < 18;
+
+            if (Input.DateOfBirth.HasValue && Input.DateOfBirth.Value > DateOnly.FromDateTime(DateTime.Today))
+                ModelState.AddModelError("Input.DateOfBirth", "Ngày sinh không hợp lệ.");
+
+            if (Input.Role == RoleTutor && isMinor)
+                ModelState.AddModelError("Input.DateOfBirth", "Gia sư phải từ 18 tuổi trở lên.");
+
+            if (Input.Role == RoleStudent && isMinor)
             {
-                _logger.LogInformation("User created a new account with password.");
+                if (string.IsNullOrWhiteSpace(Input.GuardianFullName))
+                    ModelState.AddModelError("Input.GuardianFullName", "Học viên dưới 18 tuổi cần nhập họ tên người giám hộ.");
+                if (string.IsNullOrWhiteSpace(Input.GuardianContact))
+                    ModelState.AddModelError("Input.GuardianContact", "Học viên dưới 18 tuổi cần nhập số điện thoại hoặc email người giám hộ.");
+            }
 
-                var userId = await _userManager.GetUserIdAsync(user);
-                var code = await _userManager.GenerateEmailConfirmationTokenAsync(user);
-                code = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(code));
-                var callbackUrl = Url.Page(
-                    "/Account/ConfirmEmail",
-                    pageHandler: null,
-                    values: new { area = "Identity", userId = userId, code = code, returnUrl = returnUrl },
-                    protocol: Request.Scheme)!;
+            if (Input.Role == RoleTutor && Input.HourlyFee is null)
+                ModelState.AddModelError("Input.HourlyFee", "Vui lòng nhập học phí mong muốn.");
 
-                await _emailSender.SendEmailAsync(Input.Email, "Confirm your email",
-                    $"Please confirm your account by <a href='{HtmlEncoder.Default.Encode(callbackUrl)}'>clicking here</a>.");
+            if (!ModelState.IsValid)
+                return Page();
 
-                if (_userManager.Options.SignIn.RequireConfirmedAccount)
+            var user = new ApplicationUser
+            {
+                UserName = Input.Email,
+                Email = Input.Email,
+                FullName = Input.FullName.Trim(),
+                PhoneNumber = Input.PhoneNumber,
+                DateOfBirth = Input.DateOfBirth,
+                Address = Input.Area
+            };
+
+            var result = await _userManager.CreateAsync(user, Input.Password);
+            if (!result.Succeeded)
+            {
+                foreach (var error in result.Errors)
+                    ModelState.AddModelError(string.Empty, TranslateError(error));
+                return Page();
+            }
+
+            try
+            {
+                if (!await _roleManager.RoleExistsAsync(Input.Role))
                 {
-                    return RedirectToPage("RegisterConfirmation", new { email = Input.Email, returnUrl = returnUrl });
+                    var createRoleResult = await _roleManager.CreateAsync(new ApplicationRole { Name = Input.Role });
+                    if (!createRoleResult.Succeeded)
+                        throw new InvalidOperationException(string.Join(", ", createRoleResult.Errors.Select(error => error.Description)));
+                }
+
+                var addRoleResult = await _userManager.AddToRoleAsync(user, Input.Role);
+                if (!addRoleResult.Succeeded)
+                    throw new InvalidOperationException(string.Join(", ", addRoleResult.Errors.Select(error => error.Description)));
+
+                if (Input.Role == RoleTutor)
+                {
+                    _db.TutorProfiles.Add(new TutorProfile
+                    {
+                        UserId = user.Id,
+                        Introduction = Input.Introduction,
+                        HourlyFee = Input.HourlyFee ?? 0,
+                        VerificationStatus = VerificationStatus.Pending   // chờ admin duyệt
+                    });
                 }
                 else
                 {
-                    await _signInManager.SignInAsync(user, isPersistent: false);
-                    return LocalRedirect(returnUrl);
+                    var student = new StudentProfile
+                    {
+                        UserId = user.Id,
+                        InterestedSubjects = Input.InterestedSubjects,
+                        Area = Input.Area
+                    };
+
+                    if (isMinor)
+                    {
+                        student.Guardians.Add(new Guardian
+                        {
+                            FullName = Input.GuardianFullName.Trim(),
+                            ContactInfo = Input.GuardianContact.Trim()
+                        });
+                    }
+
+                    _db.StudentProfiles.Add(student);
                 }
+
+                await _db.SaveChangesAsync();
             }
-            foreach (var error in result.Errors)
+            catch (Exception ex)
             {
-                ModelState.AddModelError(string.Empty, error.Description);
+                // Tạo hồ sơ lỗi thì xóa tài khoản vừa tạo để người dùng đăng ký lại được
+                _logger.LogError(ex, "Tạo hồ sơ cho tài khoản {Email} thất bại.", Input.Email);
+                await _userManager.DeleteAsync(user);
+                ModelState.AddModelError(string.Empty, "Không thể hoàn tất đăng ký. Vui lòng thử lại.");
+                return Page();
             }
+
+            _logger.LogInformation("Tài khoản mới ({Role}): {Email}", Input.Role, Input.Email);
+
+            await _signInManager.SignInAsync(user, isPersistent: false);
+
+            if (Input.Role == RoleTutor)
+                TempData["Message"] = "Đăng ký thành công. Hồ sơ gia sư của bạn đang chờ quản trị viên duyệt.";
+
+            var destination = RoleLandingPage.Resolve(
+                returnUrl,
+                new[] { Input.Role },
+                Url.IsLocalUrl,
+                Url.Content("~/"));
+            return LocalRedirect(destination);
         }
 
-        // If we got this far, something failed, redisplay form
-        return Page();
-    }
+        // Tính tuổi tròn theo ngày sinh
+        private static int? CalculateAge(DateOnly? dob)
+        {
+            if (!dob.HasValue) return null;
+            var today = DateOnly.FromDateTime(DateTime.Today);
+            var age = today.Year - dob.Value.Year;
+            if (dob.Value > today.AddYears(-age)) age--;
+            return age;
+        }
 
-    private ApplicationUser CreateUser()
-    {
-        try
+        // Việt hóa vài lỗi hay gặp của Identity
+        private static string TranslateError(IdentityError e) => e.Code switch
         {
-            return Activator.CreateInstance<ApplicationUser>();
-        }
-        catch
-        {
-            throw new InvalidOperationException($"Can't create an instance of '{nameof(ApplicationUser)}'. " +
-                $"Ensure that '{nameof(ApplicationUser)}' is not an abstract class and has a parameterless constructor, or alternatively " +
-                $"override the register page in /Areas/Identity/Pages/Account/Register.cshtml");
-        }
-    }
-
-    private IUserEmailStore<ApplicationUser> GetEmailStore()
-    {
-        if (!_userManager.SupportsUserEmail)
-        {
-            throw new NotSupportedException("The default UI requires a user store with email support.");
-        }
-        return (IUserEmailStore<ApplicationUser>)_userStore;
+            "DuplicateUserName" or "DuplicateEmail" => "Email này đã được đăng ký.",
+            "PasswordRequiresDigit" => "Mật khẩu phải có ít nhất một chữ số (0-9).",
+            "PasswordRequiresLower" => "Mật khẩu phải có ít nhất một chữ thường (a-z).",
+            "PasswordRequiresUpper" => "Mật khẩu phải có ít nhất một chữ hoa (A-Z).",
+            "PasswordRequiresNonAlphanumeric" => "Mật khẩu phải có ít nhất một ký tự đặc biệt (ví dụ: @, #, !).",
+            "PasswordTooShort" => "Mật khẩu quá ngắn.",
+            _ => e.Description
+        };
     }
 }

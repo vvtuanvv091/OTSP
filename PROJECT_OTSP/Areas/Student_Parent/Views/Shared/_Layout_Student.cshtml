@@ -1,0 +1,117 @@
+@{
+    Layout = "_Layout";
+
+    var controllerName = ViewContext.RouteData.Values["controller"]?.ToString();
+    var areaName = ViewContext.RouteData.Values["area"]?.ToString();
+    bool inStudentArea = string.Equals(areaName, "Student_Parent", StringComparison.OrdinalIgnoreCase);
+
+    // Tên tạm lấy từ cookie, tên đầy đủ được tải sau bằng fetch
+    var initialName = User.Identity?.Name ?? "";
+    var summaryUrl = Url.Action("Summary", "Header");
+}
+
+<div class="student-dashboard-shell">
+    <aside class="student-sidebar" id="studentSidebar" aria-label="Thanh điều hướng học viên">
+
+        <div class="student-sidebar-user" id="studentSidebarUser" data-info-url="@summaryUrl">
+            <img class="student-sidebar-avatar d-none" data-role="avatar-img" alt="" referrerpolicy="no-referrer" />
+            <span class="student-sidebar-avatar" data-role="avatar-icon"><i class="bi bi-person-fill" aria-hidden="true"></i></span>
+            <div class="student-sidebar-user-info">
+                <strong data-role="name">@initialName</strong>
+                <small>Học viên / Phụ huynh</small>
+            </div>
+        </div>
+
+        <nav class="student-sidebar-nav">
+            <span class="student-sidebar-heading">TỔNG QUAN</span>
+            <a asp-area="Student_Parent" asp-controller="StudentProfile" asp-action="Index"
+               class="student-sidebar-link @(inStudentArea && controllerName == "StudentProfile" ? "active" : "")">
+                <i class="bi bi-grid" aria-hidden="true"></i><span>Tổng quan</span>
+            </a>
+
+            <span class="student-sidebar-heading">HỌC TẬP</span>
+            <span class="student-sidebar-link is-disabled" aria-disabled="true"><i class="bi bi-calendar3" aria-hidden="true"></i><span>Lịch học</span></span>
+            <span class="student-sidebar-link is-disabled" aria-disabled="true"><i class="bi bi-easel" aria-hidden="true"></i><span>Lớp của tôi</span></span>
+            <a asp-area="Student_Parent" asp-controller="Send_Details_Tutor" asp-action="MyRequests"
+               class="student-sidebar-link @(inStudentArea && controllerName == "Send_Details_Tutor" ? "active" : "")">
+                <i class="bi bi-person-plus" aria-hidden="true"></i><span>Yêu cầu kết nối</span>
+            </a>
+            <span class="student-sidebar-link is-disabled" aria-disabled="true"><i class="bi bi-journal-check" aria-hidden="true"></i><span>Lớp đã đăng</span></span>
+            <span class="student-sidebar-link is-disabled" aria-disabled="true"><i class="bi bi-folder2-open" aria-hidden="true"></i><span>Tài liệu</span></span>
+
+            <span class="student-sidebar-heading">TƯƠNG TÁC</span>
+            <span class="student-sidebar-link is-disabled" aria-disabled="true"><i class="bi bi-chat-dots" aria-hidden="true"></i><span>Tin nhắn</span></span>
+            <a asp-area="" asp-controller="Notifications" asp-action="Index"
+               class="student-sidebar-link @(controllerName == "Notifications" ? "active" : "")">
+                <i class="bi bi-bell" aria-hidden="true"></i><span>Thông báo</span>
+            </a>
+
+            <span class="student-sidebar-heading">TÀI CHÍNH &amp; GIA ĐÌNH</span>
+            <span class="student-sidebar-link is-disabled" aria-disabled="true"><i class="bi bi-credit-card" aria-hidden="true"></i><span>Học phí &amp; thanh toán</span></span>
+            <a asp-area="Student_Parent" asp-controller="StudentProfile" asp-action="Index" asp-fragment="guardians"
+               class="student-sidebar-link @(inStudentArea && controllerName == "StudentProfile" ? "active" : "")">
+                <i class="bi bi-people" aria-hidden="true"></i><span>Người giám hộ</span>
+            </a>
+
+            <span class="student-sidebar-heading">TÀI KHOẢN</span>
+            <a asp-area="Student_Parent" asp-controller="Student_Parent_Profile" asp-action="Index"
+               class="student-sidebar-link @(inStudentArea && controllerName == "Student_Parent_Profile" ? "active" : "")">
+                <i class="bi bi-person-vcard" aria-hidden="true"></i><span>Hồ sơ</span>
+            </a>
+        </nav>
+    </aside>
+
+    <button type="button" class="student-menu-toggle" id="studentMenuToggle"
+            aria-label="Thu gọn thanh điều hướng" aria-controls="studentSidebar" aria-expanded="true">
+        <i class="bi bi-x-lg" aria-hidden="true"></i>
+    </button>
+    <button type="button" class="student-sidebar-backdrop" id="studentSidebarBackdrop" aria-label="Đóng thanh điều hướng"></button>
+
+    <main id="studentPageContent" role="main" class="student-dashboard-main pb-3">
+        @RenderBody()
+    </main>
+</div>
+
+<script>
+    (() => {
+        // Tên và avatar đầy đủ, tải sau khi trang đã hiện
+        const box = document.getElementById('studentSidebarUser');
+        if (box && box.dataset.infoUrl) {
+            fetch(box.dataset.infoUrl, { credentials: 'same-origin', headers: { Accept: 'application/json' } })
+                .then(res => res.ok ? res.json() : null)
+                .then(data => {
+                    const user = data && data.user;
+                    if (!user) return;
+                    box.querySelector('[data-role="name"]').textContent = user.name || '';
+                    if (user.avatarUrl) {
+                        const img = box.querySelector('[data-role="avatar-img"]');
+                        img.src = user.avatarUrl;
+                        img.classList.remove('d-none');
+                        box.querySelector('[data-role="avatar-icon"]').classList.add('d-none');
+                    }
+                })
+                .catch(() => { /* giữ tên tạm */ });
+        }
+
+        // Mở/đóng sidebar: máy tính mở sẵn, điện thoại đóng sẵn
+        const toggle = document.getElementById('studentMenuToggle');
+        const backdrop = document.getElementById('studentSidebarBackdrop');
+        const mobileQuery = window.matchMedia('(max-width: 991.98px)');
+
+        function setSidebarOpen(open) {
+            document.body.classList.toggle('student-sidebar-open', open);
+            document.body.classList.toggle('student-sidebar-collapsed', !open && !mobileQuery.matches);
+            toggle.setAttribute('aria-expanded', String(open));
+            toggle.querySelector('i').className = open ? 'bi bi-x-lg' : 'bi bi-list';
+        }
+
+        setSidebarOpen(!mobileQuery.matches);
+        toggle.addEventListener('click', () => setSidebarOpen(!document.body.classList.contains('student-sidebar-open')));
+        backdrop.addEventListener('click', () => setSidebarOpen(false));
+        mobileQuery.addEventListener('change', e => setSidebarOpen(!e.matches));
+    })();
+</script>
+
+@section Scripts {
+    @await RenderSectionAsync("Scripts", required: false)
+}

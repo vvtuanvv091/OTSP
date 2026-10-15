@@ -13,6 +13,7 @@
         public enum ComplaintStatus { New, Processing, Resolved, Rejected }
         public enum AlertStatus { New, Reviewed, Dismissed }
         public enum ClassroomType { OneToOne, Group }
+        public enum TeachingFormat { Online, Offline, Hybrid }
 
 
     }

@@ -1,7 +1,11 @@
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Localization;
 using Microsoft.EntityFrameworkCore;
 using PROJECT_OTSP.Data;
+using PROJECT_OTSP.Hubs;
 using PROJECT_OTSP.Models;
+using PROJECT_OTSP.Services;
+using System.Globalization;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -10,7 +14,13 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
     ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
 
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseNpgsql(connectionString));
+    options.UseNpgsql(connectionString, npgsqlOptions =>
+    {
+        npgsqlOptions.EnableRetryOnFailure(
+            maxRetryCount: 5,
+            maxRetryDelay: TimeSpan.FromSeconds(10),
+            errorCodesToAdd: null);
+    }));
 
 // Hiển thị lỗi migration chi tiết khi đang phát triển
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
@@ -24,8 +34,36 @@ builder.Services.AddDefaultIdentity<ApplicationUser>(options =>
 // ===== 3. MVC, Razor Pages, API =====
 builder.Services.AddControllersWithViews();
 builder.Services.AddRazorPages();
+builder.Services.AddSignalR();
+builder.Services.AddLocalization();
+builder.Services.AddMemoryCache();
+
+// ===== 3.1 Services =====
+builder.Services.AddScoped<ISearchService, SearchService>();
+builder.Services.AddScoped<IOpenGroupClassroomService, OpenGroupClassroomService>();
+builder.Services.Configure<CloudinarySettings>(builder.Configuration.GetSection("Cloudinary"));
+builder.Services.AddSingleton<IImageStorageService, CloudinaryImageStorageService>();
+
+var supportedCultures = new[] { new CultureInfo("vi"), new CultureInfo("en") };
+builder.Services.Configure<RequestLocalizationOptions>(options =>
+{
+    options.DefaultRequestCulture = new RequestCulture("vi");
+    options.SupportedCultures = supportedCultures;
+    options.SupportedUICultures = supportedCultures;
+});
+
 
 var app = builder.Build();
+
+// Hỗ trợ cờ dòng lệnh --seed-only nếu muốn chạy nạp dữ liệu một lần rồi thoát
+if (args.Contains("--seed-only"))
+{
+    using var scope = app.Services.CreateScope();
+    await DbSeeder.SeedAsync(scope.ServiceProvider, forceBulk: true);
+    var seedLogger = scope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Program");
+    seedLogger.LogInformation("Đã hoàn tất nạp dữ liệu lên cơ sở dữ liệu (--seed-only). Kết thúc tiến trình.");
+    return;
+}
 
 // ===== 4. Seed dữ liệu mẫu (chỉ khi đang phát triển) =====
 if (app.Environment.IsDevelopment())
@@ -47,7 +85,11 @@ else
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();
+app.UseRequestLocalization();
+
+
 app.UseRouting();
+
 
 app.UseAuthentication();   // phải đứng trước UseAuthorization
 app.UseAuthorization();
@@ -55,6 +97,12 @@ app.UseAuthorization();
 app.MapStaticAssets();
 
 app.MapControllers();      // API có [Route] (attribute routing)
+app.MapHub<ConnectionRequestHub>("/hubs/connection-requests");
+
+app.MapControllerRoute(
+    name: "areas",
+    pattern: "{area:exists}/{controller=Home}/{action=Index}/{id?}");
+
 app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}")

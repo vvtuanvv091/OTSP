@@ -29,10 +29,15 @@ namespace PROJECT_OTSP.Models
         public int TutorId { get; set; }
         public TutorProfile Tutor { get; set; } = null!;
 
-        // Khóa ngoại tới môn-cấp của tài liệu
-        [ForeignKey("SubjectLevel")]
-        public int SubjectLevelId { get; set; }
-        public SubjectLevel SubjectLevel { get; set; } = null!;
+        // Môn học (ví dụ: Toán)
+        [ForeignKey("Subject")]
+        public int SubjectId { get; set; }
+        public Subject Subject { get; set; } = null!;
+
+        // Cấp học (ví dụ: THCS)
+        [ForeignKey("GradeLevel")]
+        public int GradeLevelId { get; set; }
+        public GradeLevel GradeLevel { get; set; } = null!;
 
     }
 }

@@ -17,6 +17,7 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Logging;
 using PROJECT_OTSP.Models;
+using PROJECT_OTSP.Services;
 
 namespace PROJECT_OTSP.Areas.Identity.Pages.Account;
 
@@ -116,7 +117,10 @@ public class ExternalLoginModel : PageModel
         if (result.Succeeded)
         {
             _logger.LogInformation("{Name} logged in with {LoginProvider} provider.", info.Principal.Identity?.Name, info.LoginProvider);
-            return LocalRedirect(returnUrl);
+            var user = await _userManager.FindByLoginAsync(info.LoginProvider, info.ProviderKey);
+            var roles = user is null ? Array.Empty<string>() : await _userManager.GetRolesAsync(user);
+            var destination = RoleLandingPage.Resolve(returnUrl, roles, Url.IsLocalUrl, Url.Content("~/"));
+            return LocalRedirect(destination);
         }
         if (result.IsLockedOut)
         {

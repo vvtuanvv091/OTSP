@@ -19,6 +19,8 @@ namespace PROJECT_OTSP.Models
         [Precision(18, 0)]
         public decimal HourlyFee { get; set; }
 
+        public Enums.TeachingFormat TeachingFormat { get; set; } = Enums.TeachingFormat.Hybrid;
+
         // Trạng thái xác thực hồ sơ: Pending, Approved, Rejected
         public VerificationStatus VerificationStatus { get; set; } = VerificationStatus.Pending;
 
@@ -49,8 +51,11 @@ namespace PROJECT_OTSP.Models
         // Đối soát doanh thu theo kỳ (1-N)
         public ICollection<Reconciliation> Reconciliations { get; set; } = new List<Reconciliation>();
 
-        // Môn-cấp gia sư có thể dạy (N-N qua bảng TutorSubjectLevel)
-        public ICollection<TutorSubjectLevel> TutorSubjectLevels { get; set; } = new List<TutorSubjectLevel>();
+        // Môn và cấp gia sư dạy (1-N qua bảng TutorSubject)
+        public ICollection<TutorSubject> TutorSubjects { get; set; } = new List<TutorSubject>();
+
+        // Các khung giờ gia sư có thể dạy, lặp lại hàng tuần (1-N)
+        public ICollection<TutorAvailability> Availabilities { get; set; } = new List<TutorAvailability>();
 
     }
 }

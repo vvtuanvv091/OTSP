@@ -1,8 +1,440 @@
-﻿@{
-    ViewData["Title"] = "Home Page";
+@using System.Globalization
+@using PROJECT_OTSP.Dtos
+@using PROJECT_OTSP.Models
+@using static PROJECT_OTSP.Models.Enums
+@model HomeViewModel
+@{
+    ViewData["Title"] = "OTSP - Nền tảng kết nối Gia sư và Học viên Trực tuyến";
+    var vi = CultureInfo.GetCultureInfo("vi-VN");
+    var isVietnamese = System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == "vi";
+    
+    // Bảng màu rực rỡ đặc trưng từ Mentor Features (Screenshot 2), màu cuối đổi thành Đỏ OTSP
+    var featureColors = new[]
+    {
+        "#ffbb2c", "#5578ff", "#e80368", "#e361ff",
+        "#47aeff", "#ffa76e", "#11dbcf", "#4233ff",
+        "#b2904f", "#b20969", "#ff5828", "#DB303A"
+    };
 }
 
-<div class="text-center">
-    <h1 class="display-4">Welcome</h1>
-    <p>Learn about <a href="https://learn.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
+<div class="main otsp-home">
+
+    <!-- ==================== 1. HERO SECTION (MENTOR STYLE) ==================== -->
+    <section id="hero" class="hero section dark-background otsp-hero">
+        <img src="@Url.Content("~/assets/img/hero-bg.jpg")" alt="Học tập cùng gia sư OTSP" data-aos="fade-in">
+        <div class="container">
+            <div class="otsp-hero-content" data-aos="fade-up" data-aos-duration="800">
+                <span class="otsp-badge-glow">
+                    <i class="bi bi-stars"></i> @(isVietnamese ? "NỀN TẢNG GIA SƯ HÀNG ĐẦU" : "PREMIER TUTORING PLATFORM")
+                </span>
+                <h1 class="otsp-hero-title">
+                    @(isVietnamese ? "Học đúng người," : "Learning Today,")<br>
+                    <span class="otsp-text-gradient">@(isVietnamese ? "giỏi đúng cách." : "Leading Tomorrow.")</span>
+                </h1>
+                <p>
+                    @(isVietnamese 
+                        ? "Kết nối với đội ngũ gia sư tài năng được kiểm duyệt bằng cấp nghiêm ngặt. Lộ trình cá nhân hóa, lịch học linh hoạt và học thử trải nghiệm miễn phí." 
+                        : "Connect with top verified tutors tailored to your learning goals. Personalized paths, flexible schedules, and trial sessions.")
+                </p>
+                <div class="otsp-hero-actions">
+                    <a href="#courses" class="btn-hero-primary">
+                        <span>@(isVietnamese ? "Bắt đầu ngay" : "Get Started")</span>
+                        <i class="bi bi-arrow-right" aria-hidden="true"></i>
+                    </a>
+                    <a asp-area="Identity" asp-page="/Account/Register" class="btn-hero-secondary">
+                        <i class="bi bi-person-plus-fill" aria-hidden="true"></i>
+                        <span>@(isVietnamese ? "Đăng ký làm gia sư" : "Become a Tutor")</span>
+                    </a>
+                </div>
+                <div class="otsp-hero-trust">
+                    <span><i class="bi bi-patch-check-fill" aria-hidden="true"></i> @(isVietnamese ? "100% Hồ sơ xác minh" : "100% Verified Tutors")</span>
+                    <span><i class="bi bi-calendar2-check-fill" aria-hidden="true"></i> @(isVietnamese ? "Lịch học linh hoạt 24/7" : "Flexible 24/7 Schedule")</span>
+                    <span><i class="bi bi-shield-lock-fill" aria-hidden="true"></i> @(isVietnamese ? "Học phí minh bạch" : "Transparent Pricing")</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ==================== 2. ABOUT SECTION (MENTOR STYLE) ==================== -->
+    <section id="about" class="section about">
+        <div class="container">
+            <div class="row gy-4 align-items-center">
+                <div class="col-lg-6 order-1 order-lg-2" data-aos="fade-up" data-aos-delay="100">
+                    <img src="@Url.Content("~/assets/img/about.jpg")" class="img-fluid rounded-4 shadow" alt="Về OTSP">
+                </div>
+                <div class="col-lg-6 order-2 order-lg-1 content" data-aos="fade-up" data-aos-delay="200">
+                    <h3>@(isVietnamese ? "Nền tảng kết nối gia sư uy tín & chuẩn hóa hàng đầu" : "Leading Tutoring & Mentorship Platform")</h3>
+                    <p class="fst-italic text-muted">
+                        @(isVietnamese 
+                            ? "OTSP xây dựng quy trình kết nối chuẩn hóa giữa gia sư và học viên, đảm bảo chất lượng giảng dạy và sự an tâm tuyệt đối cho phụ huynh học sinh." 
+                            : "OTSP provides a standardized connecting mechanism between students and tutors with verified credentials.")
+                    </p>
+                    <ul class="list-unstyled">
+                        <li class="d-flex align-items-start gap-2 mb-2">
+                            <i class="bi bi-check-circle-fill text-danger fs-5"></i>
+                            <span>@(isVietnamese ? "100% hồ sơ gia sư được thẩm định bằng cấp đại học và chứng chỉ nghiệp vụ sư phạm." : "100% tutors verified with academic degrees.")</span>
+                        </li>
+                        <li class="d-flex align-items-start gap-2 mb-2">
+                            <i class="bi bi-check-circle-fill text-danger fs-5"></i>
+                            <span>@(isVietnamese ? "Học phí niêm yết công khai, minh bạch, đối soát hóa đơn tự động và rõ ràng." : "Transparent tuition rates with zero hidden fees.")</span>
+                        </li>
+                        <li class="d-flex align-items-start gap-2 mb-3">
+                            <i class="bi bi-check-circle-fill text-danger fs-5"></i>
+                            <span>@(isVietnamese ? "Chủ động chọn lịch học linh hoạt theo ma trận thời gian thực của gia sư." : "Flexible scheduling aligned with tutor availability.")</span>
+                        </li>
+                    </ul>
+                    <a href="#features" class="btn btn-otsp">
+                        <span>@(isVietnamese ? "Khám phá môn học" : "Explore Subjects")</span>
+                        <i class="bi bi-arrow-right ms-1"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ==================== 3. COUNTS SECTION (MENTOR STYLE) ==================== -->
+    <section id="counts" class="section counts light-background">
+        <div class="container" data-aos="fade-up" data-aos-delay="100">
+            <div class="row gy-4">
+                <div class="col-lg-3 col-md-6">
+                    <div class="stats-item text-center w-100 h-100">
+                        <span data-purecounter-start="0" data-purecounter-end="@Model.StudentCount" data-purecounter-duration="1" class="purecounter">@Model.StudentCount</span>
+                        <p>@(isVietnamese ? "Học viên đồng hành" : "Students")</p>
+                    </div>
+                </div>
+                <div class="col-lg-3 col-md-6">
+                    <div class="stats-item text-center w-100 h-100">
+                        <span data-purecounter-start="0" data-purecounter-end="@Model.SubjectCount" data-purecounter-duration="1" class="purecounter">@Model.SubjectCount</span>
+                        <p>@(isVietnamese ? "Môn học đào tạo" : "Subjects")</p>
+                    </div>
+                </div>
+                <div class="col-lg-3 col-md-6">
+                    <div class="stats-item text-center w-100 h-100">
+                        <span data-purecounter-start="0" data-purecounter-end="@Model.CompletedSessionCount" data-purecounter-duration="1" class="purecounter">@Model.CompletedSessionCount</span>
+                        <p>@(isVietnamese ? "Buổi học thành công" : "Completed Sessions")</p>
+                    </div>
+                </div>
+                <div class="col-lg-3 col-md-6">
+                    <div class="stats-item text-center w-100 h-100">
+                        <span data-purecounter-start="0" data-purecounter-end="@Model.TutorCount" data-purecounter-duration="1" class="purecounter">@Model.TutorCount</span>
+                        <p>@(isVietnamese ? "Gia sư đã kiểm duyệt" : "Verified Tutors")</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ==================== 4. WHY US SECTION (MENTOR STYLE) ==================== -->
+    <section id="why-us" class="section why-us">
+        <div class="container">
+            <div class="row gy-4">
+                <div class="col-lg-4" data-aos="fade-up" data-aos-delay="100">
+                    <div class="why-box">
+                        <h3>@(isVietnamese ? "Vì sao hàng ngàn phụ huynh tin chọn OTSP?" : "Why Choose OTSP?")</h3>
+                        <p>
+                            @(isVietnamese 
+                                ? "OTSP là nền tảng số hóa giáo dục gia sư hàng đầu, tiên phong trong việc chuẩn hóa chất lượng gia sư tại Việt Nam. Chúng tôi cam kết đồng hành cùng học viên bứt phá thành tích trong mọi kỳ thi." 
+                                : "OTSP is the leading tutor platform connecting students with high quality certified tutors.")
+                        </p>
+                        <div class="text-center">
+                            <a href="#about" class="more-btn">
+                                <span>@(isVietnamese ? "Tìm hiểu thêm" : "Learn More")</span>
+                                <i class="bi bi-chevron-right"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-8 d-flex align-items-stretch">
+                    <div class="row gy-4 w-100" data-aos="fade-up" data-aos-delay="200">
+                        <div class="col-xl-4 col-md-4">
+                            <div class="icon-box d-flex flex-column justify-content-center align-items-center">
+                                <i class="bi bi-patch-check"></i>
+                                <h4>@(isVietnamese ? "Gia sư chọn lọc" : "Verified Tutors")</h4>
+                                <p>@(isVietnamese ? "Bằng cấp đại học, chứng chỉ sư phạm được kiểm duyệt nghiêm ngặt bởi Admin." : "University degrees and teaching credentials verified before listing.")</p>
+                            </div>
+                        </div>
+                        <div class="col-xl-4 col-md-4">
+                            <div class="icon-box d-flex flex-column justify-content-center align-items-center">
+                                <i class="bi bi-cash-stack"></i>
+                                <h4>@(isVietnamese ? "Học phí minh bạch" : "Clear Tuition Fee")</h4>
+                                <p>@(isVietnamese ? "Học phí niêm yết rõ ràng theo giờ hoặc theo tháng, không phụ phí ẩn, đối soát tự động." : "Transparent hourly rates with zero hidden charges and instant receipts.")</p>
+                            </div>
+                        </div>
+                        <div class="col-xl-4 col-md-4">
+                            <div class="icon-box d-flex flex-column justify-content-center align-items-center">
+                                <i class="bi bi-calendar-check"></i>
+                                <h4>@(isVietnamese ? "Lịch học linh hoạt" : "Flexible Slots")</h4>
+                                <p>@(isVietnamese ? "Chủ động chọn khung giờ theo ma trận lịch rảnh của gia sư, dễ dàng đổi lịch khi bận." : "Match available weekly time-slots and adjust lessons seamlessly.")</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ==================== 5. FEATURES SECTION (MENTOR SCREENSHOT 2) ==================== -->
+    <section id="features" class="section features">
+        <div class="container section-title" data-aos="fade-up">
+            <h2>@(isVietnamese ? "DANH MỤC ĐÀO TẠO" : "TRAINING SUBJECTS")</h2>
+            <p>@(isVietnamese ? "Môn học & Cấp học phổ biến" : "Featured Subjects & Grade Levels")</p>
+        </div>
+        <div class="container">
+            @if (Model.Subjects.Count == 0)
+            {
+                <div class="text-center py-5" data-aos="fade-up">
+                    <i class="bi bi-journal-x text-muted" style="font-size: 3rem;"></i>
+                    <p class="text-body-secondary mt-3">@(isVietnamese ? "Hiện chưa có môn học nào được cấu hình." : "No subjects available at the moment.")</p>
+                </div>
+            }
+            else
+            {
+                <div class="row gy-4" id="subjectCardsGrid">
+                    @for (var i = 0; i < Model.Subjects.Count; i++)
+                    {
+                        var s = Model.Subjects[i];
+                        var iconColor = featureColors[i % featureColors.Length];
+                        <div class="col-lg-3 col-md-4 col-sm-6 subject-item" data-subject-name="@s.Name.ToLowerInvariant()" data-aos="fade-up" data-aos-delay="@(50 + (i % 6) * 50)">
+                            <div class="features-item">
+                                <i class="bi @s.IconClass" style="color: @iconColor;"></i>
+                                <h3><a href="#trainers-index" class="stretched-link" onclick="highlightSubject('@s.Name')">@s.Name</a></h3>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    </section>
+
+    <!-- ==================== 6. COURSES SECTION (MENTOR SCREENSHOT 1) ==================== -->
+    <section id="courses" class="section courses">
+        <div class="container section-title" data-aos="fade-up">
+            <h2>@(isVietnamese ? "LỚP HỌC ĐANG MỞ" : "POPULAR COURSES")</h2>
+            <p>@(isVietnamese ? "Các lớp học chất lượng cao sẵn sàng nhận học viên" : "Open Classes Ready for Enrollment")</p>
+        </div>
+        <div class="container">
+            @if (Model.Classes.Count == 0)
+            {
+                <div class="text-center py-5" data-aos="fade-up">
+                    <div class="p-4 rounded-4 bg-surface d-inline-block border">
+                        <i class="bi bi-door-closed text-muted" style="font-size: 2.8rem;"></i>
+                        <p class="mt-2 mb-3 text-muted">@(isVietnamese ? "Hiện chưa có lớp học công khai nào đang mở." : "No open classes currently.")</p>
+                        <a href="#trainers-index" class="btn btn-otsp">
+                            <i class="bi bi-search me-1"></i> @(isVietnamese ? "Kết nối trực tiếp với gia sư" : "Contact Tutors Directly")
+                        </a>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="row gy-4">
+                    @for (var i = 0; i < Model.Classes.Count; i++)
+                    {
+                        var c = Model.Classes[i];
+                        var courseImgIndex = (i % 3) + 1;
+                        <div class="col-lg-4 col-md-6 d-flex align-items-stretch" data-aos="zoom-in" data-aos-delay="@(100 + (i % 3) * 100)">
+                            <div class="course-item w-100">
+                                <img src="@Url.Content($"~/assets/img/course-{courseImgIndex}.jpg")" class="img-fluid w-100" alt="@c.Name">
+                                <div class="course-content">
+                                    <div class="d-flex justify-content-between align-items-center mb-3">
+                                        <p class="category">@c.SubjectName · @c.GradeName</p>
+                                        <p class="price">@c.Fee.ToString("N0", vi) đ</p>
+                                    </div>
+
+                                    <h3><a href="#trainers-index">@c.Name</a></h3>
+                                    @if (!string.IsNullOrEmpty(c.Description))
+                                    {
+                                        <p class="description">@c.Description</p>
+                                    }
+                                    else
+                                    {
+                                        <p class="description text-muted fst-italic">@(isVietnamese ? "Lớp học tiêu chuẩn với giáo trình được biên soạn bài bản, theo sát tiến độ học sinh." : "Standard course with customized curriculum.")</p>
+                                    }
+
+                                    <div class="trainer d-flex justify-content-between align-items-center">
+                                        <div class="trainer-profile d-flex align-items-center">
+                                            <img src="@Url.Content("~/assets/img/default-avatar.svg")" class="img-fluid rounded-circle" alt="@c.TutorName">
+                                            <a href="#trainers-index" class="trainer-link">@c.TutorName</a>
+                                        </div>
+                                        <div class="trainer-rank d-flex align-items-center">
+                                            <i class="bi bi-person user-icon me-1"></i>@c.StudentCount/@c.MaxStudents
+                                            &nbsp;&nbsp;
+                                            <i class="bi bi-heart heart-icon me-1"></i>@(c.StudentCount * 8 + 24)
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    </section>
+
+    <!-- ==================== 7. FEATURED TUTORS SECTION (MENTOR TRAINERS) ==================== -->
+    <section id="trainers-index" class="section trainers-index">
+        <div class="container section-title" data-aos="fade-up">
+            <h2>@(isVietnamese ? "ĐỘI NGŨ GIA SƯ" : "TOP TRAINERS")</h2>
+            <p>@(isVietnamese ? "Gia sư tiêu biểu được đánh giá cao" : "Featured Certified Tutors")</p>
+        </div>
+        <div class="container">
+            @if (Model.FeaturedTutors.Count == 0)
+            {
+                <div class="text-center py-5" data-aos="fade-up">
+                    <i class="bi bi-person-x text-muted" style="font-size: 3rem;"></i>
+                    <p class="mt-3 text-muted">@(isVietnamese ? "Chưa có gia sư nào được phê duyệt hiển thị." : "No featured tutors available.")</p>
+                    <a asp-area="Identity" asp-page="/Account/Register" class="btn btn-outline-otsp mt-2">
+                        <i class="bi bi-person-plus me-1"></i> @(isVietnamese ? "Đăng ký làm gia sư ngay" : "Register as Tutor")
+                    </a>
+                </div>
+            }
+            else
+            {
+                <div class="row gy-4" id="tutorsCardsGrid">
+                    @for (var i = 0; i < Model.FeaturedTutors.Count; i++)
+                    {
+                        var t = Model.FeaturedTutors[i];
+                        var trainerImg = string.IsNullOrWhiteSpace(t.AvatarUrl)
+                            ? Url.Content($"~/assets/img/trainers/trainer-{(i % 3) + 1}.jpg")
+                            : t.AvatarUrl;
+                        <div class="col-lg-4 col-md-6 d-flex align-items-stretch tutor-item" data-aos="fade-up" data-aos-delay="@(100 + (i % 3) * 100)">
+                            <div class="member w-100">
+                                <img src="@trainerImg" class="img-fluid" alt="@t.FullName">
+                                <div class="member-content">
+                                    <h4>@t.FullName</h4>
+                                    <span>@(t.Teaching.Count > 0 ? $"{t.Teaching[0].SubjectName} · {t.Teaching[0].GradeName}" : (isVietnamese ? "Gia sư đa môn" : "Certified Tutor"))</span>
+                                    <p>@(t.Introduction ?? (isVietnamese ? "Gia sư tận tâm với phương pháp sư phạm hiện đại, truyền cảm hứng học tập." : "Dedicated tutor with modern and approachable teaching methods."))</p>
+                                    <div class="d-flex justify-content-between align-items-center pt-3 border-top mt-auto">
+                                        <span class="otsp-price text-danger fw-bold">@t.HourlyFee.ToString("N0", vi) <small class="text-muted fw-normal">đ/giờ</small></span>
+                                        @if (t.AverageRating > 0)
+                                        {
+                                            <span class="rating-badge">
+                                                <i class="bi bi-star-fill text-warning"></i> @t.AverageRating.ToString("0.0", CultureInfo.InvariantCulture)
+                                            </span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-light text-muted border">@(isVietnamese ? "Mới" : "New")</span>
+                                        }
+                                    </div>
+                                    <div class="social mt-3">
+                                        <a asp-area="Identity" asp-page="/Account/Register" class="btn btn-sm btn-otsp w-100 py-2">
+                                            <i class="bi bi-chat-dots-fill me-1"></i> @(isVietnamese ? "Kết nối học tập" : "Connect & Book")
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    </section>
+
+    <!-- ==================== 8. 4 STEPS HOW IT WORKS ==================== -->
+    <section class="section steps-section">
+        <div class="container section-title" data-aos="fade-up">
+            <h2>@(isVietnamese ? "QUY TRÌNH HỌC TẬP" : "EASY 4-STEP PROCESS")</h2>
+            <p>@(isVietnamese ? "Bắt đầu học cùng gia sư chỉ với 4 bước đơn giản" : "How OTSP Works in 4 Steps")</p>
+        </div>
+        <div class="container">
+            <div class="row g-4">
+                <div class="col-12 col-sm-6 col-lg-3" data-aos="fade-up" data-aos-delay="100">
+                    <div class="step-card">
+                        <div class="step-number">1</div>
+                        <h4>@(isVietnamese ? "Tìm kiếm gia sư" : "Find Your Tutor")</h4>
+                        <p>@(isVietnamese ? "Lọc theo môn học, cấp học, khu vực và mức học phí mong muốn." : "Filter by subject, grade level, hourly fee, and location.")</p>
+                    </div>
+                </div>
+                <div class="col-12 col-sm-6 col-lg-3" data-aos="fade-up" data-aos-delay="200">
+                    <div class="step-card">
+                        <div class="step-number">2</div>
+                        <h4>@(isVietnamese ? "Đăng ký học thử" : "Free Trial")</h4>
+                        <p>@(isVietnamese ? "Gửi yêu cầu học thử để đánh giá độ phù hợp của phương pháp giảng dạy." : "Schedule a trial lesson to test teaching compatibility.")</p>
+                    </div>
+                </div>
+                <div class="col-12 col-sm-6 col-lg-3" data-aos="fade-up" data-aos-delay="300">
+                    <div class="step-card">
+                        <div class="step-number">3</div>
+                        <h4>@(isVietnamese ? "Vào lớp chính thức" : "Start Classes")</h4>
+                        <p>@(isVietnamese ? "Học trực tuyến qua phòng video hoặc trực tiếp tại nhà với lịch linh hoạt." : "Study online or in-person with tailored schedules.")</p>
+                    </div>
+                </div>
+                <div class="col-12 col-sm-6 col-lg-3" data-aos="fade-up" data-aos-delay="400">
+                    <div class="step-card">
+                        <div class="step-number">4</div>
+                        <h4>@(isVietnamese ? "Đánh giá & Tiến bộ" : "Review & Progress")</h4>
+                        <p>@(isVietnamese ? "Đánh giá chất lượng sau mỗi buổi học và theo dõi tiến độ vững chắc." : "Review sessions and track performance improvement continuously.")</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ==================== 9. CALL TO ACTION SECTION ==================== -->
+    <section class="section otsp-cta-section">
+        <div class="container" data-aos="zoom-in">
+            <div class="otsp-cta-box">
+                <div class="row align-items-center">
+                    <div class="col-lg-8">
+                        <h2>@(isVietnamese ? "Sẵn sàng bứt phá điểm số cùng gia sư xuất sắc?" : "Ready to boost your academic performance?")</h2>
+                        <p>
+                            @(isVietnamese 
+                                ? "Đăng ký ngay hôm nay để nhận tư vấn lộ trình học tập miễn phí và kết nối với gia sư phù hợp nhất cho kỳ thi sắp tới."
+                                : "Join thousands of students and certified tutors on OTSP today.")
+                        </p>
+                    </div>
+                    <div class="col-lg-4 text-lg-end">
+                        <div class="d-flex flex-column flex-sm-row justify-content-lg-end gap-3">
+                            <a href="#features" class="btn btn-hero-primary">
+                                <i class="bi bi-search me-1"></i> @(isVietnamese ? "Tìm gia sư ngay" : "Find Tutors")
+                            </a>
+                            <a asp-area="Identity" asp-page="/Account/Register" class="btn btn-hero-secondary">
+                                <i class="bi bi-briefcase me-1"></i> @(isVietnamese ? "Làm gia sư" : "Become Tutor")
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
 </div>
+
+@section Scripts {
+    <script>
+    function filterSubjectsFromSearch() {
+        const keyword = (document.getElementById('quickKeyword')?.value || '').trim().toLowerCase();
+        const grade = (document.getElementById('quickGrade')?.value || '').trim().toLowerCase();
+        const items = document.querySelectorAll('.subject-item');
+        
+        let foundAny = false;
+        items.forEach(el => {
+            const name = el.getAttribute('data-subject-name') || '';
+            const textContent = el.textContent.toLowerCase();
+            const matchKw = !keyword || name.includes(keyword) || textContent.includes(keyword);
+            const matchGrade = !grade || textContent.includes(grade);
+            
+            if (matchKw && matchGrade) {
+                el.style.display = '';
+                foundAny = true;
+            } else {
+                el.style.display = 'none';
+            }
+        });
+
+        // Smooth scroll to subjects
+        const target = document.getElementById('features');
+        if (target) {
+            target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    }
+
+    function highlightSubject(subjectName) {
+        const tutorsSec = document.getElementById('trainers-index');
+        if (tutorsSec) {
+            tutorsSec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    }
+    </script>
+}
