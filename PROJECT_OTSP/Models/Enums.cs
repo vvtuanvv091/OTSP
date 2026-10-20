@@ -8,7 +8,7 @@
         public enum RequestStatus { Pending, Accepted, Rejected, Cancelled }
         public enum ScheduleStatus { Pending, Confirmed, Rejected }
         public enum ClassroomStatus { Active, Completed, Cancelled }
-        public enum SessionStatus { Scheduled, Done, Cancelled }
+        public enum SessionStatus { Scheduled, Done, Cancelled, InProgress }
         public enum PaymentStatus { Pending, Success, Failed }
         public enum ComplaintStatus { New, Processing, Resolved, Rejected }
         public enum AlertStatus { New, Reviewed, Dismissed }

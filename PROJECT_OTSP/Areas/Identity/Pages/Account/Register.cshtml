@@ -102,6 +102,16 @@
                             <label asp-for="Input.FullName">Họ và tên</label>
                             <span asp-validation-for="Input.FullName" class="text-danger"></span>
                         </div>
+                        <div class="form-floating mb-3">
+                            <input asp-for="Input.CitizenIdNumber" class="form-control" inputmode="numeric" maxlength="12" placeholder="Số CCCD" />
+                            <label asp-for="Input.CitizenIdNumber">Số CCCD (12 chữ số)</label>
+                            <span asp-validation-for="Input.CitizenIdNumber" class="text-danger"></span>
+                        </div>
+                        <div class="form-floating mb-3">
+                            <input asp-for="Input.ResidenceAddress" class="form-control" autocomplete="street-address" placeholder="Nơi ở" />
+                            <label asp-for="Input.ResidenceAddress">Nơi ở hiện tại</label>
+                            <span asp-validation-for="Input.ResidenceAddress" class="text-danger"></span>
+                        </div>
                         <div class="row">
                             <div class="col-md-6">
                                 <div class="form-floating mb-3">
@@ -141,6 +151,16 @@
                                 <input asp-for="Input.GuardianContact" class="form-control" placeholder="Số điện thoại hoặc email" />
                                 <label asp-for="Input.GuardianContact">Số điện thoại hoặc email phụ huynh</label>
                                 <span asp-validation-for="Input.GuardianContact" class="text-danger"></span>
+                            </div>
+                            <div class="form-floating mb-3">
+                                <input asp-for="Input.GuardianCitizenIdNumber" class="form-control" inputmode="numeric" maxlength="12" placeholder="CCCD người giám hộ" />
+                                <label asp-for="Input.GuardianCitizenIdNumber">CCCD người giám hộ (12 chữ số)</label>
+                                <span asp-validation-for="Input.GuardianCitizenIdNumber" class="text-danger"></span>
+                            </div>
+                            <div class="form-floating mb-3">
+                                <input asp-for="Input.GuardianResidenceAddress" class="form-control" placeholder="Nơi ở người giám hộ" />
+                                <label asp-for="Input.GuardianResidenceAddress">Nơi ở người giám hộ</label>
+                                <span asp-validation-for="Input.GuardianResidenceAddress" class="text-danger"></span>
                             </div>
                         </div>
 

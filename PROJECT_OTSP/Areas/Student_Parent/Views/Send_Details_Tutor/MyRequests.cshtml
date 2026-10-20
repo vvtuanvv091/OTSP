@@ -124,7 +124,7 @@
         <div class="row g-3">
             @foreach (var item in Model)
             {
-                <div class="col-12 col-md-6 col-xl-4" data-request-card="@item.Id">
+                <div class="col-12 col-md-6 col-xl-4" data-request-card="@item.Id" data-class-session-id="@item.ClassSessionId">
                     <div class="pro-card h-100 d-flex flex-column justify-content-between">
                         <div>
                             <!-- Header thẻ -->
@@ -175,6 +175,34 @@
                                 </div>
                             }
 
+                            @if (item.ClassSessionId.HasValue && item.ClassSessionStatus == SessionStatus.Scheduled)
+                            {
+                                <form asp-area="" asp-controller="ClassSession" asp-action="Join" method="post" class="mb-3">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="id" value="@item.ClassSessionId.Value" />
+                                    <button type="submit" class="btn btn-success btn-sm"><i class="bi bi-camera-video me-1" aria-hidden="true"></i>Tham gia lớp học thử</button>
+                                </form>
+                            }
+                            else if (item.ClassSessionId.HasValue && item.ClassSessionStatus == SessionStatus.InProgress)
+                            {
+                                <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+                                    <span class="badge text-bg-primary" data-class-session-status="@item.ClassSessionId">Buổi học đang diễn ra</span>
+                                    <form asp-area="" asp-controller="ClassSession" asp-action="Join" method="post">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="id" value="@item.ClassSessionId.Value" />
+                                        <button type="submit" class="btn btn-success btn-sm"><i class="bi bi-camera-video me-1" aria-hidden="true"></i>Tham gia lại</button>
+                                    </form>
+                                </div>
+                            }
+                            else if (item.ClassSessionId.HasValue && item.ClassSessionStatus == SessionStatus.Done)
+                            {
+                                <div class="alert alert-secondary py-2 mb-3" data-class-session-status="@item.ClassSessionId">Buổi học đã kết thúc.</div>
+                            }
+                            else if (item.ClassSessionId.HasValue && item.ClassSessionStatus == SessionStatus.Cancelled)
+                            {
+                                <div class="alert alert-danger py-2 mb-3" data-class-session-status="@item.ClassSessionId">Buổi học đã bị hủy.</div>
+                            }
+
                             @if (!string.IsNullOrWhiteSpace(item.Message))
                             {
                                 <div class="bg-light p-2 rounded-2 small text-secondary mb-3 border">
@@ -193,6 +221,13 @@
                                 <a asp-action="Index" asp-route-id="@item.TutorId" class="btn btn-sm btn-outline-secondary" title="Xem hồ sơ gia sư">
                                     <i class="bi bi-eye"></i>
                                 </a>
+
+                                @if (item.Status == RequestStatus.Accepted)
+                                {
+                                    <a asp-area="" asp-controller="Chat" asp-action="Conversation" asp-route-requestId="@item.Id" class="btn btn-sm btn-outline-danger" title="Nhắn tin với gia sư">
+                                        <i class="bi bi-chat-dots"></i> Nhắn tin
+                                    </a>
+                                }
 
                                 @if (item.Status == RequestStatus.Pending)
                                 {
@@ -259,6 +294,11 @@
             notice.textContent = `Gia sư đã xác nhận lịch học thử: ${scheduledAt}.`;
             notice.classList.remove("d-none");
             window.setTimeout(() => window.location.reload(), 500);
+        });
+
+        connection.on("ClassSessionStatusChanged", update => {
+            const sessionCard = document.querySelector(`[data-class-session-id="${update.classSessionId}"]`);
+            if (sessionCard) window.location.reload();
         });
 
         connection.start().catch(error => console.error("SignalR connection failed:", error));

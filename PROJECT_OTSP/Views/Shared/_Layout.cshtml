@@ -203,11 +203,7 @@
         <i class="bi bi-arrow-up-short"></i>
     </a>
 
-    <!-- Preloader (không chặn trên các trang tài khoản/đăng nhập/đăng ký) -->
-    @if (!Context.Request.Path.StartsWithSegments("/Identity"))
-    {
-        <div id="preloader"></div>
-    }
+    <div id="preloader"></div>
 
     <!-- Vendor Scripts -->
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
@@ -219,6 +215,7 @@
 
     <!-- Main Site Script -->
     <script src="~/assets/js/main.js"></script>
+    <script src="~/assets/js/preloader.js" asp-append-version="true"></script>
 
     <!-- Instant Dark/Light Theme Switching Script (No page reload) -->
     <script>

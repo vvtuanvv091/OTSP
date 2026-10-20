@@ -57,6 +57,16 @@ namespace PROJECT_OTSP.Areas.Identity.Pages.Account
             [Display(Name = "Họ và tên")]
             public string FullName { get; set; }
 
+            [Required(ErrorMessage = "Vui lòng nhập số CCCD.")]
+            [RegularExpression(@"^[0-9]{12}$", ErrorMessage = "CCCD phải gồm đúng 12 chữ số.")]
+            [Display(Name = "Số CCCD")]
+            public string CitizenIdNumber { get; set; }
+
+            [Required(ErrorMessage = "Vui lòng nhập nơi ở.")]
+            [StringLength(500)]
+            [Display(Name = "Nơi ở")]
+            public string ResidenceAddress { get; set; }
+
             [Required(ErrorMessage = "Vui lòng chọn ngày sinh.")]
             [DataType(DataType.Date)]
             [Display(Name = "Ngày sinh")]
@@ -75,6 +85,13 @@ namespace PROJECT_OTSP.Areas.Identity.Pages.Account
             [StringLength(100)]
             [Display(Name = "Liên hệ người giám hộ")]
             public string GuardianContact { get; set; }
+
+            [Display(Name = "CCCD người giám hộ")]
+            public string GuardianCitizenIdNumber { get; set; }
+
+            [StringLength(500)]
+            [Display(Name = "Nơi ở người giám hộ")]
+            public string GuardianResidenceAddress { get; set; }
 
             // ===== Riêng học viên =====
             [Display(Name = "Môn học quan tâm")]
@@ -149,6 +166,10 @@ namespace PROJECT_OTSP.Areas.Identity.Pages.Account
                     ModelState.AddModelError("Input.GuardianFullName", "Học viên dưới 18 tuổi cần nhập họ tên người giám hộ.");
                 if (string.IsNullOrWhiteSpace(Input.GuardianContact))
                     ModelState.AddModelError("Input.GuardianContact", "Học viên dưới 18 tuổi cần nhập số điện thoại hoặc email người giám hộ.");
+                if (!System.Text.RegularExpressions.Regex.IsMatch(Input.GuardianCitizenIdNumber ?? string.Empty, @"^[0-9]{12}$"))
+                    ModelState.AddModelError("Input.GuardianCitizenIdNumber", "CCCD người giám hộ phải gồm đúng 12 chữ số.");
+                if (string.IsNullOrWhiteSpace(Input.GuardianResidenceAddress) || Input.GuardianResidenceAddress.Length > 500)
+                    ModelState.AddModelError("Input.GuardianResidenceAddress", "Vui lòng nhập nơi ở người giám hộ (tối đa 500 ký tự).");
             }
 
             if (Input.Role == RoleTutor && Input.HourlyFee is null)
@@ -162,6 +183,8 @@ namespace PROJECT_OTSP.Areas.Identity.Pages.Account
                 UserName = Input.Email,
                 Email = Input.Email,
                 FullName = Input.FullName.Trim(),
+                CitizenIdNumber = Input.CitizenIdNumber.Trim(),
+                ResidenceAddress = Input.ResidenceAddress.Trim(),
                 PhoneNumber = Input.PhoneNumber,
                 DateOfBirth = Input.DateOfBirth,
                 Address = Input.Area
@@ -212,7 +235,9 @@ namespace PROJECT_OTSP.Areas.Identity.Pages.Account
                         student.Guardians.Add(new Guardian
                         {
                             FullName = Input.GuardianFullName.Trim(),
-                            ContactInfo = Input.GuardianContact.Trim()
+                            ContactInfo = Input.GuardianContact.Trim(),
+                            CitizenIdNumber = Input.GuardianCitizenIdNumber.Trim(),
+                            ResidenceAddress = Input.GuardianResidenceAddress.Trim()
                         });
                     }
 

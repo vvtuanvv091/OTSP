@@ -51,6 +51,8 @@ namespace PROJECT_OTSP.Areas.Student_Parent.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> UpdateProfile(
             string? fullName,
+            string? citizenIdNumber,
+            string? residenceAddress,
             string? interestedSubjects,
             string? area,
             string? freeSchedule,
@@ -69,9 +71,23 @@ namespace PROJECT_OTSP.Areas.Student_Parent.Controllers
                 return NotFound();
 
             fullName = fullName?.Trim();
+            citizenIdNumber = citizenIdNumber?.Trim();
+            residenceAddress = residenceAddress?.Trim();
             if (string.IsNullOrWhiteSpace(fullName) || fullName.Length > 150)
             {
                 TempData["Error"] = "Họ tên phải có từ 1 đến 150 ký tự.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            if (!System.Text.RegularExpressions.Regex.IsMatch(citizenIdNumber ?? string.Empty, @"^[0-9]{12}$"))
+            {
+                TempData["Error"] = "CCCD phải gồm đúng 12 chữ số.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            if (string.IsNullOrWhiteSpace(residenceAddress) || residenceAddress.Length > 500)
+            {
+                TempData["Error"] = "Vui lòng nhập nơi ở (tối đa 500 ký tự).";
                 return RedirectToAction(nameof(Index));
             }
 
@@ -92,6 +108,8 @@ namespace PROJECT_OTSP.Areas.Student_Parent.Controllers
             }
 
             profile.User.FullName = fullName;
+            profile.User.CitizenIdNumber = citizenIdNumber;
+            profile.User.ResidenceAddress = residenceAddress;
             profile.InterestedSubjects = string.IsNullOrWhiteSpace(interestedSubjects) ? null : interestedSubjects;
             profile.Area = string.IsNullOrWhiteSpace(area) ? null : area;
             profile.FreeSchedule = string.IsNullOrWhiteSpace(freeSchedule) ? null : freeSchedule;
@@ -109,7 +127,12 @@ namespace PROJECT_OTSP.Areas.Student_Parent.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> AddGuardian(string? fullName, string? contactInfo, CancellationToken cancellationToken)
+        public async Task<IActionResult> AddGuardian(
+            string? fullName,
+            string? contactInfo,
+            string? citizenIdNumber,
+            string? residenceAddress,
+            CancellationToken cancellationToken)
         {
             var userId = CurrentUserId;
             if (string.IsNullOrWhiteSpace(userId))
@@ -117,10 +140,24 @@ namespace PROJECT_OTSP.Areas.Student_Parent.Controllers
 
             fullName = fullName?.Trim();
             contactInfo = contactInfo?.Trim();
+            citizenIdNumber = citizenIdNumber?.Trim();
+            residenceAddress = residenceAddress?.Trim();
 
             if (string.IsNullOrWhiteSpace(fullName) || fullName.Length > 150)
             {
                 TempData["Error"] = "Họ tên người giám hộ phải có từ 1 đến 150 ký tự.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            if (!System.Text.RegularExpressions.Regex.IsMatch(citizenIdNumber ?? string.Empty, @"^[0-9]{12}$"))
+            {
+                TempData["Error"] = "CCCD người giám hộ phải gồm đúng 12 chữ số.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            if (string.IsNullOrWhiteSpace(residenceAddress) || residenceAddress.Length > 500)
+            {
+                TempData["Error"] = "Vui lòng nhập nơi ở người giám hộ (tối đa 500 ký tự).";
                 return RedirectToAction(nameof(Index));
             }
 
@@ -138,11 +175,56 @@ namespace PROJECT_OTSP.Areas.Student_Parent.Controllers
             {
                 StudentProfileId = profileId.Value,
                 FullName = fullName,
-                ContactInfo = contactInfo
+                ContactInfo = contactInfo,
+                CitizenIdNumber = citizenIdNumber,
+                ResidenceAddress = residenceAddress
             });
             await _dbcontext.SaveChangesAsync(cancellationToken);
 
             TempData["Success"] = "Đã thêm người giám hộ.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> UpdateGuardian(
+            int id,
+            string? fullName,
+            string? contactInfo,
+            string? citizenIdNumber,
+            string? residenceAddress,
+            CancellationToken cancellationToken)
+        {
+            var userId = CurrentUserId;
+            if (string.IsNullOrWhiteSpace(userId))
+                return RedirectToAction("Login", "Account", new { area = "Identity" });
+
+            fullName = fullName?.Trim();
+            contactInfo = contactInfo?.Trim();
+            citizenIdNumber = citizenIdNumber?.Trim();
+            residenceAddress = residenceAddress?.Trim();
+
+            if (string.IsNullOrWhiteSpace(fullName) || fullName.Length > 150 ||
+                string.IsNullOrWhiteSpace(contactInfo) || contactInfo.Length > 100 ||
+                !System.Text.RegularExpressions.Regex.IsMatch(citizenIdNumber ?? string.Empty, @"^[0-9]{12}$") ||
+                string.IsNullOrWhiteSpace(residenceAddress) || residenceAddress.Length > 500)
+            {
+                TempData["Error"] = "Vui lòng kiểm tra lại họ tên, liên hệ, CCCD 12 chữ số và nơi ở người giám hộ.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            var guardian = await _dbcontext.Guardians
+                .FirstOrDefaultAsync(g => g.Id == id && g.StudentProfile.UserId == userId, cancellationToken);
+            if (guardian is null)
+                return NotFound();
+
+            guardian.FullName = fullName;
+            guardian.ContactInfo = contactInfo;
+            guardian.CitizenIdNumber = citizenIdNumber;
+            guardian.ResidenceAddress = residenceAddress;
+            await _dbcontext.SaveChangesAsync(cancellationToken);
+
+            TempData["Success"] = "Đã cập nhật hồ sơ người giám hộ.";
             return RedirectToAction(nameof(Index));
         }
 

@@ -227,6 +227,10 @@ namespace PROJECT_OTSP.Data.Migrations
                     b.Property<string>("AvatarUrl")
                         .HasColumnType("text");
 
+                    b.Property<string>("CitizenIdNumber")
+                        .HasMaxLength(12)
+                        .HasColumnType("character varying(12)");
+
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
                         .HasColumnType("text");
@@ -271,6 +275,10 @@ namespace PROJECT_OTSP.Data.Migrations
 
                     b.Property<bool>("PhoneNumberConfirmed")
                         .HasColumnType("boolean");
+
+                    b.Property<string>("ResidenceAddress")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
 
                     b.Property<string>("SecurityStamp")
                         .HasColumnType("text");
@@ -355,6 +363,42 @@ namespace PROJECT_OTSP.Data.Migrations
                     b.HasIndex("ClassroomId");
 
                     b.ToTable("ClassSessions");
+                });
+
+            modelBuilder.Entity("PROJECT_OTSP.Models.ClassSessionAttendance", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("ClassSessionId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("JoinCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1);
+
+                    b.Property<DateTime>("JoinedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("LeftAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("ClassSessionId", "UserId")
+                        .IsUnique();
+
+                    b.ToTable("ClassSessionAttendances");
                 });
 
             modelBuilder.Entity("PROJECT_OTSP.Models.Classroom", b =>
@@ -606,6 +650,10 @@ namespace PROJECT_OTSP.Data.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("CitizenIdNumber")
+                        .HasMaxLength(12)
+                        .HasColumnType("character varying(12)");
+
                     b.Property<string>("ContactInfo")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -618,6 +666,10 @@ namespace PROJECT_OTSP.Data.Migrations
                         .IsRequired()
                         .HasMaxLength(150)
                         .HasColumnType("character varying(150)");
+
+                    b.Property<string>("ResidenceAddress")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
 
                     b.Property<int>("StudentProfileId")
                         .HasColumnType("integer");
@@ -1134,6 +1186,9 @@ namespace PROJECT_OTSP.Data.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<int?>("ClassSessionId")
+                        .HasColumnType("integer");
+
                     b.Property<int>("ConnectionRequestId")
                         .HasColumnType("integer");
 
@@ -1144,6 +1199,9 @@ namespace PROJECT_OTSP.Data.Migrations
                         .HasColumnType("integer");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("ClassSessionId")
+                        .IsUnique();
 
                     b.HasIndex("ConnectionRequestId");
 
@@ -1338,6 +1396,25 @@ namespace PROJECT_OTSP.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("Classroom");
+                });
+
+            modelBuilder.Entity("PROJECT_OTSP.Models.ClassSessionAttendance", b =>
+                {
+                    b.HasOne("PROJECT_OTSP.Models.ClassSession", "ClassSession")
+                        .WithMany("Attendances")
+                        .HasForeignKey("ClassSessionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("PROJECT_OTSP.Models.ApplicationUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("ClassSession");
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("PROJECT_OTSP.Models.Classroom", b =>
@@ -1690,11 +1767,18 @@ namespace PROJECT_OTSP.Data.Migrations
 
             modelBuilder.Entity("PROJECT_OTSP.Models.TrialSchedule", b =>
                 {
+                    b.HasOne("PROJECT_OTSP.Models.ClassSession", "ClassSession")
+                        .WithOne()
+                        .HasForeignKey("PROJECT_OTSP.Models.TrialSchedule", "ClassSessionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("PROJECT_OTSP.Models.ConnectionRequest", "ConnectionRequest")
                         .WithMany("TrialSchedules")
                         .HasForeignKey("ConnectionRequestId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("ClassSession");
 
                     b.Navigation("ConnectionRequest");
                 });
@@ -1788,6 +1872,8 @@ namespace PROJECT_OTSP.Data.Migrations
 
             modelBuilder.Entity("PROJECT_OTSP.Models.ClassSession", b =>
                 {
+                    b.Navigation("Attendances");
+
                     b.Navigation("Reviews");
                 });
 

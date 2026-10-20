@@ -22,5 +22,8 @@ namespace PROJECT_OTSP.Models
         public int ConnectionRequestId { get; set; }
         public ConnectionRequest ConnectionRequest { get; set; } = null!;
 
+        public int? ClassSessionId { get; set; }
+        public ClassSession? ClassSession { get; set; }
+
     }
 }

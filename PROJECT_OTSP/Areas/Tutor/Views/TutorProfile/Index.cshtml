@@ -308,6 +308,16 @@
                                    value="@Model.User.FullName" maxlength="150" required />
                         </div>
                         <div class="col-md-6">
+                            <label for="citizenIdNumber" class="form-label">Số CCCD (12 chữ số)</label>
+                            <input id="citizenIdNumber" name="citizenIdNumber" class="form-control" inputmode="numeric"
+                                   value="@Model.User.CitizenIdNumber" maxlength="12" pattern="[0-9]{12}" required />
+                        </div>
+                        <div class="col-12">
+                            <label for="residenceAddress" class="form-label">Nơi ở hiện tại (thông tin riêng tư)</label>
+                            <input id="residenceAddress" name="residenceAddress" class="form-control"
+                                   value="@Model.User.ResidenceAddress" maxlength="500" required />
+                        </div>
+                        <div class="col-md-6">
                             <label for="Email" class="form-label">Email</label>
                             <input id="Email" class="form-control" value="@Model.User.Email" readonly />
                         </div>

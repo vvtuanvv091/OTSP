@@ -102,7 +102,12 @@ namespace PROJECT_OTSP.Areas.Tutor.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> UpdateProfile(string? DisplayName,string? Introduction,CancellationToken cancellationToken)
+        public async Task<IActionResult> UpdateProfile(
+            string? DisplayName,
+            string? Introduction,
+            string? citizenIdNumber,
+            string? residenceAddress,
+            CancellationToken cancellationToken)
         {
             var userId = GetCurrentUserId();
             if (string.IsNullOrWhiteSpace(userId))
@@ -116,13 +121,29 @@ namespace PROJECT_OTSP.Areas.Tutor.Controllers
                 return NotFound();
 
             var fullName = DisplayName?.Trim();
+            citizenIdNumber = citizenIdNumber?.Trim();
+            residenceAddress = residenceAddress?.Trim();
             if (string.IsNullOrWhiteSpace(fullName) || fullName.Length > 150)
             {
                 TempData["Error"] = "Họ tên phải có từ 1 đến 150 ký tự.";
                 return RedirectToAction(nameof(Index));
             }
 
+            if (!System.Text.RegularExpressions.Regex.IsMatch(citizenIdNumber ?? string.Empty, @"^[0-9]{12}$"))
+            {
+                TempData["Error"] = "CCCD phải gồm đúng 12 chữ số.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            if (string.IsNullOrWhiteSpace(residenceAddress) || residenceAddress.Length > 500)
+            {
+                TempData["Error"] = "Vui lòng nhập nơi ở (tối đa 500 ký tự).";
+                return RedirectToAction(nameof(Index));
+            }
+
             tutorProfile.User.FullName = fullName;
+            tutorProfile.User.CitizenIdNumber = citizenIdNumber;
+            tutorProfile.User.ResidenceAddress = residenceAddress;
             tutorProfile.Introduction = string.IsNullOrWhiteSpace(Introduction)
                 ? null
                 : Introduction.Trim();

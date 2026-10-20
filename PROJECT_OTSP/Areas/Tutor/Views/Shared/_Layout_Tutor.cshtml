@@ -33,6 +33,7 @@
     <link rel="stylesheet" href="~/css/tutor-mobile.css" asp-append-version="true" />
 </head>
 <body class="index-page" data-controller="@controllerName">
+    <div id="preloader"></div>
     <div id="tutor-realtime-config" class="d-none"
          data-hub-url="@Url.Content("~/hubs/connection-requests")"
          data-requests-url="@Url.Action("Index", "TutorConnectionRequest", new { area = "Tutor" })"></div>
@@ -318,10 +319,18 @@
                 window.setTimeout(() => window.location.reload(), 500);
         });
 
+        connection.on("ClassSessionStatusChanged", update => {
+            const labels = { InProgress: "Buổi học đang diễn ra hoặc đã được mở lại.", Done: "Buổi học đã kết thúc.", Cancelled: "Buổi học đã bị hủy." };
+            showNotice(labels[update.status] || "Trạng thái buổi học đã thay đổi.");
+            if (document.body.dataset.controller === "TutorSchedule")
+                window.setTimeout(() => window.location.reload(), 500);
+        });
+
         connection.start().catch(error => console.error("SignalR connection failed:", error));
     })();
 </script>
 
+<script src="~/assets/js/preloader.js" asp-append-version="true"></script>
 @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

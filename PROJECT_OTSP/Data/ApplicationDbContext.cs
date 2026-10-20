@@ -32,6 +32,7 @@ namespace PROJECT_OTSP.Data
         public DbSet<Classroom> Classrooms => Set<Classroom>();
         public DbSet<ClassroomStudent> ClassroomStudents => Set<ClassroomStudent>();
         public DbSet<ClassSession> ClassSessions => Set<ClassSession>();
+        public DbSet<ClassSessionAttendance> ClassSessionAttendances => Set<ClassSessionAttendance>();
         public DbSet<Review> Reviews => Set<Review>();
         public DbSet<ReviewAlert> ReviewAlerts => Set<ReviewAlert>();
         public DbSet<Payment> Payments => Set<Payment>();
@@ -70,6 +71,27 @@ namespace PROJECT_OTSP.Data
             b.Entity<TutorAvailability>()
                 .HasIndex(x => new { x.TutorId, x.DayOfWeek, x.StartTime, x.EndTime })
                 .IsUnique();
+
+            b.Entity<ClassSessionAttendance>()
+                .HasIndex(x => new { x.ClassSessionId, x.UserId })
+                .IsUnique();
+            b.Entity<ClassSessionAttendance>()
+                .Property(x => x.JoinCount)
+                .HasDefaultValue(1);
+            b.Entity<ClassSessionAttendance>()
+                .HasOne(x => x.ClassSession).WithMany(x => x.Attendances)
+                .HasForeignKey(x => x.ClassSessionId).OnDelete(DeleteBehavior.Cascade);
+            b.Entity<ClassSessionAttendance>()
+                .HasOne(x => x.User).WithMany()
+                .HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);
+
+            b.Entity<TrialSchedule>()
+                .HasIndex(x => x.ClassSessionId)
+                .IsUnique();
+            b.Entity<TrialSchedule>()
+                .HasOne(x => x.ClassSession).WithOne()
+                .HasForeignKey<TrialSchedule>(x => x.ClassSessionId)
+                .OnDelete(DeleteBehavior.Restrict);
 
             // ===== 4. Gia sư không dạy trùng môn-cấp =====
             b.Entity<TutorSubject>().HasIndex(x => new { x.TutorId, x.SubjectId, x.GradeLevelId }).IsUnique();

@@ -203,7 +203,7 @@ public class Send_Details_TutorController : Controller
     /// </summary>
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> SendRequest(SendConnectionRequestDto model, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> SendRequest([Bind(Prefix = "Request")] SendConnectionRequestDto model, CancellationToken cancellationToken = default)
     {
         if (!ModelState.IsValid)
         {
@@ -381,6 +381,18 @@ public class Send_Details_TutorController : Controller
                     .Where(schedule => schedule.Status == ScheduleStatus.Confirmed)
                     .OrderByDescending(schedule => schedule.ScheduledAt)
                     .Select(schedule => (DateTime?)schedule.ScheduledAt)
+                    .FirstOrDefault(),
+                ClassSessionId = cr.TrialSchedules
+                    .Where(schedule => schedule.Status == ScheduleStatus.Confirmed)
+                    .OrderByDescending(schedule => schedule.ScheduledAt)
+                    .Select(schedule => schedule.ClassSessionId)
+                    .FirstOrDefault(),
+                ClassSessionStatus = cr.TrialSchedules
+                    .Where(schedule => schedule.Status == ScheduleStatus.Confirmed)
+                    .OrderByDescending(schedule => schedule.ScheduledAt)
+                    .Select(schedule => schedule.ClassSession == null
+                        ? (SessionStatus?)null
+                        : schedule.ClassSession.Status)
                     .FirstOrDefault()
             })
             .ToListAsync(cancellationToken);

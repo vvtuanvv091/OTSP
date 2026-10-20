@@ -1,105 +1,724 @@
 @using static PROJECT_OTSP.Models.Enums
-@model IReadOnlyList<PROJECT_OTSP.Dtos.TutorTeachingScheduleDto>
+@model PROJECT_OTSP.Dtos.TutorSchedulePageVm
 
 @{
     ViewData["Title"] = "Lịch dạy";
+    var days = new[]
+    {
+        DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday,
+        DayOfWeek.Thursday, DayOfWeek.Friday, DayOfWeek.Saturday,
+        DayOfWeek.Sunday
+    };
+    var dayShortLabels = new Dictionary<DayOfWeek, string>
+    {
+        [DayOfWeek.Monday] = "T2",
+        [DayOfWeek.Tuesday] = "T3",
+        [DayOfWeek.Wednesday] = "T4",
+        [DayOfWeek.Thursday] = "T5",
+        [DayOfWeek.Friday] = "T6",
+        [DayOfWeek.Saturday] = "T7",
+        [DayOfWeek.Sunday] = "CN"
+    };
 }
 
-<div class="container-fluid py-4">
-    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+<style>
+    .schedule-page {
+        --availability-accent: var(--bs-danger, #DB303A);
+        --availability-accent-text: #B7212B;
+        --availability-accent-soft: #FDE8E8;
+        --availability-accent-border: #FCA5A5;
+        --availability-border: var(--bs-border-color, #E5E7EB);
+        --availability-busy-bg: #374151;
+        --availability-busy-border: #1F2937;
+        --availability-busy-text: #FFFFFF;
+    }
+
+    .schedule-card {
+        background: var(--bs-body-bg);
+        border: 1px solid var(--availability-border);
+        border-radius: 8px;
+    }
+
+    .schedule-table-wrap {
+        overflow-x: auto;
+    }
+
+    .schedule-table {
+        width: 100%;
+        min-width: 760px;
+        table-layout: fixed;
+        border-collapse: separate;
+        border-spacing: 3px 4px;
+        font-size: 12px;
+    }
+
+    .schedule-table th {
+        padding: 5px 3px;
+        color: var(--bs-body-color);
+        font-weight: 500;
+        text-align: center;
+        white-space: nowrap;
+    }
+
+    .schedule-table th.period-column { width: 44px; }
+    .schedule-table th.time-column { width: 92px; }
+    .schedule-table td { padding: 0 1px; text-align: center; vertical-align: middle; }
+
+    .schedule-period-label {
+        color: var(--availability-accent-text);
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: .5px;
+    }
+
+    .schedule-time-label {
+        color: var(--bs-secondary-color);
+        font-size: 11px;
+        white-space: nowrap;
+    }
+
+    .schedule-table th.day-column {
+        background: var(--bs-tertiary-bg);
+        border-radius: 4px;
+    }
+
+    .schedule-table th.day-column.is-today {
+        background: var(--availability-accent-soft);
+        color: var(--availability-accent-text);
+        border: 1px solid var(--availability-accent-border);
+    }
+
+    .day-title {
+        font-size: 12px;
+        font-weight: 700;
+        line-height: 1.2;
+    }
+
+    .day-date {
+        font-size: 11px;
+        color: var(--bs-secondary-color);
+    }
+
+    .is-today .day-date {
+        color: var(--availability-accent-text);
+        font-weight: 600;
+    }
+
+    .availability-slot {
+        position: relative;
+        display: flex;
+        width: 100%;
+        min-height: 28px;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid var(--availability-border);
+        border-radius: 4px;
+        background: var(--bs-body-bg);
+        font-size: 11px;
+        line-height: 1;
+        transition: all .15s ease-in-out;
+    }
+
+    .availability-slot.is-free {
+        border-color: var(--availability-accent-border);
+        background: var(--availability-accent-soft);
+        color: var(--availability-accent-text);
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+    .availability-slot.is-free:hover {
+        filter: brightness(.95);
+        transform: translateY(-1px);
+        box-shadow: 0 2px 4px rgba(219, 48, 58, .15);
+    }
+
+    .availability-slot.is-empty {
+        background: var(--bs-body-bg);
+        border-color: var(--availability-border);
+    }
+
+    .schedule-session-card {
+        border: 1px solid var(--availability-border);
+        border-left: 3px solid #DB303A;
+        border-radius: 4px;
+        padding: 4px 6px;
+        background: var(--bs-body-bg);
+        text-align: left;
+        cursor: pointer;
+        transition: transform .15s ease, box-shadow .15s ease;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, .05);
+    }
+
+    .schedule-session-card:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 10px rgba(0, 0, 0, .1);
+    }
+
+    .schedule-session-card.status-inprogress {
+        border-left-color: #0d6efd;
+        background: rgba(13, 110, 253, .05);
+    }
+
+    .schedule-session-card.status-done {
+        border-left-color: #6c757d;
+        background: rgba(108, 117, 125, .05);
+    }
+
+    .schedule-session-card.status-scheduled {
+        border-left-color: #198754;
+        background: rgba(25, 135, 84, .05);
+    }
+
+    .schedule-session-card.status-cancelled {
+        border-left-color: #dc3545;
+        background: rgba(220, 53, 69, .05);
+    }
+
+    .schedule-session-card .session-time {
+        font-size: 10px;
+        font-weight: 700;
+        line-height: 1;
+    }
+
+    .schedule-session-card .session-student {
+        font-size: 11px;
+        font-weight: 600;
+        line-height: 1.2;
+    }
+
+    .schedule-session-card .session-subject {
+        font-size: 10px;
+        color: var(--bs-secondary-color);
+        line-height: 1.2;
+    }
+
+    .availability-legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 16px;
+        color: var(--bs-secondary-color);
+        font-size: 12px;
+        align-items: center;
+    }
+
+    .legend-item {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .legend-swatch {
+        width: 14px;
+        height: 14px;
+        border: 1px solid var(--availability-border);
+        border-radius: 3px;
+        background: var(--bs-body-bg);
+    }
+
+    .legend-swatch.is-free {
+        border-color: var(--availability-accent-border);
+        background: var(--availability-accent-soft);
+    }
+
+    .legend-swatch.is-busy {
+        border-color: var(--availability-busy-border);
+        background: var(--availability-busy-bg);
+    }
+
+    .card-highlight-pulse {
+        animation: cardPulse 1.8s ease-in-out;
+    }
+
+    @@keyframes cardPulse {
+        0% { outline: 3px solid rgba(219, 48, 58, .8); box-shadow: 0 0 16px rgba(219, 48, 58, .4); }
+        50% { outline: 3px solid rgba(219, 48, 58, .4); box-shadow: 0 0 10px rgba(219, 48, 58, .2); }
+        100% { outline: 3px solid transparent; box-shadow: none; }
+    }
+
+    .availability-mobile-day-picker { display: none; }
+    .availability-day-button {
+        border: 1px solid var(--availability-border);
+        border-radius: var(--bs-border-radius);
+        background: var(--bs-body-bg);
+        color: var(--bs-body-color);
+        padding: .45rem .6rem;
+        font-size: .85rem;
+    }
+    .availability-day-button[aria-pressed="true"] {
+        border-color: var(--availability-accent);
+        background: var(--availability-accent);
+        color: #fff;
+    }
+
+    @@media (max-width: 767.98px) {
+        .availability-mobile-day-picker {
+            display: flex;
+            gap: .3rem;
+            overflow-x: auto;
+            padding: .1rem .1rem .5rem;
+            scrollbar-width: thin;
+        }
+        .availability-day-button {
+            flex: 1 0 auto;
+            min-width: 2.35rem;
+            padding: .4rem .35rem;
+        }
+        .schedule-table {
+            min-width: 100%;
+            border-spacing: 2px 4px;
+            font-size: .72rem;
+        }
+        .schedule-table th.period-column { width: 2.45rem; }
+        .schedule-table th.time-column { width: 4.65rem; }
+        .schedule-table th[data-day-column],
+        .schedule-table td[data-day-column] { display: none; }
+        .schedule-page[data-active-day="1"] .schedule-table [data-day-column="1"],
+        .schedule-page[data-active-day="2"] .schedule-table [data-day-column="2"],
+        .schedule-page[data-active-day="3"] .schedule-table [data-day-column="3"],
+        .schedule-page[data-active-day="4"] .schedule-table [data-day-column="4"],
+        .schedule-page[data-active-day="5"] .schedule-table [data-day-column="5"],
+        .schedule-page[data-active-day="6"] .schedule-table [data-day-column="6"],
+        .schedule-page[data-active-day="0"] .schedule-table [data-day-column="0"] { display: table-cell; }
+        .availability-slot { min-height: 2rem; font-size: .72rem; }
+    }
+</style>
+
+<div class="container-fluid py-4 schedule-page" data-active-day="1">
+    <!-- Header -->
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
         <div>
             <h1 class="h3 mb-1">Lịch dạy</h1>
-            <p class="text-body-secondary mb-0">Yêu cầu chỉ xuất hiện tại đây sau khi gia sư chấp nhận.</p>
+            <p class="text-body-secondary mb-0">Thời khóa biểu giảng dạy và lịch học thử theo giờ Việt Nam (GMT+7). Yêu cầu chỉ xuất hiện tại đây sau khi gia sư chấp nhận.</p>
         </div>
-        <a asp-area="Tutor" asp-controller="TutorConnectionRequest" asp-action="Index" class="btn btn-outline-danger">
-            Xem yêu cầu kết nối
-        </a>
+        <div class="d-flex flex-wrap gap-2">
+            <a asp-area="Tutor" asp-controller="TutorAvailability" asp-action="Index" class="btn btn-outline-secondary">
+                <i class="bi bi-calendar-range me-1" aria-hidden="true"></i>Cài đặt lịch rảnh
+            </a>
+            <a asp-area="Tutor" asp-controller="TutorConnectionRequest" asp-action="Index" class="btn btn-outline-danger">
+                <i class="bi bi-person-plus me-1" aria-hidden="true"></i>Xem yêu cầu kết nối
+            </a>
+        </div>
     </div>
 
     @if (TempData["Success"] is string successMessage)
     {
-        <div class="alert alert-success" role="status">@successMessage</div>
+        <div class="alert alert-success alert-dismissible fade show mb-3" role="status">
+            <i class="bi bi-check-circle-fill me-2" aria-hidden="true"></i>@successMessage
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Đóng"></button>
+        </div>
     }
     @if (TempData["Error"] is string errorMessage)
     {
-        <div class="alert alert-warning" role="alert">@errorMessage</div>
+        <div class="alert alert-warning alert-dismissible fade show mb-3" role="alert">
+            <i class="bi bi-exclamation-triangle-fill me-2" aria-hidden="true"></i>@errorMessage
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Đóng"></button>
+        </div>
     }
 
-    @if (Model.Count == 0)
-    {
-        <div class="card border-0 shadow-sm">
-            <div class="card-body py-5 text-center">
-                <i class="bi bi-calendar-event fs-1 text-body-secondary" aria-hidden="true"></i>
-                <h2 class="h5 mt-3">Chưa có lịch dạy</h2>
-                <p class="text-body-secondary mb-0">Khi bạn chấp nhận yêu cầu kết nối, học viên sẽ xuất hiện tại đây để xác nhận lịch học thử.</p>
+    <!-- Weekly Timetable Card (Hình 2 style with detailed calendar dates) -->
+    <div class="schedule-card p-3 mb-4 shadow-sm">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3 pb-3 border-bottom">
+            <div class="d-flex align-items-center gap-2">
+                <a asp-action="Index" asp-route-weekOffset="@(Model.WeekOffset - 1)" class="btn btn-outline-secondary btn-sm" title="Tuần trước">
+                    <i class="bi bi-chevron-left" aria-hidden="true"></i> Tuần trước
+                </a>
+                <a asp-action="Index" asp-route-weekOffset="0" class="btn @(Model.WeekOffset == 0 ? "btn-danger" : "btn-outline-danger") btn-sm">
+                    Tuần này
+                </a>
+                <a asp-action="Index" asp-route-weekOffset="@(Model.WeekOffset + 1)" class="btn btn-outline-secondary btn-sm" title="Tuần sau">
+                    Tuần sau <i class="bi bi-chevron-right" aria-hidden="true"></i>
+                </a>
+            </div>
+
+            <div class="d-flex align-items-center gap-2">
+                <i class="bi bi-calendar-week text-danger fs-5" aria-hidden="true"></i>
+                <span class="h6 mb-0 fw-bold">
+                    @Model.SelectedMonday.ToString("dd/MM/yyyy") – @Model.SelectedSunday.ToString("dd/MM/yyyy")
+                </span>
+                @if (Model.WeekOffset != 0)
+                {
+                    <span class="badge bg-secondary-subtle text-secondary border">
+                        @(Model.WeekOffset > 0 ? $"+{Model.WeekOffset} tuần" : $"{Model.WeekOffset} tuần")
+                    </span>
+                }
+            </div>
+
+            <div class="d-flex align-items-center gap-2">
+                <form method="get" asp-action="Index" class="d-flex align-items-center gap-1">
+                    <label for="jumpDateInput" class="visually-hidden">Chọn ngày xem lịch</label>
+                    <input id="jumpDateInput" type="date" name="jumpDate" class="form-control form-control-sm"
+                           value="@Model.SelectedMonday.ToString("yyyy-MM-dd")" onchange="this.form.submit()" title="Chọn ngày xem lịch" />
+                </form>
             </div>
         </div>
-    }
-    else
-    {
-        <div class="d-flex flex-column gap-3">
-            @foreach (var item in Model)
-            {
-                <article class="card border-0 shadow-sm">
-                    <div class="card-body">
-                        <div class="d-flex flex-wrap align-items-start justify-content-between gap-3">
-                            <div>
-                                <h2 class="h5 mb-1">@item.StudentName</h2>
-                                <div class="text-body-secondary">@item.SubjectName · @item.GradeLevelName · @(item.PreferredType == ClassroomType.Group ? "Lớp nhóm" : "1 kèm 1")</div>
-                            </div>
-                            @if (item.TrialStatus == ScheduleStatus.Confirmed && item.TrialScheduledAt.HasValue)
-                            {
-                                <span class="badge text-bg-success">Đã xác nhận lịch học thử</span>
-                            }
-                            else if (item.TrialStatus == ScheduleStatus.Pending)
-                            {
-                                <span class="badge text-bg-warning">Đang chờ xác nhận lịch</span>
-                            }
-                            else if (item.TrialStatus == ScheduleStatus.Rejected)
-                            {
-                                <span class="badge text-bg-secondary">Lịch trước đó đã bị từ chối</span>
-                            }
-                        </div>
 
-                        @if (item.TrialStatus == ScheduleStatus.Confirmed && item.TrialScheduledAt.HasValue)
-                        {
-                            <p class="mt-3 mb-0"><i class="bi bi-calendar-check me-2"></i>Lịch học thử: <strong>@item.TrialScheduledAt.Value.AddHours(7).ToString("dd/MM/yyyy HH:mm") (GMT+7)</strong></p>
-                        }
-                        else
-                        {
-                            <form asp-action="ConfirmTrialSchedule" method="post" class="row g-2 align-items-end mt-2 trial-schedule-form">
-                                @Html.AntiForgeryToken()
-                                <input type="hidden" name="requestId" value="@item.RequestId" />
-                                <input type="hidden" name="scheduledAtUtc" />
-                                <div class="col-12 col-md-6">
-                                    <label class="form-label" for="trial-time-@item.RequestId">Chọn lịch học thử</label>
-                                    <input id="trial-time-@item.RequestId" type="datetime-local" class="form-control" required min="@DateTime.Now.AddMinutes(30).ToString("yyyy-MM-ddTHH:mm")" />
-                                </div>
-                                <div class="col-12 col-md-auto">
-                                    <button type="submit" class="btn btn-success">Xác nhận lịch học thử</button>
-                                </div>
-                            </form>
-                        }
-                    </div>
-                </article>
+        <!-- Legend (Hình 2 style) -->
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
+            <div class="availability-legend">
+                <span class="legend-item"><span class="legend-swatch is-free" aria-hidden="true"></span>Rảnh - có thể nhận lớp</span>
+                <span class="legend-item"><span class="legend-swatch is-busy" aria-hidden="true"></span>Đã có lớp / Buổi học</span>
+                <span class="legend-item"><span class="legend-swatch" aria-hidden="true"></span>Không dạy</span>
+            </div>
+            <div class="small text-body-secondary">
+                <i class="bi bi-info-circle me-1" aria-hidden="true"></i>Nhấp vào buổi học để cuộn đến thẻ chi tiết bên dưới.
+            </div>
+        </div>
+
+        <!-- Mobile day picker -->
+        <div class="availability-mobile-day-picker mb-2" role="group" aria-label="Chọn ngày trong tuần">
+            @for (var i = 0; i < 7; i++)
+            {
+                var dayDate = Model.SelectedMonday.AddDays(i);
+                var isToday = dayDate == Model.TodayVn;
+                var active = i == 0;
+                <button type="button" class="availability-day-button"
+                        data-mobile-day="@((int)dayDate.DayOfWeek)" aria-pressed="@(active ? "true" : "false")">
+                    @dayShortLabels[dayDate.DayOfWeek] @dayDate.ToString("dd/MM") @(isToday ? "•" : "")
+                </button>
             }
         </div>
-    }
+
+        <!-- Table Grid -->
+        <div class="schedule-table-wrap">
+            <table class="schedule-table mb-0" aria-label="Thời khóa biểu lịch dạy trong tuần">
+                <thead>
+                    <tr>
+                        <th class="period-column" scope="col">Buổi</th>
+                        <th class="time-column" scope="col">Khung giờ</th>
+                        @for (var i = 0; i < 7; i++)
+                        {
+                            var dayDate = Model.SelectedMonday.AddDays(i);
+                            var isToday = dayDate == Model.TodayVn;
+                            var dayTitle = i switch
+                            {
+                                0 => "Thứ 2",
+                                1 => "Thứ 3",
+                                2 => "Thứ 4",
+                                3 => "Thứ 5",
+                                4 => "Thứ 6",
+                                5 => "Thứ 7",
+                                _ => "Chủ nhật"
+                            };
+                            <th scope="col" class="day-column @(isToday ? "is-today" : "")" data-day-column="@((int)dayDate.DayOfWeek)">
+                                <div class="day-title">@dayTitle</div>
+                                <div class="day-date">@dayDate.ToString("dd/MM")</div>
+                                @if (isToday)
+                                {
+                                    <span class="badge rounded-pill text-bg-danger mt-1" style="font-size: 9px;">Hôm nay</span>
+                                }
+                            </th>
+                        }
+                    </tr>
+                </thead>
+                <tbody>
+                    @for (var hour = 6; hour < 22; hour++)
+                    {
+                        <tr>
+                            @if (hour == 6)
+                            {
+                                <th class="schedule-period-label" scope="rowgroup" rowspan="6">Sáng</th>
+                            }
+                            else if (hour == 12)
+                            {
+                                <th class="schedule-period-label" scope="rowgroup" rowspan="6">Chiều</th>
+                            }
+                            else if (hour == 18)
+                            {
+                                <th class="schedule-period-label" scope="rowgroup" rowspan="4">Tối</th>
+                            }
+                            <th class="schedule-time-label" scope="row">
+                                @string.Format("{0:00}:00 - {1:00}:00", hour, hour + 1)
+                            </th>
+                            @for (var i = 0; i < 7; i++)
+                            {
+                                var dayDate = Model.SelectedMonday.AddDays(i);
+                                var dayOfWeek = dayDate.DayOfWeek;
+                                var sessions = Model.CalendarSessions
+                                    .Where(s => s.Date == dayDate && s.Hour == hour)
+                                    .ToList();
+                                var isFree = Model.Availabilities.Any(a => a.DayOfWeek == dayOfWeek
+                                    && a.StartTime <= new TimeOnly(hour, 0)
+                                    && a.EndTime >= new TimeOnly(hour + 1, 0));
+
+                                <td data-day-column="@((int)dayOfWeek)">
+                                    @if (sessions.Count > 0)
+                                    {
+                                        <div class="d-flex flex-column gap-1">
+                                            @foreach (var session in sessions)
+                                            {
+                                                var sessionStatusClass = session.Status switch
+                                                {
+                                                    SessionStatus.InProgress => "status-inprogress",
+                                                    SessionStatus.Done => "status-done",
+                                                    SessionStatus.Cancelled => "status-cancelled",
+                                                    _ => "status-scheduled"
+                                                };
+                                                var sessionBadgeClass = session.Status switch
+                                                {
+                                                    SessionStatus.InProgress => "text-bg-primary",
+                                                    SessionStatus.Done => "text-bg-secondary",
+                                                    SessionStatus.Cancelled => "text-bg-danger",
+                                                    _ => "text-bg-success"
+                                                };
+                                                var sessionBadgeLabel = session.Status switch
+                                                {
+                                                    SessionStatus.InProgress => "Đang diễn ra",
+                                                    SessionStatus.Done => "Đã kết thúc",
+                                                    SessionStatus.Cancelled => "Đã hủy",
+                                                    _ => "Đã xác nhận"
+                                                };
+                                                <div class="schedule-session-card @sessionStatusClass"
+                                                     data-schedule-target="@(session.RequestId.HasValue ? $"schedule-card-{session.RequestId.Value}" : "")"
+                                                     title="@session.StudentName · @session.SubjectName (@session.ScheduledAtVn.ToString("HH:mm"))">
+                                                    <div class="d-flex align-items-center justify-content-between gap-1">
+                                                        <span class="session-time"><i class="bi bi-clock me-1"></i>@session.ScheduledAtVn.ToString("HH:mm")</span>
+                                                        <span class="badge @sessionBadgeClass" style="font-size: 8px; padding: 2px 4px;">@sessionBadgeLabel</span>
+                                                    </div>
+                                                    <div class="session-student text-truncate" title="@session.StudentName">@session.StudentName</div>
+                                                    <div class="session-subject text-truncate">@session.SubjectName · @(session.ClassroomType == ClassroomType.Group ? "Lớp nhóm" : "1-1")</div>
+                                                    @if (session.SessionId > 0 && session.Status is SessionStatus.Scheduled or SessionStatus.InProgress)
+                                                    {
+                                                        <form asp-area="" asp-controller="ClassSession" asp-action="Join" method="post" class="mt-1" onclick="event.stopPropagation();">
+                                                            @Html.AntiForgeryToken()
+                                                            <input type="hidden" name="id" value="@session.SessionId" />
+                                                            <button type="submit" class="btn btn-success btn-sm w-100 py-0" style="font-size: 10px; line-height: 1.4;">
+                                                                <i class="bi bi-camera-video me-1" aria-hidden="true"></i>@(session.Status == SessionStatus.InProgress ? "Vào lại" : "Vào lớp")
+                                                            </button>
+                                                        </form>
+                                                    }
+                                                    @if (session.SessionId > 0 && session.Status == SessionStatus.InProgress)
+                                                    {
+                                                        <form asp-area="" asp-controller="ClassSession" asp-action="End" method="post" class="mt-1" onclick="event.stopPropagation();" onsubmit="return confirm('Bạn có chắc muốn kết thúc buổi học này?');">
+                                                            @Html.AntiForgeryToken()
+                                                            <input type="hidden" name="id" value="@session.SessionId" />
+                                                            <button type="submit" class="btn btn-outline-danger btn-sm w-100 py-0" style="font-size: 10px; line-height: 1.4;">
+                                                                <i class="bi bi-stop-circle me-1" aria-hidden="true"></i>Kết thúc
+                                                            </button>
+                                                        </form>
+                                                    }
+                                                </div>
+                                            }
+                                        </div>
+                                    }
+                                    else if (isFree)
+                                    {
+                                        <div class="availability-slot is-free"
+                                             data-slot-date="@dayDate.ToString("yyyy-MM-dd")"
+                                             data-slot-hour="@hour"
+                                             title="Khung giờ rảnh theo lịch cố định (@dayDate.ToString("dd/MM/yyyy") @string.Format("{0:00}:00", hour)). Bấm để điền vào lịch học thử bên dưới.">
+                                            <span>Rảnh</span>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <div class="availability-slot is-empty"></div>
+                                    }
+                                </td>
+                            }
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Section below the calendar ("ở dưới có ....") -->
+    <div class="mt-4 pt-2" id="teaching-requests-section">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
+            <div>
+                <h2 class="h5 mb-1">
+                    <i class="bi bi-person-lines-fill text-danger me-2" aria-hidden="true"></i>Chi tiết lịch dạy & yêu cầu kết nối
+                    <span class="badge rounded-pill bg-danger-subtle text-danger border border-danger-subtle fs-6 align-middle ms-2">@Model.Requests.Count</span>
+                </h2>
+                <p class="text-body-secondary small mb-0">Quản lý các buổi học thử, trạng thái phòng học trực tuyến và xếp lịch với học viên.</p>
+            </div>
+        </div>
+
+        @if (Model.Requests.Count == 0)
+        {
+            <div class="card border-0 shadow-sm">
+                <div class="card-body py-5 text-center">
+                    <i class="bi bi-calendar-event fs-1 text-body-secondary" aria-hidden="true"></i>
+                    <h3 class="h5 mt-3">Chưa có lịch dạy</h3>
+                    <p class="text-body-secondary mb-0">Khi bạn chấp nhận yêu cầu kết nối, học viên sẽ xuất hiện tại đây để xác nhận lịch học thử.</p>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="d-flex flex-column gap-3">
+                @foreach (var item in Model.Requests)
+                {
+                    <article class="card border-0 shadow-sm" id="schedule-card-@item.RequestId">
+                        <div class="card-body">
+                            <div class="d-flex flex-wrap align-items-start justify-content-between gap-3">
+                                <div>
+                                    <h3 class="h5 mb-1">@item.StudentName</h3>
+                                    <div class="text-body-secondary">@item.SubjectName · @item.GradeLevelName · @(item.PreferredType == ClassroomType.Group ? "Lớp nhóm" : "1 kèm 1")</div>
+                                </div>
+                                @if (item.TrialStatus == ScheduleStatus.Confirmed && item.TrialScheduledAt.HasValue)
+                                {
+                                    var sessionBadge = item.ClassSessionStatus switch
+                                    {
+                                        SessionStatus.InProgress => "text-bg-primary",
+                                        SessionStatus.Done => "text-bg-secondary",
+                                        SessionStatus.Cancelled => "text-bg-danger",
+                                        _ => "text-bg-success"
+                                    };
+                                    var sessionLabel = item.ClassSessionStatus switch
+                                    {
+                                        SessionStatus.InProgress => "Đang diễn ra",
+                                        SessionStatus.Done => "Đã kết thúc",
+                                        SessionStatus.Cancelled => "Đã hủy",
+                                        _ => "Đã xác nhận lịch học thử"
+                                    };
+                                    <span class="badge @sessionBadge" data-class-session-status="@item.ClassSessionId">@sessionLabel</span>
+                                }
+                                else if (item.TrialStatus == ScheduleStatus.Pending)
+                                {
+                                    <span class="badge text-bg-warning">Đang chờ xác nhận lịch</span>
+                                }
+                                else if (item.TrialStatus == ScheduleStatus.Rejected)
+                                {
+                                    <span class="badge text-bg-secondary">Lịch trước đó đã bị từ chối</span>
+                                }
+                            </div>
+
+                            @if (item.TrialStatus == ScheduleStatus.Confirmed && item.TrialScheduledAt.HasValue)
+                            {
+                                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mt-3">
+                                    <p class="mb-0"><i class="bi bi-calendar-check me-2" aria-hidden="true"></i>Lịch học thử: <strong>@item.TrialScheduledAt.Value.AddHours(7).ToString("dd/MM/yyyy HH:mm") (GMT+7)</strong></p>
+                                    <div class="d-flex flex-wrap gap-2">
+                                        @if (item.ClassSessionId.HasValue && item.ClassSessionStatus is SessionStatus.Scheduled or SessionStatus.InProgress)
+                                        {
+                                            <form asp-area="" asp-controller="ClassSession" asp-action="Join" method="post">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="id" value="@item.ClassSessionId.Value" />
+                                                <button type="submit" class="btn btn-success btn-sm"><i class="bi bi-camera-video me-1" aria-hidden="true"></i>@(item.ClassSessionStatus == SessionStatus.InProgress ? "Tham gia lại" : "Tham gia lớp")</button>
+                                            </form>
+                                        }
+                                        @if (item.ClassSessionId.HasValue && item.ClassSessionStatus == SessionStatus.InProgress)
+                                        {
+                                            <form asp-area="" asp-controller="ClassSession" asp-action="End" method="post" onsubmit="return confirm('Kết thúc buổi học cho tất cả mọi người?');">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="id" value="@item.ClassSessionId.Value" />
+                                                <button type="submit" class="btn btn-outline-danger btn-sm"><i class="bi bi-stop-circle me-1" aria-hidden="true"></i>Kết thúc buổi học</button>
+                                            </form>
+                                        }
+                                        @if (item.ClassSessionId.HasValue && item.ClassSessionStatus == SessionStatus.Done)
+                                        {
+                                            <form asp-area="" asp-controller="ClassSession" asp-action="Reopen" method="post" onsubmit="return confirm('Mở lại buổi học để các thành viên có thể tham gia?');">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="id" value="@item.ClassSessionId.Value" />
+                                                <button type="submit" class="btn btn-outline-primary btn-sm"><i class="bi bi-arrow-clockwise me-1" aria-hidden="true"></i>Mở lại buổi học</button>
+                                            </form>
+                                        }
+                                    </div>
+                                </div>
+                            }
+                            else
+                            {
+                                <form asp-action="ConfirmTrialSchedule" method="post" class="row g-2 align-items-end mt-2 trial-schedule-form">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="requestId" value="@item.RequestId" />
+                                    <input type="hidden" name="scheduledAtUtc" />
+                                    <div class="col-12 col-md-6">
+                                        <label class="form-label" for="trial-time-@item.RequestId">Chọn lịch học thử</label>
+                                        <input id="trial-time-@item.RequestId" type="datetime-local" class="form-control" required step="60" />
+                                    </div>
+                                    <div class="col-12 col-md-auto">
+                                        <button type="submit" class="btn btn-success">Xác nhận lịch học thử</button>
+                                    </div>
+                                </form>
+                            }
+                        </div>
+                    </article>
+                }
+            </div>
+        }
+    </div>
 </div>
 
 <script>
-    document.querySelectorAll(".trial-schedule-form").forEach(form => {
-        form.addEventListener("submit", event => {
-            const localTime = form.querySelector('input[type="datetime-local"]');
-            const utcTime = form.querySelector('input[name="scheduledAtUtc"]');
-            const selectedTime = new Date(localTime.value);
-            if (Number.isNaN(selectedTime.getTime())) {
-                event.preventDefault();
-                localTime.setCustomValidity("Vui lòng chọn ngày giờ hợp lệ.");
-                localTime.reportValidity();
-                return;
-            }
-            utcTime.value = selectedTime.toISOString();
+    (() => {
+        // Mobile day picker switcher
+        const page = document.querySelector('.schedule-page');
+        if (page) {
+            page.querySelectorAll('[data-mobile-day]').forEach(button => {
+                button.addEventListener('click', () => {
+                    page.dataset.activeDay = button.dataset.mobileDay;
+                    page.querySelectorAll('[data-mobile-day]').forEach(dayBtn => {
+                        dayBtn.setAttribute('aria-pressed', String(dayBtn === button));
+                    });
+                });
+            });
+        }
+
+        // Click on calendar session card to smoothly scroll and highlight the request card below
+        document.querySelectorAll('.schedule-session-card[data-schedule-target]').forEach(card => {
+            card.addEventListener('click', () => {
+                const targetId = card.dataset.scheduleTarget;
+                if (!targetId) return;
+                const targetEl = document.getElementById(targetId);
+                if (targetEl) {
+                    targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    targetEl.classList.remove('card-highlight-pulse');
+                    // Force reflow
+                    void targetEl.offsetWidth;
+                    targetEl.classList.add('card-highlight-pulse');
+                }
+            });
         });
-    });
+
+        // Click on a free "Rảnh" slot to help auto-fill pending trial schedule form
+        document.querySelectorAll('.availability-slot.is-free[data-slot-date]').forEach(slot => {
+            slot.addEventListener('click', () => {
+                const pendingInput = document.querySelector('.trial-schedule-form input[type="datetime-local"]');
+                if (!pendingInput) return;
+
+                const dateStr = slot.dataset.slotDate;
+                const hour = parseInt(slot.dataset.slotHour, 10);
+                const hourStr = String(hour).padStart(2, '0');
+                const fillValue = `${dateStr}T${hourStr}:00`;
+
+                pendingInput.value = fillValue;
+                const formCard = pendingInput.closest('article.card');
+                if (formCard) {
+                    formCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    formCard.classList.remove('card-highlight-pulse');
+                    void formCard.offsetWidth;
+                    formCard.classList.add('card-highlight-pulse');
+                }
+                pendingInput.focus();
+            });
+        });
+
+        // Datetime-local form validation for trial schedules
+        document.querySelectorAll(".trial-schedule-form").forEach(form => {
+            const localTime = form.querySelector('input[type="datetime-local"]');
+            if (!localTime) return;
+
+            const toLocalInputValue = date => {
+                const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+                return localDate.toISOString().slice(0, 16);
+            };
+            const minimumTime = new Date();
+            minimumTime.setSeconds(0, 0);
+            minimumTime.setMinutes(minimumTime.getMinutes() + 1);
+            localTime.min = toLocalInputValue(minimumTime);
+
+            form.addEventListener("submit", event => {
+                const utcTime = form.querySelector('input[name="scheduledAtUtc"]');
+                const selectedTime = new Date(localTime.value);
+                if (Number.isNaN(selectedTime.getTime()) || selectedTime <= new Date()) {
+                    event.preventDefault();
+                    localTime.setCustomValidity("Vui lòng chọn một ngày giờ trong tương lai.");
+                    localTime.reportValidity();
+                    return;
+                }
+                utcTime.value = selectedTime.toISOString();
+            });
+        });
+    })();
 </script>

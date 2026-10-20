@@ -81,10 +81,10 @@ public class SearchService : ISearchService
         var total = await query.CountAsync();
 
         var items = await query
-            .OrderByDescending(t => t.Id)
-            .OrderByDescending(t => t.AverageRating)
+            .OrderByDescending(t => t.User.CreatedAt)
+            .ThenByDescending(t => t.AverageRating)
             .ThenBy(t => t.HourlyFee)
-            .ThenBy(t => t.Id)
+            .ThenByDescending(t => t.Id)
             .Skip(skip)
             .Take(size)
             .Select(t => new TutorCardDto

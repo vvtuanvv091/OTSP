@@ -797,7 +797,14 @@ h6 {
   z-index: 999999;
   overflow: hidden;
   background: var(--background-color);
+  opacity: 0;
+  visibility: hidden;
   transition: opacity 0.3s ease-out, visibility 0.3s ease-out;
+}
+
+#preloader.visible {
+  opacity: 1;
+  visibility: visible;
 }
 
 #preloader.loaded {

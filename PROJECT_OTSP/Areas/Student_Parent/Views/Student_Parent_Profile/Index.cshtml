@@ -218,6 +218,16 @@
                                    value="@Model.User.FullName" maxlength="150" required />
                         </div>
                         <div class="col-md-6">
+                            <label for="citizenIdNumber" class="form-label">Số CCCD (12 chữ số)</label>
+                            <input id="citizenIdNumber" name="citizenIdNumber" class="form-control" inputmode="numeric"
+                                   value="@Model.User.CitizenIdNumber" maxlength="12" pattern="[0-9]{12}" required />
+                        </div>
+                        <div class="col-12">
+                            <label for="residenceAddress" class="form-label">Nơi ở hiện tại</label>
+                            <input id="residenceAddress" name="residenceAddress" class="form-control"
+                                   value="@Model.User.ResidenceAddress" maxlength="500" required />
+                        </div>
+                        <div class="col-md-6">
                             <label class="form-label">Email</label>
                             <input class="form-control" value="@Model.User.Email" readonly />
                         </div>
@@ -280,13 +290,32 @@
                 {
                     @foreach (var guardian in Model.Guardians)
                     {
-                        <div class="guardian-item">
-                            <div>
-                                <div class="fw-semibold">@guardian.FullName</div>
-                                <small class="text-secondary">@guardian.ContactInfo</small>
-                            </div>
-
-                            <form asp-action="RemoveGuardian" method="post" class="d-inline"
+                        <div class="guardian-item d-block">
+                            <form asp-action="UpdateGuardian" method="post">
+                                <input type="hidden" name="id" value="@guardian.Id" />
+                                <div class="row g-3 align-items-end">
+                                    <div class="col-md-6">
+                                        <label class="form-label">Họ và tên</label>
+                                        <input name="fullName" class="form-control" value="@guardian.FullName" maxlength="150" required />
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Số điện thoại hoặc email</label>
+                                        <input name="contactInfo" class="form-control" value="@guardian.ContactInfo" maxlength="100" required />
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">CCCD người giám hộ (12 chữ số)</label>
+                                        <input name="citizenIdNumber" class="form-control" value="@guardian.CitizenIdNumber" inputmode="numeric" maxlength="12" pattern="[0-9]{12}" required />
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Nơi ở người giám hộ</label>
+                                        <input name="residenceAddress" class="form-control" value="@guardian.ResidenceAddress" maxlength="500" required />
+                                    </div>
+                                    <div class="col-12 d-flex justify-content-end gap-2">
+                                        <button type="submit" class="btn btn-outline-primary btn-sm px-3">Lưu</button>
+                                    </div>
+                                </div>
+                            </form>
+                            <form asp-action="RemoveGuardian" method="post" class="mt-2 text-end"
                                   onsubmit="return confirm('Xóa người giám hộ này?');">
                                 <input type="hidden" name="id" value="@guardian.Id" />
                                 <button type="submit" class="btn btn-outline-danger btn-sm px-3">Xóa</button>
@@ -308,11 +337,19 @@
                             <label for="guardianName" class="form-label">Họ và tên người giám hộ</label>
                             <input id="guardianName" name="fullName" class="form-control" maxlength="150" required />
                         </div>
-                        <div class="col-md-5">
+                        <div class="col-md-4">
                             <label for="guardianContact" class="form-label">Số điện thoại hoặc email</label>
                             <input id="guardianContact" name="contactInfo" class="form-control" maxlength="100" required />
                         </div>
-                        <div class="col-md-2 d-grid">
+                        <div class="col-md-4">
+                            <label for="guardianCitizenIdNumber" class="form-label">CCCD (12 chữ số)</label>
+                            <input id="guardianCitizenIdNumber" name="citizenIdNumber" class="form-control" inputmode="numeric" maxlength="12" pattern="[0-9]{12}" required />
+                        </div>
+                        <div class="col-md-4">
+                            <label for="guardianResidenceAddress" class="form-label">Nơi ở</label>
+                            <input id="guardianResidenceAddress" name="residenceAddress" class="form-control" maxlength="500" required />
+                        </div>
+                        <div class="col-12 d-grid">
                             <button type="submit" class="btn btn-brand">Thêm</button>
                         </div>
                     </div>

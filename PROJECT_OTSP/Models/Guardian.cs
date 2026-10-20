@@ -19,6 +19,13 @@ namespace PROJECT_OTSP.Models
         [Required, MaxLength(100)]
         public string ContactInfo { get; set; } = "";
 
+        [MaxLength(12)]
+        [RegularExpression("^[0-9]{12}$")]
+        public string? CitizenIdNumber { get; set; }
+
+        [MaxLength(500)]
+        public string? ResidenceAddress { get; set; }
+
         // Thời điểm thêm vào hồ sơ (UTC)
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 

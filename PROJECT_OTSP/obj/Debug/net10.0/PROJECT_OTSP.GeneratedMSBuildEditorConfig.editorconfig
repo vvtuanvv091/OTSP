@@ -279,6 +279,14 @@ build_metadata.AdditionalFiles.CssScope =
 build_metadata.AdditionalFiles.TargetPath = QXJlYXNcVHV0b3JcVmlld3NcX1ZpZXdTdGFydC5jc2h0bWw=
 build_metadata.AdditionalFiles.CssScope = 
 
+[C:/tai_lieu_hoc_thuat_cua_tuan/mauthietkephanmem/OTSP/PROJECT_OTSP/Views/Chat/Conversation.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcQ2hhdFxDb252ZXJzYXRpb24uY3NodG1s
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/tai_lieu_hoc_thuat_cua_tuan/mauthietkephanmem/OTSP/PROJECT_OTSP/Views/ClassSession/Room.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcQ2xhc3NTZXNzaW9uXFJvb20uY3NodG1s
+build_metadata.AdditionalFiles.CssScope = 
+
 [C:/tai_lieu_hoc_thuat_cua_tuan/mauthietkephanmem/OTSP/PROJECT_OTSP/Views/Home/Index.cshtml]
 build_metadata.AdditionalFiles.TargetPath = Vmlld3NcSG9tZVxJbmRleC5jc2h0bWw=
 build_metadata.AdditionalFiles.CssScope = 

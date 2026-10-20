@@ -1,0 +1,111 @@
+﻿using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using PROJECT_OTSP.Data;
+using PROJECT_OTSP.Dtos;
+using static PROJECT_OTSP.Models.Enums;
+
+namespace PROJECT_OTSP.Controllers;
+
+[Authorize(Roles = "Student_Parent,Tutor")]
+public sealed class ClassSessionController : Controller
+{
+    private readonly ApplicationDbContext _db;
+
+    public ClassSessionController(ApplicationDbContext db)
+    {
+        _db = db;
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Join(int id, CancellationToken cancellationToken)
+    {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrWhiteSpace(userId))
+            return Challenge();
+
+        var session = await _db.ClassSessions
+            .FirstOrDefaultAsync(item => item.Id == id
+                && item.Status == SessionStatus.Scheduled
+                && item.Classroom.Status == ClassroomStatus.Active,
+                cancellationToken);
+        if (session is null)
+            return NotFound();
+
+        if (!await IsParticipantAsync(session.ClassroomId, userId, cancellationToken))
+            return Forbid();
+
+        if (string.IsNullOrWhiteSpace(session.VideoRoom))
+        {
+            session.VideoRoom = $"OTSP-{Guid.NewGuid():N}";
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+
+        await _db.Database.ExecuteSqlInterpolatedAsync(
+            $"INSERT INTO \"ClassSessionAttendances\" (\"ClassSessionId\", \"UserId\", \"JoinedAtUtc\") VALUES ({session.Id}, {userId}, {DateTime.UtcNow}) ON CONFLICT (\"ClassSessionId\", \"UserId\") DO NOTHING",
+            cancellationToken);
+
+        return RedirectToAction(nameof(Room), new { id });
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> Room(int id, CancellationToken cancellationToken)
+    {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrWhiteSpace(userId))
+            return Challenge();
+
+        var session = await _db.ClassSessions
+            .AsNoTracking()
+            .Where(item => item.Id == id
+                && item.Status == SessionStatus.Scheduled
+                && item.Classroom.Status == ClassroomStatus.Active)
+            .Select(item => new
+            {
+                item.Id,
+                item.ClassroomId,
+                item.Classroom.Name,
+                SubjectName = item.Classroom.Subject.Name,
+                item.ScheduledAt,
+                item.VideoRoom
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+        if (session is null)
+            return NotFound();
+
+        if (!await IsParticipantAsync(session.ClassroomId, userId, cancellationToken)
+            || !await _db.ClassSessionAttendances.AnyAsync(
+                attendance => attendance.ClassSessionId == id && attendance.UserId == userId,
+                cancellationToken))
+        {
+            return Forbid();
+        }
+
+        var displayName = await _db.Users.AsNoTracking()
+            .Where(user => user.Id == userId)
+            .Select(user => user.FullName)
+            .FirstOrDefaultAsync(cancellationToken) ?? "Học viên";
+
+        return View(new ClassSessionRoomVm
+        {
+            SessionId = session.Id,
+            ClassroomName = session.Name,
+            SubjectName = session.SubjectName,
+            ScheduledAtUtc = session.ScheduledAt,
+            RoomName = session.VideoRoom ?? string.Empty,
+            DisplayName = displayName
+        });
+    }
+
+    private Task<bool> IsParticipantAsync(int classroomId, string userId, CancellationToken cancellationToken)
+    {
+        return _db.Classrooms.AsNoTracking().AnyAsync(classroom =>
+            classroom.Id == classroomId
+            && classroom.Status == ClassroomStatus.Active
+            && (classroom.Tutor.UserId == userId
+                || classroom.ClassroomStudents.Any(student => student.Student.UserId == userId)),
+            cancellationToken);
+    }
+}

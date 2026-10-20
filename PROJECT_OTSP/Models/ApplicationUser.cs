@@ -10,6 +10,11 @@ namespace PROJECT_OTSP.Models
         public string FullName { get; set; } = "";
         [MaxLength(300)]
         public string? Address { get; set; }
+        [MaxLength(12)]
+        [RegularExpression("^[0-9]{12}$")]
+        public string? CitizenIdNumber { get; set; }
+        [MaxLength(500)]
+        public string? ResidenceAddress { get; set; }
 
         // Ngày sinh, dùng để tính tuổi (dưới 18 thì cần người giám hộ)
         public DateOnly? DateOfBirth { get; set; }

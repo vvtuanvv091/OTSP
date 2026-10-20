@@ -140,6 +140,14 @@
                                 </form>
                             </div>
                         }
+                        else if (request.Status == RequestStatus.Accepted)
+                        {
+                            <div class="d-flex justify-content-end mt-4">
+                                <a asp-area="" asp-controller="Chat" asp-action="Conversation" asp-route-requestId="@request.Id" class="btn btn-outline-success">
+                                    <i class="bi bi-chat-dots me-1" aria-hidden="true"></i> Nhắn tin với học viên
+                                </a>
+                            </div>
+                        }
                     </div>
                 </article>
             }

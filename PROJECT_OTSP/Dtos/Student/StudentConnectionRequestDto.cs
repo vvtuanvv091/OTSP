@@ -21,6 +21,8 @@ public class StudentConnectionRequestDto
     public DateTime CreatedAt { get; set; }
     public DateTime? RespondedAt { get; set; }
     public DateTime? TrialScheduledAt { get; set; }
+    public int? ClassSessionId { get; set; }
+    public SessionStatus? ClassSessionStatus { get; set; }
 
     public string StatusBadgeClass => Status switch
     {

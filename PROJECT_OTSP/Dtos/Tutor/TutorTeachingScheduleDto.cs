@@ -12,4 +12,6 @@ public sealed class TutorTeachingScheduleDto
     public DateTime CreatedAt { get; init; }
     public DateTime? TrialScheduledAt { get; init; }
     public ScheduleStatus? TrialStatus { get; init; }
+    public int? ClassSessionId { get; init; }
+    public SessionStatus? ClassSessionStatus { get; init; }
 }

@@ -31,5 +31,7 @@ namespace PROJECT_OTSP.Models
         // Các đánh giá của buổi học (1-N)
         public ICollection<Review> Reviews { get; set; } = new List<Review>();
 
+        public ICollection<ClassSessionAttendance> Attendances { get; set; } = new List<ClassSessionAttendance>();
+
     }
 }
