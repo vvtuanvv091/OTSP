@@ -1,8 +1,4 @@
-<<<<<<< HEAD
-﻿using Microsoft.EntityFrameworkCore;
-=======
 using Microsoft.EntityFrameworkCore;
->>>>>>> eb30c869e0525d8bf651bfa9c0aee3191384d225
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using static PROJECT_OTSP.Models.Enums;
@@ -19,22 +15,7 @@ namespace PROJECT_OTSP.Models
         // Tên lớp
         [Required, MaxLength(200)]
         public string Name { get; set; } = "";
-<<<<<<< HEAD
-        // Ảnh bìa của lớp. Có thể null, khi đó giao diện hiện khối icon thay thế.
-        [MaxLength(500)]
-        public string? CoverImageUrl { get; set; }
-        [MaxLength(255)]
-        public string? CoverImagePublicId { get; set; }
-        // Học phí lớp (VNĐ)
-        [Precision(18, 0)]
-        public decimal Fee { get; set; }
-=======
-<<<<<<< HEAD
 
-        // Học phí lớp (VNĐ)
-        [Precision(18, 0)]
-        public decimal Fee { get; set; }
-=======
         // Ảnh bìa của lớp. Có thể null, khi đó giao diện hiện khối icon thay thế.
         [MaxLength(500)]
         public string? CoverImageUrl { get; set; }
@@ -43,15 +24,10 @@ namespace PROJECT_OTSP.Models
         // Học phí lớp (VNĐ)
         [Precision(18, 0)]
         public decimal Fee { get; set; }
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
+
         // Mô tả riêng của lớp (nội dung, đối tượng, lịch học...), hiển thị trên thẻ lớp học
         [MaxLength(1000)]
         public string? Description { get; set; }
-
-<<<<<<< HEAD
-=======
->>>>>>> eb30c869e0525d8bf651bfa9c0aee3191384d225
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
 
         // Ngày bắt đầu lớp
         public DateOnly? StartDate { get; set; }
@@ -65,8 +41,6 @@ namespace PROJECT_OTSP.Models
         // Sức chứa tối đa của phòng. Lớp 1-1 luôn bằng 1, lớp nhóm do gia sư đặt.
         public int MaxStudents { get; set; } = 1;
 
-<<<<<<< HEAD
-=======
         // Số buổi học mỗi tuần (ví dụ: 1, 2, 3 buổi/tuần)
         public int SessionsPerWeek { get; set; } = 1;
 
@@ -76,7 +50,6 @@ namespace PROJECT_OTSP.Models
         // Chi tiết lịch cố định các buổi trong tuần (Buổi 1, 2, 3...)
         public ICollection<ClassroomWeeklySchedule> WeeklySchedules { get; set; } = new List<ClassroomWeeklySchedule>();
 
->>>>>>> eb30c869e0525d8bf651bfa9c0aee3191384d225
         // Khóa ngoại tới gia sư dạy lớp
         [ForeignKey("Tutor")]
         public int TutorId { get; set; }
@@ -94,11 +67,6 @@ namespace PROJECT_OTSP.Models
         // Các yêu cầu kết nối xin vào lớp này (1-N, dùng cho lớp nhóm)
         public ICollection<ConnectionRequest> ConnectionRequests { get; set; } = new List<ConnectionRequest>();
 
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
-=======
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
         // Môn học của lớp (ví dụ: Toán)
         [ForeignKey("Subject")]
         public int SubjectId { get; set; }
@@ -108,10 +76,5 @@ namespace PROJECT_OTSP.Models
         [ForeignKey("GradeLevel")]
         public int GradeLevelId { get; set; }
         public GradeLevel GradeLevel { get; set; } = null!;
-
-<<<<<<< HEAD
-=======
->>>>>>> eb30c869e0525d8bf651bfa9c0aee3191384d225
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
     }
 }

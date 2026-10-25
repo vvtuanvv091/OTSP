@@ -1,8 +1,4 @@
-<<<<<<< HEAD
-﻿using System.ComponentModel.DataAnnotations;
-=======
 using System.ComponentModel.DataAnnotations;
->>>>>>> eb30c869e0525d8bf651bfa9c0aee3191384d225
 using System.ComponentModel.DataAnnotations.Schema;
 using static PROJECT_OTSP.Models.Enums;
 
@@ -25,12 +21,9 @@ public class ConnectionRequest
     // Thời điểm gia sư phản hồi (UTC), null khi còn Pending
     public DateTime? RespondedAt { get; set; }
 
-<<<<<<< HEAD
-=======
     // Khung giờ học thử đề xuất do học viên chọn từ lịch rảnh của gia sư (UTC)
     public DateTime? ProposedTrialSlotUtc { get; set; }
 
->>>>>>> eb30c869e0525d8bf651bfa9c0aee3191384d225
     [ForeignKey("Student")]
     public int StudentId { get; set; }
     public StudentProfile Student { get; set; } = null!;
@@ -39,17 +32,6 @@ public class ConnectionRequest
     public int TutorId { get; set; }
     public TutorProfile Tutor { get; set; } = null!;
 
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
-    // Môn-cấp học học viên muốn học
-    [ForeignKey("SubjectLevel")]
-    public int SubjectLevelId { get; set; }
-    public SubjectLevel SubjectLevel { get; set; } = null!;
-
-=======
->>>>>>> eb30c869e0525d8bf651bfa9c0aee3191384d225
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
     // Kiểu học học viên muốn: 1-1 hoặc nhóm
     public ClassroomType PreferredType { get; set; } = ClassroomType.OneToOne;
 
@@ -59,11 +41,7 @@ public class ConnectionRequest
     public Classroom? Classroom { get; set; }
 
     public ICollection<TrialSchedule> TrialSchedules { get; set; } = new List<TrialSchedule>();
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
-=======
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
+
     // Môn học (ví dụ: Toán)
     [ForeignKey("Subject")]
     public int SubjectId { get; set; }
@@ -73,9 +51,4 @@ public class ConnectionRequest
     [ForeignKey("GradeLevel")]
     public int GradeLevelId { get; set; }
     public GradeLevel GradeLevel { get; set; } = null!;
-
-<<<<<<< HEAD
-=======
->>>>>>> eb30c869e0525d8bf651bfa9c0aee3191384d225
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
 }

@@ -25,15 +25,12 @@ public class SendConnectionRequestDto
     [Display(Name = "Lớp học tham gia")]
     public int? ClassroomId { get; set; }
 
-<<<<<<< HEAD
-=======
     [Display(Name = "Khung giờ học thử đề xuất (1 kèm 1)")]
     public DateTime? ProposedTrialSlotUtc { get; set; }
 
     [Display(Name = "Danh sách các khung giờ học đề xuất (1 kèm 1)")]
     public List<DateTime> ProposedTrialSlotsUtc { get; set; } = new();
 
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
     [MaxLength(1000, ErrorMessage = "Lời nhắn gửi gia sư không được vượt quá 1000 ký tự.")]
     [Display(Name = "Lời nhắn / Mục tiêu học tập")]
     public string? Message { get; set; }

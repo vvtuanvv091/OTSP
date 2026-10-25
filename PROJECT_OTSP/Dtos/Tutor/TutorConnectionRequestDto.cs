@@ -17,9 +17,6 @@ public class TutorConnectionRequestDto
     public string? ClassroomName { get; set; }
     public RequestStatus Status { get; set; }
     public DateTime CreatedAt { get; set; }
-<<<<<<< HEAD
-=======
     public DateTime? ProposedTrialSlotUtc { get; set; }
     public List<DateTime> ProposedTrialSlotsUtc { get; set; } = new();
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
 }

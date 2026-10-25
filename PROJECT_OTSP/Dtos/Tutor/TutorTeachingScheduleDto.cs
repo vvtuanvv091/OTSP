@@ -14,11 +14,8 @@ public sealed class TutorTeachingScheduleDto
     public ScheduleStatus? TrialStatus { get; init; }
     public int? ClassSessionId { get; init; }
     public SessionStatus? ClassSessionStatus { get; init; }
-<<<<<<< HEAD
-=======
     public DateTime? ProposedTrialSlotUtc { get; init; }
     public List<DateTime> ProposedTrialSlotsUtc { get; init; } = new();
     public int? ClassroomId { get; init; }
     public string? ClassroomName { get; init; }
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
 }

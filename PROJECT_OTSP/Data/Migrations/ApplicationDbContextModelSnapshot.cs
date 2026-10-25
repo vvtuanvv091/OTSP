@@ -8,15 +8,7 @@ using PROJECT_OTSP.Data;
 
 #nullable disable
 
-<<<<<<< HEAD
 namespace PROJECT_OTSP.Data.Migrations
-=======
-<<<<<<< HEAD
-namespace PROJECT_OTSP.Migrations
-=======
-namespace PROJECT_OTSP.Data.Migrations
->>>>>>> eb30c869e0525d8bf651bfa9c0aee3191384d225
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
 {
     [DbContext(typeof(ApplicationDbContext))]
     partial class ApplicationDbContextModelSnapshot : ModelSnapshot
@@ -235,19 +227,10 @@ namespace PROJECT_OTSP.Data.Migrations
                     b.Property<string>("AvatarUrl")
                         .HasColumnType("text");
 
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
-=======
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
                     b.Property<string>("CitizenIdNumber")
                         .HasMaxLength(12)
                         .HasColumnType("character varying(12)");
 
-<<<<<<< HEAD
-=======
->>>>>>> eb30c869e0525d8bf651bfa9c0aee3191384d225
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
                         .HasColumnType("text");
@@ -293,19 +276,10 @@ namespace PROJECT_OTSP.Data.Migrations
                     b.Property<bool>("PhoneNumberConfirmed")
                         .HasColumnType("boolean");
 
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
-=======
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
                     b.Property<string>("ResidenceAddress")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
-<<<<<<< HEAD
-=======
->>>>>>> eb30c869e0525d8bf651bfa9c0aee3191384d225
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
                     b.Property<string>("SecurityStamp")
                         .HasColumnType("text");
 
@@ -391,11 +365,6 @@ namespace PROJECT_OTSP.Data.Migrations
                     b.ToTable("ClassSessions");
                 });
 
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
-=======
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
             modelBuilder.Entity("PROJECT_OTSP.Models.ClassSessionAttendance", b =>
                 {
                     b.Property<int>("Id")
@@ -432,10 +401,6 @@ namespace PROJECT_OTSP.Data.Migrations
                     b.ToTable("ClassSessionAttendances");
                 });
 
-<<<<<<< HEAD
-=======
->>>>>>> eb30c869e0525d8bf651bfa9c0aee3191384d225
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
             modelBuilder.Entity("PROJECT_OTSP.Models.Classroom", b =>
                 {
                     b.Property<int>("Id")
@@ -444,11 +409,6 @@ namespace PROJECT_OTSP.Data.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
-=======
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
                     b.Property<string>("CoverImagePublicId")
                         .HasMaxLength(255)
                         .HasColumnType("character varying(255)");
@@ -461,29 +421,16 @@ namespace PROJECT_OTSP.Data.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
 
-<<<<<<< HEAD
-=======
->>>>>>> eb30c869e0525d8bf651bfa9c0aee3191384d225
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
                     b.Property<decimal>("Fee")
                         .HasPrecision(18)
                         .HasColumnType("numeric(18,0)");
 
-<<<<<<< HEAD
-                    b.Property<int>("GradeLevelId")
-                        .HasColumnType("integer");
-
-=======
-<<<<<<< HEAD
-=======
                     b.Property<int>("GradeLevelId")
                         .HasColumnType("integer");
 
                     b.Property<double>("HoursPerSession")
                         .HasColumnType("double precision");
 
->>>>>>> eb30c869e0525d8bf651bfa9c0aee3191384d225
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
                     b.Property<int>("MaxStudents")
                         .HasColumnType("integer");
 
@@ -492,37 +439,24 @@ namespace PROJECT_OTSP.Data.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
-<<<<<<< HEAD
-=======
                     b.Property<int>("SessionsPerWeek")
                         .HasColumnType("integer");
 
->>>>>>> eb30c869e0525d8bf651bfa9c0aee3191384d225
                     b.Property<DateOnly?>("StartDate")
                         .HasColumnType("date");
 
                     b.Property<int>("Status")
                         .HasColumnType("integer");
 
-<<<<<<< HEAD
                     b.Property<int>("SubjectId")
                         .HasColumnType("integer");
 
-=======
-<<<<<<< HEAD
-=======
-                    b.Property<int>("SubjectId")
-                        .HasColumnType("integer");
-
->>>>>>> eb30c869e0525d8bf651bfa9c0aee3191384d225
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
                     b.Property<int>("TutorId")
                         .HasColumnType("integer");
 
                     b.Property<int>("Type")
                         .HasColumnType("integer");
 
-<<<<<<< HEAD
                     b.Property<uint>("xmin")
                         .IsConcurrencyToken()
                         .ValueGeneratedOnAddOrUpdate()
@@ -531,31 +465,12 @@ namespace PROJECT_OTSP.Data.Migrations
 
                     b.HasKey("Id");
 
-=======
-<<<<<<< HEAD
-                    b.HasKey("Id");
-
-                    b.HasIndex("TutorId");
-=======
-                    b.Property<uint>("xmin")
-                        .IsConcurrencyToken()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("xid")
-                        .HasColumnName("xmin");
-
-                    b.HasKey("Id");
-
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
                     b.HasIndex("GradeLevelId");
 
                     b.HasIndex("SubjectId");
 
                     b.HasIndex("TutorId", "Type", "Status")
                         .HasDatabaseName("IX_Classrooms_TutorId_Type_Status");
-<<<<<<< HEAD
-=======
->>>>>>> eb30c869e0525d8bf651bfa9c0aee3191384d225
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
 
                     b.ToTable("Classrooms");
                 });
@@ -578,8 +493,6 @@ namespace PROJECT_OTSP.Data.Migrations
                     b.ToTable("ClassroomStudents");
                 });
 
-<<<<<<< HEAD
-=======
             modelBuilder.Entity("PROJECT_OTSP.Models.ClassroomWeeklySchedule", b =>
                 {
                     b.Property<int>("Id")
@@ -610,7 +523,6 @@ namespace PROJECT_OTSP.Data.Migrations
                     b.ToTable("ClassroomWeeklySchedules");
                 });
 
->>>>>>> eb30c869e0525d8bf651bfa9c0aee3191384d225
             modelBuilder.Entity("PROJECT_OTSP.Models.Complaint", b =>
                 {
                     b.Property<int>("Id")
@@ -670,18 +582,9 @@ namespace PROJECT_OTSP.Data.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
-<<<<<<< HEAD
                     b.Property<int>("GradeLevelId")
                         .HasColumnType("integer");
 
-=======
-<<<<<<< HEAD
-=======
-                    b.Property<int>("GradeLevelId")
-                        .HasColumnType("integer");
-
->>>>>>> eb30c869e0525d8bf651bfa9c0aee3191384d225
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
                     b.Property<string>("Message")
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
@@ -689,12 +592,9 @@ namespace PROJECT_OTSP.Data.Migrations
                     b.Property<int>("PreferredType")
                         .HasColumnType("integer");
 
-<<<<<<< HEAD
-=======
                     b.Property<DateTime?>("ProposedTrialSlotUtc")
                         .HasColumnType("timestamp with time zone");
 
->>>>>>> eb30c869e0525d8bf651bfa9c0aee3191384d225
                     b.Property<DateTime?>("RespondedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -704,15 +604,7 @@ namespace PROJECT_OTSP.Data.Migrations
                     b.Property<int>("StudentId")
                         .HasColumnType("integer");
 
-<<<<<<< HEAD
                     b.Property<int>("SubjectId")
-=======
-<<<<<<< HEAD
-                    b.Property<int>("SubjectLevelId")
-=======
-                    b.Property<int>("SubjectId")
->>>>>>> eb30c869e0525d8bf651bfa9c0aee3191384d225
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
                         .HasColumnType("integer");
 
                     b.Property<int>("TutorId")
@@ -722,36 +614,17 @@ namespace PROJECT_OTSP.Data.Migrations
 
                     b.HasIndex("ClassroomId");
 
-<<<<<<< HEAD
                     b.HasIndex("GradeLevelId");
 
                     b.HasIndex("StudentId");
 
                     b.HasIndex("SubjectId");
-=======
-<<<<<<< HEAD
-                    b.HasIndex("StudentId");
-
-                    b.HasIndex("SubjectLevelId");
-=======
-                    b.HasIndex("GradeLevelId");
-
-                    b.HasIndex("StudentId");
-
-                    b.HasIndex("SubjectId");
->>>>>>> eb30c869e0525d8bf651bfa9c0aee3191384d225
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
 
                     b.HasIndex("TutorId");
 
                     b.ToTable("ConnectionRequests");
                 });
 
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
-=======
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
             modelBuilder.Entity("PROJECT_OTSP.Models.GradeLevel", b =>
                 {
                     b.Property<int>("Id")
@@ -775,10 +648,6 @@ namespace PROJECT_OTSP.Data.Migrations
                     b.ToTable("GradeLevels");
                 });
 
-<<<<<<< HEAD
-=======
->>>>>>> eb30c869e0525d8bf651bfa9c0aee3191384d225
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
             modelBuilder.Entity("PROJECT_OTSP.Models.GroupClass", b =>
                 {
                     b.Property<int>("Id")
@@ -801,19 +670,10 @@ namespace PROJECT_OTSP.Data.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
-=======
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
                     b.Property<string>("SubjectText")
                         .IsRequired()
                         .HasColumnType("text");
 
-<<<<<<< HEAD
-=======
->>>>>>> eb30c869e0525d8bf651bfa9c0aee3191384d225
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
                     b.HasKey("Id");
 
                     b.HasIndex("CenterId");
@@ -829,19 +689,10 @@ namespace PROJECT_OTSP.Data.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
-=======
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
                     b.Property<string>("CitizenIdNumber")
                         .HasMaxLength(12)
                         .HasColumnType("character varying(12)");
 
-<<<<<<< HEAD
-=======
->>>>>>> eb30c869e0525d8bf651bfa9c0aee3191384d225
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
                     b.Property<string>("ContactInfo")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -855,19 +706,10 @@ namespace PROJECT_OTSP.Data.Migrations
                         .HasMaxLength(150)
                         .HasColumnType("character varying(150)");
 
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
-=======
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
                     b.Property<string>("ResidenceAddress")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
-<<<<<<< HEAD
-=======
->>>>>>> eb30c869e0525d8bf651bfa9c0aee3191384d225
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
                     b.Property<int>("StudentProfileId")
                         .HasColumnType("integer");
 
@@ -919,20 +761,10 @@ namespace PROJECT_OTSP.Data.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
-                    b.Property<int>("SubjectLevelId")
-=======
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
                     b.Property<int>("GradeLevelId")
                         .HasColumnType("integer");
 
                     b.Property<int>("SubjectId")
-<<<<<<< HEAD
-=======
->>>>>>> eb30c869e0525d8bf651bfa9c0aee3191384d225
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
                         .HasColumnType("integer");
 
                     b.Property<string>("Title")
@@ -948,19 +780,9 @@ namespace PROJECT_OTSP.Data.Migrations
 
                     b.HasKey("Id");
 
-<<<<<<< HEAD
                     b.HasIndex("GradeLevelId");
 
                     b.HasIndex("SubjectId");
-=======
-<<<<<<< HEAD
-                    b.HasIndex("SubjectLevelId");
-=======
-                    b.HasIndex("GradeLevelId");
-
-                    b.HasIndex("SubjectId");
->>>>>>> eb30c869e0525d8bf651bfa9c0aee3191384d225
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
 
                     b.HasIndex("TutorId");
 
@@ -1368,15 +1190,7 @@ namespace PROJECT_OTSP.Data.Migrations
                     b.ToTable("StudentProfiles");
                 });
 
-<<<<<<< HEAD
             modelBuilder.Entity("PROJECT_OTSP.Models.Subject", b =>
-=======
-<<<<<<< HEAD
-            modelBuilder.Entity("PROJECT_OTSP.Models.SubjectLevel", b =>
-=======
-            modelBuilder.Entity("PROJECT_OTSP.Models.Subject", b =>
->>>>>>> eb30c869e0525d8bf651bfa9c0aee3191384d225
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -1384,50 +1198,23 @@ namespace PROJECT_OTSP.Data.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
-<<<<<<< HEAD
-                    b.Property<string>("Code")
-=======
-<<<<<<< HEAD
-                    b.Property<string>("GradeLevel")
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-<<<<<<< HEAD
-=======
-                    b.Property<string>("SubjectName")
-=======
                     b.Property<string>("Code")
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
 
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
                     b.Property<string>("Description")
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
 
                     b.Property<string>("Name")
-<<<<<<< HEAD
-=======
->>>>>>> eb30c869e0525d8bf651bfa9c0aee3191384d225
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
                     b.HasKey("Id");
 
-<<<<<<< HEAD
                     b.ToTable("Subjects");
-=======
-<<<<<<< HEAD
-                    b.ToTable("SubjectLevels");
-=======
-                    b.ToTable("Subjects");
->>>>>>> eb30c869e0525d8bf651bfa9c0aee3191384d225
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
                 });
 
             modelBuilder.Entity("PROJECT_OTSP.Models.TrialSchedule", b =>
@@ -1438,18 +1225,9 @@ namespace PROJECT_OTSP.Data.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
-<<<<<<< HEAD
                     b.Property<int?>("ClassSessionId")
                         .HasColumnType("integer");
 
-=======
-<<<<<<< HEAD
-=======
-                    b.Property<int?>("ClassSessionId")
-                        .HasColumnType("integer");
-
->>>>>>> eb30c869e0525d8bf651bfa9c0aee3191384d225
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
                     b.Property<int>("ConnectionRequestId")
                         .HasColumnType("integer");
 
@@ -1461,28 +1239,14 @@ namespace PROJECT_OTSP.Data.Migrations
 
                     b.HasKey("Id");
 
-<<<<<<< HEAD
                     b.HasIndex("ClassSessionId")
                         .IsUnique();
 
-=======
-<<<<<<< HEAD
-=======
-                    b.HasIndex("ClassSessionId")
-                        .IsUnique();
-
->>>>>>> eb30c869e0525d8bf651bfa9c0aee3191384d225
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
                     b.HasIndex("ConnectionRequestId");
 
                     b.ToTable("TrialSchedules");
                 });
 
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
-=======
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
             modelBuilder.Entity("PROJECT_OTSP.Models.TutorAvailability", b =>
                 {
                     b.Property<int>("Id")
@@ -1511,10 +1275,6 @@ namespace PROJECT_OTSP.Data.Migrations
                     b.ToTable("TutorAvailabilities");
                 });
 
-<<<<<<< HEAD
-=======
->>>>>>> eb30c869e0525d8bf651bfa9c0aee3191384d225
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
             modelBuilder.Entity("PROJECT_OTSP.Models.TutorProfile", b =>
                 {
                     b.Property<int>("Id")
@@ -1533,20 +1293,11 @@ namespace PROJECT_OTSP.Data.Migrations
                     b.Property<string>("Introduction")
                         .HasColumnType("text");
 
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
-=======
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
                     b.Property<int>("TeachingFormat")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("integer")
                         .HasDefaultValue(2);
 
-<<<<<<< HEAD
-=======
->>>>>>> eb30c869e0525d8bf651bfa9c0aee3191384d225
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
                     b.Property<string>("UserId")
                         .IsRequired()
                         .HasColumnType("text");
@@ -1562,38 +1313,6 @@ namespace PROJECT_OTSP.Data.Migrations
                     b.ToTable("TutorProfiles");
                 });
 
-<<<<<<< HEAD
-            modelBuilder.Entity("PROJECT_OTSP.Models.TutorSubject", b =>
-=======
-<<<<<<< HEAD
-            modelBuilder.Entity("PROJECT_OTSP.Models.TutorSubjectLevel", b =>
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<int>("GradeLevelId")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("SubjectId")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("TutorId")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("GradeLevelId");
-
-                    b.HasIndex("SubjectId");
-
-<<<<<<< HEAD
-=======
-                    b.ToTable("TutorSubjectLevels");
-=======
             modelBuilder.Entity("PROJECT_OTSP.Models.TutorSubject", b =>
                 {
                     b.Property<int>("Id")
@@ -1617,15 +1336,10 @@ namespace PROJECT_OTSP.Data.Migrations
 
                     b.HasIndex("SubjectId");
 
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
                     b.HasIndex("TutorId", "SubjectId", "GradeLevelId")
                         .IsUnique();
 
                     b.ToTable("TutorSubjects");
-<<<<<<< HEAD
-=======
->>>>>>> eb30c869e0525d8bf651bfa9c0aee3191384d225
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>
@@ -1723,7 +1437,6 @@ namespace PROJECT_OTSP.Data.Migrations
                     b.Navigation("Classroom");
                 });
 
-<<<<<<< HEAD
             modelBuilder.Entity("PROJECT_OTSP.Models.ClassSessionAttendance", b =>
                 {
                     b.HasOne("PROJECT_OTSP.Models.ClassSession", "ClassSession")
@@ -1745,33 +1458,6 @@ namespace PROJECT_OTSP.Data.Migrations
 
             modelBuilder.Entity("PROJECT_OTSP.Models.Classroom", b =>
                 {
-=======
-<<<<<<< HEAD
-            modelBuilder.Entity("PROJECT_OTSP.Models.Classroom", b =>
-                {
-=======
-            modelBuilder.Entity("PROJECT_OTSP.Models.ClassSessionAttendance", b =>
-                {
-                    b.HasOne("PROJECT_OTSP.Models.ClassSession", "ClassSession")
-                        .WithMany("Attendances")
-                        .HasForeignKey("ClassSessionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("PROJECT_OTSP.Models.ApplicationUser", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("ClassSession");
-
-                    b.Navigation("User");
-                });
-
-            modelBuilder.Entity("PROJECT_OTSP.Models.Classroom", b =>
-                {
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
                     b.HasOne("PROJECT_OTSP.Models.GradeLevel", "GradeLevel")
                         .WithMany("Classrooms")
                         .HasForeignKey("GradeLevelId")
@@ -1784,29 +1470,16 @@ namespace PROJECT_OTSP.Data.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-<<<<<<< HEAD
-=======
->>>>>>> eb30c869e0525d8bf651bfa9c0aee3191384d225
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
                     b.HasOne("PROJECT_OTSP.Models.TutorProfile", "Tutor")
                         .WithMany("Classrooms")
                         .HasForeignKey("TutorId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
-=======
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
                     b.Navigation("GradeLevel");
 
                     b.Navigation("Subject");
 
-<<<<<<< HEAD
-=======
->>>>>>> eb30c869e0525d8bf651bfa9c0aee3191384d225
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
                     b.Navigation("Tutor");
                 });
 
@@ -1829,8 +1502,6 @@ namespace PROJECT_OTSP.Data.Migrations
                     b.Navigation("Student");
                 });
 
-<<<<<<< HEAD
-=======
             modelBuilder.Entity("PROJECT_OTSP.Models.ClassroomWeeklySchedule", b =>
                 {
                     b.HasOne("PROJECT_OTSP.Models.Classroom", "Classroom")
@@ -1842,7 +1513,6 @@ namespace PROJECT_OTSP.Data.Migrations
                     b.Navigation("Classroom");
                 });
 
->>>>>>> eb30c869e0525d8bf651bfa9c0aee3191384d225
             modelBuilder.Entity("PROJECT_OTSP.Models.Complaint", b =>
                 {
                     b.HasOne("PROJECT_OTSP.Models.AdminProfile", "HandledByAdmin")
@@ -1874,42 +1544,21 @@ namespace PROJECT_OTSP.Data.Migrations
                         .HasForeignKey("ClassroomId")
                         .OnDelete(DeleteBehavior.Restrict);
 
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
-=======
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
                     b.HasOne("PROJECT_OTSP.Models.GradeLevel", "GradeLevel")
                         .WithMany("ConnectionRequests")
                         .HasForeignKey("GradeLevelId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-<<<<<<< HEAD
-=======
->>>>>>> eb30c869e0525d8bf651bfa9c0aee3191384d225
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
                     b.HasOne("PROJECT_OTSP.Models.StudentProfile", "Student")
                         .WithMany("ConnectionRequests")
                         .HasForeignKey("StudentId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-<<<<<<< HEAD
                     b.HasOne("PROJECT_OTSP.Models.Subject", "Subject")
                         .WithMany("ConnectionRequests")
                         .HasForeignKey("SubjectId")
-=======
-<<<<<<< HEAD
-                    b.HasOne("PROJECT_OTSP.Models.SubjectLevel", "SubjectLevel")
-                        .WithMany("ConnectionRequests")
-                        .HasForeignKey("SubjectLevelId")
-=======
-                    b.HasOne("PROJECT_OTSP.Models.Subject", "Subject")
-                        .WithMany("ConnectionRequests")
-                        .HasForeignKey("SubjectId")
->>>>>>> eb30c869e0525d8bf651bfa9c0aee3191384d225
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
@@ -1921,25 +1570,11 @@ namespace PROJECT_OTSP.Data.Migrations
 
                     b.Navigation("Classroom");
 
-<<<<<<< HEAD
                     b.Navigation("GradeLevel");
 
                     b.Navigation("Student");
 
                     b.Navigation("Subject");
-=======
-<<<<<<< HEAD
-                    b.Navigation("Student");
-
-                    b.Navigation("SubjectLevel");
-=======
-                    b.Navigation("GradeLevel");
-
-                    b.Navigation("Student");
-
-                    b.Navigation("Subject");
->>>>>>> eb30c869e0525d8bf651bfa9c0aee3191384d225
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
 
                     b.Navigation("Tutor");
                 });
@@ -1979,19 +1614,8 @@ namespace PROJECT_OTSP.Data.Migrations
 
             modelBuilder.Entity("PROJECT_OTSP.Models.LearningDocument", b =>
                 {
-<<<<<<< HEAD
                     b.HasOne("PROJECT_OTSP.Models.GradeLevel", "GradeLevel")
                         .WithMany("LearningDocuments")
-=======
-<<<<<<< HEAD
-                    b.HasOne("PROJECT_OTSP.Models.SubjectLevel", "SubjectLevel")
-                        .WithMany("LearningDocuments")
-                        .HasForeignKey("SubjectLevelId")
-                        .OnDelete(DeleteBehavior.Cascade)
-=======
-                    b.HasOne("PROJECT_OTSP.Models.GradeLevel", "GradeLevel")
-                        .WithMany("LearningDocuments")
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
                         .HasForeignKey("GradeLevelId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
@@ -2000,10 +1624,6 @@ namespace PROJECT_OTSP.Data.Migrations
                         .WithMany("LearningDocuments")
                         .HasForeignKey("SubjectId")
                         .OnDelete(DeleteBehavior.Restrict)
-<<<<<<< HEAD
-=======
->>>>>>> eb30c869e0525d8bf651bfa9c0aee3191384d225
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
                         .IsRequired();
 
                     b.HasOne("PROJECT_OTSP.Models.TutorProfile", "Tutor")
@@ -2012,19 +1632,9 @@ namespace PROJECT_OTSP.Data.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-<<<<<<< HEAD
                     b.Navigation("GradeLevel");
 
                     b.Navigation("Subject");
-=======
-<<<<<<< HEAD
-                    b.Navigation("SubjectLevel");
-=======
-                    b.Navigation("GradeLevel");
-
-                    b.Navigation("Subject");
->>>>>>> eb30c869e0525d8bf651bfa9c0aee3191384d225
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
 
                     b.Navigation("Tutor");
                 });
@@ -2207,44 +1817,22 @@ namespace PROJECT_OTSP.Data.Migrations
 
             modelBuilder.Entity("PROJECT_OTSP.Models.TrialSchedule", b =>
                 {
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
-=======
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
                     b.HasOne("PROJECT_OTSP.Models.ClassSession", "ClassSession")
                         .WithOne()
                         .HasForeignKey("PROJECT_OTSP.Models.TrialSchedule", "ClassSessionId")
                         .OnDelete(DeleteBehavior.Restrict);
 
-<<<<<<< HEAD
-=======
->>>>>>> eb30c869e0525d8bf651bfa9c0aee3191384d225
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
                     b.HasOne("PROJECT_OTSP.Models.ConnectionRequest", "ConnectionRequest")
                         .WithMany("TrialSchedules")
                         .HasForeignKey("ConnectionRequestId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-<<<<<<< HEAD
                     b.Navigation("ClassSession");
 
                     b.Navigation("ConnectionRequest");
                 });
 
-=======
-<<<<<<< HEAD
-                    b.Navigation("ConnectionRequest");
-                });
-
-=======
-                    b.Navigation("ClassSession");
-
-                    b.Navigation("ConnectionRequest");
-                });
-
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
             modelBuilder.Entity("PROJECT_OTSP.Models.TutorAvailability", b =>
                 {
                     b.HasOne("PROJECT_OTSP.Models.TutorProfile", "Tutor")
@@ -2256,10 +1844,6 @@ namespace PROJECT_OTSP.Data.Migrations
                     b.Navigation("Tutor");
                 });
 
-<<<<<<< HEAD
-=======
->>>>>>> eb30c869e0525d8bf651bfa9c0aee3191384d225
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
             modelBuilder.Entity("PROJECT_OTSP.Models.TutorProfile", b =>
                 {
                     b.HasOne("PROJECT_OTSP.Models.ApplicationUser", "User")
@@ -2271,31 +1855,6 @@ namespace PROJECT_OTSP.Data.Migrations
                     b.Navigation("User");
                 });
 
-<<<<<<< HEAD
-            modelBuilder.Entity("PROJECT_OTSP.Models.TutorSubject", b =>
-=======
-<<<<<<< HEAD
-            modelBuilder.Entity("PROJECT_OTSP.Models.TutorSubjectLevel", b =>
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
-                {
-                    b.HasOne("PROJECT_OTSP.Models.GradeLevel", "GradeLevel")
-                        .WithMany("TutorSubjects")
-                        .HasForeignKey("GradeLevelId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("PROJECT_OTSP.Models.Subject", "Subject")
-                        .WithMany("TutorSubjects")
-                        .HasForeignKey("SubjectId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("PROJECT_OTSP.Models.TutorProfile", "Tutor")
-<<<<<<< HEAD
-                        .WithMany("TutorSubjects")
-=======
-                        .WithMany("TutorSubjectLevels")
-=======
             modelBuilder.Entity("PROJECT_OTSP.Models.TutorSubject", b =>
                 {
                     b.HasOne("PROJECT_OTSP.Models.GradeLevel", "GradeLevel")
@@ -2312,25 +1871,13 @@ namespace PROJECT_OTSP.Data.Migrations
 
                     b.HasOne("PROJECT_OTSP.Models.TutorProfile", "Tutor")
                         .WithMany("TutorSubjects")
->>>>>>> eb30c869e0525d8bf651bfa9c0aee3191384d225
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
                         .HasForeignKey("TutorId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-<<<<<<< HEAD
                     b.Navigation("GradeLevel");
 
                     b.Navigation("Subject");
-=======
-<<<<<<< HEAD
-                    b.Navigation("SubjectLevel");
-=======
-                    b.Navigation("GradeLevel");
-
-                    b.Navigation("Subject");
->>>>>>> eb30c869e0525d8bf651bfa9c0aee3191384d225
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
 
                     b.Navigation("Tutor");
                 });
@@ -2375,16 +1922,8 @@ namespace PROJECT_OTSP.Data.Migrations
 
             modelBuilder.Entity("PROJECT_OTSP.Models.ClassSession", b =>
                 {
-<<<<<<< HEAD
                     b.Navigation("Attendances");
 
-=======
-<<<<<<< HEAD
-=======
-                    b.Navigation("Attendances");
-
->>>>>>> eb30c869e0525d8bf651bfa9c0aee3191384d225
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
                     b.Navigation("Reviews");
                 });
 
@@ -2397,11 +1936,8 @@ namespace PROJECT_OTSP.Data.Migrations
                     b.Navigation("ConnectionRequests");
 
                     b.Navigation("Payments");
-<<<<<<< HEAD
-=======
 
                     b.Navigation("WeeklySchedules");
->>>>>>> eb30c869e0525d8bf651bfa9c0aee3191384d225
                 });
 
             modelBuilder.Entity("PROJECT_OTSP.Models.ConnectionRequest", b =>
@@ -2409,11 +1945,6 @@ namespace PROJECT_OTSP.Data.Migrations
                     b.Navigation("TrialSchedules");
                 });
 
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
-=======
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
             modelBuilder.Entity("PROJECT_OTSP.Models.GradeLevel", b =>
                 {
                     b.Navigation("Classrooms");
@@ -2425,10 +1956,6 @@ namespace PROJECT_OTSP.Data.Migrations
                     b.Navigation("TutorSubjects");
                 });
 
-<<<<<<< HEAD
-=======
->>>>>>> eb30c869e0525d8bf651bfa9c0aee3191384d225
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
             modelBuilder.Entity("PROJECT_OTSP.Models.PartnerCenter", b =>
                 {
                     b.Navigation("GroupClasses");
@@ -2459,49 +1986,21 @@ namespace PROJECT_OTSP.Data.Migrations
                     b.Navigation("Reviews");
                 });
 
-<<<<<<< HEAD
             modelBuilder.Entity("PROJECT_OTSP.Models.Subject", b =>
                 {
                     b.Navigation("Classrooms");
 
-=======
-<<<<<<< HEAD
-            modelBuilder.Entity("PROJECT_OTSP.Models.SubjectLevel", b =>
-                {
-=======
-            modelBuilder.Entity("PROJECT_OTSP.Models.Subject", b =>
-                {
-                    b.Navigation("Classrooms");
-
->>>>>>> eb30c869e0525d8bf651bfa9c0aee3191384d225
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
                     b.Navigation("ConnectionRequests");
 
                     b.Navigation("LearningDocuments");
 
-<<<<<<< HEAD
                     b.Navigation("TutorSubjects");
-=======
-<<<<<<< HEAD
-                    b.Navigation("TutorSubjectLevels");
-=======
-                    b.Navigation("TutorSubjects");
->>>>>>> eb30c869e0525d8bf651bfa9c0aee3191384d225
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
                 });
 
             modelBuilder.Entity("PROJECT_OTSP.Models.TutorProfile", b =>
                 {
-<<<<<<< HEAD
                     b.Navigation("Availabilities");
 
-=======
-<<<<<<< HEAD
-=======
-                    b.Navigation("Availabilities");
-
->>>>>>> eb30c869e0525d8bf651bfa9c0aee3191384d225
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
                     b.Navigation("Classrooms");
 
                     b.Navigation("ConnectionRequests");
@@ -2514,15 +2013,7 @@ namespace PROJECT_OTSP.Data.Migrations
 
                     b.Navigation("Reconciliations");
 
-<<<<<<< HEAD
                     b.Navigation("TutorSubjects");
-=======
-<<<<<<< HEAD
-                    b.Navigation("TutorSubjectLevels");
-=======
-                    b.Navigation("TutorSubjects");
->>>>>>> eb30c869e0525d8bf651bfa9c0aee3191384d225
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
                 });
 #pragma warning restore 612, 618
         }
