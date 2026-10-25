@@ -1,5 +1,9 @@
 using CloudinaryDotNet;
 using CloudinaryDotNet.Actions;
+<<<<<<< Updated upstream
+=======
+using Microsoft.AspNetCore.Http;
+>>>>>>> Stashed changes
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
@@ -27,6 +31,16 @@ public sealed class CloudinaryImageStorageService : IImageStorageService
 {
     private readonly CloudinarySettings _settings;
     private readonly ILogger<CloudinaryImageStorageService> _logger;
+<<<<<<< Updated upstream
+=======
+
+    public CloudinaryImageStorageService(
+        IOptions<CloudinarySettings> settings,
+        ILogger<CloudinaryImageStorageService> logger)
+    {
+        _settings = settings.Value;
+        _logger = logger;
+>>>>>>> Stashed changes
     private readonly IWebHostEnvironment _environment;
 
     public CloudinaryImageStorageService(
@@ -84,6 +98,31 @@ public sealed class CloudinaryImageStorageService : IImageStorageService
 
     public async Task<StoredImage> UploadClassroomCoverAsync(IFormFile file, CancellationToken cancellationToken)
     {
+<<<<<<< Updated upstream
+=======
+        var cloudinary = CreateClient();
+        await using var stream = file.OpenReadStream();
+        var result = await cloudinary.UploadAsync(new ImageUploadParams
+        {
+            File = new FileDescription(file.FileName, stream),
+            Folder = "otsp/classrooms",
+            PublicId = Guid.NewGuid().ToString("N"),
+            Overwrite = false,
+            UseFilename = false,
+            UniqueFilename = false
+        }, cancellationToken);
+
+        if (result.Error is not null || result.SecureUrl is null || string.IsNullOrWhiteSpace(result.PublicId))
+            throw new InvalidOperationException(result.Error?.Message ?? "Cloudinary did not return an image URL.");
+
+        const string uploadPath = "/image/upload/";
+        var secureUrl = result.SecureUrl.ToString();
+        var markerIndex = secureUrl.IndexOf(uploadPath, StringComparison.Ordinal);
+        if (markerIndex >= 0)
+            secureUrl = secureUrl.Insert(markerIndex + uploadPath.Length, "f_auto,q_auto,c_limit,w_1600/");
+
+        return new StoredImage(secureUrl, result.PublicId);
+>>>>>>> Stashed changes
         ValidateImageFile(file, maxBytes: 8 * 1024 * 1024);
 
         if (IsCloudinaryConfigured())
@@ -126,6 +165,17 @@ public sealed class CloudinaryImageStorageService : IImageStorageService
 
     public async Task DeleteAsync(string publicId, CancellationToken cancellationToken)
     {
+<<<<<<< Updated upstream
+=======
+        var result = await CreateClient().DestroyAsync(new DeletionParams(publicId)
+        {
+            ResourceType = ResourceType.Image,
+            Invalidate = true
+        });
+
+        if (result.Error is not null)
+            _logger.LogWarning("Cloudinary could not delete image {PublicId}: {Error}", publicId, result.Error.Message);
+>>>>>>> Stashed changes
         if (IsCloudinaryConfigured())
         {
             try
@@ -199,6 +249,12 @@ public sealed class CloudinaryImageStorageService : IImageStorageService
 
     private Cloudinary CreateClient()
     {
+<<<<<<< Updated upstream
+=======
+        if (string.IsNullOrWhiteSpace(_settings.CloudName)
+            || string.IsNullOrWhiteSpace(_settings.ApiKey)
+            || string.IsNullOrWhiteSpace(_settings.ApiSecret))
+>>>>>>> Stashed changes
         if (!IsCloudinaryConfigured())
         {
             throw new InvalidOperationException(

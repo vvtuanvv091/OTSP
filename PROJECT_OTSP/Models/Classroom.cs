@@ -1,3 +1,7 @@
+<<<<<<< Updated upstream
+=======
+﻿using Microsoft.EntityFrameworkCore;
+>>>>>>> Stashed changes
 using Microsoft.EntityFrameworkCore;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
@@ -15,7 +19,9 @@ namespace PROJECT_OTSP.Models
         // Tên lớp
         [Required, MaxLength(200)]
         public string Name { get; set; } = "";
+<<<<<<< Updated upstream
 
+=======
         // Ảnh bìa của lớp. Có thể null, khi đó giao diện hiện khối icon thay thế.
         [MaxLength(500)]
         public string? CoverImageUrl { get; set; }
@@ -25,10 +31,30 @@ namespace PROJECT_OTSP.Models
         [Precision(18, 0)]
         public decimal Fee { get; set; }
 
+        // Học phí lớp (VNĐ)
+        [Precision(18, 0)]
+        public decimal Fee { get; set; }
+>>>>>>> Stashed changes
+        // Ảnh bìa của lớp. Có thể null, khi đó giao diện hiện khối icon thay thế.
+        [MaxLength(500)]
+        public string? CoverImageUrl { get; set; }
+        [MaxLength(255)]
+        public string? CoverImagePublicId { get; set; }
+        // Học phí lớp (VNĐ)
+        [Precision(18, 0)]
+        public decimal Fee { get; set; }
+<<<<<<< Updated upstream
+
+=======
+>>>>>>> Stashed changes
         // Mô tả riêng của lớp (nội dung, đối tượng, lịch học...), hiển thị trên thẻ lớp học
         [MaxLength(1000)]
         public string? Description { get; set; }
 
+<<<<<<< Updated upstream
+=======
+
+>>>>>>> Stashed changes
         // Ngày bắt đầu lớp
         public DateOnly? StartDate { get; set; }
 
@@ -76,5 +102,9 @@ namespace PROJECT_OTSP.Models
         [ForeignKey("GradeLevel")]
         public int GradeLevelId { get; set; }
         public GradeLevel GradeLevel { get; set; } = null!;
+<<<<<<< Updated upstream
+=======
+
+>>>>>>> Stashed changes
     }
 }

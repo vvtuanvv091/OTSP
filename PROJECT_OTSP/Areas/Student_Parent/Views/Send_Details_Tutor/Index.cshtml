@@ -1,10 +1,7 @@
 @using PROJECT_OTSP.Dtos
 @using static PROJECT_OTSP.Models.Enums
 @model TutorDetailsVm
-<<<<<<< HEAD
-=======
 @inject PROJECT_OTSP.Services.IScheduleBlockService BlockService
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
 
 @{
     ViewData["Title"] = $"Hồ sơ gia sư - {Model.FullName}";
@@ -19,7 +16,6 @@
 }
 
 <style>
-<<<<<<< HEAD
     :root {
         --brand: #DB303A;
         --brand-dark: #B7212B;
@@ -59,7 +55,6 @@
     .tutor-avatar-fallback {
         width: 100px;
         height: 100px;
-=======
     /* Specific styles for Tutor Details & Booking View */
     .tutor-detail-shell {
         max-width: 1200px;
@@ -184,18 +179,14 @@
     .tutor-avatar-fallback {
         width: 90px;
         height: 90px;
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
         border-radius: 50%;
         background: linear-gradient(135deg, var(--brand), #ea580c);
         color: #fff;
         display: flex;
         align-items: center;
         justify-content: center;
-<<<<<<< HEAD
         font-size: 2.2rem;
-=======
         font-size: 2rem;
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
         font-weight: 700;
         box-shadow: 0 6px 18px var(--brand-glow);
     }
@@ -220,7 +211,6 @@
     .sticky-card {
         position: sticky;
         top: 90px;
-<<<<<<< HEAD
     }
 
     .section-title {
@@ -240,7 +230,6 @@
     .tag-item {
         background: #f1f5f9;
         color: #334155;
-=======
         display: flex;
         flex-direction: column;
         gap: 1rem;
@@ -249,7 +238,6 @@
     .tag-item {
         background: var(--bs-tertiary-bg);
         color: var(--bs-body-color);
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
         border-radius: 20px;
         padding: .4rem .9rem;
         font-size: .88rem;
@@ -257,7 +245,6 @@
         display: inline-flex;
         align-items: center;
         gap: .4rem;
-<<<<<<< HEAD
         border: 1px solid #e2e8f0;
     }
 
@@ -265,7 +252,6 @@
         background: #ecfdf5;
         color: #065f46;
         border: 1px solid #a7f3d0;
-=======
         border: 1px solid var(--bs-border-color);
     }
 
@@ -273,13 +259,11 @@
         background: rgba(16, 185, 129, 0.12);
         color: #047857;
         border: 1px solid rgba(16, 185, 129, 0.3);
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
         border-radius: var(--radius-md);
         padding: .5rem .75rem;
         font-size: .85rem;
     }
 
-<<<<<<< HEAD
     .btn-brand {
         background: var(--brand);
         border-color: var(--brand);
@@ -331,10 +315,8 @@
         display: flex;
         flex-direction: column;
         gap: 1rem;
-=======
     html[data-bs-theme="dark"] .time-slot-tag {
         color: #34d399;
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
     }
 
     .request-steps {
@@ -349,11 +331,8 @@
         display: flex;
         align-items: center;
         gap: .35rem;
-<<<<<<< HEAD
         color: #64748b;
-=======
         color: var(--bs-secondary-color);
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
         font-size: .72rem;
         white-space: nowrap;
     }
@@ -366,13 +345,10 @@
         align-items: center;
         justify-content: center;
         border-radius: 50%;
-<<<<<<< HEAD
         background: #e9ecef;
         color: #64748b;
-=======
         background: var(--bs-tertiary-bg);
         color: var(--bs-secondary-color);
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
         font-size: .7rem;
         font-weight: 700;
     }
@@ -392,11 +368,8 @@
         height: 1px;
         flex: 1;
         min-width: .35rem;
-<<<<<<< HEAD
         background: #dee2e6;
-=======
         background: var(--bs-border-color);
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
     }
 
     .tutor-chat-card {
@@ -411,17 +384,14 @@
         display: flex;
         align-items: center;
         justify-content: center;
-<<<<<<< HEAD
         border: 1px solid #dee2e6;
         border-radius: .65rem;
         background: #f8f9fa;
         color: #94a3b8;
-=======
         border: 1px solid var(--bs-border-color);
         border-radius: .65rem;
         background: var(--bs-tertiary-bg);
         color: var(--bs-secondary-color);
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
         font-size: .8rem;
     }
 
@@ -433,9 +403,7 @@
 
     @@media (max-width: 575.98px) {
         .tutor-detail-shell {
-<<<<<<< HEAD
             padding-inline: .75rem;
-=======
             padding-inline: .5rem;
         }
 
@@ -444,7 +412,6 @@
             width: 68px;
             height: 68px;
             font-size: 1.5rem;
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
         }
 
         .request-step {
@@ -676,7 +643,6 @@
                     }
                 </div>
 
-<<<<<<< HEAD
                 <!-- Lịch rảnh trong tuần -->
                 <div class="pro-card">
                     <h2 class="section-title"><i class="bi bi-calendar-week"></i> Khung giờ có thể dạy hàng tuần</h2>
@@ -694,7 +660,6 @@
                                     <div class="time-slot-tag d-flex justify-content-between align-items-center">
                                         <span class="fw-semibold">@slot.DayOfWeekName</span>
                                         <span>@slot.TimeRange</span>
-=======
                 <!-- Khung lịch rảnh & Đặt lịch học thử (1 kèm 1) -->
                 <div class="pro-card" id="tutorScheduleCard">
                     <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
@@ -862,7 +827,6 @@
                                                 }
                                             </tbody>
                                         </table>
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
                                     </div>
                                 </div>
                             }
@@ -893,15 +857,12 @@
                                             </div>
                                             <h6 class="fw-bold mb-1">@cls.Name</h6>
                                             <p class="text-muted small mb-2">@cls.Description</p>
-<<<<<<< HEAD
-=======
                                             @if (!string.IsNullOrWhiteSpace(cls.ScheduleSummary))
                                             {
                                                 <div class="mb-2 p-2 bg-white rounded border small">
                                                     <i class="bi bi-calendar-event text-danger me-1"></i><strong>Lịch học:</strong> @cls.ScheduleSummary
                                                 </div>
                                             }
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
                                         </div>
                                         <div class="d-flex justify-content-between align-items-center pt-2 border-top small text-muted">
                                             <span><i class="bi bi-people me-1"></i> @cls.StudentCount / @cls.MaxStudents học viên</span>
@@ -1012,11 +973,8 @@
                             <input type="hidden" asp-for="Request.TutorId" value="@Model.TutorId" />
                             <input type="hidden" asp-for="Request.SubjectId" id="hiddenSubjectId" value="@Model.Request.SubjectId" />
                             <input type="hidden" asp-for="Request.GradeLevelId" id="hiddenGradeLevelId" value="@Model.Request.GradeLevelId" />
-<<<<<<< HEAD
-=======
                             <input type="hidden" asp-for="Request.ProposedTrialSlotUtc" id="hiddenProposedTrialSlotUtc" />
                             <div id="hiddenSlotsContainer"></div>
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
 
                             <!-- Chọn môn học & cấp học -->
                             <div class="mb-3">
@@ -1047,7 +1005,6 @@
                                 </div>
                             </div>
 
-<<<<<<< HEAD
                             <!-- Dropdown chọn lớp nhóm nếu có -->
                             @if (Model.ClassroomOptions.Count > 0)
                             {
@@ -1062,7 +1019,6 @@
                                     </select>
                                 </div>
                             }
-=======
                             <!-- Khi chọn 1 kèm 1: Chọn slot học từ lịch rảnh thực tế của gia sư (Bắt buộc đủ 4 tiếng: 2 buổi, mỗi buổi 2 tiếng) -->
                             <div class="mb-3" id="trialSlotSection">
                                 <label class="form-label small fw-semibold d-flex justify-content-between align-items-center mb-1">
@@ -1131,7 +1087,6 @@
                                     </div>
                                 }
                             </div>
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
 
                             <!-- Lời nhắn -->
                             <div class="mb-3">
@@ -1194,8 +1149,6 @@
             const radioOneToOne = document.getElementById('typeOneToOne');
             const radioGroup = document.getElementById('typeGroup');
             const classroomBox = document.getElementById('classroomSelectBox');
-<<<<<<< HEAD
-=======
             const trialSlotSection = document.getElementById('trialSlotSection');
             const hiddenTrialSlot = document.getElementById('hiddenProposedTrialSlotUtc');
             const classroomSelect = document.getElementById('classroomSelect');
@@ -1211,7 +1164,6 @@
             const slotProgressBar = document.getElementById('slotProgressBar');
             const hiddenSlotsContainer = document.getElementById('hiddenSlotsContainer');
             const sendRequestForm = document.getElementById('sendRequestForm');
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
 
             function syncSubjectGrade() {
                 if (!select) return;
@@ -1228,14 +1180,12 @@
                 syncSubjectGrade();
             }
 
-<<<<<<< HEAD
             if (radioGroup && radioOneToOne && classroomBox) {
                 radioGroup.addEventListener('change', function () {
                     if (this.checked) classroomBox.classList.remove('d-none');
                 });
                 radioOneToOne.addEventListener('change', function () {
                     if (this.checked) classroomBox.classList.add('d-none');
-=======
             function toggleType() {
                 if (radioGroup && radioGroup.checked) {
                     if (classroomBox) classroomBox.classList.remove('d-none');
@@ -1451,7 +1401,6 @@
                     } else {
                         scheduleBadge.classList.add('d-none');
                     }
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
                 });
             }
         });

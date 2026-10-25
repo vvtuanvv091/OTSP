@@ -7,10 +7,7 @@ using PROJECT_OTSP.Data;
 using PROJECT_OTSP.Dtos;
 using PROJECT_OTSP.Hubs;
 using PROJECT_OTSP.Models;
-<<<<<<< HEAD
-=======
 using PROJECT_OTSP.Services;
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
 using static PROJECT_OTSP.Models.Enums;
 
 namespace PROJECT_OTSP.Areas.Tutor.Controllers;
@@ -19,43 +16,34 @@ namespace PROJECT_OTSP.Areas.Tutor.Controllers;
 [Authorize(Roles = "Tutor")]
 public sealed class TutorScheduleController : TutorAreaController
 {
-<<<<<<< HEAD
     private const int TrialDurationMinutes = 60;
     private readonly ApplicationDbContext _dbContext;
     private readonly IHubContext<ConnectionRequestHub> _hubContext;
     private readonly ILogger<TutorScheduleController> _logger;
-=======
     private const int VietnamUtcOffsetHours = 7;
 
     private readonly ApplicationDbContext _dbContext;
     private readonly IHubContext<ConnectionRequestHub> _hubContext;
     private readonly ILogger<TutorScheduleController> _logger;
     private readonly IScheduleBlockService _blocks;
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
 
     public TutorScheduleController(
         ApplicationDbContext dbContext,
         IHubContext<ConnectionRequestHub> hubContext,
-<<<<<<< HEAD
         ILogger<TutorScheduleController> logger)
-=======
         ILogger<TutorScheduleController> logger,
         IScheduleBlockService blocks)
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
     {
         _dbContext = dbContext;
         _hubContext = hubContext;
         _logger = logger;
-<<<<<<< HEAD
     }
 
-=======
         _blocks = blocks;
     }
 
     // ───────────────────────── Xem lịch dạy ─────────────────────────
 
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
     [HttpGet]
     public async Task<IActionResult> Index(
         int weekOffset = 0,
@@ -66,7 +54,6 @@ public sealed class TutorScheduleController : TutorAreaController
         if (string.IsNullOrWhiteSpace(userId))
             return NotFound();
 
-<<<<<<< HEAD
         var tutor = await _dbContext.TutorProfiles
             .AsNoTracking()
             .FirstOrDefaultAsync(item => item.UserId == userId, cancellationToken);
@@ -96,7 +83,6 @@ public sealed class TutorScheduleController : TutorAreaController
         var availabilities = await _dbContext.TutorAvailabilities
             .AsNoTracking()
             .Where(x => x.TutorId == tutor.Id)
-=======
         var tutorId = await _dbContext.TutorProfiles
             .AsNoTracking()
             .Where(item => item.UserId == userId)
@@ -172,7 +158,6 @@ public sealed class TutorScheduleController : TutorAreaController
         _dbContext.TutorAvailabilities
             .AsNoTracking()
             .Where(x => x.TutorId == tutorId)
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
             .OrderBy(x => x.DayOfWeek)
             .ThenBy(x => x.StartTime)
             .Select(x => new TutorAvailabilityDto
@@ -181,7 +166,6 @@ public sealed class TutorScheduleController : TutorAreaController
                 StartTime = x.StartTime,
                 EndTime = x.EndTime
             })
-<<<<<<< HEAD
             .ToListAsync(cancellationToken);
 
         var sessionsInWeek = await _dbContext.ClassSessions
@@ -206,7 +190,6 @@ public sealed class TutorScheduleController : TutorAreaController
                     .Select(ts => (int?)ts.ConnectionRequestId)
                     .FirstOrDefault(),
                 StudentName = _dbContext.TrialSchedules
-=======
             .ToListAsync(ct);
 
     private sealed record CalendarRow(
@@ -244,12 +227,10 @@ public sealed class TutorScheduleController : TutorAreaController
                 session.ClassroomId,
                 session.Classroom.Name,
                 _dbContext.TrialSchedules
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
                     .Where(ts => ts.ClassSessionId == session.Id)
                     .Select(ts => ts.ConnectionRequest.Student.User.FullName)
                     .FirstOrDefault()
                     ?? session.Classroom.ClassroomStudents.Select(cs => cs.Student.User.FullName).FirstOrDefault()
-<<<<<<< HEAD
                     ?? session.Classroom.Name
             })
             .ToListAsync(cancellationToken);
@@ -316,7 +297,6 @@ public sealed class TutorScheduleController : TutorAreaController
         }
 
         var schedules = await _dbContext.ConnectionRequests
-=======
                     ?? session.Classroom.Name,
                 session.Classroom.Subject.Name,
                 session.Classroom.GradeLevel.Name,
@@ -372,7 +352,6 @@ public sealed class TutorScheduleController : TutorAreaController
 
     private Task<List<TutorTeachingScheduleDto>> LoadTeachingRequestsAsync(string userId, CancellationToken ct) =>
         _dbContext.ConnectionRequests
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
             .AsNoTracking()
             .Where(request => request.Tutor.UserId == userId && request.Status == RequestStatus.Accepted)
             .OrderByDescending(request => request.RespondedAt)
@@ -403,7 +382,6 @@ public sealed class TutorScheduleController : TutorAreaController
                     .Select(schedule => schedule.ClassSession == null
                         ? (SessionStatus?)null
                         : schedule.ClassSession.Status)
-<<<<<<< HEAD
                     .FirstOrDefault()
             })
             .ToListAsync(cancellationToken);
@@ -421,7 +399,6 @@ public sealed class TutorScheduleController : TutorAreaController
 
         return View(viewModel);
     }
-=======
                     .FirstOrDefault(),
                 ProposedTrialSlotUtc = request.ProposedTrialSlotUtc,
                 ProposedTrialSlotsUtc = request.TrialSchedules
@@ -434,7 +411,6 @@ public sealed class TutorScheduleController : TutorAreaController
             .ToListAsync(ct);
 
     // ─────────────────── Xác nhận lịch học thử ───────────────────
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
 
     [HttpPost]
     [ValidateAntiForgeryToken]
@@ -449,7 +425,6 @@ public sealed class TutorScheduleController : TutorAreaController
 
         var scheduledAt = scheduledAtUtc.UtcDateTime;
         if (scheduledAt <= DateTime.UtcNow)
-<<<<<<< HEAD
         {
             TempData["Error"] = "Lịch học thử phải ở thời điểm trong tương lai.";
             return RedirectToAction(nameof(Index));
@@ -466,7 +441,6 @@ public sealed class TutorScheduleController : TutorAreaController
                 && item.Status == RequestStatus.Accepted,
                 cancellationToken);
 
-=======
             return Fail("Lịch học thử phải ở thời điểm trong tương lai.");
 
         var block = ResolveBlock(scheduledAt);
@@ -481,7 +455,6 @@ public sealed class TutorScheduleController : TutorAreaController
                                          && item.Tutor.UserId == tutorUserId
                                          && item.Status == RequestStatus.Accepted,
                 cancellationToken);
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
         if (request is null)
             return NotFound();
 
@@ -489,7 +462,6 @@ public sealed class TutorScheduleController : TutorAreaController
             .Where(schedule => schedule.ConnectionRequestId == requestId)
             .OrderByDescending(schedule => schedule.ScheduledAt)
             .FirstOrDefaultAsync(cancellationToken);
-<<<<<<< HEAD
 
         if (latestSchedule?.Status == ScheduleStatus.Confirmed)
         {
@@ -519,20 +491,17 @@ public sealed class TutorScheduleController : TutorAreaController
             TempData["Error"] = "Gia sư đã có buổi học khác trong khoảng thời gian này. Vui lòng chọn giờ khác.";
             return RedirectToAction(nameof(Index));
         }
-=======
         if (latestSchedule?.Status == ScheduleStatus.Confirmed)
             return Fail("Lịch học thử này đã được xác nhận.");
 
         if (await HasScheduleConflictAsync(tutorUserId, requestId, scheduledAt, block.Value.Hours * 60, cancellationToken))
             return Fail("Gia sư đã có buổi học khác trong khối giờ này. Vui lòng chọn khối khác.");
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
 
         if (latestSchedule is null)
         {
             latestSchedule = new TrialSchedule { ConnectionRequestId = requestId };
             _dbContext.TrialSchedules.Add(latestSchedule);
         }
-<<<<<<< HEAD
 
         latestSchedule.ScheduledAt = scheduledAt;
         latestSchedule.Status = ScheduleStatus.Confirmed;
@@ -567,13 +536,11 @@ public sealed class TutorScheduleController : TutorAreaController
                 JoinedAt = DateTime.UtcNow
             });
         }
-=======
         latestSchedule.ScheduledAt = scheduledAt;
         latestSchedule.Status = ScheduleStatus.Confirmed;
 
         var classroom = GetOrCreateClassroom(request);
         await EnsureEnrolledAsync(classroom, request.StudentId, cancellationToken);
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
 
         var classSession = new ClassSession
         {
@@ -586,14 +553,12 @@ public sealed class TutorScheduleController : TutorAreaController
         latestSchedule.ClassSession = classSession;
         await _dbContext.SaveChangesAsync(cancellationToken);
 
-<<<<<<< HEAD
         try
         {
             await _hubContext.Clients.User(request.Student.UserId).SendAsync(
                 "TrialScheduleConfirmed",
                 new { requestId, scheduledAtUtc = scheduledAt, classSessionId = classSession.Id },
                 cancellationToken);
-=======
         await NotifyStudentAsync(request.Student.UserId, requestId, scheduledAt, classSession.Id, cancellationToken);
 
         TempData["Success"] = "Đã xác nhận lịch học thử và thông báo cho học viên.";
@@ -683,19 +648,16 @@ public sealed class TutorScheduleController : TutorAreaController
                 "TrialScheduleConfirmed",
                 new { requestId, scheduledAtUtc = scheduledAt, classSessionId },
                 ct);
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
         }
         catch (Exception exception)
         {
             _logger.LogWarning(exception, "Could not send realtime trial schedule update for request {RequestId}", requestId);
         }
-<<<<<<< HEAD
 
         TempData["Success"] = "Đã xác nhận lịch học thử và thông báo cho học viên.";
         return RedirectToAction(nameof(Index));
     }
 }
-=======
     }
 
     // ─────────────────── Nhận vào lớp chính thức ───────────────────
@@ -1025,4 +987,3 @@ public sealed class TutorScheduleController : TutorAreaController
         return RedirectToAction(nameof(Index));
     }
 }
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc

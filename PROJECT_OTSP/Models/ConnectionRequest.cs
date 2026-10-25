@@ -1,3 +1,7 @@
+<<<<<<< Updated upstream
+=======
+﻿using System.ComponentModel.DataAnnotations;
+>>>>>>> Stashed changes
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using static PROJECT_OTSP.Models.Enums;
@@ -32,6 +36,14 @@ public class ConnectionRequest
     public int TutorId { get; set; }
     public TutorProfile Tutor { get; set; } = null!;
 
+<<<<<<< Updated upstream
+=======
+    // Môn-cấp học học viên muốn học
+    [ForeignKey("SubjectLevel")]
+    public int SubjectLevelId { get; set; }
+    public SubjectLevel SubjectLevel { get; set; } = null!;
+
+>>>>>>> Stashed changes
     // Kiểu học học viên muốn: 1-1 hoặc nhóm
     public ClassroomType PreferredType { get; set; } = ClassroomType.OneToOne;
 
@@ -41,7 +53,10 @@ public class ConnectionRequest
     public Classroom? Classroom { get; set; }
 
     public ICollection<TrialSchedule> TrialSchedules { get; set; } = new List<TrialSchedule>();
+<<<<<<< Updated upstream
 
+=======
+>>>>>>> Stashed changes
     // Môn học (ví dụ: Toán)
     [ForeignKey("Subject")]
     public int SubjectId { get; set; }
@@ -51,4 +66,8 @@ public class ConnectionRequest
     [ForeignKey("GradeLevel")]
     public int GradeLevelId { get; set; }
     public GradeLevel GradeLevel { get; set; } = null!;
+<<<<<<< Updated upstream
+=======
+
+>>>>>>> Stashed changes
 }

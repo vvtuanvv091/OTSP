@@ -6,6 +6,17 @@ using PROJECT_OTSP.Data;
 using PROJECT_OTSP.Hubs;
 using PROJECT_OTSP.Models;
 using PROJECT_OTSP.Services;
+<<<<<<< Updated upstream
+=======
+using System.Globalization;
+using Microsoft.AspNetCore.Localization;
+using Microsoft.EntityFrameworkCore;
+using PROJECT_OTSP.Data;
+using PROJECT_OTSP.Hubs;
+using PROJECT_OTSP.Models;
+using PROJECT_OTSP.Services;
+using System.Globalization;
+>>>>>>> Stashed changes
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -14,6 +25,10 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
     ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
 
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
+<<<<<<< Updated upstream
+=======
+    options.UseNpgsql(connectionString));
+>>>>>>> Stashed changes
     options.UseNpgsql(connectionString, npgsqlOptions =>
     {
         npgsqlOptions.EnableRetryOnFailure(
@@ -34,6 +49,41 @@ builder.Services.AddDefaultIdentity<ApplicationUser>(options =>
 // ===== 3. MVC, Razor Pages, API =====
 builder.Services.AddControllersWithViews();
 builder.Services.AddRazorPages();
+<<<<<<< Updated upstream
+=======
+builder.Services.AddSignalR();
+builder.Services.AddLocalization();
+builder.Services.AddMemoryCache();
+builder.Services.AddDistributedMemoryCache();
+builder.Services.AddSession(options =>
+{
+    options.IdleTimeout = TimeSpan.FromMinutes(60);
+    options.Cookie.HttpOnly = true;
+    options.Cookie.IsEssential = true;
+});
+
+// ===== 3.1 Services =====
+builder.Services.AddScoped<ISearchService, SearchService>();
+builder.Services.AddScoped<IOpenGroupClassroomService, OpenGroupClassroomService>();
+builder.Services.AddScoped<IChatService, ChatService>();
+builder.Services.Configure<CloudinarySettings>(builder.Configuration.GetSection("Cloudinary"));
+builder.Services.AddSingleton<IImageStorageService, CloudinaryImageStorageService>();
+
+var supportedCultures = new[] { new CultureInfo("vi"), new CultureInfo("en") };
+builder.Services.Configure<RequestLocalizationOptions>(options =>
+{
+    options.DefaultRequestCulture = new RequestCulture("vi");
+    options.SupportedCultures = supportedCultures;
+    options.SupportedUICultures = supportedCultures;
+});
+
+
+var app = builder.Build();
+
+
+var app = builder.Build();
+
+>>>>>>> Stashed changes
 builder.Services.AddSignalR();
 builder.Services.AddLocalization();
 builder.Services.AddMemoryCache();
@@ -106,6 +156,15 @@ app.UseRequestLocalization();
 
 app.UseRouting();
 app.UseSession();
+<<<<<<< Updated upstream
+=======
+app.UseRouting();
+app.UseRequestLocalization();
+
+
+app.UseRouting();
+app.UseSession();
+>>>>>>> Stashed changes
 
 app.UseAuthentication();   // phải đứng trước UseAuthorization
 app.UseAuthorization();
@@ -129,3 +188,8 @@ app.MapRazorPages()        // trang Identity: /Identity/Account/Login, Register.
    .WithStaticAssets();
 
 app.Run();
+<<<<<<< Updated upstream
+=======
+app.Run();
+app.Run();
+>>>>>>> Stashed changes

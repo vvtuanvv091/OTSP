@@ -30,10 +30,8 @@
             </a>
 
             <span class="student-sidebar-heading">HỌC TẬP</span>
-<<<<<<< HEAD
             <span class="student-sidebar-link is-disabled" aria-disabled="true"><i class="bi bi-calendar3" aria-hidden="true"></i><span>Lịch học</span></span>
             <span class="student-sidebar-link is-disabled" aria-disabled="true"><i class="bi bi-easel" aria-hidden="true"></i><span>Lớp của tôi</span></span>
-=======
             <a asp-area="Student_Parent" asp-controller="StudentSchedule" asp-action="Index"
                class="student-sidebar-link @(inStudentArea && controllerName == "StudentSchedule" ? "active" : "")">
                 <i class="bi bi-calendar3" aria-hidden="true"></i><span>Lịch học</span>
@@ -42,7 +40,6 @@
                class="student-sidebar-link @(inStudentArea && controllerName == "StudentClassroom" ? "active" : "")">
                 <i class="bi bi-easel" aria-hidden="true"></i><span>Lớp của tôi</span>
             </a>
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
             <a asp-area="Student_Parent" asp-controller="Send_Details_Tutor" asp-action="MyRequests"
                class="student-sidebar-link @(inStudentArea && controllerName == "Send_Details_Tutor" ? "active" : "")">
                 <i class="bi bi-person-plus" aria-hidden="true"></i><span>Yêu cầu kết nối</span>
@@ -120,8 +117,6 @@
         toggle.addEventListener('click', () => setSidebarOpen(!document.body.classList.contains('student-sidebar-open')));
         backdrop.addEventListener('click', () => setSidebarOpen(false));
         mobileQuery.addEventListener('change', e => setSidebarOpen(!e.matches));
-<<<<<<< HEAD
-=======
 
         // Tự động đồng bộ chiều cao Header để thanh Sidebar và Nút Menu không bị đè khuất trên điện thoại
         const header = document.getElementById('header');
@@ -136,7 +131,6 @@
                 new ResizeObserver(syncHeaderOffset).observe(header);
             }
         }
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
     })();
 </script>
 

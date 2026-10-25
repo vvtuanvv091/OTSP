@@ -9,6 +9,11 @@ using PROJECT_OTSP.Data;
 #nullable disable
 
 namespace PROJECT_OTSP.Data.Migrations
+<<<<<<< Updated upstream
+=======
+namespace PROJECT_OTSP.Migrations
+namespace PROJECT_OTSP.Data.Migrations
+>>>>>>> Stashed changes
 {
     [DbContext(typeof(ApplicationDbContext))]
     partial class ApplicationDbContextModelSnapshot : ModelSnapshot
@@ -425,6 +430,12 @@ namespace PROJECT_OTSP.Data.Migrations
                         .HasPrecision(18)
                         .HasColumnType("numeric(18,0)");
 
+<<<<<<< Updated upstream
+=======
+                    b.Property<int>("GradeLevelId")
+                        .HasColumnType("integer");
+
+>>>>>>> Stashed changes
                     b.Property<int>("GradeLevelId")
                         .HasColumnType("integer");
 
@@ -451,6 +462,12 @@ namespace PROJECT_OTSP.Data.Migrations
                     b.Property<int>("SubjectId")
                         .HasColumnType("integer");
 
+<<<<<<< Updated upstream
+=======
+                    b.Property<int>("SubjectId")
+                        .HasColumnType("integer");
+
+>>>>>>> Stashed changes
                     b.Property<int>("TutorId")
                         .HasColumnType("integer");
 
@@ -465,6 +482,20 @@ namespace PROJECT_OTSP.Data.Migrations
 
                     b.HasKey("Id");
 
+<<<<<<< Updated upstream
+=======
+                    b.HasKey("Id");
+
+                    b.HasIndex("TutorId");
+                    b.Property<uint>("xmin")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id");
+
+>>>>>>> Stashed changes
                     b.HasIndex("GradeLevelId");
 
                     b.HasIndex("SubjectId");
@@ -585,6 +616,12 @@ namespace PROJECT_OTSP.Data.Migrations
                     b.Property<int>("GradeLevelId")
                         .HasColumnType("integer");
 
+<<<<<<< Updated upstream
+=======
+                    b.Property<int>("GradeLevelId")
+                        .HasColumnType("integer");
+
+>>>>>>> Stashed changes
                     b.Property<string>("Message")
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
@@ -605,6 +642,11 @@ namespace PROJECT_OTSP.Data.Migrations
                         .HasColumnType("integer");
 
                     b.Property<int>("SubjectId")
+<<<<<<< Updated upstream
+=======
+                    b.Property<int>("SubjectLevelId")
+                    b.Property<int>("SubjectId")
+>>>>>>> Stashed changes
                         .HasColumnType("integer");
 
                     b.Property<int>("TutorId")
@@ -619,6 +661,17 @@ namespace PROJECT_OTSP.Data.Migrations
                     b.HasIndex("StudentId");
 
                     b.HasIndex("SubjectId");
+<<<<<<< Updated upstream
+=======
+                    b.HasIndex("StudentId");
+
+                    b.HasIndex("SubjectLevelId");
+                    b.HasIndex("GradeLevelId");
+
+                    b.HasIndex("StudentId");
+
+                    b.HasIndex("SubjectId");
+>>>>>>> Stashed changes
 
                     b.HasIndex("TutorId");
 
@@ -761,6 +814,10 @@ namespace PROJECT_OTSP.Data.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+<<<<<<< Updated upstream
+=======
+                    b.Property<int>("SubjectLevelId")
+>>>>>>> Stashed changes
                     b.Property<int>("GradeLevelId")
                         .HasColumnType("integer");
 
@@ -783,6 +840,13 @@ namespace PROJECT_OTSP.Data.Migrations
                     b.HasIndex("GradeLevelId");
 
                     b.HasIndex("SubjectId");
+<<<<<<< Updated upstream
+=======
+                    b.HasIndex("SubjectLevelId");
+                    b.HasIndex("GradeLevelId");
+
+                    b.HasIndex("SubjectId");
+>>>>>>> Stashed changes
 
                     b.HasIndex("TutorId");
 
@@ -1191,6 +1255,11 @@ namespace PROJECT_OTSP.Data.Migrations
                 });
 
             modelBuilder.Entity("PROJECT_OTSP.Models.Subject", b =>
+<<<<<<< Updated upstream
+=======
+            modelBuilder.Entity("PROJECT_OTSP.Models.SubjectLevel", b =>
+            modelBuilder.Entity("PROJECT_OTSP.Models.Subject", b =>
+>>>>>>> Stashed changes
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -1198,6 +1267,16 @@ namespace PROJECT_OTSP.Data.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+<<<<<<< Updated upstream
+=======
+                    b.Property<string>("Code")
+                    b.Property<string>("GradeLevel")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("SubjectName")
+>>>>>>> Stashed changes
                     b.Property<string>("Code")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -1215,6 +1294,11 @@ namespace PROJECT_OTSP.Data.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Subjects");
+<<<<<<< Updated upstream
+=======
+                    b.ToTable("SubjectLevels");
+                    b.ToTable("Subjects");
+>>>>>>> Stashed changes
                 });
 
             modelBuilder.Entity("PROJECT_OTSP.Models.TrialSchedule", b =>
@@ -1228,6 +1312,12 @@ namespace PROJECT_OTSP.Data.Migrations
                     b.Property<int?>("ClassSessionId")
                         .HasColumnType("integer");
 
+<<<<<<< Updated upstream
+=======
+                    b.Property<int?>("ClassSessionId")
+                        .HasColumnType("integer");
+
+>>>>>>> Stashed changes
                     b.Property<int>("ConnectionRequestId")
                         .HasColumnType("integer");
 
@@ -1242,6 +1332,12 @@ namespace PROJECT_OTSP.Data.Migrations
                     b.HasIndex("ClassSessionId")
                         .IsUnique();
 
+<<<<<<< Updated upstream
+=======
+                    b.HasIndex("ClassSessionId")
+                        .IsUnique();
+
+>>>>>>> Stashed changes
                     b.HasIndex("ConnectionRequestId");
 
                     b.ToTable("TrialSchedules");
@@ -1313,6 +1409,34 @@ namespace PROJECT_OTSP.Data.Migrations
                     b.ToTable("TutorProfiles");
                 });
 
+<<<<<<< Updated upstream
+=======
+            modelBuilder.Entity("PROJECT_OTSP.Models.TutorSubject", b =>
+            modelBuilder.Entity("PROJECT_OTSP.Models.TutorSubjectLevel", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("GradeLevelId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("SubjectId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("TutorId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GradeLevelId");
+
+                    b.HasIndex("SubjectId");
+
+                    b.ToTable("TutorSubjectLevels");
+>>>>>>> Stashed changes
             modelBuilder.Entity("PROJECT_OTSP.Models.TutorSubject", b =>
                 {
                     b.Property<int>("Id")
@@ -1458,6 +1582,32 @@ namespace PROJECT_OTSP.Data.Migrations
 
             modelBuilder.Entity("PROJECT_OTSP.Models.Classroom", b =>
                 {
+<<<<<<< Updated upstream
+=======
+            modelBuilder.Entity("PROJECT_OTSP.Models.Classroom", b =>
+                {
+            modelBuilder.Entity("PROJECT_OTSP.Models.ClassSessionAttendance", b =>
+                {
+                    b.HasOne("PROJECT_OTSP.Models.ClassSession", "ClassSession")
+                        .WithMany("Attendances")
+                        .HasForeignKey("ClassSessionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("PROJECT_OTSP.Models.ApplicationUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("ClassSession");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("PROJECT_OTSP.Models.Classroom", b =>
+                {
+>>>>>>> Stashed changes
                     b.HasOne("PROJECT_OTSP.Models.GradeLevel", "GradeLevel")
                         .WithMany("Classrooms")
                         .HasForeignKey("GradeLevelId")
@@ -1559,6 +1709,15 @@ namespace PROJECT_OTSP.Data.Migrations
                     b.HasOne("PROJECT_OTSP.Models.Subject", "Subject")
                         .WithMany("ConnectionRequests")
                         .HasForeignKey("SubjectId")
+<<<<<<< Updated upstream
+=======
+                    b.HasOne("PROJECT_OTSP.Models.SubjectLevel", "SubjectLevel")
+                        .WithMany("ConnectionRequests")
+                        .HasForeignKey("SubjectLevelId")
+                    b.HasOne("PROJECT_OTSP.Models.Subject", "Subject")
+                        .WithMany("ConnectionRequests")
+                        .HasForeignKey("SubjectId")
+>>>>>>> Stashed changes
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
@@ -1575,6 +1734,17 @@ namespace PROJECT_OTSP.Data.Migrations
                     b.Navigation("Student");
 
                     b.Navigation("Subject");
+<<<<<<< Updated upstream
+=======
+                    b.Navigation("Student");
+
+                    b.Navigation("SubjectLevel");
+                    b.Navigation("GradeLevel");
+
+                    b.Navigation("Student");
+
+                    b.Navigation("Subject");
+>>>>>>> Stashed changes
 
                     b.Navigation("Tutor");
                 });
@@ -1616,6 +1786,15 @@ namespace PROJECT_OTSP.Data.Migrations
                 {
                     b.HasOne("PROJECT_OTSP.Models.GradeLevel", "GradeLevel")
                         .WithMany("LearningDocuments")
+<<<<<<< Updated upstream
+=======
+                    b.HasOne("PROJECT_OTSP.Models.SubjectLevel", "SubjectLevel")
+                        .WithMany("LearningDocuments")
+                        .HasForeignKey("SubjectLevelId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                    b.HasOne("PROJECT_OTSP.Models.GradeLevel", "GradeLevel")
+                        .WithMany("LearningDocuments")
+>>>>>>> Stashed changes
                         .HasForeignKey("GradeLevelId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
@@ -1635,6 +1814,13 @@ namespace PROJECT_OTSP.Data.Migrations
                     b.Navigation("GradeLevel");
 
                     b.Navigation("Subject");
+<<<<<<< Updated upstream
+=======
+                    b.Navigation("SubjectLevel");
+                    b.Navigation("GradeLevel");
+
+                    b.Navigation("Subject");
+>>>>>>> Stashed changes
 
                     b.Navigation("Tutor");
                 });
@@ -1833,6 +2019,17 @@ namespace PROJECT_OTSP.Data.Migrations
                     b.Navigation("ConnectionRequest");
                 });
 
+<<<<<<< Updated upstream
+=======
+                    b.Navigation("ConnectionRequest");
+                });
+
+                    b.Navigation("ClassSession");
+
+                    b.Navigation("ConnectionRequest");
+                });
+
+>>>>>>> Stashed changes
             modelBuilder.Entity("PROJECT_OTSP.Models.TutorAvailability", b =>
                 {
                     b.HasOne("PROJECT_OTSP.Models.TutorProfile", "Tutor")
@@ -1855,6 +2052,27 @@ namespace PROJECT_OTSP.Data.Migrations
                     b.Navigation("User");
                 });
 
+<<<<<<< Updated upstream
+=======
+            modelBuilder.Entity("PROJECT_OTSP.Models.TutorSubject", b =>
+            modelBuilder.Entity("PROJECT_OTSP.Models.TutorSubjectLevel", b =>
+                {
+                    b.HasOne("PROJECT_OTSP.Models.GradeLevel", "GradeLevel")
+                        .WithMany("TutorSubjects")
+                        .HasForeignKey("GradeLevelId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("PROJECT_OTSP.Models.Subject", "Subject")
+                        .WithMany("TutorSubjects")
+                        .HasForeignKey("SubjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("PROJECT_OTSP.Models.TutorProfile", "Tutor")
+                        .WithMany("TutorSubjects")
+                        .WithMany("TutorSubjectLevels")
+>>>>>>> Stashed changes
             modelBuilder.Entity("PROJECT_OTSP.Models.TutorSubject", b =>
                 {
                     b.HasOne("PROJECT_OTSP.Models.GradeLevel", "GradeLevel")
@@ -1878,6 +2096,13 @@ namespace PROJECT_OTSP.Data.Migrations
                     b.Navigation("GradeLevel");
 
                     b.Navigation("Subject");
+<<<<<<< Updated upstream
+=======
+                    b.Navigation("SubjectLevel");
+                    b.Navigation("GradeLevel");
+
+                    b.Navigation("Subject");
+>>>>>>> Stashed changes
 
                     b.Navigation("Tutor");
                 });
@@ -1924,6 +2149,11 @@ namespace PROJECT_OTSP.Data.Migrations
                 {
                     b.Navigation("Attendances");
 
+<<<<<<< Updated upstream
+=======
+                    b.Navigation("Attendances");
+
+>>>>>>> Stashed changes
                     b.Navigation("Reviews");
                 });
 
@@ -1990,17 +2220,36 @@ namespace PROJECT_OTSP.Data.Migrations
                 {
                     b.Navigation("Classrooms");
 
+<<<<<<< Updated upstream
+=======
+            modelBuilder.Entity("PROJECT_OTSP.Models.SubjectLevel", b =>
+                {
+            modelBuilder.Entity("PROJECT_OTSP.Models.Subject", b =>
+                {
+                    b.Navigation("Classrooms");
+
+>>>>>>> Stashed changes
                     b.Navigation("ConnectionRequests");
 
                     b.Navigation("LearningDocuments");
 
                     b.Navigation("TutorSubjects");
+<<<<<<< Updated upstream
+=======
+                    b.Navigation("TutorSubjectLevels");
+                    b.Navigation("TutorSubjects");
+>>>>>>> Stashed changes
                 });
 
             modelBuilder.Entity("PROJECT_OTSP.Models.TutorProfile", b =>
                 {
                     b.Navigation("Availabilities");
 
+<<<<<<< Updated upstream
+=======
+                    b.Navigation("Availabilities");
+
+>>>>>>> Stashed changes
                     b.Navigation("Classrooms");
 
                     b.Navigation("ConnectionRequests");
@@ -2014,6 +2263,11 @@ namespace PROJECT_OTSP.Data.Migrations
                     b.Navigation("Reconciliations");
 
                     b.Navigation("TutorSubjects");
+<<<<<<< Updated upstream
+=======
+                    b.Navigation("TutorSubjectLevels");
+                    b.Navigation("TutorSubjects");
+>>>>>>> Stashed changes
                 });
 #pragma warning restore 612, 618
         }

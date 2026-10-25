@@ -1,9 +1,6 @@
 @using static PROJECT_OTSP.Models.Enums
 @model PROJECT_OTSP.Dtos.TutorSchedulePageVm
-<<<<<<< HEAD
-=======
 @inject PROJECT_OTSP.Services.IScheduleBlockService BlockService
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
 
 @{
     ViewData["Title"] = "Lịch dạy";
@@ -23,8 +20,6 @@
         [DayOfWeek.Saturday] = "T7",
         [DayOfWeek.Sunday] = "CN"
     };
-<<<<<<< HEAD
-=======
 
     // Các hàng của bảng: mỗi khối 2 tiếng là 1 hàng, khoảng trống giữa 2 khối (nghỉ trưa) là 1 hàng mờ
     var blocks = BlockService.Blocks;
@@ -44,7 +39,6 @@
         for (var k = index; k < rows.Count && !rows[k].IsRest && periodOf(rows[k].Start) == p; k++) n++;
         return n;
     };
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
 }
 
 <style>
@@ -78,7 +72,6 @@
         font-size: 12px;
     }
 
-<<<<<<< HEAD
     .schedule-table th {
         padding: 5px 3px;
         color: var(--bs-body-color);
@@ -90,7 +83,6 @@
     .schedule-table th.period-column { width: 44px; }
     .schedule-table th.time-column { width: 92px; }
     .schedule-table td { padding: 0 1px; text-align: center; vertical-align: middle; }
-=======
         .schedule-table th {
             padding: 5px 3px;
             color: var(--bs-body-color);
@@ -112,7 +104,6 @@
             text-align: center;
             vertical-align: middle;
         }
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
 
     .schedule-period-label {
         color: var(--availability-accent-text);
@@ -132,19 +123,16 @@
         border-radius: 4px;
     }
 
-<<<<<<< HEAD
     .schedule-table th.day-column.is-today {
         background: var(--availability-accent-soft);
         color: var(--availability-accent-text);
         border: 1px solid var(--availability-accent-border);
     }
-=======
         .schedule-table th.day-column.is-today {
             background: var(--availability-accent-soft);
             color: var(--availability-accent-text);
             border: 1px solid var(--availability-accent-border);
         }
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
 
     .day-title {
         font-size: 12px;
@@ -166,11 +154,8 @@
         position: relative;
         display: flex;
         width: 100%;
-<<<<<<< HEAD
         min-height: 28px;
-=======
         min-height: 44px;
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
         align-items: center;
         justify-content: center;
         border: 1px solid var(--availability-border);
@@ -181,7 +166,6 @@
         transition: all .15s ease-in-out;
     }
 
-<<<<<<< HEAD
     .availability-slot.is-free {
         border-color: var(--availability-accent-border);
         background: var(--availability-accent-soft);
@@ -200,7 +184,6 @@
         background: var(--bs-body-bg);
         border-color: var(--availability-border);
     }
-=======
         .availability-slot.is-free {
             border-color: var(--availability-accent-border);
             background: var(--availability-accent-soft);
@@ -227,7 +210,6 @@
             color: var(--bs-secondary-color);
             font-size: 10px;
         }
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
 
     .schedule-session-card {
         border: 1px solid var(--availability-border);
@@ -241,7 +223,6 @@
         box-shadow: 0 1px 3px rgba(0, 0, 0, .05);
     }
 
-<<<<<<< HEAD
     .schedule-session-card:hover {
         transform: translateY(-1px);
         box-shadow: 0 4px 10px rgba(0, 0, 0, .1);
@@ -284,7 +265,6 @@
         color: var(--bs-secondary-color);
         line-height: 1.2;
     }
-=======
         .schedule-session-card:hover {
             transform: translateY(-1px);
             box-shadow: 0 4px 10px rgba(0, 0, 0, .1);
@@ -327,7 +307,6 @@
             color: var(--bs-secondary-color);
             line-height: 1.2;
         }
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
 
     .availability-legend {
         display: flex;
@@ -352,7 +331,6 @@
         background: var(--bs-body-bg);
     }
 
-<<<<<<< HEAD
     .legend-swatch.is-free {
         border-color: var(--availability-accent-border);
         background: var(--availability-accent-soft);
@@ -362,7 +340,6 @@
         border-color: var(--availability-busy-border);
         background: var(--availability-busy-bg);
     }
-=======
         .legend-swatch.is-free {
             border-color: var(--availability-accent-border);
             background: var(--availability-accent-soft);
@@ -372,21 +349,18 @@
             border-color: var(--availability-busy-border);
             background: var(--availability-busy-bg);
         }
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
 
     .card-highlight-pulse {
         animation: cardPulse 1.8s ease-in-out;
     }
 
     @@keyframes cardPulse {
-<<<<<<< HEAD
         0% { outline: 3px solid rgba(219, 48, 58, .8); box-shadow: 0 0 16px rgba(219, 48, 58, .4); }
         50% { outline: 3px solid rgba(219, 48, 58, .4); box-shadow: 0 0 10px rgba(219, 48, 58, .2); }
         100% { outline: 3px solid transparent; box-shadow: none; }
     }
 
     .availability-mobile-day-picker { display: none; }
-=======
         0% {
             outline: 3px solid rgba(219, 48, 58, .8);
             box-shadow: 0 0 16px rgba(219, 48, 58, .4);
@@ -407,7 +381,6 @@
         display: none;
     }
 
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
     .availability-day-button {
         border: 1px solid var(--availability-border);
         border-radius: var(--bs-border-radius);
@@ -416,20 +389,17 @@
         padding: .45rem .6rem;
         font-size: .85rem;
     }
-<<<<<<< HEAD
     .availability-day-button[aria-pressed="true"] {
         border-color: var(--availability-accent);
         background: var(--availability-accent);
         color: #fff;
     }
-=======
 
         .availability-day-button[aria-pressed="true"] {
             border-color: var(--availability-accent);
             background: var(--availability-accent);
             color: #fff;
         }
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
 
     @@media (max-width: 767.98px) {
         .availability-mobile-day-picker {
@@ -439,30 +409,22 @@
             padding: .1rem .1rem .5rem;
             scrollbar-width: thin;
         }
-<<<<<<< HEAD
-=======
 
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
         .availability-day-button {
             flex: 1 0 auto;
             min-width: 2.35rem;
             padding: .4rem .35rem;
         }
-<<<<<<< HEAD
-=======
 
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
         .schedule-table {
             min-width: 100%;
             border-spacing: 2px 4px;
             font-size: .72rem;
         }
-<<<<<<< HEAD
         .schedule-table th.period-column { width: 2.45rem; }
         .schedule-table th.time-column { width: 4.65rem; }
         .schedule-table th[data-day-column],
         .schedule-table td[data-day-column] { display: none; }
-=======
 
             .schedule-table th.period-column {
                 width: 2.45rem;
@@ -477,17 +439,14 @@
                 display: none;
             }
 
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
         .schedule-page[data-active-day="1"] .schedule-table [data-day-column="1"],
         .schedule-page[data-active-day="2"] .schedule-table [data-day-column="2"],
         .schedule-page[data-active-day="3"] .schedule-table [data-day-column="3"],
         .schedule-page[data-active-day="4"] .schedule-table [data-day-column="4"],
         .schedule-page[data-active-day="5"] .schedule-table [data-day-column="5"],
         .schedule-page[data-active-day="6"] .schedule-table [data-day-column="6"],
-<<<<<<< HEAD
         .schedule-page[data-active-day="0"] .schedule-table [data-day-column="0"] { display: table-cell; }
         .availability-slot { min-height: 2rem; font-size: .72rem; }
-=======
         .schedule-page[data-active-day="0"] .schedule-table [data-day-column="0"] {
             display: table-cell;
         }
@@ -496,7 +455,6 @@
             min-height: 2.4rem;
             font-size: .75rem;
         }
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
     }
 </style>
 
@@ -505,18 +463,15 @@
     <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
         <div>
             <h1 class="h3 mb-1">Lịch dạy</h1>
-<<<<<<< HEAD
             <p class="text-body-secondary mb-0">Thời khóa biểu giảng dạy và lịch học thử theo giờ Việt Nam (GMT+7). Yêu cầu chỉ xuất hiện tại đây sau khi gia sư chấp nhận.</p>
         </div>
         <div class="d-flex flex-wrap gap-2">
-=======
             <p class="text-body-secondary mb-0">Thời khóa biểu giảng dạy theo giờ Việt Nam (GMT+7). Mỗi buổi học là một khối 2 tiếng. Yêu cầu chỉ xuất hiện tại đây sau khi gia sư chấp nhận.</p>
         </div>
         <div class="d-flex flex-wrap gap-2">
             <button type="button" class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#createSessionModal">
                 <i class="bi bi-calendar-plus me-1" aria-hidden="true"></i>Tự tạo lịch học / Dạy bù
             </button>
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
             <a asp-area="Tutor" asp-controller="TutorAvailability" asp-action="Index" class="btn btn-outline-secondary">
                 <i class="bi bi-calendar-range me-1" aria-hidden="true"></i>Cài đặt lịch rảnh
             </a>
@@ -541,11 +496,8 @@
         </div>
     }
 
-<<<<<<< HEAD
     <!-- Weekly Timetable Card (Hình 2 style with detailed calendar dates) -->
-=======
     <!-- Weekly timetable -->
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
     <div class="schedule-card p-3 mb-4 shadow-sm">
         <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3 pb-3 border-bottom">
             <div class="d-flex align-items-center gap-2">
@@ -582,11 +534,8 @@
             </div>
         </div>
 
-<<<<<<< HEAD
         <!-- Legend (Hình 2 style) -->
-=======
         <!-- Legend -->
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
         <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
             <div class="availability-legend">
                 <span class="legend-item"><span class="legend-swatch is-free" aria-hidden="true"></span>Rảnh - có thể nhận lớp</span>
@@ -612,12 +561,9 @@
             }
         </div>
 
-<<<<<<< HEAD
         <!-- Table Grid -->
-=======
         <!-- Table grid -->
         <div class="mobile-scroll-hint px-3 pt-2"><i class="bi bi-arrows-expand"></i> Vuốt ngang để xem đủ các ngày trong tuần</div>
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
         <div class="schedule-table-wrap">
             <table class="schedule-table mb-0" aria-label="Thời khóa biểu lịch dạy trong tuần">
                 <thead>
@@ -650,7 +596,6 @@
                     </tr>
                 </thead>
                 <tbody>
-<<<<<<< HEAD
                     @for (var hour = 6; hour < 22; hour++)
                     {
                         <tr>
@@ -668,7 +613,6 @@
                             }
                             <th class="schedule-time-label" scope="row">
                                 @string.Format("{0:00}:00 - {1:00}:00", hour, hour + 1)
-=======
                     @for (var r = 0; r < rows.Count; r++)
                     {
                         var row = rows[r];
@@ -686,20 +630,17 @@
                             }
                             <th class="schedule-time-label" scope="row">
                                 @string.Format("{0:00}:00 - {1:00}:00", row.Start, row.End)
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
                             </th>
                             @for (var i = 0; i < 7; i++)
                             {
                                 var dayDate = Model.SelectedMonday.AddDays(i);
                                 var dayOfWeek = dayDate.DayOfWeek;
-<<<<<<< HEAD
                                 var sessions = Model.CalendarSessions
                                     .Where(s => s.Date == dayDate && s.Hour == hour)
                                     .ToList();
                                 var isFree = Model.Availabilities.Any(a => a.DayOfWeek == dayOfWeek
                                     && a.StartTime <= new TimeOnly(hour, 0)
                                     && a.EndTime >= new TimeOnly(hour + 1, 0));
-=======
 
                                 // Buổi học nằm trong khối nếu giờ bắt đầu (giờ VN) rơi vào [Start, End)
                                 var sessions = Model.CalendarSessions
@@ -708,7 +649,6 @@
                                 var isFree = !row.IsRest && Model.Availabilities.Any(a => a.DayOfWeek == dayOfWeek
                                     && a.StartTime <= new TimeOnly(row.Start, 0)
                                     && a.EndTime >= new TimeOnly(row.End, 0));
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
 
                                 <td data-day-column="@((int)dayOfWeek)">
                                     @if (sessions.Count > 0)
@@ -728,23 +668,17 @@
                                                     SessionStatus.InProgress => "text-bg-primary",
                                                     SessionStatus.Done => "text-bg-secondary",
                                                     SessionStatus.Cancelled => "text-bg-danger",
-<<<<<<< HEAD
                                                     _ => "text-bg-success"
-=======
                                                     _ => session.IsMakeup ? "text-bg-info text-white" : "text-bg-success"
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
                                                 };
                                                 var sessionBadgeLabel = session.Status switch
                                                 {
                                                     SessionStatus.InProgress => "Đang diễn ra",
                                                     SessionStatus.Done => "Đã kết thúc",
-<<<<<<< HEAD
                                                     SessionStatus.Cancelled => "Đã hủy",
                                                     _ => "Đã xác nhận"
-=======
                                                     SessionStatus.Cancelled => "Báo bận / Hủy",
                                                     _ => session.IsMakeup ? "Lịch dạy bù" : "Đã xác nhận"
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
                                                 };
                                                 <div class="schedule-session-card @sessionStatusClass"
                                                      data-schedule-target="@(session.RequestId.HasValue ? $"schedule-card-{session.RequestId.Value}" : "")"
@@ -765,8 +699,6 @@
                                                             </button>
                                                         </form>
                                                     }
-<<<<<<< HEAD
-=======
                                                     @if (session.SessionId > 0 && session.Status == SessionStatus.Scheduled)
                                                     {
                                                         <button type="button" class="btn btn-outline-danger btn-sm w-100 py-0 mt-1 btn-cancel-session"
@@ -788,7 +720,6 @@
                                                             <i class="bi bi-calendar-plus me-1"></i>Lên lịch bù
                                                         </button>
                                                     }
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
                                                     @if (session.SessionId > 0 && session.Status == SessionStatus.InProgress)
                                                     {
                                                         <form asp-area="" asp-controller="ClassSession" asp-action="End" method="post" class="mt-1" onclick="event.stopPropagation();" onsubmit="return confirm('Bạn có chắc muốn kết thúc buổi học này?');">
@@ -807,20 +738,17 @@
                                     {
                                         <div class="availability-slot is-free"
                                              data-slot-date="@dayDate.ToString("yyyy-MM-dd")"
-<<<<<<< HEAD
                                              data-slot-hour="@hour"
                                              title="Khung giờ rảnh theo lịch cố định (@dayDate.ToString("dd/MM/yyyy") @string.Format("{0:00}:00", hour)). Bấm để điền vào lịch học thử bên dưới.">
                                             <span>Rảnh</span>
                                         </div>
                                     }
-=======
                                              data-slot-start="@row.Start"
                                              title="Khối rảnh (@dayDate.ToString("dd/MM/yyyy") @string.Format("{0:00}:00 - {1:00}:00", row.Start, row.End)). Bấm để điền vào form xác nhận lịch học bên dưới.">
                                             <span>Rảnh</span>
                                         </div>
                                     }
                                    
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
                                     else
                                     {
                                         <div class="availability-slot is-empty"></div>
@@ -834,11 +762,8 @@
         </div>
     </div>
 
-<<<<<<< HEAD
     <!-- Section below the calendar ("ở dưới có ....") -->
-=======
     <!-- Request details -->
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
     <div class="mt-4 pt-2" id="teaching-requests-section">
         <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
             <div>
@@ -885,11 +810,8 @@
                                     {
                                         SessionStatus.InProgress => "Đang diễn ra",
                                         SessionStatus.Done => "Đã kết thúc",
-<<<<<<< HEAD
                                         SessionStatus.Cancelled => "Đã hủy",
-=======
                                         SessionStatus.Cancelled => "Báo bận / Đã hủy",
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
                                         _ => "Đã xác nhận lịch học thử"
                                     };
                                     <span class="badge @sessionBadge" data-class-session-status="@item.ClassSessionId">@sessionLabel</span>
@@ -906,15 +828,12 @@
 
                             @if (item.TrialStatus == ScheduleStatus.Confirmed && item.TrialScheduledAt.HasValue)
                             {
-<<<<<<< HEAD
                                 <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mt-3">
                                     <p class="mb-0"><i class="bi bi-calendar-check me-2" aria-hidden="true"></i>Lịch học thử: <strong>@item.TrialScheduledAt.Value.AddHours(7).ToString("dd/MM/yyyy HH:mm") (GMT+7)</strong></p>
-=======
                                 var trialVn = item.TrialScheduledAt.Value.AddHours(7);
                                 var trialBlock = BlockService.Containing(trialVn.Hour);
                                 <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mt-3">
                                     <p class="mb-0"><i class="bi bi-calendar-check me-2" aria-hidden="true"></i>Lịch học thử: <strong>@trialVn.ToString("dd/MM/yyyy") @(trialBlock?.Label ?? trialVn.ToString("HH:mm")) (GMT+7)</strong></p>
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
                                     <div class="d-flex flex-wrap gap-2">
                                         @if (item.ClassSessionId.HasValue && item.ClassSessionStatus is SessionStatus.Scheduled or SessionStatus.InProgress)
                                         {
@@ -924,8 +843,6 @@
                                                 <button type="submit" class="btn btn-success btn-sm"><i class="bi bi-camera-video me-1" aria-hidden="true"></i>@(item.ClassSessionStatus == SessionStatus.InProgress ? "Tham gia lại" : "Tham gia lớp")</button>
                                             </form>
                                         }
-<<<<<<< HEAD
-=======
                                         @if (item.ClassSessionId.HasValue && item.ClassSessionStatus == SessionStatus.Scheduled)
                                         {
                                             <button type="button" class="btn btn-outline-danger btn-sm btn-cancel-session"
@@ -935,7 +852,6 @@
                                                 <i class="bi bi-calendar-x me-1"></i>Báo bận / Hủy buổi
                                             </button>
                                         }
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
                                         @if (item.ClassSessionId.HasValue && item.ClassSessionStatus == SessionStatus.InProgress)
                                         {
                                             <form asp-area="" asp-controller="ClassSession" asp-action="End" method="post" onsubmit="return confirm('Kết thúc buổi học cho tất cả mọi người?');">
@@ -954,7 +870,6 @@
                                         }
                                     </div>
                                 </div>
-<<<<<<< HEAD
                             }
                             else
                             {
@@ -965,7 +880,6 @@
                                     <div class="col-12 col-md-6">
                                         <label class="form-label" for="trial-time-@item.RequestId">Chọn lịch học thử</label>
                                         <input id="trial-time-@item.RequestId" type="datetime-local" class="form-control" required step="60" />
-=======
 
                                 @if (item.ClassSessionStatus == SessionStatus.Cancelled)
                                 {
@@ -1107,7 +1021,6 @@
                                                 <option value="@b.Start">@b.Label</option>
                                             }
                                         </select>
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
                                     </div>
                                     <div class="col-12 col-md-auto">
                                         <button type="submit" class="btn btn-success">Xác nhận lịch học thử</button>
@@ -1124,11 +1037,8 @@
 
 <script>
     (() => {
-<<<<<<< HEAD
         // Mobile day picker switcher
-=======
         // Mobile day picker
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
         const page = document.querySelector('.schedule-page');
         if (page) {
             page.querySelectorAll('[data-mobile-day]').forEach(button => {
@@ -1141,9 +1051,7 @@
             });
         }
 
-<<<<<<< HEAD
         // Click on calendar session card to smoothly scroll and highlight the request card below
-=======
         const pulse = el => {
             el.classList.remove('card-highlight-pulse');
             void el.offsetWidth;
@@ -1151,7 +1059,6 @@
         };
 
         // Bấm vào buổi học trên lịch: cuộn tới thẻ chi tiết bên dưới
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
         document.querySelectorAll('.schedule-session-card[data-schedule-target]').forEach(card => {
             card.addEventListener('click', () => {
                 const targetId = card.dataset.scheduleTarget;
@@ -1159,19 +1066,15 @@
                 const targetEl = document.getElementById(targetId);
                 if (targetEl) {
                     targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-<<<<<<< HEAD
                     targetEl.classList.remove('card-highlight-pulse');
                     // Force reflow
                     void targetEl.offsetWidth;
                     targetEl.classList.add('card-highlight-pulse');
-=======
                     pulse(targetEl);
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
                 }
             });
         });
 
-<<<<<<< HEAD
         // Click on a free "Rảnh" slot to help auto-fill pending trial schedule form
         document.querySelectorAll('.availability-slot.is-free[data-slot-date]').forEach(slot => {
             slot.addEventListener('click', () => {
@@ -1223,7 +1126,6 @@
         });
     })();
 </script>
-=======
         // Bấm vào khối "Rảnh": điền ngày + khối giờ vào form đang chờ xác nhận
         document.querySelectorAll('.availability-slot.is-free[data-slot-date]').forEach(slot => {
             slot.addEventListener('click', () => {
@@ -1497,4 +1399,3 @@
         </div>
     </div>
 </div>
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc

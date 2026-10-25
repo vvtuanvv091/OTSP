@@ -11,7 +11,6 @@
     bool needsGuardian = isMinor && Model.Guardians.Count == 0;
 }
 
-<<<<<<< HEAD
 <style>
     :root {
         --brand: #DB303A;
@@ -148,8 +147,6 @@
     .alert { border-radius: var(--radius-md); }
 </style>
 
-=======
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
 <div class="container profile-wrap">
 
     @if (TempData["Success"] is string success)
@@ -181,10 +178,8 @@
         <aside class="col-lg-4">
             <div class="sticky-side">
                 <div class="pro-card text-center">
-<<<<<<< HEAD
                     <div class="avatar-ring">
                         <img src="@avatarUrl" alt="Ảnh đại diện" />
-=======
                     <div class="avatar-wrapper">
                         <div class="avatar-ring">
                             <img id="studentAvatarImg" src="@avatarUrl" alt="Ảnh đại diện" />
@@ -196,7 +191,6 @@
                             <i class="bi bi-camera-fill"></i>
                         </label>
                         <input type="file" id="avatarFileInput" accept="image/jpeg,image/png,image/webp" class="d-none" />
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
                     </div>
 
                     <h2 class="h5 fw-bold mb-2">@Model.User.FullName</h2>
@@ -375,9 +369,7 @@
 
         </main>
     </div>
-<<<<<<< HEAD
 </div>
-=======
 </div>
 
 @section Scripts {
@@ -423,4 +415,3 @@
     })();
     </script>
 }
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc

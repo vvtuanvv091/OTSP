@@ -1,8 +1,5 @@
 @model System.Collections.Generic.List<PROJECT_OTSP.Dtos.TutorAvailabilityDto>
-<<<<<<< HEAD
-=======
 @inject PROJECT_OTSP.Services.IScheduleBlockService BlockService
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
 
 @{
     var days = new[]
@@ -24,7 +21,6 @@
     var busySlotKeys = ViewBag.BusySlotKeys as System.Collections.Generic.HashSet<string>
                        ?? new System.Collections.Generic.HashSet<string>(System.StringComparer.Ordinal);
 
-<<<<<<< HEAD
     var freeHourCount = 0;
     foreach (var day in days)
     {
@@ -36,7 +32,6 @@
             if (!busySlotKeys.Contains(key)
                 && Model.Exists(x => x.DayOfWeek == day && x.StartTime <= start && x.EndTime >= end))
                 freeHourCount++;
-=======
     var blocks = BlockService.Blocks;
     System.Func<int, string> periodOf = startHour => startHour < 12 ? "Sáng" : startHour < 17 ? "Chiều" : "Tối";
     var periodSpan = blocks
@@ -58,7 +53,6 @@
                 freeBlockCount++;
                 freeHourCount += block.Hours;
             }
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
         }
     }
 }
@@ -76,7 +70,6 @@
         color: var(--bs-body-color);
     }
 
-<<<<<<< HEAD
     .availability-page .availability-layout {
         display: grid;
         grid-template-columns: minmax(0, 1fr) 240px;
@@ -181,7 +174,6 @@
     }
 
     .availability-page .availability-mobile-day-picker { display: none; }
-=======
         .availability-page .availability-layout {
             display: grid;
             grid-template-columns: minmax(0, 1fr) 240px;
@@ -366,7 +358,6 @@
         display: none;
     }
 
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
     .availability-page .availability-day-button {
         border: 1px solid var(--availability-border);
         border-radius: var(--bs-border-radius);
@@ -375,27 +366,23 @@
         padding: .45rem .6rem;
         font-size: .85rem;
     }
-<<<<<<< HEAD
     .availability-page .availability-day-button[aria-pressed="true"] {
         border-color: var(--availability-accent);
         background: var(--availability-accent);
         color: #fff;
     }
-=======
 
         .availability-page .availability-day-button[aria-pressed="true"] {
             border-color: var(--availability-accent);
             background: var(--availability-accent);
             color: #fff;
         }
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
 
     @@media (max-width: 767.98px) {
         .availability-page {
             min-height: 0;
             padding: 1rem .65rem !important;
         }
-<<<<<<< HEAD
         .availability-page .availability-layout {
             display: flex;
             flex-direction: column;
@@ -440,7 +427,6 @@
         .availability-page .availability-slot { min-height: 2rem; font-size: .72rem; }
         .availability-page .availability-card { max-width: 100%; }
         .availability-page .summary-hours { font-size: 1.2rem; }
-=======
 
             .availability-page .availability-layout {
                 display: flex;
@@ -513,18 +499,14 @@
             .availability-page .summary-hours {
                 font-size: 1.2rem;
             }
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
     }
 </style>
 
 <div class="container-fluid py-4 availability-page" data-active-day="1">
     <div class="mb-3">
         <h1 class="h4 mb-1">Lịch rảnh hàng tuần</h1>
-<<<<<<< HEAD
         <p class="text-muted small mb-0">Chọn các khung giờ bạn có thể dạy. Mỗi ô là 1 giờ học, theo giờ Việt Nam (GMT+7).</p>
-=======
         <p class="text-muted small mb-0">Chọn các khối bạn có thể dạy. Mỗi ô là một buổi học 2 tiếng, theo giờ Việt Nam (GMT+7).</p>
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
     </div>
 
     @if (TempData["Success"] is string success)
@@ -568,7 +550,6 @@
                             </tr>
                         </thead>
                         <tbody>
-<<<<<<< HEAD
                             @for (var hour = 6; hour < 22; hour++)
                             {
                                 <tr>
@@ -591,7 +572,6 @@
                                         var isBusy = busySlotKeys.Contains(slotKey);
                                         var slotStart = new System.TimeOnly(hour, 0);
                                         var slotEnd = new System.TimeOnly(hour + 1, 0);
-=======
                             @for (var i = 0; i < blocks.Count; i++)
                             {
                                 var block = blocks[i];
@@ -611,7 +591,6 @@
                                         var isBusy = busySlotKeys.Contains(slotKey);
                                         var slotStart = new System.TimeOnly(block.Start, 0);
                                         var slotEnd = new System.TimeOnly(block.End, 0);
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
                                         var isSelected = !isBusy && Model.Exists(x => x.DayOfWeek == day
                                                                                   && x.StartTime <= slotStart
                                                                                   && x.EndTime >= slotEnd);
@@ -624,12 +603,9 @@
                                             <td data-day-column="@((int)day)">
                                                 <label class="availability-slot @(isSelected ? "is-selected" : "")">
                                                     <input class="slot-checkbox slot-toggle" type="checkbox" name="SelectedSlotKeys"
-<<<<<<< HEAD
                                                            value="@slotKey" checked="@isSelected" aria-label="Chọn @day @slotStart–@slotEnd" />
-=======
                                                            value="@slotKey" data-hours="@block.Hours" checked="@isSelected"
                                                            aria-label="Chọn @dayLabels[day] @block.Label" />
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
                                                     <span>@(isSelected ? "Rảnh" : "")</span>
                                                 </label>
                                             </td>
@@ -644,7 +620,6 @@
 
             <aside class="availability-card p-3" aria-label="Tóm tắt lịch rảnh">
                 <h2 class="h6 text-muted mb-3">Tóm tắt tuần</h2>
-<<<<<<< HEAD
                 <div class="summary-hours mb-1"><span id="free-hour-count">@freeHourCount</span> giờ rảnh / tuần</div>
                 <p class="small text-muted mb-3"><span>@busySlotKeys.Count</span> giờ đã có lớp - không thể bỏ chọn</p>
                 <div class="small fw-semibold mb-2">Chọn nhanh</div>
@@ -653,7 +628,6 @@
                     <button type="button" class="quick-action" data-quick-action="weekend">Cuối tuần cả ngày (08:00–17:00)</button>
                     <button type="button" class="quick-action" data-quick-action="clear">Xóa tất cả</button>
                     <button type="submit" class="save-action mt-1">Lưu lịch rảnh</button>
-=======
                 <div class="summary-hours mb-1"><span id="free-block-count">@freeBlockCount</span> buổi rảnh / tuần</div>
                 <p class="small text-muted mb-1">tương đương <span id="free-hour-count">@freeHourCount</span> giờ dạy</p>
                 <p class="small text-muted mb-3"><span>@busySlotKeys.Count</span> buổi đã có lớp - không thể bỏ chọn</p>
@@ -675,7 +649,6 @@
                             <i class="bi bi-arrow-right-circle me-1"></i>Sang Lịch dạy &amp; Tạo lịch bù
                         </a>
                     </div>
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
                 </div>
             </aside>
         </div>
@@ -683,7 +656,6 @@
 </div>
 
 <script>
-<<<<<<< HEAD
         (() => {
             const page = document.querySelector('.availability-page');
             const form = page?.querySelector('form');
@@ -737,7 +709,6 @@
             });
         })();
 </script>
-=======
     (() => {
         const page = document.querySelector('.availability-page');
         const form = page?.querySelector('form');
@@ -793,4 +764,3 @@
         });
     })();
 </script>
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
