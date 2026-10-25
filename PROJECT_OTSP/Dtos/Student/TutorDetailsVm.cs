@@ -39,7 +39,10 @@ public class TutorDetailsVm
     // Dữ liệu lựa chọn cho Form gửi yêu cầu
     public List<SelectListItem> SubjectOptions { get; set; } = new();
     public List<SelectListItem> ClassroomOptions { get; set; } = new();
+<<<<<<< HEAD
+=======
     public List<TutorAvailableSlotDto> AvailableTrialSlots { get; set; } = new();
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
 
     // Trạng thái kết nối của học viên hiện tại với gia sư này
     public bool HasExistingPendingRequest { get; set; }

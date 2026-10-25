@@ -1,0 +1,188 @@
+﻿@using static PROJECT_OTSP.Models.Enums
+@model IReadOnlyList<PROJECT_OTSP.Dtos.TutorConnectionRequestDto>
+
+@{
+    ViewData["Title"] = "Yêu cầu kết nối";
+    var selectedStatus = ViewBag.SelectedStatus as RequestStatus?;
+    var currentPage = (int)ViewBag.CurrentPage;
+    var totalPages = (int)ViewBag.TotalPages;
+    var totalItems = (int)ViewBag.TotalItems;
+}
+
+<div id="tutor-requests-page" class="container-fluid py-4"
+     data-hub-url="@Url.Content("~/hubs/connection-requests")">
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+        <div>
+            <h1 class="h3 mb-1">Yêu cầu kết nối</h1>
+            <p class="text-body-secondary mb-0">Xem và phản hồi yêu cầu học từ học viên.</p>
+        </div>
+        <span class="badge text-bg-success rounded-pill px-3 py-2">@totalItems yêu cầu</span>
+    </div>
+
+    @if (TempData["Success"] is string successMessage)
+    {
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            @successMessage
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Đóng"></button>
+        </div>
+    }
+
+    <div id="realtime-cancellation-notice" class="alert alert-info d-none" role="status"></div>
+    @if (TempData["Error"] is string errorMessage)
+    {
+        <div class="alert alert-warning alert-dismissible fade show" role="alert">
+            @errorMessage
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Đóng"></button>
+        </div>
+    }
+
+    <nav class="mb-3" aria-label="Lọc yêu cầu theo trạng thái">
+        <div class="nav nav-pills flex-wrap gap-2">
+            <a asp-action="Index" class="nav-link @(selectedStatus is null ? "active" : "")">Tất cả</a>
+            <a asp-action="Index" asp-route-status="@RequestStatus.Pending" class="nav-link @(selectedStatus == RequestStatus.Pending ? "active" : "")">Đang chờ</a>
+            <a asp-action="Index" asp-route-status="@RequestStatus.Accepted" class="nav-link @(selectedStatus == RequestStatus.Accepted ? "active" : "")">Đã chấp nhận</a>
+            <a asp-action="Index" asp-route-status="@RequestStatus.Rejected" class="nav-link @(selectedStatus == RequestStatus.Rejected ? "active" : "")">Đã từ chối</a>
+            <a asp-action="Index" asp-route-status="@RequestStatus.Cancelled" class="nav-link @(selectedStatus == RequestStatus.Cancelled ? "active" : "")">Đã hủy</a>
+        </div>
+    </nav>
+
+    @if (Model.Count == 0)
+    {
+        <div class="card border-0 shadow-sm">
+            <div class="card-body py-5 text-center">
+                <i class="bi bi-person-plus fs-1 text-body-secondary" aria-hidden="true"></i>
+                <h2 class="h5 mt-3">Chưa có yêu cầu phù hợp</h2>
+                <p class="text-body-secondary mb-0">Yêu cầu mới từ học viên sẽ hiển thị tại đây.</p>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="d-flex flex-column gap-3">
+            @foreach (var request in Model)
+            {
+                var statusLabel = request.Status switch
+                {
+                    RequestStatus.Pending => "Đang chờ",
+                    RequestStatus.Accepted => "Đã chấp nhận",
+                    RequestStatus.Rejected => "Đã từ chối",
+                    RequestStatus.Cancelled => "Đã hủy",
+                    _ => request.Status.ToString()
+                };
+                var badgeClass = request.Status switch
+                {
+                    RequestStatus.Pending => "text-bg-warning",
+                    RequestStatus.Accepted => "text-bg-success",
+                    RequestStatus.Rejected => "text-bg-secondary",
+                    _ => "text-bg-light"
+                };
+
+                <article class="card border-0 shadow-sm" data-request-card="@request.Id">
+                    <div class="card-body">
+                        <div class="d-flex flex-wrap align-items-start justify-content-between gap-3">
+                            <div class="d-flex align-items-center gap-3">
+                                @if (!string.IsNullOrWhiteSpace(request.StudentAvatarUrl))
+                                {
+                                    <img src="@request.StudentAvatarUrl" alt="" class="rounded-circle object-fit-cover" width="48" height="48" />
+                                }
+                                else
+                                {
+                                    <span class="rounded-circle bg-success-subtle text-success d-inline-flex align-items-center justify-content-center" style="width:48px;height:48px">
+                                        <i class="bi bi-person" aria-hidden="true"></i>
+                                    </span>
+                                }
+                                <div>
+                                    <h2 class="h5 mb-1">@request.StudentName</h2>
+                                    <div class="small text-body-secondary">Gửi lúc @request.CreatedAt.AddHours(7).ToString("dd/MM/yyyy HH:mm") (GMT+7)</div>
+                                </div>
+                            </div>
+                            <span class="badge @badgeClass">@statusLabel</span>
+                        </div>
+
+                        <hr />
+                        <div class="row g-3">
+                            <div class="col-12 col-md-4">
+                                <div class="small text-body-secondary">Môn học</div>
+                                <div class="fw-semibold">@request.SubjectName</div>
+                            </div>
+                            <div class="col-6 col-md-4">
+                                <div class="small text-body-secondary">Cấp học</div>
+                                <div class="fw-semibold">@request.GradeLevelName</div>
+                            </div>
+                            <div class="col-6 col-md-4">
+                                <div class="small text-body-secondary">Hình thức</div>
+                                <div class="fw-semibold">@(request.PreferredType == ClassroomType.Group ? "Học nhóm" : "Học 1-1")</div>
+                            </div>
+                            @if (!string.IsNullOrWhiteSpace(request.ClassroomName))
+                            {
+                                <div class="col-12">
+                                    <div class="small text-body-secondary">Lớp nhóm</div>
+                                    <div class="fw-semibold">@request.ClassroomName</div>
+                                </div>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(request.Message))
+                            {
+                                <div class="col-12">
+                                    <div class="small text-body-secondary">Lời nhắn</div>
+                                    <p class="mb-0 text-break">@request.Message</p>
+                                </div>
+                            }
+                        </div>
+
+<script src="https://cdn.jsdelivr.net/npm/@microsoft/signalr@10.0.0/dist/browser/signalr.min.js"></script>
+<script>
+    (() => {
+        const page = document.getElementById("tutor-requests-page");
+        const notice = document.getElementById("realtime-cancellation-notice");
+        if (!page || !window.signalR) return;
+
+        const connection = new signalR.HubConnectionBuilder()
+            .withUrl(page.dataset.hubUrl)
+            .withAutomaticReconnect()
+            .build();
+
+        connection.on("ConnectionRequestCancelled", update => {
+            const card = document.querySelector(`[data-request-card="${update.requestId}"]`);
+            if (!card) return;
+
+            notice.textContent = "Học viên đã hủy yêu cầu kết nối.";
+            notice.classList.remove("d-none");
+            window.setTimeout(() => window.location.reload(), 500);
+        });
+
+        connection.start().catch(error => console.error("SignalR connection failed:", error));
+    })();
+</script>
+
+                        @if (request.Status == RequestStatus.Pending)
+                        {
+                            <div class="d-flex flex-wrap justify-content-end gap-2 mt-4">
+                                <form asp-action="Reject" asp-route-id="@request.Id" method="post">
+                                    <button type="submit" class="btn btn-outline-secondary">Từ chối</button>
+                                </form>
+                                <form asp-action="Accept" asp-route-id="@request.Id" method="post">
+                                    <button type="submit" class="btn btn-success">Chấp nhận</button>
+                                </form>
+                            </div>
+                        }
+                    </div>
+                </article>
+            }
+        </div>
+
+        @if (totalPages > 1)
+        {
+            <nav class="mt-4" aria-label="Phân trang yêu cầu kết nối">
+                <ul class="pagination justify-content-center flex-wrap">
+                    <li class="page-item @(currentPage <= 1 ? "disabled" : "")">
+                        <a class="page-link" asp-action="Index" asp-route-status="@selectedStatus" asp-route-page="@(currentPage - 1)" aria-label="Trang trước">Trước</a>
+                    </li>
+                    <li class="page-item disabled"><span class="page-link">@currentPage / @totalPages</span></li>
+                    <li class="page-item @(currentPage >= totalPages ? "disabled" : "")">
+                        <a class="page-link" asp-action="Index" asp-route-status="@selectedStatus" asp-route-page="@(currentPage + 1)" aria-label="Trang sau">Sau</a>
+                    </li>
+                </ul>
+            </nav>
+        }
+    }
+</div>

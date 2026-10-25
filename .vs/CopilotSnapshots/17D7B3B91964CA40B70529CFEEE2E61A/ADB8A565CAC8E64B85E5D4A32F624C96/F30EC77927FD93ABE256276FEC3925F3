@@ -1,0 +1,324 @@
+﻿@using PROJECT_OTSP.Models
+@model StudentProfile
+@{
+    ViewData["Title"] = "Hồ sơ học viên";
+
+    var avatarUrl = string.IsNullOrWhiteSpace(Model.User.AvatarUrl)
+        ? Url.Content("~/assets/img/default-avatar.svg")
+        : Model.User.AvatarUrl;
+
+    bool isMinor = ViewBag.IsMinor is bool m && m;
+    bool needsGuardian = isMinor && Model.Guardians.Count == 0;
+}
+
+<style>
+    :root {
+        --brand: #DB303A;
+        --brand-dark: #B7212B;
+        --brand-glow: rgba(219, 48, 58, .22);
+        --brand-soft: rgba(219, 48, 58, .12);
+        --radius-lg: 1.25rem;
+        --radius-md: .9rem;
+    }
+
+    .profile-wrap { padding-top: 2rem; padding-bottom: 4rem; }
+
+    .pro-card {
+        background: var(--bs-body-bg);
+        border: 1px solid var(--bs-border-color);
+        border-radius: var(--radius-lg);
+        box-shadow: 0 10px 30px rgba(0, 0, 0, .06);
+        padding: 1.75rem;
+    }
+
+    @@media (min-width: 992px) {
+        .sticky-side { position: sticky; top: 90px; }
+    }
+
+    .avatar-ring {
+        width: 128px;
+        height: 128px;
+        margin: 0 auto 1rem;
+        padding: 5px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--brand), #f3a0a5);
+        box-shadow: 0 8px 22px var(--brand-glow);
+    }
+    .avatar-ring img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        border-radius: 50%;
+        border: 4px solid var(--bs-body-bg);
+    }
+
+    .section-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        flex-wrap: wrap;
+        margin-bottom: 1.25rem;
+    }
+    .section-title {
+        display: flex;
+        align-items: center;
+        gap: .7rem;
+        margin: 0;
+        font-size: 1.05rem;
+        font-weight: 700;
+        color: var(--bs-body-color);
+    }
+    .section-icon {
+        width: 36px;
+        height: 36px;
+        border-radius: 10px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--brand-soft);
+        color: var(--brand);
+    }
+
+    .form-label {
+        font-size: .8rem;
+        font-weight: 600;
+        color: var(--bs-secondary-color);
+        margin-bottom: .4rem;
+    }
+    .form-control {
+        border-radius: .75rem;
+        border-color: var(--bs-border-color);
+        min-height: 48px;
+        background-color: var(--bs-body-bg);
+        color: var(--bs-body-color);
+    }
+    .form-control:focus {
+        border-color: var(--brand);
+        box-shadow: 0 0 0 .22rem var(--brand-glow);
+    }
+    .form-control[readonly] {
+        background-color: var(--bs-tertiary-bg);
+        border-style: dashed;
+        cursor: not-allowed;
+    }
+
+    .guardian-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 1rem;
+        padding: 1rem 1.1rem;
+        border: 1px solid var(--bs-border-color);
+        border-radius: var(--radius-md);
+    }
+    .guardian-item + .guardian-item { margin-top: .75rem; }
+
+    .empty-box {
+        display: flex;
+        align-items: center;
+        gap: .9rem;
+        padding: 1.1rem 1.25rem;
+        border: 1px dashed var(--bs-border-color);
+        border-radius: var(--radius-md);
+        color: var(--bs-secondary-color);
+        font-size: .9rem;
+    }
+    .empty-box i { font-size: 1.4rem; color: var(--brand); }
+
+    .btn-brand {
+        background: linear-gradient(120deg, var(--brand), var(--brand-dark));
+        color: #fff;
+        border: none;
+        border-radius: 999px;
+        padding: .7rem 1.8rem;
+        font-weight: 600;
+        box-shadow: 0 8px 20px var(--brand-glow);
+    }
+    .btn-brand:hover { color: #fff; }
+
+    .upload-box {
+        border: 1px dashed var(--brand);
+        border-radius: var(--radius-md);
+        background: var(--brand-soft);
+        padding: 1.25rem;
+    }
+
+    .alert { border-radius: var(--radius-md); }
+</style>
+
+<div class="container profile-wrap">
+
+    @if (TempData["Success"] is string success)
+    {
+        <div class="alert alert-success alert-dismissible fade show shadow-sm" role="alert">
+            <i class="bi bi-check-circle me-2"></i>@success
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Đóng"></button>
+        </div>
+    }
+
+    @if (TempData["Error"] is string error)
+    {
+        <div class="alert alert-danger alert-dismissible fade show shadow-sm" role="alert">
+            <i class="bi bi-exclamation-triangle me-2"></i>@error
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Đóng"></button>
+        </div>
+    }
+
+    @if (TempData["Warning"] is string warning)
+    {
+        <div class="alert alert-warning alert-dismissible fade show shadow-sm" role="alert">
+            <i class="bi bi-person-exclamation me-2"></i>@warning
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Đóng"></button>
+        </div>
+    }
+
+    <div class="row g-4">
+
+        <aside class="col-lg-4">
+            <div class="sticky-side">
+                <div class="pro-card text-center">
+                    <div class="avatar-ring">
+                        <img src="@avatarUrl" alt="Ảnh đại diện" />
+                    </div>
+
+                    <h2 class="h5 fw-bold mb-2">@Model.User.FullName</h2>
+
+                    @if (isMinor)
+                    {
+                        <span class="badge rounded-pill bg-info-subtle text-info-emphasis px-3 py-2">Học viên dưới 18 tuổi</span>
+                    }
+                    else
+                    {
+                        <span class="badge rounded-pill bg-secondary-subtle text-secondary-emphasis px-3 py-2">Học viên / Phụ huynh</span>
+                    }
+
+                    <div class="small text-secondary mt-3">
+                        Người giám hộ: <strong>@Model.Guardians.Count</strong>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <main class="col-lg-8">
+
+            <form asp-action="UpdateProfile" method="post">
+                <section class="pro-card mb-4">
+                    <div class="section-head">
+                        <h2 class="section-title">
+                            <span class="section-icon"><i class="bi bi-person-vcard"></i></span>
+                            Thông tin cá nhân
+                        </h2>
+                    </div>
+
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label for="fullName" class="form-label">Họ và tên</label>
+                            <input id="fullName" name="fullName" class="form-control"
+                                   value="@Model.User.FullName" maxlength="150" required />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Email</label>
+                            <input class="form-control" value="@Model.User.Email" readonly />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Số điện thoại</label>
+                            <input class="form-control" value="@Model.User.PhoneNumber" readonly />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Ngày sinh</label>
+                            <input class="form-control" value="@(Model.User.DateOfBirth?.ToString("dd/MM/yyyy"))" readonly />
+                        </div>
+                    </div>
+                </section>
+
+                <section class="pro-card mb-4">
+                    <div class="section-head">
+                        <h2 class="section-title">
+                            <span class="section-icon"><i class="bi bi-search"></i></span>
+                            Nhu cầu học tập
+                        </h2>
+                    </div>
+
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label for="interestedSubjects" class="form-label">Môn học quan tâm</label>
+                            <input id="interestedSubjects" name="interestedSubjects" class="form-control"
+                                   value="@Model.InterestedSubjects" maxlength="500"
+                                   placeholder="Ví dụ: Toán, Tiếng Anh" />
+                        </div>
+                        <div class="col-md-6">
+                            <label for="area" class="form-label">Khu vực học mong muốn</label>
+                            <input id="area" name="area" class="form-control"
+                                   value="@Model.Area" maxlength="200" placeholder="Ví dụ: Biên Hòa" />
+                        </div>
+                        <div class="col-md-6">
+                            <label for="freeSchedule" class="form-label">Lịch rảnh</label>
+                            <input id="freeSchedule" name="freeSchedule" class="form-control"
+                                   value="@Model.FreeSchedule" maxlength="500"
+                                   placeholder="Ví dụ: Thứ 3, Thứ 5 buổi tối" />
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-end mt-4">
+                        <button type="submit" class="btn btn-brand">
+                            <i class="bi bi-check2-circle me-2"></i>Lưu hồ sơ
+                        </button>
+                    </div>
+                </section>
+            </form>
+
+            <section class="pro-card mb-4">
+                <div class="section-head">
+                    <h2 class="section-title">
+                        <span class="section-icon"><i class="bi bi-people"></i></span>
+                        Người giám hộ
+                    </h2>
+                </div>
+
+                @if (Model.Guardians.Any())
+                {
+                    @foreach (var guardian in Model.Guardians)
+                    {
+                        <div class="guardian-item">
+                            <div>
+                                <div class="fw-semibold">@guardian.FullName</div>
+                                <small class="text-secondary">@guardian.ContactInfo</small>
+                            </div>
+
+                            <form asp-action="RemoveGuardian" method="post" class="d-inline"
+                                  onsubmit="return confirm('Xóa người giám hộ này?');">
+                                <input type="hidden" name="id" value="@guardian.Id" />
+                                <button type="submit" class="btn btn-outline-danger btn-sm px-3">Xóa</button>
+                            </form>
+                        </div>
+                    }
+                }
+                else
+                {
+                    <div class="empty-box mb-3">
+                        <i class="bi bi-person-plus"></i>
+                        <span>Chưa có người giám hộ. @(isMinor ? "Học viên dưới 18 tuổi cần thêm ít nhất một người giám hộ." : "Không bắt buộc nếu bạn đã trên 18 tuổi.")</span>
+                    </div>
+                }
+
+                <form asp-action="AddGuardian" method="post" class="upload-box mt-4">
+                    <div class="row g-3 align-items-end">
+                        <div class="col-md-5">
+                            <label for="guardianName" class="form-label">Họ và tên người giám hộ</label>
+                            <input id="guardianName" name="fullName" class="form-control" maxlength="150" required />
+                        </div>
+                        <div class="col-md-5">
+                            <label for="guardianContact" class="form-label">Số điện thoại hoặc email</label>
+                            <input id="guardianContact" name="contactInfo" class="form-control" maxlength="100" required />
+                        </div>
+                        <div class="col-md-2 d-grid">
+                            <button type="submit" class="btn btn-brand">Thêm</button>
+                        </div>
+                    </div>
+                </form>
+            </section>
+
+        </main>
+    </div>
+</div>

@@ -1,0 +1,108 @@
+@model TutorApprovalsIndexViewModel
+
+@{
+    ViewData["Title"] = "Duyệt hồ sơ gia sư";
+}
+
+<div class="container py-4">
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-4">
+        <div>
+            <h1 class="h3 mb-1">Duyệt hồ sơ gia sư</h1>
+            <p class="text-body-secondary mb-0">Kiểm tra thông tin và bằng cấp trước khi duyệt hồ sơ.</p>
+        </div>
+        <span class="badge text-bg-warning">Đang chờ: @Model.PendingTutors.Count</span>
+    </div>
+
+    @if (TempData["Success"] is string success)
+    {
+        <div class="alert alert-success" role="status">@success</div>
+    }
+    @if (TempData["Error"] is string error)
+    {
+        <div class="alert alert-danger" role="alert">@error</div>
+    }
+
+    @if (Model.PendingTutors.Count == 0)
+    {
+        <div class="alert alert-info">Hiện không có hồ sơ gia sư nào đang chờ duyệt.</div>
+    }
+    else
+    {
+        <div class="d-grid gap-4">
+            @foreach (var tutor in Model.PendingTutors)
+            {
+                <section class="card shadow-sm" aria-labelledby="tutor-@tutor.TutorId">
+                    <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
+                        <div>
+                            <h2 class="h5 mb-1" id="tutor-@tutor.TutorId">@tutor.FullName</h2>
+                            <span class="small text-body-secondary">Mã hồ sơ: @tutor.TutorId</span>
+                        </div>
+                        <span class="badge text-bg-warning">Chờ duyệt</span>
+                    </div>
+
+                    <div class="card-body">
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6"><strong>Email:</strong> @(tutor.Email ?? "Chưa cập nhật")</div>
+                            <div class="col-md-6"><strong>Điện thoại:</strong> @(tutor.PhoneNumber ?? "Chưa cập nhật")</div>
+                            <div class="col-md-6"><strong>Khu vực:</strong> @(tutor.Address ?? "Chưa cập nhật")</div>
+                            <div class="col-md-6"><strong>Ngày sinh:</strong> @(tutor.DateOfBirth?.ToString("dd/MM/yyyy") ?? "Chưa cập nhật")</div>
+                            <div class="col-md-6"><strong>Học phí:</strong> @tutor.HourlyFee.ToString("N0") đ/giờ</div>
+                        </div>
+
+                        <h3 class="h6">Giới thiệu</h3>
+                        <p class="text-break">@(string.IsNullOrWhiteSpace(tutor.Introduction) ? "Chưa có nội dung giới thiệu." : tutor.Introduction)</p>
+
+                        <h3 class="h6">Môn và cấp dạy</h3>
+                        @if (tutor.Subjects.Count == 0)
+                        {
+                            <p class="text-body-secondary">Chưa khai báo môn dạy.</p>
+                        }
+                        else
+                        {
+                            <div class="d-flex flex-wrap gap-2 mb-3">
+                                @foreach (var subject in tutor.Subjects)
+                                {
+                                    <span class="badge text-bg-light border">@subject.SubjectName · @subject.GradeName</span>
+                                }
+                            </div>
+                        }
+
+                        <h3 class="h6">Bằng cấp / chứng chỉ</h3>
+                        @if (tutor.Qualifications.Count == 0)
+                        {
+                            <p class="text-body-secondary">Chưa tải lên bằng cấp hoặc chứng chỉ.</p>
+                        }
+                        else
+                        {
+                            <ul class="list-group mb-4">
+                                @foreach (var qualification in tutor.Qualifications)
+                                {
+                                    <li class="list-group-item d-flex flex-wrap align-items-center justify-content-between gap-2">
+                                        <span>@qualification.Title <small class="text-body-secondary">(@qualification.Status)</small></span>
+                                        @if (!string.IsNullOrWhiteSpace(qualification.FileUrl))
+                                        {
+                                            <a asp-action="OpenQualification" asp-route-id="@qualification.Id" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline-primary">Mở tài liệu</a>
+                                        }
+                                    </li>
+                                }
+                            </ul>
+                        }
+
+                        <div class="d-flex flex-wrap align-items-start gap-3 border-top pt-3">
+                            <form asp-action="Approve" method="post">
+                                <input type="hidden" name="id" value="@tutor.TutorId" />
+                                <button type="submit" class="btn btn-success">Duyệt hồ sơ</button>
+                            </form>
+                            <form asp-action="Reject" method="post" class="d-flex flex-grow-1 flex-wrap gap-2">
+                                <input type="hidden" name="TutorId" value="@tutor.TutorId" />
+                                <label class="visually-hidden" for="reason-@tutor.TutorId">Lý do từ chối</label>
+                                <input id="reason-@tutor.TutorId" name="Reason" class="form-control flex-grow-1" maxlength="1000" required placeholder="Nhập lý do nếu từ chối" />
+                                <button type="submit" class="btn btn-outline-danger">Từ chối</button>
+                            </form>
+                        </div>
+                    </div>
+                </section>
+            }
+        </div>
+    }
+</div>

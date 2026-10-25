@@ -1,0 +1,90 @@
+/* /Areas/Tutor/Views/Shared/_Layout_Tutor.cshtml.rz.scp.css */
+/* Please see documentation at https://learn.microsoft.com/aspnet/core/client-side/bundling-and-minification
+for details on configuring this project to bundle and minify static web assets. */
+
+a.navbar-brand[b-2hpofqzlpb] {
+  white-space: normal;
+  text-align: center;
+  word-break: break-all;
+}
+
+a[b-2hpofqzlpb] {
+  color: #B7212B;
+}
+
+.btn-primary[b-2hpofqzlpb] {
+  color: #fff;
+  background-color: #DB303A;
+  border-color: #DB303A;
+}
+
+.nav-pills .nav-link.active[b-2hpofqzlpb], .nav-pills .show > .nav-link[b-2hpofqzlpb] {
+  color: #fff;
+  background-color: #DB303A;
+  border-color: #DB303A;
+}
+
+.border-top[b-2hpofqzlpb] {
+  border-top: 1px solid #e5e5e5;
+}
+.border-bottom[b-2hpofqzlpb] {
+  border-bottom: 1px solid #e5e5e5;
+}
+
+.box-shadow[b-2hpofqzlpb] {
+  box-shadow: 0 .25rem .75rem rgba(0, 0, 0, .05);
+}
+
+button.accept-policy[b-2hpofqzlpb] {
+  font-size: 1rem;
+  line-height: inherit;
+}
+
+.footer[b-2hpofqzlpb] {
+  position: absolute;
+  bottom: 0;
+  width: 100%;
+  white-space: nowrap;
+  line-height: 60px;
+}
+/* /Views/Shared/_Layout.cshtml.rz.scp.css */
+/* Please see documentation at https://learn.microsoft.com/aspnet/core/client-side/bundling-and-minification
+for details on configuring this project to bundle and minify static web assets. */
+
+a.navbar-brand[b-u24tsq5kks] {
+  white-space: normal;
+  text-align: center;
+  word-break: break-all;
+}
+
+a[b-u24tsq5kks] {
+  color: #B7212B;
+}
+
+.btn-primary[b-u24tsq5kks] {
+  color: #fff;
+  background-color: #DB303A;
+  border-color: #DB303A;
+}
+
+.nav-pills .nav-link.active[b-u24tsq5kks], .nav-pills .show > .nav-link[b-u24tsq5kks] {
+  color: #fff;
+  background-color: #DB303A;
+  border-color: #DB303A;
+}
+
+.border-top[b-u24tsq5kks] {
+  border-top: 1px solid #e5e5e5;
+}
+.border-bottom[b-u24tsq5kks] {
+  border-bottom: 1px solid #e5e5e5;
+}
+
+.box-shadow[b-u24tsq5kks] {
+  box-shadow: 0 .25rem .75rem rgba(0, 0, 0, .05);
+}
+
+button.accept-policy[b-u24tsq5kks] {
+  font-size: 1rem;
+  line-height: inherit;
+}

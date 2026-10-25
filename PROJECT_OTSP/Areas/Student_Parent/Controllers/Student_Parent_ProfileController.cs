@@ -2,10 +2,15 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+<<<<<<< HEAD
+using PROJECT_OTSP.Data;
+using PROJECT_OTSP.Models;
+=======
 using Microsoft.Extensions.Caching.Memory;
 using PROJECT_OTSP.Data;
 using PROJECT_OTSP.Models;
 using PROJECT_OTSP.Services;
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
 
 namespace PROJECT_OTSP.Areas.Student_Parent.Controllers
 {
@@ -16,6 +21,12 @@ namespace PROJECT_OTSP.Areas.Student_Parent.Controllers
         private const int MinorAge = 18;
 
         private readonly ApplicationDbContext _dbcontext;
+<<<<<<< HEAD
+
+        public Student_Parent_ProfileController(ApplicationDbContext dbcontext)
+        {
+            _dbcontext = dbcontext;
+=======
         private readonly IImageStorageService _imageStorage;
         private readonly IMemoryCache _cache;
 
@@ -27,6 +38,7 @@ namespace PROJECT_OTSP.Areas.Student_Parent.Controllers
             _dbcontext = dbcontext;
             _imageStorage = imageStorage;
             _cache = cache;
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
         }
 
         private string? CurrentUserId => User.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -300,6 +312,8 @@ namespace PROJECT_OTSP.Areas.Student_Parent.Controllers
                 age--;
             return age < MinorAge;
         }
+<<<<<<< HEAD
+=======
 
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -361,5 +375,6 @@ namespace PROJECT_OTSP.Areas.Student_Parent.Controllers
                 return RedirectToAction(nameof(Index));
             }
         }
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
     }
 }

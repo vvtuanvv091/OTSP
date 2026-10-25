@@ -1,0 +1,442 @@
+﻿using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
+using PROJECT_OTSP.Models;
+using static PROJECT_OTSP.Models.Enums;
+
+namespace PROJECT_OTSP.Data;
+
+internal static class ExtraSampleDataSeeder
+{
+    private const int SampleCount = 30;
+    private const string Password = "Demo@12345";
+
+    public static async Task SeedAsync(
+        ApplicationDbContext db,
+        UserManager<ApplicationUser> userManager)
+    {
+        var subjects = await EnsureSubjectsAsync(db);
+        var gradeLevels = await EnsureGradeLevelsAsync(db);
+        var admins = await EnsureProfilesAsync(db, userManager, "Admin", "admin", i =>
+            new AdminProfile { Rank = $"Quản trị mẫu {i:D3}" });
+        var tutors = await EnsureProfilesAsync(db, userManager, "Tutor", "tutor", i =>
+            new TutorProfile
+            {
+                Introduction = $"Gia sư mẫu {i:D3}, chuyên hỗ trợ học tập.",
+                HourlyFee = 100000 + i * 10000,
+                VerificationStatus = VerificationStatus.Approved,
+                AverageRating = 4 + i % 10 / 10.0
+            });
+        var students = await EnsureProfilesAsync(db, userManager, "Student_Parent", "student", i =>
+            new StudentProfile
+            {
+                InterestedSubjects = $"Môn học mẫu {i:D3}",
+                Area = $"Khu vực mẫu {i:D3}",
+                FreeSchedule = "Thứ 3, Thứ 5 buổi tối"
+            });
+
+        await EnsureTutorSubjectsAsync(db, tutors, subjects, gradeLevels);
+        await EnsureAvailabilitiesAsync(db, tutors);
+        await EnsureGuardiansAsync(db, students);
+        await EnsureQualificationsAsync(db, tutors);
+        await EnsureVerificationsAsync(db, tutors, admins);
+        await EnsureRequestsAsync(db, students, tutors, subjects, gradeLevels);
+
+        var requests = await db.ConnectionRequests
+            .Where(x => x.Message != null && x.Message.StartsWith("Mẫu yêu cầu kết nối "))
+            .OrderBy(x => x.Message)
+            .ToListAsync();
+        await EnsureTrialSchedulesAsync(db, requests);
+        await EnsureClassroomsAsync(db, tutors, subjects, gradeLevels);
+
+        var classrooms = await db.Classrooms
+            .Where(x => x.Name.StartsWith("Mẫu lớp học "))
+            .OrderBy(x => x.Name)
+            .ToListAsync();
+        await EnsureClassroomStudentsAsync(db, classrooms, students);
+        await EnsureClassSessionsAsync(db, classrooms);
+
+        var sessions = await db.ClassSessions
+            .Where(x => x.VideoRoom != null && x.VideoRoom.StartsWith("OTSP-SEED30-SESSION-"))
+            .OrderBy(x => x.VideoRoom)
+            .ToListAsync();
+        await EnsureReviewsAsync(db, sessions, students);
+
+        var reviews = await db.Reviews
+            .Where(x => x.Comment != null && x.Comment.StartsWith("Mẫu đánh giá "))
+            .OrderBy(x => x.Comment)
+            .ToListAsync();
+        await EnsureReviewAlertsAsync(db, reviews, admins);
+        await EnsurePaymentsAndInvoicesAsync(db, classrooms, students);
+        await EnsureReconciliationsAsync(db, tutors, admins);
+        await EnsureLearningDocumentsAsync(db, tutors, subjects, gradeLevels);
+        await EnsureAiStudySessionsAsync(db, students);
+        await EnsureNewsAsync(db, admins);
+        await EnsurePartnerCentersAndGroupClassesAsync(db, admins);
+        await EnsureStatisticReportsAsync(db, admins);
+        await EnsureUserActivityAsync(db, tutors, students);
+    }
+
+    private static async Task<List<Subject>> EnsureSubjectsAsync(ApplicationDbContext db)
+    {
+        var codes = Enumerable.Range(1, SampleCount).Select(i => $"M30S{i:D3}").ToArray();
+        var existing = await db.Subjects.Where(x => codes.Contains(x.Code)).Select(x => x.Code).ToListAsync();
+        foreach (var i in Enumerable.Range(1, SampleCount).Where(i => !existing.Contains($"M30S{i:D3}")))
+        {
+            db.Subjects.Add(new Subject
+            {
+                Code = $"M30S{i:D3}",
+                Name = $"Môn học mẫu {i:D3}",
+                Description = $"Danh mục môn học bổ sung {i:D3} dùng cho dữ liệu thử nghiệm."
+            });
+        }
+
+        await db.SaveChangesAsync();
+        return await db.Subjects.Where(x => codes.Contains(x.Code)).OrderBy(x => x.Code).ToListAsync();
+    }
+
+    private static async Task<List<GradeLevel>> EnsureGradeLevelsAsync(ApplicationDbContext db)
+    {
+        var codes = Enumerable.Range(1, SampleCount).Select(i => $"M30G{i:D3}").ToArray();
+        var existing = await db.GradeLevels.Where(x => codes.Contains(x.Code)).Select(x => x.Code).ToListAsync();
+        foreach (var i in Enumerable.Range(1, SampleCount).Where(i => !existing.Contains($"M30G{i:D3}")))
+        {
+            db.GradeLevels.Add(new GradeLevel { Code = $"M30G{i:D3}", Name = $"Cấp học mẫu {i:D3}" });
+        }
+
+        await db.SaveChangesAsync();
+        return await db.GradeLevels.Where(x => codes.Contains(x.Code)).OrderBy(x => x.Code).ToListAsync();
+    }
+
+    private static async Task<List<TProfile>> EnsureProfilesAsync<TProfile>(
+        ApplicationDbContext db,
+        UserManager<ApplicationUser> userManager,
+        string role,
+        string accountPrefix,
+        Func<int, TProfile> profileFactory)
+        where TProfile : class
+    {
+        var profiles = new List<TProfile>(SampleCount);
+        for (var i = 1; i <= SampleCount; i++)
+        {
+            var email = $"seed30.{accountPrefix}.{i:D3}@otsp.local";
+            var user = await userManager.FindByEmailAsync(email);
+            if (user == null)
+            {
+                user = new ApplicationUser
+                {
+                    UserName = email,
+                    Email = email,
+                    EmailConfirmed = true,
+                    FullName = $"Tài khoản {accountPrefix} mẫu {i:D3}",
+                    DateOfBirth = accountPrefix == "student"
+                        ? new DateOnly(2010, (i - 1) % 12 + 1, (i - 1) % 27 + 1)
+                        : new DateOnly(1990 + i % 15, (i - 1) % 12 + 1, (i - 1) % 27 + 1)
+                };
+                var createResult = await userManager.CreateAsync(user, Password);
+                EnsureSucceeded(createResult, $"Tạo tài khoản mẫu {email}");
+            }
+
+            if (!await userManager.IsInRoleAsync(user, role))
+            {
+                EnsureSucceeded(await userManager.AddToRoleAsync(user, role), $"Gán vai trò {role} cho {email}");
+            }
+
+            var profile = await db.Set<TProfile>().FindAsync(GetProfileKey<TProfile>(user.Id));
+            if (profile == null)
+            {
+                profile = profileFactory(i);
+                SetUserId(profile, user.Id);
+                db.Set<TProfile>().Add(profile);
+            }
+
+            profiles.Add(profile);
+        }
+
+        await db.SaveChangesAsync();
+        return profiles;
+    }
+
+    private static object[] GetProfileKey<TProfile>(string userId) where TProfile : class
+    {
+        if (typeof(TProfile) == typeof(AdminProfile))
+            return new object[] { ((ApplicationDbContext?)null)?.AdminProfiles ?? throw new InvalidOperationException() };
+
+        return new object[] { userId };
+    }
+
+    private static void SetUserId<TProfile>(TProfile profile, string userId) where TProfile : class
+    {
+        switch (profile)
+        {
+            case AdminProfile value: value.UserId = userId; break;
+            case TutorProfile value: value.UserId = userId; break;
+            case StudentProfile value: value.UserId = userId; break;
+        }
+    }
+
+    private static void EnsureSucceeded(IdentityResult result, string operation)
+    {
+        if (!result.Succeeded)
+            throw new InvalidOperationException($"{operation}: {string.Join(", ", result.Errors.Select(x => x.Description))}");
+    }
+
+    private static async Task EnsureTutorSubjectsAsync(
+        ApplicationDbContext db, IReadOnlyList<TutorProfile> tutors,
+        IReadOnlyList<Subject> subjects, IReadOnlyList<GradeLevel> grades)
+    {
+        var tutorIds = tutors.Select(x => x.Id).ToArray();
+        var existing = await db.TutorSubjects.Where(x => tutorIds.Contains(x.TutorId))
+            .Select(x => new { x.TutorId, x.SubjectId, x.GradeLevelId }).ToListAsync();
+        var keys = existing.Select(x => $"{x.TutorId}:{x.SubjectId}:{x.GradeLevelId}").ToHashSet();
+        for (var i = 0; i < SampleCount; i++)
+        {
+            var key = $"{tutors[i].Id}:{subjects[i].Id}:{grades[i].Id}";
+            if (!keys.Contains(key))
+                db.TutorSubjects.Add(new TutorSubject { TutorId = tutors[i].Id, SubjectId = subjects[i].Id, GradeLevelId = grades[i].Id });
+        }
+        await db.SaveChangesAsync();
+    }
+
+    private static async Task EnsureAvailabilitiesAsync(ApplicationDbContext db, IReadOnlyList<TutorProfile> tutors)
+    {
+        var ids = tutors.Select(x => x.Id).ToArray();
+        var existing = await db.TutorAvailabilities.Where(x => ids.Contains(x.TutorId))
+            .Select(x => new { x.TutorId, x.DayOfWeek, x.StartTime, x.EndTime }).ToListAsync();
+        var keys = existing.Select(x => $"{x.TutorId}:{x.DayOfWeek}:{x.StartTime}:{x.EndTime}").ToHashSet();
+        for (var i = 0; i < SampleCount; i++)
+        {
+            var day = (DayOfWeek)(i % 7);
+            var start = new TimeOnly(16 + i % 3, 0);
+            var end = start.AddHours(2);
+            if (!keys.Contains($"{tutors[i].Id}:{day}:{start}:{end}"))
+                db.TutorAvailabilities.Add(new TutorAvailability { TutorId = tutors[i].Id, DayOfWeek = day, StartTime = start, EndTime = end });
+        }
+        await db.SaveChangesAsync();
+    }
+
+    private static async Task EnsureGuardiansAsync(ApplicationDbContext db, IReadOnlyList<StudentProfile> students)
+    {
+        var ids = students.Select(x => x.Id).ToArray();
+        var existing = await db.Guardians.Where(x => ids.Contains(x.StudentProfileId)).Select(x => x.StudentProfileId).ToListAsync();
+        var keys = existing.ToHashSet();
+        for (var i = 0; i < SampleCount; i++)
+            if (!keys.Contains(students[i].Id))
+                db.Guardians.Add(new Guardian { FullName = $"Người giám hộ mẫu {i + 1:D3}", ContactInfo = $"guardian{i + 1:D3}@example.test", StudentProfileId = students[i].Id });
+        await db.SaveChangesAsync();
+    }
+
+    private static async Task EnsureQualificationsAsync(ApplicationDbContext db, IReadOnlyList<TutorProfile> tutors)
+    {
+        var names = Enumerable.Range(1, SampleCount).Select(i => SampleName("bằng cấp", i)).ToArray();
+        var existing = await db.Qualifications.Where(x => names.Contains(x.Title)).Select(x => x.Title).ToListAsync();
+        for (var i = 1; i <= SampleCount; i++)
+            if (!existing.Contains(SampleName("bằng cấp", i)))
+                db.Qualifications.Add(new Qualification { Title = SampleName("bằng cấp", i), FileUrl = null, Status = VerificationStatus.Approved, TutorId = tutors[i - 1].Id });
+        await db.SaveChangesAsync();
+    }
+
+    private static async Task EnsureVerificationsAsync(ApplicationDbContext db, IReadOnlyList<TutorProfile> tutors, IReadOnlyList<AdminProfile> admins)
+    {
+        var names = Enumerable.Range(1, SampleCount).Select(i => SampleName("xác minh", i)).ToArray();
+        var existing = await db.ProfileVerifications.Where(x => x.OcrSuggestion != null && names.Contains(x.OcrSuggestion)).Select(x => x.OcrSuggestion!).ToListAsync();
+        for (var i = 1; i <= SampleCount; i++)
+            if (!existing.Contains(SampleName("xác minh", i)))
+                db.ProfileVerifications.Add(new ProfileVerification { Result = VerificationStatus.Approved, OcrSuggestion = SampleName("xác minh", i), ProcessedAt = DateTime.UtcNow, TutorId = tutors[i - 1].Id, AdminId = admins[i - 1].Id });
+        await db.SaveChangesAsync();
+    }
+
+    private static async Task EnsureRequestsAsync(ApplicationDbContext db, IReadOnlyList<StudentProfile> students, IReadOnlyList<TutorProfile> tutors, IReadOnlyList<Subject> subjects, IReadOnlyList<GradeLevel> grades)
+    {
+        var names = Enumerable.Range(1, SampleCount).Select(i => SampleName("yêu cầu kết nối", i)).ToArray();
+        var existing = await db.ConnectionRequests.Where(x => x.Message != null && names.Contains(x.Message)).Select(x => x.Message!).ToListAsync();
+        for (var i = 1; i <= SampleCount; i++)
+            if (!existing.Contains(SampleName("yêu cầu kết nối", i)))
+                db.ConnectionRequests.Add(new ConnectionRequest { Message = SampleName("yêu cầu kết nối", i), Status = (RequestStatus)((i - 1) % 4), StudentId = students[i - 1].Id, TutorId = tutors[i - 1].Id, SubjectId = subjects[i - 1].Id, GradeLevelId = grades[i - 1].Id, PreferredType = i % 2 == 0 ? ClassroomType.Group : ClassroomType.OneToOne });
+        await db.SaveChangesAsync();
+    }
+
+    private static async Task EnsureTrialSchedulesAsync(ApplicationDbContext db, IReadOnlyList<ConnectionRequest> requests)
+    {
+        var ids = requests.Select(x => x.Id).ToArray();
+        var existing = (await db.TrialSchedules.Where(x => ids.Contains(x.ConnectionRequestId)).Select(x => x.ConnectionRequestId).ToListAsync()).ToHashSet();
+        for (var i = 0; i < Math.Min(SampleCount, requests.Count); i++)
+            if (!existing.Contains(requests[i].Id))
+                db.TrialSchedules.Add(new TrialSchedule { ConnectionRequestId = requests[i].Id, ScheduledAt = DateTime.UtcNow.AddDays(i + 1), Status = (ScheduleStatus)(i % 3) });
+        await db.SaveChangesAsync();
+    }
+
+    private static async Task EnsureClassroomsAsync(ApplicationDbContext db, IReadOnlyList<TutorProfile> tutors, IReadOnlyList<Subject> subjects, IReadOnlyList<GradeLevel> grades)
+    {
+        var names = Enumerable.Range(1, SampleCount).Select(i => SampleName("lớp học", i)).ToArray();
+        var existing = await db.Classrooms.Where(x => names.Contains(x.Name)).Select(x => x.Name).ToListAsync();
+        for (var i = 1; i <= SampleCount; i++)
+            if (!existing.Contains(SampleName("lớp học", i)))
+                db.Classrooms.Add(new Classroom { Name = SampleName("lớp học", i), Fee = 200000 + i * 10000, Description = $"Lớp học mẫu số {i:D3}.", StartDate = DateOnly.FromDateTime(DateTime.UtcNow.Date.AddDays(i)), Status = ClassroomStatus.Active, Type = ClassroomType.OneToOne, MaxStudents = 1, TutorId = tutors[i - 1].Id, SubjectId = subjects[i - 1].Id, GradeLevelId = grades[i - 1].Id });
+        await db.SaveChangesAsync();
+    }
+
+    private static async Task EnsureClassroomStudentsAsync(ApplicationDbContext db, IReadOnlyList<Classroom> classrooms, IReadOnlyList<StudentProfile> students)
+    {
+        var classroomIds = classrooms.Select(x => x.Id).ToArray();
+        var studentIds = students.Select(x => x.Id).ToArray();
+        var existing = await db.ClassroomStudents.Where(x => classroomIds.Contains(x.ClassroomId) && studentIds.Contains(x.StudentId))
+            .Select(x => new { x.ClassroomId, x.StudentId }).ToListAsync();
+        var keys = existing.Select(x => $"{x.ClassroomId}:{x.StudentId}").ToHashSet();
+        for (var i = 0; i < Math.Min(SampleCount, Math.Min(classrooms.Count, students.Count)); i++)
+            if (!keys.Contains($"{classrooms[i].Id}:{students[i].Id}"))
+                db.ClassroomStudents.Add(new ClassroomStudent { ClassroomId = classrooms[i].Id, StudentId = students[i].Id, JoinedAt = DateTime.UtcNow.AddDays(-i) });
+        await db.SaveChangesAsync();
+    }
+
+    private static async Task EnsureClassSessionsAsync(ApplicationDbContext db, IReadOnlyList<Classroom> classrooms)
+    {
+        var rooms = Enumerable.Range(1, SampleCount).Select(i => $"OTSP-SEED30-SESSION-{i:D3}").ToArray();
+        var existing = await db.ClassSessions.Where(x => x.VideoRoom != null && rooms.Contains(x.VideoRoom)).Select(x => x.VideoRoom!).ToListAsync();
+        for (var i = 1; i <= Math.Min(SampleCount, classrooms.Count); i++)
+            if (!existing.Contains($"OTSP-SEED30-SESSION-{i:D3}"))
+                db.ClassSessions.Add(new ClassSession { ClassroomId = classrooms[i - 1].Id, ScheduledAt = DateTime.UtcNow.AddDays(i), Status = SessionStatus.Scheduled, VideoRoom = $"OTSP-SEED30-SESSION-{i:D3}" });
+        await db.SaveChangesAsync();
+    }
+
+    private static async Task EnsureReviewsAsync(ApplicationDbContext db, IReadOnlyList<ClassSession> sessions, IReadOnlyList<StudentProfile> students)
+    {
+        var comments = Enumerable.Range(1, SampleCount).Select(i => SampleName("đánh giá", i)).ToArray();
+        var existing = await db.Reviews.Where(x => x.Comment != null && comments.Contains(x.Comment)).Select(x => x.Comment!).ToListAsync();
+        for (var i = 1; i <= Math.Min(SampleCount, Math.Min(sessions.Count, students.Count)); i++)
+            if (!existing.Contains(SampleName("đánh giá", i)))
+                db.Reviews.Add(new Review { Comment = SampleName("đánh giá", i), Score = (i - 1) % 5 + 1, ReviewedAt = DateTime.UtcNow.AddDays(-i), ClassSessionId = sessions[i - 1].Id, StudentId = students[i - 1].Id });
+        await db.SaveChangesAsync();
+    }
+
+    private static async Task EnsureReviewAlertsAsync(ApplicationDbContext db, IReadOnlyList<Review> reviews, IReadOnlyList<AdminProfile> admins)
+    {
+        var reasons = Enumerable.Range(1, SampleCount).Select(i => SampleName("cảnh báo đánh giá", i)).ToArray();
+        var existing = await db.ReviewAlerts.Where(x => reasons.Contains(x.Reason)).Select(x => x.Reason).ToListAsync();
+        for (var i = 1; i <= Math.Min(SampleCount, reviews.Count); i++)
+            if (!existing.Contains(SampleName("cảnh báo đánh giá", i)))
+                db.ReviewAlerts.Add(new ReviewAlert { Reason = SampleName("cảnh báo đánh giá", i), Status = AlertStatus.New, ReviewId = reviews[i - 1].Id, ReviewedByAdminId = admins[i - 1].Id });
+        await db.SaveChangesAsync();
+    }
+
+    private static async Task EnsurePaymentsAndInvoicesAsync(ApplicationDbContext db, IReadOnlyList<Classroom> classrooms, IReadOnlyList<StudentProfile> students)
+    {
+        var codes = Enumerable.Range(1, SampleCount).Select(i => $"OTSP-SEED30-PAY-{i:D3}").ToArray();
+        var payments = await db.Payments.Where(x => x.GatewayTransactionCode != null && codes.Contains(x.GatewayTransactionCode)).ToListAsync();
+        var existingCodes = payments.Select(x => x.GatewayTransactionCode).ToHashSet();
+        for (var i = 1; i <= Math.Min(SampleCount, Math.Min(classrooms.Count, students.Count)); i++)
+            if (!existingCodes.Contains($"OTSP-SEED30-PAY-{i:D3}"))
+                db.Payments.Add(new Payment { Amount = classrooms[i - 1].Fee, Method = "Demo", Status = PaymentStatus.Success, GatewayTransactionCode = $"OTSP-SEED30-PAY-{i:D3}", PaidAt = DateTime.UtcNow.AddDays(-i), StudentId = students[i - 1].Id, ClassroomId = classrooms[i - 1].Id });
+        await db.SaveChangesAsync();
+
+        payments = await db.Payments.Where(x => x.GatewayTransactionCode != null && codes.Contains(x.GatewayTransactionCode)).OrderBy(x => x.GatewayTransactionCode).ToListAsync();
+        var paymentIds = payments.Select(x => x.Id).ToArray();
+        var invoiced = (await db.Invoices.Where(x => paymentIds.Contains(x.PaymentId)).Select(x => x.PaymentId).ToListAsync()).ToHashSet();
+        for (var i = 0; i < payments.Count; i++)
+            if (!invoiced.Contains(payments[i].Id))
+                db.Invoices.Add(new Invoice { PaymentId = payments[i].Id, IssuedDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-i)), TotalAmount = payments[i].Amount });
+        await db.SaveChangesAsync();
+    }
+
+    private static async Task EnsureReconciliationsAsync(ApplicationDbContext db, IReadOnlyList<TutorProfile> tutors, IReadOnlyList<AdminProfile> admins)
+    {
+        var periods = Enumerable.Range(1, SampleCount).Select(i => $"OTSP-SEED30-{i:D3}").ToArray();
+        var existing = await db.Reconciliations.Where(x => periods.Contains(x.Period)).Select(x => x.Period).ToListAsync();
+        for (var i = 1; i <= SampleCount; i++)
+            if (!existing.Contains($"OTSP-SEED30-{i:D3}"))
+                db.Reconciliations.Add(new Reconciliation { Period = $"OTSP-SEED30-{i:D3}", TotalRevenue = 500000 + i * 100000, CreatedDate = DateOnly.FromDateTime(DateTime.UtcNow.Date), TutorId = tutors[i - 1].Id, AdminId = admins[i - 1].Id });
+        await db.SaveChangesAsync();
+    }
+
+    private static async Task EnsureLearningDocumentsAsync(ApplicationDbContext db, IReadOnlyList<TutorProfile> tutors, IReadOnlyList<Subject> subjects, IReadOnlyList<GradeLevel> grades)
+    {
+        var titles = Enumerable.Range(1, SampleCount).Select(i => SampleName("tài liệu", i)).ToArray();
+        var existing = await db.LearningDocuments.Where(x => titles.Contains(x.Title)).Select(x => x.Title).ToListAsync();
+        for (var i = 1; i <= SampleCount; i++)
+            if (!existing.Contains(SampleName("tài liệu", i)))
+                db.LearningDocuments.Add(new LearningDocument { Title = SampleName("tài liệu", i), Description = "Tài liệu mẫu dùng để kiểm thử.", FileUrl = $"https://example.com/sample-document-{i:D3}.pdf", TutorId = tutors[i - 1].Id, SubjectId = subjects[i - 1].Id, GradeLevelId = grades[i - 1].Id });
+        await db.SaveChangesAsync();
+    }
+
+    private static async Task EnsureAiStudySessionsAsync(ApplicationDbContext db, IReadOnlyList<StudentProfile> students)
+    {
+        var questions = Enumerable.Range(1, SampleCount).Select(i => SampleName("câu hỏi AI", i)).ToArray();
+        var existing = await db.AiStudySessions.Where(x => questions.Contains(x.Question)).Select(x => x.Question).ToListAsync();
+        for (var i = 1; i <= SampleCount; i++)
+            if (!existing.Contains(SampleName("câu hỏi AI", i)))
+                db.AiStudySessions.Add(new AiStudySession { Question = SampleName("câu hỏi AI", i), Suggestion = "Hãy chia bài toán thành các bước nhỏ và kiểm tra lại kết quả.", StudentId = students[i - 1].Id });
+        await db.SaveChangesAsync();
+    }
+
+    private static async Task EnsureNewsAsync(ApplicationDbContext db, IReadOnlyList<AdminProfile> admins)
+    {
+        var titles = Enumerable.Range(1, SampleCount).Select(i => SampleName("tin tức", i)).ToArray();
+        var existing = await db.NewsArticles.Where(x => titles.Contains(x.Title)).Select(x => x.Title).ToListAsync();
+        for (var i = 1; i <= SampleCount; i++)
+            if (!existing.Contains(SampleName("tin tức", i)))
+                db.NewsArticles.Add(new NewsArticle { Title = SampleName("tin tức", i), Content = $"Nội dung minh họa cho bài viết giáo dục mẫu số {i:D3}.", Category = "Giáo dục", AdminId = admins[i - 1].Id });
+        await db.SaveChangesAsync();
+    }
+
+    private static async Task EnsurePartnerCentersAndGroupClassesAsync(ApplicationDbContext db, IReadOnlyList<AdminProfile> admins)
+    {
+        var names = Enumerable.Range(1, SampleCount).Select(i => SampleName("trung tâm", i)).ToArray();
+        var existing = await db.PartnerCenters.Where(x => names.Contains(x.Name)).Select(x => x.Name).ToListAsync();
+        for (var i = 1; i <= SampleCount; i++)
+            if (!existing.Contains(SampleName("trung tâm", i)))
+                db.PartnerCenters.Add(new PartnerCenter { Name = SampleName("trung tâm", i), Address = $"Địa chỉ mẫu {i:D3}", ContactInfo = $"center{i:D3}@example.test", Status = "Active", AdminId = admins[i - 1].Id });
+        await db.SaveChangesAsync();
+
+        var centerNames = Enumerable.Range(1, SampleCount).Select(i => SampleName("lớp nhóm", i)).ToArray();
+        var existingGroups = await db.GroupClasses.Where(x => centerNames.Contains(x.Name)).Select(x => x.Name).ToListAsync();
+        var centers = await db.PartnerCenters.Where(x => names.Contains(x.Name)).OrderBy(x => x.Name).ToListAsync();
+        for (var i = 1; i <= Math.Min(SampleCount, centers.Count); i++)
+            if (!existingGroups.Contains(SampleName("lớp nhóm", i)))
+                db.GroupClasses.Add(new GroupClass { Name = SampleName("lớp nhóm", i), SubjectLevelText = "Cấp học mẫu", SubjectText = "Môn học mẫu", Schedule = "Thứ 7, Chủ nhật", CenterId = centers[i - 1].Id });
+        await db.SaveChangesAsync();
+    }
+
+    private static async Task EnsureStatisticReportsAsync(ApplicationDbContext db, IReadOnlyList<AdminProfile> admins)
+    {
+        var types = Enumerable.Range(1, SampleCount).Select(i => SampleName("báo cáo", i)).ToArray();
+        var existing = await db.StatisticReports.Where(x => types.Contains(x.ReportType)).Select(x => x.ReportType).ToListAsync();
+        for (var i = 1; i <= SampleCount; i++)
+            if (!existing.Contains(SampleName("báo cáo", i)))
+                db.StatisticReports.Add(new StatisticReport { ReportType = SampleName("báo cáo", i), FromDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-30)), ToDate = DateOnly.FromDateTime(DateTime.UtcNow), AdminId = admins[i - 1].Id });
+        await db.SaveChangesAsync();
+    }
+
+    private static async Task EnsureUserActivityAsync(ApplicationDbContext db, IReadOnlyList<TutorProfile> tutors, IReadOnlyList<StudentProfile> students)
+    {
+        var tutorUsers = tutors.Select(x => x.UserId).ToArray();
+        var studentUsers = students.Select(x => x.UserId).ToArray();
+        var userIds = tutorUsers.Concat(studentUsers).ToArray();
+
+        var auditActions = Enumerable.Range(1, SampleCount).Select(i => SampleName("nhật ký", i)).ToArray();
+        var existingAudits = await db.AuditLogs.Where(x => auditActions.Contains(x.Action)).Select(x => x.Action).ToListAsync();
+        for (var i = 1; i <= SampleCount; i++)
+            if (!existingAudits.Contains(SampleName("nhật ký", i)))
+                db.AuditLogs.Add(new AuditLog { Action = SampleName("nhật ký", i), IpAddress = "127.0.0.1", UserId = tutorUsers[i - 1] });
+
+        var notificationTitles = Enumerable.Range(1, SampleCount).Select(i => SampleName("thông báo", i)).ToArray();
+        var existingNotifications = await db.Notifications.Where(x => notificationTitles.Contains(x.Title)).Select(x => x.Title).ToListAsync();
+        for (var i = 1; i <= SampleCount; i++)
+            if (!existingNotifications.Contains(SampleName("thông báo", i)))
+                db.Notifications.Add(new Notification { Title = SampleName("thông báo", i), Content = "Đây là nội dung thông báo mẫu.", UserId = userIds[(i - 1) % userIds.Length] });
+
+        var messages = Enumerable.Range(1, SampleCount).Select(i => SampleName("tin nhắn", i)).ToArray();
+        var existingMessages = await db.Messagers.Where(x => messages.Contains(x.Content)).Select(x => x.Content).ToListAsync();
+        for (var i = 1; i <= SampleCount; i++)
+            if (!existingMessages.Contains(SampleName("tin nhắn", i)))
+                db.Messagers.Add(new Messager { Content = SampleName("tin nhắn", i), SenderId = tutorUsers[i - 1], ReceiverId = studentUsers[i - 1] });
+
+        var complaints = Enumerable.Range(1, SampleCount).Select(i => SampleName("khiếu nại", i)).ToArray();
+        var existingComplaints = await db.Complaints.Where(x => complaints.Contains(x.Content)).Select(x => x.Content).ToListAsync();
+        for (var i = 1; i <= SampleCount; i++)
+            if (!existingComplaints.Contains(SampleName("khiếu nại", i)))
+                db.Complaints.Add(new Complaint { Content = SampleName("khiếu nại", i), Status = ComplaintStatus.New, SenderId = studentUsers[i - 1], TargetUserId = tutorUsers[i - 1] });
+
+        await db.SaveChangesAsync();
+    }
+
+    private static string SampleName(string type, int index) => $"Mẫu {type} {index:D3}";
+}

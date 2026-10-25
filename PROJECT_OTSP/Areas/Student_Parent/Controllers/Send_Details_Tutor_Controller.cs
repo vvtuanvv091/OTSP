@@ -23,20 +23,29 @@ public class Send_Details_TutorController : Controller
     private readonly ApplicationDbContext _db;
     private readonly ILogger<Send_Details_TutorController> _logger;
     private readonly IOpenGroupClassroomService _openGroupClassroomService;
+<<<<<<< HEAD
+=======
     private readonly IAvailabilitySlotService _availabilitySlotService;
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
     private readonly IHubContext<ConnectionRequestHub> _hubContext;
 
     public Send_Details_TutorController(
         ApplicationDbContext db,
         ILogger<Send_Details_TutorController> logger,
         IOpenGroupClassroomService openGroupClassroomService,
+<<<<<<< HEAD
+=======
         IAvailabilitySlotService availabilitySlotService,
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
         IHubContext<ConnectionRequestHub> hubContext)
     {
         _db = db;
         _logger = logger;
         _openGroupClassroomService = openGroupClassroomService;
+<<<<<<< HEAD
+=======
         _availabilitySlotService = availabilitySlotService;
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
         _hubContext = hubContext;
     }
 
@@ -178,7 +187,10 @@ public class Send_Details_TutorController : Controller
                 }).ToList(),
 
             Classrooms = openClassrooms,
+<<<<<<< HEAD
+=======
             AvailableTrialSlots = await _availabilitySlotService.GetAvailableSlotsAsync(tutor.Id, 14, cancellationToken),
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
 
             Reviews = reviews,
             SubjectOptions = subjectOptions,
@@ -282,6 +294,8 @@ public class Send_Details_TutorController : Controller
             return RedirectToAction(nameof(Index), new { id = model.TutorId });
         }
 
+<<<<<<< HEAD
+=======
         var selectedSlots = (model.ProposedTrialSlotsUtc ?? new List<DateTime>())
             .Where(s => s > DateTime.UtcNow)
             .Distinct()
@@ -323,6 +337,7 @@ public class Send_Details_TutorController : Controller
                 : $"{scheduleHeader}\n{baseMessage}";
         }
 
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
         // Tạo yêu cầu kết nối mới
         var connectionRequest = new ConnectionRequest
         {
@@ -332,12 +347,18 @@ public class Send_Details_TutorController : Controller
             GradeLevelId = model.GradeLevelId,
             PreferredType = model.PreferredType,
             ClassroomId = model.PreferredType == ClassroomType.Group ? model.ClassroomId : null,
+<<<<<<< HEAD
+            Message = model.Message?.Trim(),
+=======
             ProposedTrialSlotUtc = model.PreferredType == ClassroomType.OneToOne ? selectedSlots.FirstOrDefault() : null,
             Message = finalMessage,
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
             Status = RequestStatus.Pending,
             CreatedAt = DateTime.UtcNow
         };
 
+<<<<<<< HEAD
+=======
         if (model.PreferredType == ClassroomType.OneToOne)
         {
             foreach (var slotUtc in selectedSlots)
@@ -350,6 +371,7 @@ public class Send_Details_TutorController : Controller
             }
         }
 
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
         _db.ConnectionRequests.Add(connectionRequest);
 
         // Tạo thông báo cho gia sư

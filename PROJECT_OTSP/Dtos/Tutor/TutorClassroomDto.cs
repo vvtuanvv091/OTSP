@@ -18,11 +18,14 @@ public class TutorClassroomDto
     public string SubjectName { get; set; } = string.Empty;
     public string GradeLevelName { get; set; } = string.Empty;
 
+<<<<<<< HEAD
+=======
     public int SessionsPerWeek { get; set; } = 1;
     public double HoursPerSession { get; set; } = 2.0;
     public string ScheduleSummary { get; set; } = string.Empty;
     public List<string> WeeklyScheduleItems { get; set; } = [];
 
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
     public bool HasAvailableSeats => StudentCount < MaxStudents;
     public int AvailableSeats => Math.Max(0, MaxStudents - StudentCount);
 }

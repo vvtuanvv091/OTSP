@@ -18,6 +18,9 @@ namespace PROJECT_OTSP.Areas.Tutor.Controllers
         private readonly ApplicationDbContext _dbcontext;
         private readonly IWebHostEnvironment _environment;
         private readonly IMemoryCache _cache;
+<<<<<<< HEAD
+        public TutorProfileController(ApplicationDbContext dbcontext, IWebHostEnvironment env, IMemoryCache cache)
+=======
         private readonly PROJECT_OTSP.Services.IImageStorageService _imageStorage;
 
         public TutorProfileController(
@@ -25,11 +28,15 @@ namespace PROJECT_OTSP.Areas.Tutor.Controllers
             IWebHostEnvironment env,
             IMemoryCache cache,
             PROJECT_OTSP.Services.IImageStorageService imageStorage)
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
         {
             _dbcontext = dbcontext;
             _environment = env;
             _cache = cache;
+<<<<<<< HEAD
+=======
             _imageStorage = imageStorage;
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
         }
 
         private string? GetCurrentUserId()
@@ -160,6 +167,8 @@ namespace PROJECT_OTSP.Areas.Tutor.Controllers
             TempData["Success"] = "Cập nhật thông tin thành công.";
             return RedirectToAction(nameof(Index));
         }
+<<<<<<< HEAD
+=======
 
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -222,5 +231,6 @@ namespace PROJECT_OTSP.Areas.Tutor.Controllers
                 return RedirectToAction(nameof(Index));
             }
         }
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
     }
 }

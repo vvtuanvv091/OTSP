@@ -20,6 +20,15 @@ public sealed class OpenGroupClassroomService : IOpenGroupClassroomService
         _db = db;
     }
 
+<<<<<<< HEAD
+    public Task<List<TutorClassroomDto>> GetOpenGroupClassroomsAsync(
+        int tutorId,
+        CancellationToken cancellationToken = default)
+    {
+        return OpenClassroomQuery(tutorId)
+            .OrderBy(classroom => classroom.Name)
+            .Select(classroom => new TutorClassroomDto
+=======
     public async Task<List<TutorClassroomDto>> GetOpenGroupClassroomsAsync(
         int tutorId,
         CancellationToken cancellationToken = default)
@@ -58,6 +67,7 @@ public sealed class OpenGroupClassroomService : IOpenGroupClassroomService
                 : $"{classroom.SessionsPerWeek} buổi/tuần ({classroom.HoursPerSession}h/buổi)";
 
             return new TutorClassroomDto
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
             {
                 Id = classroom.Id,
                 Name = classroom.Name,
@@ -65,6 +75,16 @@ public sealed class OpenGroupClassroomService : IOpenGroupClassroomService
                 CoverImageUrl = classroom.CoverImageUrl,
                 Fee = classroom.Fee,
                 Type = classroom.Type,
+<<<<<<< HEAD
+                StudentCount = classroom.ClassroomStudents.Count,
+                MaxStudents = classroom.MaxStudents,
+                SubjectName = classroom.Subject.Name,
+                GradeLevelName = classroom.GradeLevel.Name
+            })
+            .ToListAsync(cancellationToken);
+    }
+
+=======
                 StudentCount = classroom.StudentCount,
                 MaxStudents = classroom.MaxStudents,
                 SubjectName = classroom.SubjectName,
@@ -101,6 +121,7 @@ public sealed class OpenGroupClassroomService : IOpenGroupClassroomService
         _ => day.ToString()
     };
 
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
     public Task<bool> IsOpenGroupClassroomAsync(
         int tutorId,
         int classroomId,

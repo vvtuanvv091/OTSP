@@ -506,5 +506,3 @@ C:\tai_lieu_hoc_thuat_cua_tuan\mauthietkephanmem\OTSP\PROJECT_OTSP\obj\Debug\net
 C:\tai_lieu_hoc_thuat_cua_tuan\mauthietkephanmem\OTSP\PROJECT_OTSP\obj\Debug\net10.0\compressed\0io52an14g-{0}-5qqyglxjin-5qqyglxjin.gz
 C:\tai_lieu_hoc_thuat_cua_tuan\mauthietkephanmem\OTSP\PROJECT_OTSP\obj\Debug\net10.0\compressed\kstfa56iz4-{0}-ipwhtyv3ta-ipwhtyv3ta.gz
 C:\tai_lieu_hoc_thuat_cua_tuan\mauthietkephanmem\OTSP\PROJECT_OTSP\obj\Debug\net10.0\staticwebassets.upToDateCheck.txt
-C:\tai_lieu_hoc_thuat_cua_tuan\mauthietkephanmem\OTSP\PROJECT_OTSP\obj\Debug\net10.0\compressed\vegabyjtfa-{0}-akzx5zqqrr-akzx5zqqrr.gz
-C:\tai_lieu_hoc_thuat_cua_tuan\mauthietkephanmem\OTSP\PROJECT_OTSP\obj\Debug\net10.0\compressed\5rwhtg0pyr-{0}-gpxaw8fmio-gpxaw8fmio.gz

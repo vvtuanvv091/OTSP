@@ -1,0 +1,280 @@
+﻿@* @using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
+@using PROJECT_OTSP.Models
+@using PROJECT_OTSP.Data
+@inject SignInManager<ApplicationUser> SignInManager
+@inject UserManager<ApplicationUser> UserManager
+@inject ApplicationDbContext DbContext
+
+@{
+    var isVietnamese = System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == "vi";
+    var currentUser = SignInManager.IsSignedIn(User) ? await UserManager.GetUserAsync(User) : null;
+    var displayName = string.IsNullOrWhiteSpace(currentUser?.FullName) ? User.Identity?.Name : currentUser.FullName;
+    var unreadNotificationsCount = 0;
+    var recentNotifications = new List<Notification>();
+
+    if (currentUser is not null)
+    {
+        unreadNotificationsCount = await DbContext.Notifications
+            .AsNoTracking()
+            .CountAsync(notification => notification.UserId == currentUser.Id && !notification.IsRead);
+
+        recentNotifications = await DbContext.Notifications
+            .AsNoTracking()
+            .Where(notification => notification.UserId == currentUser.Id)
+            .OrderByDescending(notification => notification.CreatedAt)
+            .Take(5)
+            .ToListAsync();
+    }
+}
+<div class="header-auth-links">
+@if (SignInManager.IsSignedIn(User))
+{
+    <div class="header-account-tools">
+        <div class="dropdown header-notifications">
+            <button type="button" class="header-notification-trigger" data-bs-toggle="dropdown" aria-expanded="false" aria-label="@(isVietnamese ? "Thông báo" : "Notifications")">
+                <i class="bi bi-bell" aria-hidden="true"></i>
+                @if (unreadNotificationsCount > 0)
+                {
+                    <span class="header-notification-count">@(unreadNotificationsCount > 99 ? "99+" : unreadNotificationsCount)</span>
+                }
+            </button>
+            <div class="dropdown-menu dropdown-menu-end header-notification-menu">
+                <div class="header-dropdown-heading">
+                    <strong>@(isVietnamese ? "Thông báo" : "Notifications")</strong>
+                    @if (unreadNotificationsCount > 0)
+                    {
+                        <span>@unreadNotificationsCount</span>
+                    }
+                </div>
+                @if (recentNotifications.Count == 0)
+                {
+                    <p class="header-notifications-empty">@(isVietnamese ? "Bạn chưa có thông báo." : "You have no notifications yet.")</p>
+                }
+                else
+                {
+                    <div class="header-notification-list">
+                        @foreach (var notification in recentNotifications)
+                        {
+                            <a class="header-notification-item @(notification.IsRead ? "is-read" : "is-unread")" asp-area="" asp-controller="Notifications" asp-action="Index">
+                                <span class="header-notification-dot" aria-hidden="true"></span>
+                                <span class="header-notification-copy">
+                                    <strong>@notification.Title</strong>
+                                    <span>@notification.Content</span>
+                                    <small>@notification.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</small>
+                                </span>
+                            </a>
+                        }
+                    </div>
+                }
+                <a class="header-notifications-all" asp-area="" asp-controller="Notifications" asp-action="Index">@(isVietnamese ? "Xem tất cả thông báo" : "See all notifications")</a>
+            </div>
+        </div>
+
+        <div class="dropdown header-user-dropdown">
+            <button type="button" class="header-user-trigger" data-bs-toggle="dropdown" aria-expanded="false">
+                @if (!string.IsNullOrWhiteSpace(currentUser?.AvatarUrl))
+                {
+                    <img class="header-user-avatar" src="@currentUser.AvatarUrl" alt="" referrerpolicy="no-referrer" />
+                }
+                else
+                {
+                    <span class="header-user-avatar header-user-avatar-fallback"><i class="bi bi-person-fill" aria-hidden="true"></i></span>
+                }
+                <span class="header-user-name">@displayName</span>
+                <i class="bi bi-chevron-down header-user-chevron" aria-hidden="true"></i>
+            </button>
+            <div class="dropdown-menu dropdown-menu-end header-user-menu">
+                <div class="header-user-menu-heading">
+                    <strong>@displayName</strong>
+                    @if (!string.IsNullOrWhiteSpace(currentUser?.Email))
+                    {
+                        <small>@currentUser.Email</small>
+                    }
+                </div>
+                <a class="dropdown-item" asp-area="" asp-controller="Home" asp-action="MyAccount"><i class="bi bi-grid" aria-hidden="true"></i>@(isVietnamese ? "Trang của tôi" : "My account")</a>
+                @if (User.IsInRole("Tutor"))
+                {
+                    <a class="dropdown-item" asp-area="Tutor" asp-controller="TutorProfile" asp-action="Index"><i class="bi bi-person-vcard" aria-hidden="true"></i>@(isVietnamese ? "Hồ sơ" : "Profile")</a>
+                }
+                <a class="dropdown-item" asp-area="Identity" asp-page="/Account/Manage/Index"><i class="bi bi-gear" aria-hidden="true"></i>@(isVietnamese ? "Quản lý tài khoản" : "Account settings")</a>
+                <div class="dropdown-divider"></div>
+                <form asp-area="Identity" asp-page="/Account/Logout" asp-route-returnUrl="@Url.Action("Index", "Home", new { area = "" })" method="post">
+                    <button type="submit" class="dropdown-item header-user-logout"><i class="bi bi-box-arrow-right" aria-hidden="true"></i>@(isVietnamese ? "Đăng xuất" : "Log out")</button>
+                </form>
+            </div>
+        </div>
+    </div>
+}
+else
+{
+    <a class="header-auth-link" asp-area="Identity" asp-page="/Account/Login">@(isVietnamese ? "Đăng nhập" : "Log in")</a>
+    <a class="header-auth-link header-auth-register" asp-area="Identity" asp-page="/Account/Register">@(isVietnamese ? "Đăng ký" : "Register")</a>
+}
+</div> *@
+@{
+    var isVietnamese = System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == "vi";
+    var isSignedIn = User.Identity?.IsAuthenticated == true;
+
+    // Tên tạm lấy từ cookie đăng nhập, không truy vấn DB
+    var fallbackName = User.Identity?.Name ?? "";
+    var summaryUrl = Url.Action("Summary", "Header");
+    var notificationsUrl = Url.Action("Index", "Notifications");
+    var logoutReturnUrl = Url.Action("Index", "Home", new { area = "" });
+}
+<div class="header-auth-links">
+@if (isSignedIn)
+{
+    <div class="header-account-tools" id="headerAccountTools"
+         data-summary-url="@summaryUrl"
+         data-notifications-url="@notificationsUrl"
+         data-vi="@(isVietnamese ? "1" : "0")">
+
+        <div class="dropdown header-notifications">
+            <button type="button" class="header-notification-trigger" data-bs-toggle="dropdown" aria-expanded="false"
+                    aria-label="@(isVietnamese ? "Thông báo" : "Notifications")">
+                <i class="bi bi-bell" aria-hidden="true"></i>
+                <span class="header-notification-count d-none" data-role="unread"></span>
+            </button>
+
+            <div class="dropdown-menu dropdown-menu-end header-notification-menu">
+                <div class="header-dropdown-heading">
+                    <strong>@(isVietnamese ? "Thông báo" : "Notifications")</strong>
+                    <span class="d-none" data-role="unread-heading"></span>
+                </div>
+
+                <p class="header-notifications-empty" data-role="empty">
+                    @(isVietnamese ? "Bạn chưa có thông báo." : "You have no notifications yet.")
+                </p>
+                <div class="header-notification-list" data-role="list"></div>
+
+                <a class="header-notifications-all" asp-area="" asp-controller="Notifications" asp-action="Index">
+                    @(isVietnamese ? "Xem tất cả thông báo" : "See all notifications")
+                </a>
+            </div>
+        </div>
+
+        <div class="dropdown header-user-dropdown">
+            <button type="button" class="header-user-trigger" data-bs-toggle="dropdown" aria-expanded="false">
+                <span class="header-user-avatar header-user-avatar-fallback" data-role="avatar-fallback">
+                    <i class="bi bi-person-fill" aria-hidden="true"></i>
+                </span>
+                <img class="header-user-avatar d-none" data-role="avatar" alt="" referrerpolicy="no-referrer" />
+                <span class="header-user-name" data-role="name">@fallbackName</span>
+                <i class="bi bi-chevron-down header-user-chevron" aria-hidden="true"></i>
+            </button>
+
+            <div class="dropdown-menu dropdown-menu-end header-user-menu">
+                <div class="header-user-menu-heading">
+                    <strong data-role="menu-name">@fallbackName</strong>
+                    <small data-role="menu-email"></small>
+                </div>
+
+                <a class="dropdown-item" asp-area="" asp-controller="Home" asp-action="MyAccount">
+                    <i class="bi bi-grid" aria-hidden="true"></i>@(isVietnamese ? "Trang của tôi" : "My account")
+                </a>
+
+                @if (User.IsInRole("Tutor"))
+                {
+                    <a class="dropdown-item" asp-area="Tutor" asp-controller="TutorProfile" asp-action="Index">
+                        <i class="bi bi-person-vcard" aria-hidden="true"></i>@(isVietnamese ? "Hồ sơ" : "Profile")
+                    </a>
+                }
+
+                <a class="dropdown-item" asp-area="Identity" asp-page="/Account/Manage/Index">
+                    <i class="bi bi-gear" aria-hidden="true"></i>@(isVietnamese ? "Quản lý tài khoản" : "Account settings")
+                </a>
+
+                <div class="dropdown-divider"></div>
+
+                <form asp-area="Identity" asp-page="/Account/Logout" asp-route-returnUrl="@logoutReturnUrl" method="post">
+                    <button type="submit" class="dropdown-item header-user-logout">
+                        <i class="bi bi-box-arrow-right" aria-hidden="true"></i>@(isVietnamese ? "Đăng xuất" : "Log out")
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    (() => {
+        const box = document.getElementById('headerAccountTools');
+        if (!box || !box.dataset.summaryUrl) return;
+
+        const q = sel => box.querySelector(sel);
+        const isVi = box.dataset.vi === '1';
+
+        fetch(box.dataset.summaryUrl, {
+            credentials: 'same-origin',
+            headers: { Accept: 'application/json' }
+        })
+        .then(res => res.ok ? res.json() : null)
+        .then(data => { if (data) render(data); })
+        .catch(() => { /* lỗi thì giữ tên tạm từ cookie */ });
+
+        function render({ user, unread, items }) {
+            if (user) {
+                // textContent tránh chèn HTML từ dữ liệu người dùng
+                q('[data-role="name"]').textContent = user.name || '';
+                q('[data-role="menu-name"]').textContent = user.name || '';
+                q('[data-role="menu-email"]').textContent = user.email || '';
+
+                if (user.avatarUrl) {
+                    const img = q('[data-role="avatar"]');
+                    img.src = user.avatarUrl;
+                    img.classList.remove('d-none');
+                    q('[data-role="avatar-fallback"]').classList.add('d-none');
+                }
+            }
+
+            if (unread > 0) {
+                const badge = q('[data-role="unread"]');
+                badge.textContent = unread > 99 ? '99+' : String(unread);
+                badge.classList.remove('d-none');
+
+                const heading = q('[data-role="unread-heading"]');
+                heading.textContent = String(unread);
+                heading.classList.remove('d-none');
+            }
+
+            if (items && items.length) {
+                q('[data-role="empty"]').classList.add('d-none');
+                const list = q('[data-role="list"]');
+                items.forEach(n => list.appendChild(notificationItem(n)));
+            }
+        }
+
+        function notificationItem(n) {
+            const a = document.createElement('a');
+            a.className = 'header-notification-item ' + (n.isRead ? 'is-read' : 'is-unread');
+            a.href = box.dataset.notificationsUrl;
+
+            const dot = document.createElement('span');
+            dot.className = 'header-notification-dot';
+            dot.setAttribute('aria-hidden', 'true');
+
+            const copy = document.createElement('span');
+            copy.className = 'header-notification-copy';
+
+            const title = document.createElement('strong');
+            title.textContent = n.title || '';
+
+            const content = document.createElement('span');
+            content.textContent = n.content || '';
+
+            const time = document.createElement('small');
+            time.textContent = new Date(n.createdAt).toLocaleString(isVi ? 'vi-VN' : 'en-GB');
+
+            copy.append(title, content, time);
+            a.append(dot, copy);
+            return a;
+        }
+    })();
+    </script>
+}
+else
+{
+    <a class="header-auth-link" asp-area="Identity" asp-page="/Account/Login">@(isVietnamese ? "Đăng nhập" : "Log in")</a>
+    <a class="header-auth-link header-auth-register" asp-area="Identity" asp-page="/Account/Register">@(isVietnamese ? "Đăng ký" : "Register")</a>
+}
+</div>

@@ -55,6 +55,23 @@ public sealed class TutorClassroomController : TutorAreaController
         if (status.HasValue)
             query = query.Where(classroom => classroom.Status == status.Value);
 
+<<<<<<< HEAD
+        var classrooms = await query
+            .OrderByDescending(classroom => classroom.Status == ClassroomStatus.Active)
+            .ThenByDescending(classroom => classroom.Id)
+            .Select(classroom => new ClassroomListItemVm
+            {
+                Id = classroom.Id,
+                Name = classroom.Name,
+                SubjectName = classroom.Subject.Name,
+                GradeLevelName = classroom.GradeLevel.Name,
+                CoverImageUrl = classroom.CoverImageUrl,
+                Fee = classroom.Fee,
+                StudentCount = classroom.ClassroomStudents.Count,
+                MaxStudents = classroom.MaxStudents,
+                Status = classroom.Status,
+                StartDate = classroom.StartDate,
+=======
         var classroomsRaw = await query
             .OrderByDescending(classroom => classroom.Status == ClassroomStatus.Active)
             .ThenByDescending(classroom => classroom.Id)
@@ -76,6 +93,7 @@ public sealed class TutorClassroomController : TutorAreaController
                     .OrderBy(w => w.SessionIndex)
                     .Select(w => new { w.SessionIndex, w.DayOfWeek, w.StartTime, w.EndTime })
                     .ToList(),
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
                 CanHardDelete = !classroom.ClassroomStudents.Any()
                     && !classroom.ConnectionRequests.Any()
                     && !classroom.ClassSessions.Any()
@@ -84,6 +102,8 @@ public sealed class TutorClassroomController : TutorAreaController
             })
             .ToListAsync(cancellationToken);
 
+<<<<<<< HEAD
+=======
         var classrooms = classroomsRaw.Select(c =>
         {
             var summary = c.WeeklySchedules.Count > 0
@@ -110,6 +130,7 @@ public sealed class TutorClassroomController : TutorAreaController
             };
         }).ToList();
 
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
         ViewBag.SelectedStatus = status;
         return RenderIndex(classrooms);
     }
@@ -121,6 +142,9 @@ public sealed class TutorClassroomController : TutorAreaController
         if (tutorId is null)
             return Forbid();
 
+<<<<<<< HEAD
+        var model = new ClassroomFormVm();
+=======
         var model = new ClassroomFormVm
         {
             SessionsPerWeek = 2,
@@ -131,6 +155,7 @@ public sealed class TutorClassroomController : TutorAreaController
                 new() { SessionIndex = 2, DayOfWeek = DayOfWeek.Wednesday, StartTime = new TimeOnly(19, 0), EndTime = new TimeOnly(21, 0) }
             }
         };
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
         await PopulateSubjectGradeOptionsAsync(model, tutorId.Value, cancellationToken);
         if (model.SubjectGradeOptions.Count == 0)
         {
@@ -165,7 +190,10 @@ public sealed class TutorClassroomController : TutorAreaController
         }
 
         await ValidateCoverImageInputAsync(model, cancellationToken);
+<<<<<<< HEAD
+=======
         await ValidateWeeklySchedulesAsync(model, tutorId.Value, null, cancellationToken);
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
 
         if (!ModelState.IsValid)
             return View(model);
@@ -184,8 +212,11 @@ public sealed class TutorClassroomController : TutorAreaController
             Description = model.Description?.Trim(),
             Fee = model.Fee,
             MaxStudents = model.MaxStudents,
+<<<<<<< HEAD
+=======
             SessionsPerWeek = model.SessionsPerWeek,
             HoursPerSession = model.HoursPerSession,
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
             StartDate = model.StartDate,
             CoverImageUrl = coverImageUrl,
             CoverImagePublicId = uploadedImage?.PublicId,
@@ -200,6 +231,8 @@ public sealed class TutorClassroomController : TutorAreaController
         {
             _db.Classrooms.Add(classroom);
             await _db.SaveChangesAsync(cancellationToken);
+<<<<<<< HEAD
+=======
 
             if (model.WeeklySchedules is { Count: > 0 })
             {
@@ -217,6 +250,7 @@ public sealed class TutorClassroomController : TutorAreaController
                 }
                 await _db.SaveChangesAsync(cancellationToken);
             }
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
         }
         catch
         {
@@ -246,6 +280,8 @@ public sealed class TutorClassroomController : TutorAreaController
             return RedirectToAction(nameof(Index));
         }
 
+<<<<<<< HEAD
+=======
         var existingSchedules = await _db.ClassroomWeeklySchedules
             .AsNoTracking()
             .Where(w => w.ClassroomId == classroom.Id)
@@ -259,6 +295,7 @@ public sealed class TutorClassroomController : TutorAreaController
             })
             .ToListAsync(cancellationToken);
 
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
         var model = new ClassroomFormVm
         {
             Id = classroom.Id,
@@ -267,6 +304,8 @@ public sealed class TutorClassroomController : TutorAreaController
             Fee = classroom.Fee,
             MaxStudents = classroom.MaxStudents,
             StartDate = classroom.StartDate,
+<<<<<<< HEAD
+=======
             SessionsPerWeek = classroom.SessionsPerWeek > 0 ? classroom.SessionsPerWeek : (existingSchedules.Count > 0 ? existingSchedules.Count : 2),
             HoursPerSession = classroom.HoursPerSession > 0 ? classroom.HoursPerSession : 2.0,
             WeeklySchedules = existingSchedules.Count > 0 ? existingSchedules : new List<ClassroomWeeklyScheduleInputDto>
@@ -274,6 +313,7 @@ public sealed class TutorClassroomController : TutorAreaController
                 new() { SessionIndex = 1, DayOfWeek = DayOfWeek.Monday, StartTime = new TimeOnly(19, 0), EndTime = new TimeOnly(21, 0) },
                 new() { SessionIndex = 2, DayOfWeek = DayOfWeek.Wednesday, StartTime = new TimeOnly(19, 0), EndTime = new TimeOnly(21, 0) }
             },
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
             CoverImageUrl = GetRemoteImageUrl(classroom.CoverImageUrl),
             CurrentCoverImageUrl = classroom.CoverImageUrl,
             SubjectGradeKey = $"{classroom.SubjectId}_{classroom.GradeLevelId}"
@@ -340,7 +380,10 @@ public sealed class TutorClassroomController : TutorAreaController
             ModelState.AddModelError(nameof(model.SubjectGradeKey), "Không thể đổi môn/cấp học khi lớp đã có học viên hoặc yêu cầu kết nối.");
 
         await ValidateCoverImageInputAsync(model, cancellationToken);
+<<<<<<< HEAD
+=======
         await ValidateWeeklySchedulesAsync(model, tutorId.Value, classroom.Id, cancellationToken);
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
 
         if (!ModelState.IsValid)
         {
@@ -358,8 +401,11 @@ public sealed class TutorClassroomController : TutorAreaController
         classroom.Description = model.Description?.Trim();
         classroom.StartDate = model.StartDate;
         classroom.MaxStudents = model.MaxStudents;
+<<<<<<< HEAD
+=======
         classroom.SessionsPerWeek = model.SessionsPerWeek;
         classroom.HoursPerSession = model.HoursPerSession;
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
         classroom.Fee = model.Fee;
         classroom.CoverImageUrl = uploadedImage?.Url
             ?? (model.RemoveCoverImage
@@ -381,6 +427,8 @@ public sealed class TutorClassroomController : TutorAreaController
         try
         {
             await _db.SaveChangesAsync(cancellationToken);
+<<<<<<< HEAD
+=======
 
             var oldSchedules = await _db.ClassroomWeeklySchedules
                 .Where(w => w.ClassroomId == classroom.Id)
@@ -403,6 +451,7 @@ public sealed class TutorClassroomController : TutorAreaController
                 }
             }
             await _db.SaveChangesAsync(cancellationToken);
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
         }
         catch (DbUpdateConcurrencyException)
         {
@@ -782,6 +831,8 @@ public sealed class TutorClassroomController : TutorAreaController
         public string? DeletedCoverImageUrl { get; set; }
         public string? DeletedCoverImagePublicId { get; set; }
     }
+<<<<<<< HEAD
+=======
 
     private async Task ValidateWeeklySchedulesAsync(
         ClassroomFormVm model, int tutorId, int? currentClassroomId, CancellationToken ct)
@@ -867,4 +918,5 @@ public sealed class TutorClassroomController : TutorAreaController
         DayOfWeek.Sunday => "CN",
         _ => day.ToString()
     };
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
 }

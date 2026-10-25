@@ -1,0 +1,103 @@
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using PROJECT_OTSP.Data;
+using PROJECT_OTSP.Models;
+using System.Security.Claims;
+
+namespace PROJECT_OTSP.Areas.Tutor.Controllers
+{
+    public class TutorSubjectController : Controller
+    {
+        [Area("Tutor")]
+        //[Authorize(Roles = "Tutor")]
+        private readonly ApplicationDbContext _dbcontext;
+
+        public TutorSubjectController(ApplicationDbContext dbcontext)
+        {
+            _dbcontext = dbcontext;
+        }
+        private string? GetCurrentUserId()
+            => User.FindFirstValue(ClaimTypes.NameIdentifier);
+        private async Task<int?> GetCurrentTutorIdAsync(CancellationToken cancellationToken)
+        {
+            var userId = GetCurrentUserId();
+            if (string.IsNullOrWhiteSpace(userId))
+                return null;
+
+            return await _dbcontext.TutorProfiles
+                .AsNoTracking()
+                .Where(t => t.UserId == userId)
+                .Select(t => (int?)t.Id)
+                .FirstOrDefaultAsync(cancellationToken);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Add(int subjectId, int gradeLevelId, CancellationToken cancellationToken)
+        {
+            var tutorId = await GetCurrentTutorIdAsync(cancellationToken);
+            if (tutorId is null)
+                return NotFound();
+
+            var validPair = await _dbcontext.Subjects.AnyAsync(s => s.Id == subjectId, cancellationToken)
+                         && await _dbcontext.GradeLevels.AnyAsync(g => g.Id == gradeLevelId, cancellationToken);
+
+            if (!validPair)
+            {
+                TempData["Error"] = "Môn học hoặc cấp học không hợp lệ.";
+                return RedirectToAction("Index", "TutorProfile");
+            }
+
+            var exists = await _dbcontext.TutorSubjects.AnyAsync(ts =>
+                ts.TutorId == tutorId.Value &&
+                ts.SubjectId == subjectId &&
+                ts.GradeLevelId == gradeLevelId, cancellationToken);
+
+            if (exists)
+            {
+                TempData["Error"] = "Bạn đã thêm môn và cấp học này rồi.";
+                return RedirectToAction("Index", "TutorProfile");
+            }
+
+            _dbcontext.TutorSubjects.Add(new TutorSubject
+            {
+                TutorId = tutorId.Value,
+                SubjectId = subjectId,
+                GradeLevelId = gradeLevelId
+            });
+
+            await _dbcontext.SaveChangesAsync(cancellationToken);
+
+            TempData["Success"] = "Đã thêm môn dạy.";
+            return RedirectToAction("Index", "TutorProfile");
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Remove(int id, CancellationToken cancellationToken)
+        {
+            var tutorId = await GetCurrentTutorIdAsync(cancellationToken);
+            if (tutorId is null)
+                return NotFound();
+
+            // Chỉ xóa được môn của chính mình
+            var item = await _dbcontext.TutorSubjects
+                .FirstOrDefaultAsync(ts => ts.Id == id && ts.TutorId == tutorId.Value, cancellationToken);
+
+            if (item is null)
+                return NotFound();
+
+            _dbcontext.TutorSubjects.Remove(item);
+            await _dbcontext.SaveChangesAsync(cancellationToken);
+
+            TempData["Success"] = "Đã xóa môn dạy.";
+            return RedirectToAction("Index", "TutorProfile");
+        }
+
+        public IActionResult Index()
+        {
+            return View();
+        }
+    }
+}

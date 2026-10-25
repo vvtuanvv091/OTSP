@@ -5,7 +5,10 @@ using Microsoft.EntityFrameworkCore;
 using PROJECT_OTSP.Data;
 using PROJECT_OTSP.Dtos;
 using PROJECT_OTSP.Models;
+<<<<<<< HEAD
+=======
 using PROJECT_OTSP.Services;
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
 using static PROJECT_OTSP.Models.Enums;
 
 namespace PROJECT_OTSP.Areas.Tutor.Controllers
@@ -14,6 +17,17 @@ namespace PROJECT_OTSP.Areas.Tutor.Controllers
     [Authorize(Roles = "Tutor")]
     public class TutorAvailabilityController : TutorAreaController
     {
+<<<<<<< HEAD
+        private const int FirstHour = 6;
+        private const int LastHour = 22;
+        private const int VietnamUtcOffsetHours = 7;
+
+        private readonly ApplicationDbContext _dbContext;
+
+        public TutorAvailabilityController(ApplicationDbContext dbContext)
+        {
+            _dbContext = dbContext;
+=======
         private const int VietnamUtcOffsetHours = 7;
 
         private readonly ApplicationDbContext _dbContext;
@@ -23,6 +37,7 @@ namespace PROJECT_OTSP.Areas.Tutor.Controllers
         {
             _dbContext = dbContext;
             _blocks = blocks;
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
         }
 
         [HttpGet]
@@ -59,17 +74,29 @@ namespace PROJECT_OTSP.Areas.Tutor.Controllers
             if (tutorId is null)
                 return NotFound();
 
+<<<<<<< HEAD
+            // Recheck booked hours on the server; disabled cells in the page are not trusted.
+=======
             // Kiểm tra lại khối đang bận ở server, không tin ô bị khóa trên giao diện
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
             var busySlotKeys = await GetBusySlotKeysAsync(tutorId.Value, cancellationToken);
             var selectedSlots = (selectedSlotKeys ?? [])
                 .Select(ParseSlotKey)
                 .Where(x => x.HasValue)
                 .Select(x => x!.Value)
+<<<<<<< HEAD
+                .Where(x => !busySlotKeys.Contains(ToSlotKey(x.Day, x.Hour)))
+                .Distinct()
+                .ToList();
+
+            // Xóa trực tiếp trên DB, không tải danh sách cũ vào bộ nhớ ChangeTracker
+=======
                 .Where(x => !busySlotKeys.Contains(ToSlotKey(x.Day, x.Block.Start)))
                 .Distinct()
                 .ToList();
 
             // Xóa trực tiếp trên DB, không tải danh sách cũ vào ChangeTracker
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
             await _dbContext.TutorAvailabilities
                 .Where(x => x.TutorId == tutorId.Value)
                 .ExecuteDeleteAsync(cancellationToken);
@@ -80,8 +107,13 @@ namespace PROJECT_OTSP.Areas.Tutor.Controllers
                 {
                     TutorId = tutorId.Value,
                     DayOfWeek = slot.Day,
+<<<<<<< HEAD
+                    StartTime = new TimeOnly(slot.Hour, 0),
+                    EndTime = new TimeOnly(slot.Hour + 1, 0)
+=======
                     StartTime = new TimeOnly(slot.Block.Start, 0),
                     EndTime = new TimeOnly(slot.Block.End, 0)
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
                 });
             }
 
@@ -123,17 +155,26 @@ namespace PROJECT_OTSP.Areas.Tutor.Controllers
                 var vietnamTime = DateTime.SpecifyKind(scheduledUtc, DateTimeKind.Utc)
                     .AddHours(VietnamUtcOffsetHours);
 
+<<<<<<< HEAD
+                if (vietnamTime.Hour >= FirstHour && vietnamTime.Hour < LastHour)
+                    busy.Add(ToSlotKey(vietnamTime.DayOfWeek, vietnamTime.Hour));
+=======
                 // Quy buổi học về khối chứa nó. Rơi vào giờ nghỉ trưa thì không khóa khối nào.
                 var block = _blocks.Containing(vietnamTime.Hour);
                 if (block.HasValue)
                     busy.Add(ToSlotKey(vietnamTime.DayOfWeek, block.Value.Start));
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
             }
 
             return busy;
         }
 
+<<<<<<< HEAD
+        private static (DayOfWeek Day, int Hour)? ParseSlotKey(string? key)
+=======
         // Key dạng "thứ:giờ bắt đầu", ví dụ "6:13" = Thứ Bảy, khối 13-15
         private (DayOfWeek Day, TimeBlock Block)? ParseSlotKey(string? key)
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
         {
             if (string.IsNullOrWhiteSpace(key))
                 return null;
@@ -142,11 +183,25 @@ namespace PROJECT_OTSP.Areas.Tutor.Controllers
             if (parts.Length != 2
                 || !int.TryParse(parts[0], out var dayValue)
                 || !int.TryParse(parts[1], out var hour)
+<<<<<<< HEAD
+                || !Enum.IsDefined(typeof(DayOfWeek), dayValue)
+                || hour < FirstHour
+                || hour >= LastHour)
+=======
                 || !Enum.IsDefined(typeof(DayOfWeek), dayValue))
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
             {
                 return null;
             }
 
+<<<<<<< HEAD
+            return ((DayOfWeek)dayValue, hour);
+        }
+
+        private static string ToSlotKey(DayOfWeek day, int hour) => $"{(int)day}:{hour}";
+    }
+}
+=======
             var block = _blocks.FindByStart(hour);
             if (!block.HasValue)
                 return null;
@@ -157,3 +212,4 @@ namespace PROJECT_OTSP.Areas.Tutor.Controllers
         private static string ToSlotKey(DayOfWeek day, int startHour) => $"{(int)day}:{startHour}";
     }
 }
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc

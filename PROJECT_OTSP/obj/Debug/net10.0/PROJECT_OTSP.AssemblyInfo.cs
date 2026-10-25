@@ -16,7 +16,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("PROJECT_OTSP")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+85c1b5aab2b9e552c856255e19cfd365ee77301c")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+85362cf56c4666635d253a531d59eaa132d82ce6")]
 [assembly: System.Reflection.AssemblyProductAttribute("PROJECT_OTSP")]
 [assembly: System.Reflection.AssemblyTitleAttribute("PROJECT_OTSP")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

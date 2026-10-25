@@ -1,0 +1,295 @@
+
+#nullable disable
+
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.RazorPages;
+using PROJECT_OTSP.Data;
+using PROJECT_OTSP.Models;
+using PROJECT_OTSP.Services;
+using System.ComponentModel.DataAnnotations;
+using static PROJECT_OTSP.Models.Enums;
+
+namespace PROJECT_OTSP.Areas.Identity.Pages.Account
+{
+    [AllowAnonymous]
+    public class RegisterModel : PageModel
+    {
+        // Tên vai trò phải trùng với dữ liệu seed trong DbSeeder
+        private const string RoleStudent = "Student_Parent";
+        private const string RoleTutor = "Tutor";
+
+        private readonly UserManager<ApplicationUser> _userManager;
+        private readonly SignInManager<ApplicationUser> _signInManager;
+        private readonly RoleManager<ApplicationRole> _roleManager;
+        private readonly ApplicationDbContext _db;
+        private readonly ILogger<RegisterModel> _logger;
+
+        public RegisterModel(
+            UserManager<ApplicationUser> userManager,
+            SignInManager<ApplicationUser> signInManager,
+            RoleManager<ApplicationRole> roleManager,
+            ApplicationDbContext db,
+            ILogger<RegisterModel> logger)
+        {
+            _userManager = userManager;
+            _signInManager = signInManager;
+            _roleManager = roleManager;
+            _db = db;
+            _logger = logger;
+        }
+
+        [BindProperty]
+        public InputModel Input { get; set; } = new();
+
+        public string ReturnUrl { get; set; }
+
+        public class InputModel
+        {
+            // ===== Vai trò =====
+            [Required(ErrorMessage = "Vui lòng chọn vai trò.")]
+            public string Role { get; set; } = RoleStudent;
+
+            // ===== Thông tin chung =====
+            [Required(ErrorMessage = "Vui lòng nhập họ và tên.")]
+            [StringLength(150)]
+            [Display(Name = "Họ và tên")]
+            public string FullName { get; set; }
+
+            [Required(ErrorMessage = "Vui lòng nhập số CCCD.")]
+            [RegularExpression(@"^[0-9]{12}$", ErrorMessage = "CCCD phải gồm đúng 12 chữ số.")]
+            [Display(Name = "Số CCCD")]
+            public string CitizenIdNumber { get; set; }
+
+            [Required(ErrorMessage = "Vui lòng nhập nơi ở.")]
+            [StringLength(500)]
+            [Display(Name = "Nơi ở")]
+            public string ResidenceAddress { get; set; }
+
+            [Required(ErrorMessage = "Vui lòng chọn ngày sinh.")]
+            [DataType(DataType.Date)]
+            [Display(Name = "Ngày sinh")]
+            public DateOnly? DateOfBirth { get; set; }
+
+            [Required(ErrorMessage = "Vui lòng nhập số điện thoại.")]
+            [RegularExpression(@"^(0|\+84)\d{9,10}$", ErrorMessage = "Số điện thoại không hợp lệ.")]
+            [Display(Name = "Số điện thoại")]
+            public string PhoneNumber { get; set; }
+
+            // ===== Người giám hộ (bắt buộc khi học viên dưới 18 tuổi, kiểm tra trong OnPost) =====
+            [StringLength(150)]
+            [Display(Name = "Họ tên người giám hộ")]
+            public string GuardianFullName { get; set; }
+
+            [StringLength(100)]
+            [Display(Name = "Liên hệ người giám hộ")]
+            public string GuardianContact { get; set; }
+
+            [Display(Name = "CCCD người giám hộ")]
+            public string GuardianCitizenIdNumber { get; set; }
+
+            [StringLength(500)]
+            [Display(Name = "Nơi ở người giám hộ")]
+            public string GuardianResidenceAddress { get; set; }
+
+            // ===== Riêng học viên =====
+            [Display(Name = "Môn học quan tâm")]
+            public string InterestedSubjects { get; set; }
+
+            [StringLength(200)]
+            [Display(Name = "Khu vực")]
+            public string Area { get; set; }
+
+            // ===== Riêng gia sư =====
+            [Range(0, 10000000, ErrorMessage = "Học phí phải từ 0 đến 10.000.000 VNĐ.")]
+            [Display(Name = "Học phí ")]
+            public decimal? HourlyFee { get; set; }
+
+            [Display(Name = "Giới thiệu")]
+            public string Introduction { get; set; }
+
+            // ===== Tài khoản =====
+            [Required(ErrorMessage = "Vui lòng nhập email.")]
+            [EmailAddress(ErrorMessage = "Email không hợp lệ.")]
+            [Display(Name = "Email")]
+            public string Email { get; set; }
+
+            [Required(ErrorMessage = "Vui lòng nhập mật khẩu.")]
+            [StringLength(100, ErrorMessage = "Mật khẩu phải có ít nhất {2} ký tự.", MinimumLength = 6)]
+            [DataType(DataType.Password)]
+            [Display(Name = "Mật khẩu")]
+            public string Password { get; set; }
+
+            [DataType(DataType.Password)]
+            [Display(Name = "Nhập lại mật khẩu")]
+            [Compare("Password", ErrorMessage = "Mật khẩu nhập lại không khớp.")]
+            public string ConfirmPassword { get; set; }
+
+            [Display(Name = "Đồng ý điều khoản")]
+            public bool AcceptTerms { get; set; }
+        }
+
+        public void OnGet(string returnUrl = null, string role = null)
+        {
+            ReturnUrl = returnUrl;
+            // /Identity/Account/Register?role=tutor để mở sẵn form gia sư
+            Input.Role = string.Equals(role, "tutor", StringComparison.OrdinalIgnoreCase)
+                ? RoleTutor
+                : RoleStudent;
+        }
+
+        public async Task<IActionResult> OnPostAsync(string returnUrl = null)
+        {
+            returnUrl ??= Url.Content("~/");
+            ReturnUrl = returnUrl;
+
+            // Chỉ cho đăng ký 2 vai trò này, tuyệt đối không cho tự chọn Admin
+            if (Input.Role != RoleStudent && Input.Role != RoleTutor)
+                ModelState.AddModelError("Input.Role", "Vai trò không hợp lệ.");
+
+            if (!Input.AcceptTerms)
+                ModelState.AddModelError("Input.AcceptTerms", "Bạn cần đồng ý điều khoản sử dụng.");
+
+            var age = CalculateAge(Input.DateOfBirth);
+            var isMinor = age.HasValue && age.Value < 18;
+
+            if (Input.DateOfBirth.HasValue && Input.DateOfBirth.Value > DateOnly.FromDateTime(DateTime.Today))
+                ModelState.AddModelError("Input.DateOfBirth", "Ngày sinh không hợp lệ.");
+
+            if (Input.Role == RoleTutor && isMinor)
+                ModelState.AddModelError("Input.DateOfBirth", "Gia sư phải từ 18 tuổi trở lên.");
+
+            if (Input.Role == RoleStudent && isMinor)
+            {
+                if (string.IsNullOrWhiteSpace(Input.GuardianFullName))
+                    ModelState.AddModelError("Input.GuardianFullName", "Học viên dưới 18 tuổi cần nhập họ tên người giám hộ.");
+                if (string.IsNullOrWhiteSpace(Input.GuardianContact))
+                    ModelState.AddModelError("Input.GuardianContact", "Học viên dưới 18 tuổi cần nhập số điện thoại hoặc email người giám hộ.");
+                if (!System.Text.RegularExpressions.Regex.IsMatch(Input.GuardianCitizenIdNumber ?? string.Empty, @"^[0-9]{12}$"))
+                    ModelState.AddModelError("Input.GuardianCitizenIdNumber", "CCCD người giám hộ phải gồm đúng 12 chữ số.");
+                if (string.IsNullOrWhiteSpace(Input.GuardianResidenceAddress) || Input.GuardianResidenceAddress.Length > 500)
+                    ModelState.AddModelError("Input.GuardianResidenceAddress", "Vui lòng nhập nơi ở người giám hộ (tối đa 500 ký tự).");
+            }
+
+            if (Input.Role == RoleTutor && Input.HourlyFee is null)
+                ModelState.AddModelError("Input.HourlyFee", "Vui lòng nhập học phí mong muốn.");
+
+            if (!ModelState.IsValid)
+                return Page();
+
+            var user = new ApplicationUser
+            {
+                UserName = Input.Email,
+                Email = Input.Email,
+                FullName = Input.FullName.Trim(),
+                CitizenIdNumber = Input.CitizenIdNumber.Trim(),
+                ResidenceAddress = Input.ResidenceAddress.Trim(),
+                PhoneNumber = Input.PhoneNumber,
+                DateOfBirth = Input.DateOfBirth,
+                Address = Input.Area
+            };
+
+            var result = await _userManager.CreateAsync(user, Input.Password);
+            if (!result.Succeeded)
+            {
+                foreach (var error in result.Errors)
+                    ModelState.AddModelError(string.Empty, TranslateError(error));
+                return Page();
+            }
+
+            try
+            {
+                if (!await _roleManager.RoleExistsAsync(Input.Role))
+                {
+                    var createRoleResult = await _roleManager.CreateAsync(new ApplicationRole { Name = Input.Role });
+                    if (!createRoleResult.Succeeded)
+                        throw new InvalidOperationException(string.Join(", ", createRoleResult.Errors.Select(error => error.Description)));
+                }
+
+                var addRoleResult = await _userManager.AddToRoleAsync(user, Input.Role);
+                if (!addRoleResult.Succeeded)
+                    throw new InvalidOperationException(string.Join(", ", addRoleResult.Errors.Select(error => error.Description)));
+
+                if (Input.Role == RoleTutor)
+                {
+                    _db.TutorProfiles.Add(new TutorProfile
+                    {
+                        UserId = user.Id,
+                        Introduction = Input.Introduction,
+                        HourlyFee = Input.HourlyFee ?? 0,
+                        VerificationStatus = VerificationStatus.Pending   // chờ admin duyệt
+                    });
+                }
+                else
+                {
+                    var student = new StudentProfile
+                    {
+                        UserId = user.Id,
+                        InterestedSubjects = Input.InterestedSubjects,
+                        Area = Input.Area
+                    };
+
+                    if (isMinor)
+                    {
+                        student.Guardians.Add(new Guardian
+                        {
+                            FullName = Input.GuardianFullName.Trim(),
+                            ContactInfo = Input.GuardianContact.Trim(),
+                            CitizenIdNumber = Input.GuardianCitizenIdNumber.Trim(),
+                            ResidenceAddress = Input.GuardianResidenceAddress.Trim()
+                        });
+                    }
+
+                    _db.StudentProfiles.Add(student);
+                }
+
+                await _db.SaveChangesAsync();
+            }
+            catch (Exception ex)
+            {
+                // Tạo hồ sơ lỗi thì xóa tài khoản vừa tạo để người dùng đăng ký lại được
+                _logger.LogError(ex, "Tạo hồ sơ cho tài khoản {Email} thất bại.", Input.Email);
+                await _userManager.DeleteAsync(user);
+                ModelState.AddModelError(string.Empty, "Không thể hoàn tất đăng ký. Vui lòng thử lại.");
+                return Page();
+            }
+
+            _logger.LogInformation("Tài khoản mới ({Role}): {Email}", Input.Role, Input.Email);
+
+            await _signInManager.SignInAsync(user, isPersistent: false);
+
+            if (Input.Role == RoleTutor)
+                TempData["Message"] = "Đăng ký thành công. Hồ sơ gia sư của bạn đang chờ quản trị viên duyệt.";
+
+            var destination = RoleLandingPage.Resolve(
+                returnUrl,
+                new[] { Input.Role },
+                Url.IsLocalUrl,
+                Url.Content("~/"));
+            return LocalRedirect(destination);
+        }
+
+        // Tính tuổi tròn theo ngày sinh
+        private static int? CalculateAge(DateOnly? dob)
+        {
+            if (!dob.HasValue) return null;
+            var today = DateOnly.FromDateTime(DateTime.Today);
+            var age = today.Year - dob.Value.Year;
+            if (dob.Value > today.AddYears(-age)) age--;
+            return age;
+        }
+
+        // Việt hóa vài lỗi hay gặp của Identity
+        private static string TranslateError(IdentityError e) => e.Code switch
+        {
+            "DuplicateUserName" or "DuplicateEmail" => "Email này đã được đăng ký.",
+            "PasswordRequiresDigit" => "Mật khẩu phải có ít nhất một chữ số (0-9).",
+            "PasswordRequiresLower" => "Mật khẩu phải có ít nhất một chữ thường (a-z).",
+            "PasswordRequiresUpper" => "Mật khẩu phải có ít nhất một chữ hoa (A-Z).",
+            "PasswordRequiresNonAlphanumeric" => "Mật khẩu phải có ít nhất một ký tự đặc biệt (ví dụ: @, #, !).",
+            "PasswordTooShort" => "Mật khẩu quá ngắn.",
+            _ => e.Description
+        };
+    }
+}
