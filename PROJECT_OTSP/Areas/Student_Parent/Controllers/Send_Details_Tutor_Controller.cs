@@ -45,7 +45,7 @@ public class Send_Details_TutorController : Controller
 <<<<<<< HEAD
 =======
         _availabilitySlotService = availabilitySlotService;
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
+
         _hubContext = hubContext;
     }
 
