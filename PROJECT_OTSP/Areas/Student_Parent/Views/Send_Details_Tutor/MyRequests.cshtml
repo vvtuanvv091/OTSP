@@ -1,0 +1,306 @@
+@using PROJECT_OTSP.Dtos
+@using static PROJECT_OTSP.Models.Enums
+@model List<StudentConnectionRequestDto>
+
+@{
+    ViewData["Title"] = "Yêu cầu kết nối đã gửi";
+    var money = new System.Globalization.CultureInfo("vi-VN");
+    var selectedStatus = ViewBag.SelectedStatus as RequestStatus?;
+}
+
+<style>
+    :root {
+        --brand: #DB303A;
+        --brand-dark: #B7212B;
+        --brand-glow: rgba(219, 48, 58, .22);
+        --brand-soft: rgba(219, 48, 58, .10);
+        --radius-lg: 1.15rem;
+        --radius-md: .85rem;
+    }
+
+    .pro-card {
+        background: var(--bs-body-bg, #fff);
+        border: 1px solid var(--bs-border-color, #e9ecef);
+        border-radius: var(--radius-lg);
+        box-shadow: 0 4px 20px rgba(0, 0, 0, .04);
+        padding: 1.5rem;
+    }
+
+    .tutor-avatar-sm {
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        object-fit: cover;
+    }
+
+    .tutor-avatar-fallback-sm {
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--brand), #ea580c);
+        color: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.1rem;
+        font-weight: 700;
+    }
+
+    .nav-filter .btn {
+        border-radius: 20px;
+        padding: .35rem 1rem;
+        font-size: .88rem;
+    }
+</style>
+
+<div id="my-requests-page" class="container-fluid py-4"
+     data-hub-url="@Url.Content("~/hubs/connection-requests")"
+     data-selected-status="@(selectedStatus?.ToString() ?? string.Empty)">
+    <!-- Header & Breadcrumbs -->
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-2">
+        <div>
+            <h1 class="h4 fw-bold mb-1">
+                <i class="bi bi-clock-history text-danger me-2"></i> Yêu cầu kết nối đã gửi
+            </h1>
+            <p class="text-muted small mb-0">Theo dõi tiến độ và phản hồi từ các gia sư bạn đã gửi yêu cầu học tập.</p>
+        </div>
+        <a asp-area="Student_Parent" asp-controller="Search" asp-action="Index" class="btn btn-sm btn-outline-danger">
+            <i class="bi bi-search me-1"></i> Tìm thêm gia sư mới
+        </a>
+    </div>
+
+    @if (TempData["Success"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show d-flex align-items-center mb-4" role="alert">
+            <i class="bi bi-check-circle-fill fs-5 me-2"></i>
+            <div>@TempData["Success"]</div>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Đóng"></button>
+        </div>
+    }
+
+    <div id="realtime-request-notice" class="alert alert-info d-none" role="status"></div>
+
+    @if (TempData["Error"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show d-flex align-items-center mb-4" role="alert">
+            <i class="bi bi-exclamation-triangle-fill fs-5 me-2"></i>
+            <div>@TempData["Error"]</div>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Đóng"></button>
+        </div>
+    }
+
+    <!-- Bộ lọc trạng thái -->
+    <div class="d-flex flex-wrap gap-2 mb-4 nav-filter">
+        <a asp-action="MyRequests" class="btn @(selectedStatus == null ? "btn-danger" : "btn-outline-secondary")">
+            Tất cả (@Model.Count)
+        </a>
+        <a asp-action="MyRequests" asp-route-status="@RequestStatus.Pending"
+           class="btn @(selectedStatus == RequestStatus.Pending ? "btn-warning" : "btn-outline-secondary")">
+            Chờ phản hồi
+        </a>
+        <a asp-action="MyRequests" asp-route-status="@RequestStatus.Accepted"
+           class="btn @(selectedStatus == RequestStatus.Accepted ? "btn-success" : "btn-outline-secondary")">
+            Đã chấp nhận
+        </a>
+        <a asp-action="MyRequests" asp-route-status="@RequestStatus.Rejected"
+           class="btn @(selectedStatus == RequestStatus.Rejected ? "btn-secondary" : "btn-outline-secondary")">
+            Đã từ chối
+        </a>
+    </div>
+
+    @if (Model.Count == 0)
+    {
+        <div class="pro-card text-center py-5">
+            <i class="bi bi-inbox fs-1 text-muted mb-3 d-block"></i>
+            <h5 class="fw-semibold">Chưa có yêu cầu kết nối nào</h5>
+            <p class="text-muted small mb-3">Bạn chưa gửi yêu cầu kết nối học tập nào theo tiêu chí này.</p>
+            <a asp-area="Student_Parent" asp-controller="Search" asp-action="Index" class="btn btn-danger btn-sm">
+                <i class="bi bi-search me-1"></i> Khám phá gia sư ngay
+            </a>
+        </div>
+    }
+    else
+    {
+        <div class="row g-3">
+            @foreach (var item in Model)
+            {
+                <div class="col-12 col-md-6 col-xl-4" data-request-card="@item.Id" data-class-session-id="@item.ClassSessionId">
+                    <div class="pro-card h-100 d-flex flex-column justify-content-between">
+                        <div>
+                            <!-- Header thẻ -->
+                            <div class="d-flex justify-content-between align-items-start mb-3">
+                                <div class="d-flex align-items-center gap-2">
+                                    @if (!string.IsNullOrWhiteSpace(item.TutorAvatarUrl))
+                                    {
+                                        <img src="@item.TutorAvatarUrl" alt="@item.TutorName" class="tutor-avatar-sm" onerror="this.onerror=null;this.src='/assets/img/default-avatar.svg';" />
+                                    }
+                                    else
+                                    {
+                                        <div class="tutor-avatar-fallback-sm">
+                                            @(string.IsNullOrWhiteSpace(item.TutorName) ? "G" : item.TutorName.Substring(0, 1).ToUpper())
+                                        </div>
+                                    }
+                                    <div>
+                                        <h6 class="fw-bold mb-0">@item.TutorName</h6>
+                                        <span class="small text-danger fw-semibold">@item.HourlyFee.ToString("N0", money) đ/h</span>
+                                    </div>
+                                </div>
+                                <span class="badge @item.StatusBadgeClass rounded-pill px-2 py-1" data-request-status>
+                                    @item.StatusText
+                                </span>
+                            </div>
+
+                            <!-- Môn học & Cấp -->
+                            <div class="mb-2">
+                                <span class="badge bg-light text-dark border">
+                                    <i class="bi bi-book me-1 text-danger"></i> @item.SubjectName · @item.GradeLevelName
+                                </span>
+                                <span class="badge bg-light text-dark border ms-1">
+                                    @(item.PreferredType == ClassroomType.OneToOne ? "1 kèm 1" : "Lớp nhóm")
+                                </span>
+                            </div>
+
+                            @if (!string.IsNullOrWhiteSpace(item.ClassroomName))
+                            {
+                                <div class="small text-muted mb-2">
+                                    <i class="bi bi-easel me-1"></i> Lớp: <strong>@item.ClassroomName</strong>
+                                </div>
+                            }
+
+                            @if (item.TrialScheduledAt.HasValue)
+                            {
+                                <div class="alert alert-success py-2 mb-3">
+                                    <i class="bi bi-calendar-check me-1"></i>
+                                    Lịch học thử: <strong>@item.TrialScheduledAt.Value.AddHours(7).ToString("dd/MM/yyyy HH:mm") (GMT+7)</strong>
+                                </div>
+                            }
+
+                            @if (item.ClassSessionId.HasValue && item.ClassSessionStatus == SessionStatus.Scheduled)
+                            {
+                                <form asp-area="" asp-controller="ClassSession" asp-action="Join" method="post" class="mb-3">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="id" value="@item.ClassSessionId.Value" />
+                                    <button type="submit" class="btn btn-success btn-sm"><i class="bi bi-camera-video me-1" aria-hidden="true"></i>Tham gia lớp học thử</button>
+                                </form>
+                            }
+                            else if (item.ClassSessionId.HasValue && item.ClassSessionStatus == SessionStatus.InProgress)
+                            {
+                                <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+                                    <span class="badge text-bg-primary" data-class-session-status="@item.ClassSessionId">Buổi học đang diễn ra</span>
+                                    <form asp-area="" asp-controller="ClassSession" asp-action="Join" method="post">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="id" value="@item.ClassSessionId.Value" />
+                                        <button type="submit" class="btn btn-success btn-sm"><i class="bi bi-camera-video me-1" aria-hidden="true"></i>Tham gia lại</button>
+                                    </form>
+                                </div>
+                            }
+                            else if (item.ClassSessionId.HasValue && item.ClassSessionStatus == SessionStatus.Done)
+                            {
+                                <div class="alert alert-secondary py-2 mb-3" data-class-session-status="@item.ClassSessionId">Buổi học đã kết thúc.</div>
+                            }
+                            else if (item.ClassSessionId.HasValue && item.ClassSessionStatus == SessionStatus.Cancelled)
+                            {
+                                <div class="alert alert-danger py-2 mb-3" data-class-session-status="@item.ClassSessionId">Buổi học đã bị hủy.</div>
+                            }
+
+                            @if (!string.IsNullOrWhiteSpace(item.Message))
+                            {
+                                <div class="bg-light p-2 rounded-2 small text-secondary mb-3 border">
+                                    <span class="fw-semibold text-dark">Lời nhắn:</span> "@item.Message"
+                                </div>
+                            }
+                        </div>
+
+                        <!-- Footer thẻ -->
+                        <div class="pt-3 border-top mt-2 d-flex justify-content-between align-items-center small text-muted">
+                            <div>
+                                <i class="bi bi-calendar3 me-1"></i> @item.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")
+                            </div>
+
+                            <div class="d-flex gap-2">
+                                <a asp-action="Index" asp-route-id="@item.TutorId" class="btn btn-sm btn-outline-secondary" title="Xem hồ sơ gia sư">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+
+                                @if (item.Status == RequestStatus.Accepted)
+                                {
+                                    <a asp-area="" asp-controller="Chat" asp-action="Conversation" asp-route-requestId="@item.Id" class="btn btn-sm btn-outline-danger" title="Nhắn tin với gia sư">
+                                        <i class="bi bi-chat-dots"></i> Nhắn tin
+                                    </a>
+                                }
+
+                                @if (item.Status == RequestStatus.Pending)
+                                {
+                                    <form asp-action="CancelRequest" method="post" data-cancel-request onsubmit="return confirm('Bạn có chắc chắn muốn hủy yêu cầu kết nối này không?');">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="id" value="@item.Id" />
+                                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Hủy yêu cầu">
+                                            <i class="bi bi-trash"></i> Hủy
+                                        </button>
+                                    </form>
+                                }
+                            </div>
+
+                        </div>
+
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@@microsoft/signalr@10.0.0/dist/browser/signalr.min.js"></script>
+<script>
+    (() => {
+        const page = document.getElementById("my-requests-page");
+        const notice = document.getElementById("realtime-request-notice");
+        if (!page || !window.signalR) return;
+
+        const labels = { Accepted: "Đã chấp nhận", Rejected: "Đã từ chối", Cancelled: "Đã hủy" };
+        const badgeClasses = {
+            Accepted: "bg-success",
+            Rejected: "bg-secondary",
+            Cancelled: "bg-dark"
+        };
+        const connection = new signalR.HubConnectionBuilder()
+            .withUrl(page.dataset.hubUrl)
+            .withAutomaticReconnect()
+            .build();
+
+        connection.on("ConnectionRequestStatusChanged", update => {
+            const card = document.querySelector(`[data-request-card="${update.requestId}"]`);
+            if (!card) return;
+
+            if (page.dataset.selectedStatus && page.dataset.selectedStatus !== update.status) {
+                window.location.reload();
+                return;
+            }
+
+            const badge = card.querySelector("[data-request-status]");
+            if (badge) {
+                badge.textContent = labels[update.status] || update.status;
+                badge.className = `badge ${badgeClasses[update.status] || "bg-secondary"} rounded-pill px-2 py-1`;
+            }
+            card.querySelector("[data-cancel-request]")?.remove();
+            notice.textContent = `Gia sư đã phản hồi: ${labels[update.status] || update.status}.`;
+            notice.classList.remove("d-none");
+        });
+
+        connection.on("TrialScheduleConfirmed", update => {
+            const scheduledAt = new Date(update.scheduledAtUtc).toLocaleString("vi-VN", {
+                timeZone: "Asia/Ho_Chi_Minh"
+            });
+            notice.textContent = `Gia sư đã xác nhận lịch học thử: ${scheduledAt}.`;
+            notice.classList.remove("d-none");
+            window.setTimeout(() => window.location.reload(), 500);
+        });
+
+        connection.on("ClassSessionStatusChanged", update => {
+            const sessionCard = document.querySelector(`[data-class-session-id="${update.classSessionId}"]`);
+            if (sessionCard) window.location.reload();
+        });
+
+        connection.start().catch(error => console.error("SignalR connection failed:", error));
+    })();
+</script>

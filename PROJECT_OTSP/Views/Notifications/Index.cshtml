@@ -1,0 +1,63 @@
+@using PROJECT_OTSP.Models
+@model IReadOnlyList<Notification>
+@{
+    var isVietnamese = System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == "vi";
+    ViewData["Title"] = isVietnamese ? "Thông báo" : "Notifications";
+    var unreadCount = Model.Count(notification => !notification.IsRead);
+}
+
+<section class="notifications-page section">
+    <div class="container">
+        <div class="notifications-heading">
+            <div>
+                <p class="notifications-eyebrow">OTSP</p>
+                <h1>@(isVietnamese ? "Thông báo" : "Notifications")</h1>
+                <p>@(isVietnamese ? "Cập nhật mới nhất dành cho tài khoản của bạn." : "Your latest account updates.")</p>
+            </div>
+            @if (unreadCount > 0)
+            {
+                <form asp-action="MarkAllAsRead" method="post">
+                    <button type="submit" class="notifications-mark-all">@(isVietnamese ? "Đánh dấu tất cả đã đọc" : "Mark all as read")</button>
+                </form>
+            }
+        </div>
+
+        @if (Model.Count == 0)
+        {
+            <div class="notifications-empty-state">
+                <span><i class="bi bi-bell" aria-hidden="true"></i></span>
+                <h2>@(isVietnamese ? "Chưa có thông báo" : "No notifications yet")</h2>
+                <p>@(isVietnamese ? "Khi có cập nhật mới, thông báo sẽ xuất hiện tại đây." : "New updates will appear here.")</p>
+            </div>
+        }
+        else
+        {
+            <div class="notifications-list">
+                @foreach (var notification in Model)
+                {
+                    <article class="notifications-card @(notification.IsRead ? "is-read" : "is-unread")">
+                        <span class="notifications-card-icon"><i class="bi bi-bell" aria-hidden="true"></i></span>
+                        <div class="notifications-card-content">
+                            <div class="notifications-card-heading">
+                                <h2>@notification.Title</h2>
+                                @if (!notification.IsRead)
+                                {
+                                    <span class="notifications-unread-label">@(isVietnamese ? "Mới" : "New")</span>
+                                }
+                            </div>
+                            <p>@notification.Content</p>
+                            <time datetime="@notification.CreatedAt.ToString("O")">@notification.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</time>
+                        </div>
+                        @if (!notification.IsRead)
+                        {
+                            <form asp-action="MarkAsRead" method="post">
+                                <input type="hidden" name="id" value="@notification.Id" />
+                                <button type="submit" class="notifications-mark-read">@(isVietnamese ? "Đánh dấu đã đọc" : "Mark as read")</button>
+                            </form>
+                        }
+                    </article>
+                }
+            </div>
+        }
+    </div>
+</section>
