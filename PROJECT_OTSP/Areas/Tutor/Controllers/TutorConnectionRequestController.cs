@@ -69,7 +69,16 @@ public class TutorConnectionRequestController : TutorAreaController
                 PreferredType = request.PreferredType,
                 ClassroomName = request.Classroom == null ? null : request.Classroom.Name,
                 Status = request.Status,
+<<<<<<< HEAD
                 CreatedAt = request.CreatedAt
+=======
+                CreatedAt = request.CreatedAt,
+                ProposedTrialSlotUtc = request.ProposedTrialSlotUtc,
+                ProposedTrialSlotsUtc = request.TrialSchedules
+                    .OrderBy(ts => ts.ScheduledAt)
+                    .Select(ts => ts.ScheduledAt)
+                    .ToList()
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
             })
             .ToListAsync(cancellationToken);
 

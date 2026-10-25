@@ -11,6 +11,7 @@
     bool needsGuardian = isMinor && Model.Guardians.Count == 0;
 }
 
+<<<<<<< HEAD
 <style>
     :root {
         --brand: #DB303A;
@@ -147,6 +148,8 @@
     .alert { border-radius: var(--radius-md); }
 </style>
 
+=======
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
 <div class="container profile-wrap">
 
     @if (TempData["Success"] is string success)
@@ -178,8 +181,22 @@
         <aside class="col-lg-4">
             <div class="sticky-side">
                 <div class="pro-card text-center">
+<<<<<<< HEAD
                     <div class="avatar-ring">
                         <img src="@avatarUrl" alt="Ảnh đại diện" />
+=======
+                    <div class="avatar-wrapper">
+                        <div class="avatar-ring">
+                            <img id="studentAvatarImg" src="@avatarUrl" alt="Ảnh đại diện" />
+                        </div>
+                        <div id="avatarSpinner" class="avatar-loading-overlay">
+                            <div class="spinner-border spinner-border-sm text-light" role="status"></div>
+                        </div>
+                        <label for="avatarFileInput" class="avatar-upload-btn" title="Đổi ảnh đại diện">
+                            <i class="bi bi-camera-fill"></i>
+                        </label>
+                        <input type="file" id="avatarFileInput" accept="image/jpeg,image/png,image/webp" class="d-none" />
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
                     </div>
 
                     <h2 class="h5 fw-bold mb-2">@Model.User.FullName</h2>
@@ -358,4 +375,52 @@
 
         </main>
     </div>
+<<<<<<< HEAD
 </div>
+=======
+</div>
+
+@section Scripts {
+    <script>
+    (() => {
+        const avatarInput = document.getElementById('avatarFileInput');
+        const avatarImg = document.getElementById('studentAvatarImg');
+        const avatarSpinner = document.getElementById('avatarSpinner');
+
+        if (avatarInput && avatarImg) {
+            avatarInput.addEventListener('change', async () => {
+                const file = avatarInput.files?.[0];
+                if (!file) return;
+
+                if (file.size > 5 * 1024 * 1024) {
+                    OTSP.notify('danger', 'Kích thước ảnh tối đa là 5 MB.');
+                    avatarInput.value = '';
+                    return;
+                }
+
+                const formData = new FormData();
+                formData.append('avatarFile', file);
+
+                if (avatarSpinner) avatarSpinner.style.display = 'flex';
+                try {
+                    const res = await OTSP.send('@Url.Action("UploadAvatar", "Student_Parent_Profile")', formData);
+                    if (res.avatarUrl) {
+                        avatarImg.src = res.avatarUrl;
+                        document.querySelectorAll('[data-role="avatar-img"], [data-role="avatar"]').forEach(img => {
+                            img.src = res.avatarUrl;
+                            img.classList.remove('d-none');
+                        });
+                    }
+                    OTSP.notify('success', res.message || 'Cập nhật ảnh đại diện thành công!');
+                } catch (err) {
+                    OTSP.notify('danger', err.message || 'Không thể tải ảnh lên.');
+                } finally {
+                    if (avatarSpinner) avatarSpinner.style.display = 'none';
+                    avatarInput.value = '';
+                }
+            });
+        }
+    })();
+    </script>
+}
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc

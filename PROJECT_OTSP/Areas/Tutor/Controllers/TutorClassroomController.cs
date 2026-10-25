@@ -55,6 +55,7 @@ public sealed class TutorClassroomController : TutorAreaController
         if (status.HasValue)
             query = query.Where(classroom => classroom.Status == status.Value);
 
+<<<<<<< HEAD
         var classrooms = await query
             .OrderByDescending(classroom => classroom.Status == ClassroomStatus.Active)
             .ThenByDescending(classroom => classroom.Id)
@@ -70,6 +71,29 @@ public sealed class TutorClassroomController : TutorAreaController
                 MaxStudents = classroom.MaxStudents,
                 Status = classroom.Status,
                 StartDate = classroom.StartDate,
+=======
+        var classroomsRaw = await query
+            .OrderByDescending(classroom => classroom.Status == ClassroomStatus.Active)
+            .ThenByDescending(classroom => classroom.Id)
+            .Select(classroom => new
+            {
+                classroom.Id,
+                classroom.Name,
+                SubjectName = classroom.Subject.Name,
+                GradeLevelName = classroom.GradeLevel.Name,
+                classroom.CoverImageUrl,
+                classroom.Fee,
+                StudentCount = classroom.ClassroomStudents.Count,
+                classroom.MaxStudents,
+                classroom.Status,
+                classroom.StartDate,
+                classroom.SessionsPerWeek,
+                classroom.HoursPerSession,
+                WeeklySchedules = classroom.WeeklySchedules
+                    .OrderBy(w => w.SessionIndex)
+                    .Select(w => new { w.SessionIndex, w.DayOfWeek, w.StartTime, w.EndTime })
+                    .ToList(),
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
                 CanHardDelete = !classroom.ClassroomStudents.Any()
                     && !classroom.ConnectionRequests.Any()
                     && !classroom.ClassSessions.Any()
@@ -78,6 +102,35 @@ public sealed class TutorClassroomController : TutorAreaController
             })
             .ToListAsync(cancellationToken);
 
+<<<<<<< HEAD
+=======
+        var classrooms = classroomsRaw.Select(c =>
+        {
+            var summary = c.WeeklySchedules.Count > 0
+                ? $"{c.SessionsPerWeek} buổi/tuần ({string.Join(", ", c.WeeklySchedules.Select(w => $"{ToShortVnDay(w.DayOfWeek)} {w.StartTime:HH\\:mm}"))} · {c.HoursPerSession}h/buổi)"
+                : $"{c.SessionsPerWeek} buổi/tuần ({c.HoursPerSession}h/buổi)";
+
+            return new ClassroomListItemVm
+            {
+                Id = c.Id,
+                Name = c.Name,
+                SubjectName = c.SubjectName,
+                GradeLevelName = c.GradeLevelName,
+                CoverImageUrl = c.CoverImageUrl,
+                Fee = c.Fee,
+                StudentCount = c.StudentCount,
+                MaxStudents = c.MaxStudents,
+                Status = c.Status,
+                StartDate = c.StartDate,
+                SessionsPerWeek = c.SessionsPerWeek,
+                HoursPerSession = c.HoursPerSession,
+                ScheduleSummary = summary,
+                CanHardDelete = c.CanHardDelete,
+                HasSuccessfulPayment = c.HasSuccessfulPayment
+            };
+        }).ToList();
+
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
         ViewBag.SelectedStatus = status;
         return RenderIndex(classrooms);
     }
@@ -89,7 +142,20 @@ public sealed class TutorClassroomController : TutorAreaController
         if (tutorId is null)
             return Forbid();
 
+<<<<<<< HEAD
         var model = new ClassroomFormVm();
+=======
+        var model = new ClassroomFormVm
+        {
+            SessionsPerWeek = 2,
+            HoursPerSession = 2.0,
+            WeeklySchedules = new List<ClassroomWeeklyScheduleInputDto>
+            {
+                new() { SessionIndex = 1, DayOfWeek = DayOfWeek.Monday, StartTime = new TimeOnly(19, 0), EndTime = new TimeOnly(21, 0) },
+                new() { SessionIndex = 2, DayOfWeek = DayOfWeek.Wednesday, StartTime = new TimeOnly(19, 0), EndTime = new TimeOnly(21, 0) }
+            }
+        };
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
         await PopulateSubjectGradeOptionsAsync(model, tutorId.Value, cancellationToken);
         if (model.SubjectGradeOptions.Count == 0)
         {
@@ -124,6 +190,10 @@ public sealed class TutorClassroomController : TutorAreaController
         }
 
         await ValidateCoverImageInputAsync(model, cancellationToken);
+<<<<<<< HEAD
+=======
+        await ValidateWeeklySchedulesAsync(model, tutorId.Value, null, cancellationToken);
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
 
         if (!ModelState.IsValid)
             return View(model);
@@ -142,6 +212,11 @@ public sealed class TutorClassroomController : TutorAreaController
             Description = model.Description?.Trim(),
             Fee = model.Fee,
             MaxStudents = model.MaxStudents,
+<<<<<<< HEAD
+=======
+            SessionsPerWeek = model.SessionsPerWeek,
+            HoursPerSession = model.HoursPerSession,
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
             StartDate = model.StartDate,
             CoverImageUrl = coverImageUrl,
             CoverImagePublicId = uploadedImage?.PublicId,
@@ -156,6 +231,26 @@ public sealed class TutorClassroomController : TutorAreaController
         {
             _db.Classrooms.Add(classroom);
             await _db.SaveChangesAsync(cancellationToken);
+<<<<<<< HEAD
+=======
+
+            if (model.WeeklySchedules is { Count: > 0 })
+            {
+                for (int i = 0; i < model.WeeklySchedules.Count; i++)
+                {
+                    var s = model.WeeklySchedules[i];
+                    _db.ClassroomWeeklySchedules.Add(new ClassroomWeeklySchedule
+                    {
+                        ClassroomId = classroom.Id,
+                        SessionIndex = i + 1,
+                        DayOfWeek = s.DayOfWeek,
+                        StartTime = s.StartTime,
+                        EndTime = s.EndTime
+                    });
+                }
+                await _db.SaveChangesAsync(cancellationToken);
+            }
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
         }
         catch
         {
@@ -185,6 +280,22 @@ public sealed class TutorClassroomController : TutorAreaController
             return RedirectToAction(nameof(Index));
         }
 
+<<<<<<< HEAD
+=======
+        var existingSchedules = await _db.ClassroomWeeklySchedules
+            .AsNoTracking()
+            .Where(w => w.ClassroomId == classroom.Id)
+            .OrderBy(w => w.SessionIndex)
+            .Select(w => new ClassroomWeeklyScheduleInputDto
+            {
+                SessionIndex = w.SessionIndex,
+                DayOfWeek = w.DayOfWeek,
+                StartTime = w.StartTime,
+                EndTime = w.EndTime
+            })
+            .ToListAsync(cancellationToken);
+
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
         var model = new ClassroomFormVm
         {
             Id = classroom.Id,
@@ -193,6 +304,16 @@ public sealed class TutorClassroomController : TutorAreaController
             Fee = classroom.Fee,
             MaxStudents = classroom.MaxStudents,
             StartDate = classroom.StartDate,
+<<<<<<< HEAD
+=======
+            SessionsPerWeek = classroom.SessionsPerWeek > 0 ? classroom.SessionsPerWeek : (existingSchedules.Count > 0 ? existingSchedules.Count : 2),
+            HoursPerSession = classroom.HoursPerSession > 0 ? classroom.HoursPerSession : 2.0,
+            WeeklySchedules = existingSchedules.Count > 0 ? existingSchedules : new List<ClassroomWeeklyScheduleInputDto>
+            {
+                new() { SessionIndex = 1, DayOfWeek = DayOfWeek.Monday, StartTime = new TimeOnly(19, 0), EndTime = new TimeOnly(21, 0) },
+                new() { SessionIndex = 2, DayOfWeek = DayOfWeek.Wednesday, StartTime = new TimeOnly(19, 0), EndTime = new TimeOnly(21, 0) }
+            },
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
             CoverImageUrl = GetRemoteImageUrl(classroom.CoverImageUrl),
             CurrentCoverImageUrl = classroom.CoverImageUrl,
             SubjectGradeKey = $"{classroom.SubjectId}_{classroom.GradeLevelId}"
@@ -259,6 +380,10 @@ public sealed class TutorClassroomController : TutorAreaController
             ModelState.AddModelError(nameof(model.SubjectGradeKey), "Không thể đổi môn/cấp học khi lớp đã có học viên hoặc yêu cầu kết nối.");
 
         await ValidateCoverImageInputAsync(model, cancellationToken);
+<<<<<<< HEAD
+=======
+        await ValidateWeeklySchedulesAsync(model, tutorId.Value, classroom.Id, cancellationToken);
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
 
         if (!ModelState.IsValid)
         {
@@ -276,6 +401,11 @@ public sealed class TutorClassroomController : TutorAreaController
         classroom.Description = model.Description?.Trim();
         classroom.StartDate = model.StartDate;
         classroom.MaxStudents = model.MaxStudents;
+<<<<<<< HEAD
+=======
+        classroom.SessionsPerWeek = model.SessionsPerWeek;
+        classroom.HoursPerSession = model.HoursPerSession;
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
         classroom.Fee = model.Fee;
         classroom.CoverImageUrl = uploadedImage?.Url
             ?? (model.RemoveCoverImage
@@ -297,6 +427,31 @@ public sealed class TutorClassroomController : TutorAreaController
         try
         {
             await _db.SaveChangesAsync(cancellationToken);
+<<<<<<< HEAD
+=======
+
+            var oldSchedules = await _db.ClassroomWeeklySchedules
+                .Where(w => w.ClassroomId == classroom.Id)
+                .ToListAsync(cancellationToken);
+            _db.ClassroomWeeklySchedules.RemoveRange(oldSchedules);
+
+            if (model.WeeklySchedules is { Count: > 0 })
+            {
+                for (int i = 0; i < model.WeeklySchedules.Count; i++)
+                {
+                    var s = model.WeeklySchedules[i];
+                    _db.ClassroomWeeklySchedules.Add(new ClassroomWeeklySchedule
+                    {
+                        ClassroomId = classroom.Id,
+                        SessionIndex = i + 1,
+                        DayOfWeek = s.DayOfWeek,
+                        StartTime = s.StartTime,
+                        EndTime = s.EndTime
+                    });
+                }
+            }
+            await _db.SaveChangesAsync(cancellationToken);
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
         }
         catch (DbUpdateConcurrencyException)
         {
@@ -676,4 +831,92 @@ public sealed class TutorClassroomController : TutorAreaController
         public string? DeletedCoverImageUrl { get; set; }
         public string? DeletedCoverImagePublicId { get; set; }
     }
+<<<<<<< HEAD
+=======
+
+    private async Task ValidateWeeklySchedulesAsync(
+        ClassroomFormVm model, int tutorId, int? currentClassroomId, CancellationToken ct)
+    {
+        if (model.WeeklySchedules == null || model.WeeklySchedules.Count != model.SessionsPerWeek)
+        {
+            ModelState.AddModelError(nameof(model.SessionsPerWeek),
+                $"Vui lòng thiết lập đủ {model.SessionsPerWeek} buổi học trong tuần.");
+            return;
+        }
+
+        for (int i = 0; i < model.WeeklySchedules.Count; i++)
+        {
+            var s = model.WeeklySchedules[i];
+            s.SessionIndex = i + 1;
+            if (s.EndTime <= s.StartTime)
+            {
+                ModelState.AddModelError($"WeeklySchedules[{i}].EndTime",
+                    $"Buổi {s.SessionIndex}: Giờ kết thúc ({s.EndTime:HH\\:mm}) phải sau giờ bắt đầu ({s.StartTime:HH\\:mm}).");
+            }
+        }
+
+        // Intra-class overlap check (kiểm tra trùng giữa các buổi trong cùng lớp)
+        for (int i = 0; i < model.WeeklySchedules.Count; i++)
+        {
+            for (int j = i + 1; j < model.WeeklySchedules.Count; j++)
+            {
+                var a = model.WeeklySchedules[i];
+                var b = model.WeeklySchedules[j];
+                if (a.DayOfWeek == b.DayOfWeek)
+                {
+                    if (a.StartTime < b.EndTime && b.StartTime < a.EndTime)
+                    {
+                        ModelState.AddModelError(string.Empty,
+                            $"Buổi {a.SessionIndex} và Buổi {b.SessionIndex} cùng vào {ToVnDay(a.DayOfWeek)} và bị trùng giờ nhau.");
+                    }
+                }
+            }
+        }
+
+        // Inter-class overlap check (kiểm tra với các lớp nhóm khác của gia sư)
+        var otherSchedules = await _db.ClassroomWeeklySchedules
+            .AsNoTracking()
+            .Where(w => w.Classroom.TutorId == tutorId
+                     && w.Classroom.Status == ClassroomStatus.Active
+                     && (currentClassroomId == null || w.ClassroomId != currentClassroomId.Value))
+            .Select(w => new { w.Classroom.Name, w.DayOfWeek, w.StartTime, w.EndTime })
+            .ToListAsync(ct);
+
+        foreach (var s in model.WeeklySchedules)
+        {
+            foreach (var other in otherSchedules)
+            {
+                if (s.DayOfWeek == other.DayOfWeek && s.StartTime < other.EndTime && other.StartTime < s.EndTime)
+                {
+                    ModelState.AddModelError(string.Empty,
+                        $"Lịch Buổi {s.SessionIndex} ({ToVnDay(s.DayOfWeek)} {s.StartTime:HH\\:mm} – {s.EndTime:HH\\:mm}) bị trùng với lớp '{other.Name}' ({other.StartTime:HH\\:mm} – {other.EndTime:HH\\:mm}).");
+                }
+            }
+        }
+    }
+
+    private static string ToVnDay(DayOfWeek day) => day switch
+    {
+        DayOfWeek.Monday => "Thứ Hai",
+        DayOfWeek.Tuesday => "Thứ Ba",
+        DayOfWeek.Wednesday => "Thứ Tư",
+        DayOfWeek.Thursday => "Thứ Năm",
+        DayOfWeek.Friday => "Thứ Sáu",
+        DayOfWeek.Saturday => "Thứ Bảy",
+        DayOfWeek.Sunday => "Chủ Nhật",
+        _ => day.ToString()
+    };
+
+    private static string ToShortVnDay(DayOfWeek day) => day switch
+    {
+        DayOfWeek.Monday => "T2",
+        DayOfWeek.Tuesday => "T3",
+        DayOfWeek.Wednesday => "T4",
+        DayOfWeek.Thursday => "T5",
+        DayOfWeek.Friday => "T6",
+        DayOfWeek.Saturday => "T7",
+        DayOfWeek.Sunday => "CN",
+        _ => day.ToString()
+    };
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
 }

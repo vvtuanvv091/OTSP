@@ -17,6 +17,12 @@ public sealed class TutorScheduleCalendarSlotDto
     public SessionStatus Status { get; init; }
     public bool IsTrial { get; init; }
     public string? VideoRoom { get; init; }
+<<<<<<< HEAD
+=======
+    public int ClassroomId { get; init; }
+    public string ClassroomName { get; init; } = string.Empty;
+    public bool IsMakeup => VideoRoom != null && VideoRoom.Contains("MAKEUP");
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
 }
 
 public sealed class TutorSchedulePageVm

@@ -1,23 +1,15 @@
 is_global = true
 build_property.TargetFramework = net10.0
-build_property.TargetFramework = net10.0
-build_property.TargetPlatformMinVersion = 
-build_property.TargetPlatformMinVersion = 
-build_property.UsingMicrosoftNETSdkWeb = true
-build_property.UsingMicrosoftNETSdkWeb = true
-build_property.ProjectTypeGuids = 
-build_property.ProjectTypeGuids = 
-build_property.InvariantGlobalization = 
-build_property.InvariantGlobalization = 
-build_property.PlatformNeutralAssembly = 
-build_property.PlatformNeutralAssembly = 
-build_property.EnforceExtendedAnalyzerRules = 
-build_property.EnforceExtendedAnalyzerRules = 
-build_property._SupportedPlatformList = Linux,macOS,Windows
-build_property._SupportedPlatformList = Linux,macOS,Windows
 build_property.TargetFrameworkIdentifier = .NETCoreApp
 build_property.TargetFrameworkVersion = v10.0
+build_property.TargetPlatformMinVersion = 
+build_property.UsingMicrosoftNETSdkWeb = true
+build_property.ProjectTypeGuids = 
+build_property.InvariantGlobalization = 
+build_property.PlatformNeutralAssembly = 
+build_property.EnforceExtendedAnalyzerRules = 
 build_property.EntryPointFilePath = 
+build_property._SupportedPlatformList = Linux,macOS,Windows
 build_property.RootNamespace = PROJECT_OTSP
 build_property.RootNamespace = PROJECT_OTSP
 build_property.ProjectDir = C:\tai_lieu_hoc_thuat_cua_tuan\mauthietkephanmem\OTSP\PROJECT_OTSP\
@@ -215,8 +207,16 @@ build_metadata.AdditionalFiles.CssScope =
 build_metadata.AdditionalFiles.TargetPath = QXJlYXNcU3R1ZGVudF9QYXJlbnRcVmlld3NcU2hhcmVkXF9MYXlvdXRfU3R1ZGVudC5jc2h0bWw=
 build_metadata.AdditionalFiles.CssScope = 
 
+[C:/tai_lieu_hoc_thuat_cua_tuan/mauthietkephanmem/OTSP/PROJECT_OTSP/Areas/Student_Parent/Views/StudentClassroom/Index.cshtml]
+build_metadata.AdditionalFiles.TargetPath = QXJlYXNcU3R1ZGVudF9QYXJlbnRcVmlld3NcU3R1ZGVudENsYXNzcm9vbVxJbmRleC5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
 [C:/tai_lieu_hoc_thuat_cua_tuan/mauthietkephanmem/OTSP/PROJECT_OTSP/Areas/Student_Parent/Views/StudentDashboard/Index.cshtml]
 build_metadata.AdditionalFiles.TargetPath = QXJlYXNcU3R1ZGVudF9QYXJlbnRcVmlld3NcU3R1ZGVudERhc2hib2FyZFxJbmRleC5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/tai_lieu_hoc_thuat_cua_tuan/mauthietkephanmem/OTSP/PROJECT_OTSP/Areas/Student_Parent/Views/StudentSchedule/Index.cshtml]
+build_metadata.AdditionalFiles.TargetPath = QXJlYXNcU3R1ZGVudF9QYXJlbnRcVmlld3NcU3R1ZGVudFNjaGVkdWxlXEluZGV4LmNzaHRtbA==
 build_metadata.AdditionalFiles.CssScope = 
 
 [C:/tai_lieu_hoc_thuat_cua_tuan/mauthietkephanmem/OTSP/PROJECT_OTSP/Areas/Student_Parent/Views/Student_Parent_Profile/Index.cshtml]

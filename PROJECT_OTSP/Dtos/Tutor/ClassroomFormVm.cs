@@ -21,6 +21,19 @@ public sealed class ClassroomFormVm
     [Display(Name = "Sĩ số tối đa")]
     public int MaxStudents { get; set; } = 2;
 
+<<<<<<< HEAD
+=======
+    [Range(1, 7, ErrorMessage = "Số buổi học mỗi tuần phải từ 1 đến 7.")]
+    [Display(Name = "Số buổi học / tuần")]
+    public int SessionsPerWeek { get; set; } = 2;
+
+    [Range(0.5, 5.0, ErrorMessage = "Thời lượng mỗi buổi phải từ 0.5 đến 5 giờ.")]
+    [Display(Name = "Thời lượng mỗi buổi (giờ)")]
+    public double HoursPerSession { get; set; } = 2.0;
+
+    public List<ClassroomWeeklyScheduleInputDto> WeeklySchedules { get; set; } = [];
+
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
     [StringLength(1000, ErrorMessage = "Mô tả không được vượt quá 1.000 ký tự.")]
     [Display(Name = "Mô tả")]
     public string? Description { get; set; }

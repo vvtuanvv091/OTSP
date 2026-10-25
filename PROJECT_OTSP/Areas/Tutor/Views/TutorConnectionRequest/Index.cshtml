@@ -119,6 +119,43 @@
                                     <div class="fw-semibold">@request.ClassroomName</div>
                                 </div>
                             }
+<<<<<<< HEAD
+=======
+                            @if (request.ProposedTrialSlotsUtc.Count > 0)
+                            {
+                                <div class="col-12">
+                                    <div class="p-2 rounded bg-danger-subtle text-danger-emphasis border border-danger-subtle">
+                                        <div class="d-flex align-items-center gap-2 mb-1">
+                                            <i class="bi bi-calendar-check fs-5 text-danger" aria-hidden="true"></i>
+                                            <div class="fw-semibold">Lịch học 1 kèm 1 đề xuất từ học viên (@(request.ProposedTrialSlotsUtc.Count * 2) tiếng/tuần):</div>
+                                        </div>
+                                        <div class="d-flex flex-column gap-1 ms-4 small">
+                                            @for (int i = 0; i < request.ProposedTrialSlotsUtc.Count; i++)
+                                            {
+                                                var sVn = request.ProposedTrialSlotsUtc[i].AddHours(7);
+                                                <div>
+                                                    <span class="badge bg-danger me-1">Buổi @(i + 1)</span>
+                                                    <strong>@sVn.ToString("dddd, dd/MM/yyyy · HH:mm", new System.Globalization.CultureInfo("vi-VN"))</strong> (Khối 2 tiếng)
+                                                </div>
+                                            }
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                            else if (request.ProposedTrialSlotUtc.HasValue)
+                            {
+                                var slotVn = request.ProposedTrialSlotUtc.Value.AddHours(7);
+                                <div class="col-12">
+                                    <div class="p-2 rounded bg-danger-subtle text-danger-emphasis border border-danger-subtle d-flex align-items-center gap-2">
+                                        <i class="bi bi-calendar-event fs-5 text-danger" aria-hidden="true"></i>
+                                        <div>
+                                            <div class="fw-semibold">Đề xuất lịch học thử từ học viên:</div>
+                                            <div>@slotVn.ToString("dddd, dd/MM/yyyy · HH:mm", new System.Globalization.CultureInfo("vi-VN")) (GMT+7)</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
                             @if (!string.IsNullOrWhiteSpace(request.Message))
                             {
                                 <div class="col-12">

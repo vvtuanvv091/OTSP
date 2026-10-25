@@ -1,6 +1,10 @@
 @using PROJECT_OTSP.Dtos
 @using static PROJECT_OTSP.Models.Enums
 @model TutorDetailsVm
+<<<<<<< HEAD
+=======
+@inject PROJECT_OTSP.Services.IScheduleBlockService BlockService
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
 
 @{
     ViewData["Title"] = $"Hồ sơ gia sư - {Model.FullName}";
@@ -15,6 +19,7 @@
 }
 
 <style>
+<<<<<<< HEAD
     :root {
         --brand: #DB303A;
         --brand-dark: #B7212B;
@@ -54,13 +59,143 @@
     .tutor-avatar-fallback {
         width: 100px;
         height: 100px;
+=======
+    /* Specific styles for Tutor Details & Booking View */
+    .tutor-detail-shell {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding-inline: 1rem;
+    }
+
+    .timetable-grid {
+        width: 100%;
+        min-width: 680px;
+        table-layout: fixed;
+        border-collapse: separate;
+        border-spacing: 3px 4px;
+        font-size: 11px;
+    }
+
+    .timetable-grid th {
+        padding: 6px 3px;
+        font-weight: 600;
+        text-align: center;
+        background: var(--bs-tertiary-bg, #f8f9fa);
+        border-radius: 4px;
+        color: var(--bs-body-color);
+    }
+
+    .timetable-grid th.time-col {
+        width: 95px;
+        font-weight: 500;
+        color: var(--bs-secondary-color);
+        background: transparent;
+    }
+
+    .timetable-grid td {
+        padding: 2px;
+        text-align: center;
+        vertical-align: middle;
+    }
+
+    .slot-cell-empty {
+        min-height: 42px;
+        background: var(--bs-tertiary-bg, #fafafa);
+        border: 1px dashed var(--bs-border-color, #e5e7eb);
+        border-radius: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--bs-secondary-color, #d1d5db);
+        font-size: 11px;
+    }
+
+    .slot-cell-btn {
+        width: 100%;
+        min-height: 42px;
+        padding: 4px 2px;
+        background: rgba(16, 185, 129, 0.12);
+        border: 1.5px solid #10b981;
+        border-radius: 4px;
+        color: #047857;
+        font-size: 11px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all .15s ease-in-out;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 1px;
+        line-height: 1.2;
+    }
+
+    html[data-bs-theme="dark"] .slot-cell-btn {
+        color: #34d399;
+        background: rgba(16, 185, 129, 0.18);
+    }
+
+    .slot-cell-btn:hover {
+        background: rgba(16, 185, 129, 0.22);
+        border-color: #059669;
+        transform: translateY(-1px);
+        box-shadow: 0 2px 8px rgba(16, 185, 129, .25);
+    }
+
+    .slot-cell-btn.is-selected {
+        background: #059669 !important;
+        border-color: #047857 !important;
+        color: #ffffff !important;
+        box-shadow: 0 0 0 3px rgba(5, 150, 105, .35) !important;
+        animation: pulseSlot .3s ease-in-out;
+    }
+
+    .slot-cell-btn .duration-tag {
+        font-size: 9px;
+        font-weight: 500;
+        opacity: .85;
+    }
+
+    .slot-cell-btn.is-selected .duration-tag {
+        opacity: 1;
+        font-weight: 700;
+    }
+
+    @@keyframes pulseSlot {
+        0% { transform: scale(.95); }
+        50% { transform: scale(1.03); }
+        100% { transform: scale(1); }
+    }
+
+    .tutor-header-card {
+        background: linear-gradient(135deg, rgba(219, 48, 58, .05) 0%, rgba(219, 48, 58, .01) 100%);
+        border: 1px solid rgba(219, 48, 58, .18);
+    }
+
+    .tutor-avatar-xl {
+        width: 90px;
+        height: 90px;
+        border-radius: 50%;
+        object-fit: cover;
+        box-shadow: 0 6px 18px var(--brand-glow);
+        border: 3px solid var(--bs-body-bg);
+    }
+
+    .tutor-avatar-fallback {
+        width: 90px;
+        height: 90px;
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
         border-radius: 50%;
         background: linear-gradient(135deg, var(--brand), #ea580c);
         color: #fff;
         display: flex;
         align-items: center;
         justify-content: center;
+<<<<<<< HEAD
         font-size: 2.2rem;
+=======
+        font-size: 2rem;
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
         font-weight: 700;
         box-shadow: 0 6px 18px var(--brand-glow);
     }
@@ -85,6 +220,7 @@
     .sticky-card {
         position: sticky;
         top: 90px;
+<<<<<<< HEAD
     }
 
     .section-title {
@@ -104,6 +240,16 @@
     .tag-item {
         background: #f1f5f9;
         color: #334155;
+=======
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .tag-item {
+        background: var(--bs-tertiary-bg);
+        color: var(--bs-body-color);
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
         border-radius: 20px;
         padding: .4rem .9rem;
         font-size: .88rem;
@@ -111,6 +257,7 @@
         display: inline-flex;
         align-items: center;
         gap: .4rem;
+<<<<<<< HEAD
         border: 1px solid #e2e8f0;
     }
 
@@ -118,11 +265,21 @@
         background: #ecfdf5;
         color: #065f46;
         border: 1px solid #a7f3d0;
+=======
+        border: 1px solid var(--bs-border-color);
+    }
+
+    .time-slot-tag {
+        background: rgba(16, 185, 129, 0.12);
+        color: #047857;
+        border: 1px solid rgba(16, 185, 129, 0.3);
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
         border-radius: var(--radius-md);
         padding: .5rem .75rem;
         font-size: .85rem;
     }
 
+<<<<<<< HEAD
     .btn-brand {
         background: var(--brand);
         border-color: var(--brand);
@@ -174,6 +331,10 @@
         display: flex;
         flex-direction: column;
         gap: 1rem;
+=======
+    html[data-bs-theme="dark"] .time-slot-tag {
+        color: #34d399;
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
     }
 
     .request-steps {
@@ -188,7 +349,11 @@
         display: flex;
         align-items: center;
         gap: .35rem;
+<<<<<<< HEAD
         color: #64748b;
+=======
+        color: var(--bs-secondary-color);
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
         font-size: .72rem;
         white-space: nowrap;
     }
@@ -201,8 +366,13 @@
         align-items: center;
         justify-content: center;
         border-radius: 50%;
+<<<<<<< HEAD
         background: #e9ecef;
         color: #64748b;
+=======
+        background: var(--bs-tertiary-bg);
+        color: var(--bs-secondary-color);
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
         font-size: .7rem;
         font-weight: 700;
     }
@@ -222,7 +392,11 @@
         height: 1px;
         flex: 1;
         min-width: .35rem;
+<<<<<<< HEAD
         background: #dee2e6;
+=======
+        background: var(--bs-border-color);
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
     }
 
     .tutor-chat-card {
@@ -237,10 +411,17 @@
         display: flex;
         align-items: center;
         justify-content: center;
+<<<<<<< HEAD
         border: 1px solid #dee2e6;
         border-radius: .65rem;
         background: #f8f9fa;
         color: #94a3b8;
+=======
+        border: 1px solid var(--bs-border-color);
+        border-radius: .65rem;
+        background: var(--bs-tertiary-bg);
+        color: var(--bs-secondary-color);
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
         font-size: .8rem;
     }
 
@@ -252,7 +433,18 @@
 
     @@media (max-width: 575.98px) {
         .tutor-detail-shell {
+<<<<<<< HEAD
             padding-inline: .75rem;
+=======
+            padding-inline: .5rem;
+        }
+
+        .tutor-avatar-xl,
+        .tutor-avatar-fallback {
+            width: 68px;
+            height: 68px;
+            font-size: 1.5rem;
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
         }
 
         .request-step {
@@ -484,6 +676,7 @@
                     }
                 </div>
 
+<<<<<<< HEAD
                 <!-- Lịch rảnh trong tuần -->
                 <div class="pro-card">
                     <h2 class="section-title"><i class="bi bi-calendar-week"></i> Khung giờ có thể dạy hàng tuần</h2>
@@ -501,6 +694,175 @@
                                     <div class="time-slot-tag d-flex justify-content-between align-items-center">
                                         <span class="fw-semibold">@slot.DayOfWeekName</span>
                                         <span>@slot.TimeRange</span>
+=======
+                <!-- Khung lịch rảnh & Đặt lịch học thử (1 kèm 1) -->
+                <div class="pro-card" id="tutorScheduleCard">
+                    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+                        <h2 class="section-title mb-0">
+                            <i class="bi bi-calendar-week text-danger"></i> Khung lịch rảnh &amp; Đặt giờ học thử (1 kèm 1)
+                        </h2>
+                        <span class="badge bg-danger-subtle text-danger border border-danger-subtle">
+                            Khối 2 tiếng · Bắt buộc đủ 4 tiếng/tuần
+                        </span>
+                    </div>
+                    <p class="small text-muted mb-3">
+                        Lịch rảnh thực tế trong 14 ngày tới (đã tự động lọc bỏ giờ gia sư bận). 
+                        <strong>Bấm chọn 2 khung giờ (mỗi khung 2 tiếng = đủ 4 tiếng/tuần)</strong> để đề xuất lịch học 1 kèm 1 chia đều trong tuần.
+                    </p>
+
+                    @if (Model.AvailableTrialSlots.Count == 0)
+                    {
+                        <div class="alert alert-light border small text-muted p-3 mb-0">
+                            <i class="bi bi-info-circle text-primary me-2"></i>Hiện tại gia sư chưa có khung giờ rảnh trống trong 14 ngày tới. Bạn có thể nêu khung giờ mong muốn ở ô lời nhắn bên dưới.
+                        </div>
+                    }
+                    else
+                    {
+                        var allSlots = Model.AvailableTrialSlots;
+                        var allDates = allSlots.Select(s => DateOnly.FromDateTime(s.SlotUtc.AddHours(7))).Distinct().OrderBy(d => d).ToList();
+                        var week1Dates = allDates.Take(7).ToList();
+                        var week2Dates = allDates.Skip(7).ToList();
+                        var blocksList = BlockService.Blocks;
+
+                        string FormatShortDay(DayOfWeek d) => d switch
+                        {
+                            DayOfWeek.Monday => "Thứ 2",
+                            DayOfWeek.Tuesday => "Thứ 3",
+                            DayOfWeek.Wednesday => "Thứ 4",
+                            DayOfWeek.Thursday => "Thứ 5",
+                            DayOfWeek.Friday => "Thứ 6",
+                            DayOfWeek.Saturday => "Thứ 7",
+                            DayOfWeek.Sunday => "Chủ Nhật",
+                            _ => d.ToString()
+                        };
+
+                        <ul class="nav nav-pills nav-fill mb-3 p-1 bg-light rounded border" id="weekTabs" role="tablist">
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link active py-2 fw-semibold small" id="week1-tab" data-bs-toggle="pill" data-bs-target="#week1-content" type="button" role="tab">
+                                    <i class="bi bi-calendar3 me-1"></i>Tuần 1 (@(week1Dates.Count > 0 ? $"{week1Dates.First():dd/MM} – {week1Dates.Last():dd/MM}" : "7 ngày tới"))
+                                </button>
+                            </li>
+                            @if (week2Dates.Count > 0)
+                            {
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link py-2 fw-semibold small" id="week2-tab" data-bs-toggle="pill" data-bs-target="#week2-content" type="button" role="tab">
+                                        <i class="bi bi-calendar3-range me-1"></i>Tuần 2 (@week2Dates.First().ToString("dd/MM") – @week2Dates.Last().ToString("dd/MM"))
+                                    </button>
+                                </li>
+                            }
+                        </ul>
+
+                        <div class="tab-content" id="weekTabsContent">
+                            <!-- Tuần 1 -->
+                            <div class="tab-pane fade show active" id="week1-content" role="tabpanel">
+                                <div class="mobile-scroll-hint"><i class="bi bi-arrows-expand"></i> Vuốt ngang để xem đủ các ngày trong tuần</div>
+                                <div class="timetable-wrapper mb-2">
+                                    <table class="timetable-grid">
+                                        <thead>
+                                            <tr>
+                                                <th class="time-col">Khung giờ</th>
+                                                @foreach (var d in week1Dates)
+                                                {
+                                                    <th>
+                                                        <div>@FormatShortDay(d.DayOfWeek)</div>
+                                                        <div class="small text-muted" style="font-size:10px;">@d.ToString("dd/MM")</div>
+                                                    </th>
+                                                }
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach (var block in blocksList)
+                                            {
+                                                <tr>
+                                                    <th class="time-col">@block.Label</th>
+                                                    @foreach (var d in week1Dates)
+                                                    {
+                                                        var matchingSlot = allSlots.FirstOrDefault(s =>
+                                                            DateOnly.FromDateTime(s.SlotUtc.AddHours(7)) == d
+                                                            && s.StartTime.Hour == block.Start);
+
+                                                        <td>
+                                                            @if (matchingSlot != null)
+                                                            {
+                                                                <button type="button"
+                                                                        class="slot-cell-btn trial-slot-picker-btn"
+                                                                        data-iso="@matchingSlot.IsoValue"
+                                                                        data-date="@matchingSlot.DateLabel"
+                                                                        data-time="@matchingSlot.TimeRange"
+                                                                        data-display="@matchingSlot.DisplayText"
+                                                                        title="Bấm để chọn: @matchingSlot.DisplayText (2 tiếng)">
+                                                                    <span>@matchingSlot.StartTime.ToString("HH:mm") – @matchingSlot.EndTime.ToString("HH:mm")</span>
+                                                                    <span class="duration-tag"><i class="bi bi-check-circle me-1"></i>2 tiếng</span>
+                                                                </button>
+                                                            }
+                                                            else
+                                                            {
+                                                                <div class="slot-cell-empty">-</div>
+                                                            }
+                                                        </td>
+                                                    }
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <!-- Tuần 2 (nếu có) -->
+                            @if (week2Dates.Count > 0)
+                            {
+                                <div class="tab-pane fade" id="week2-content" role="tabpanel">
+                                    <div class="mobile-scroll-hint"><i class="bi bi-arrows-expand"></i> Vuốt ngang để xem đủ các ngày trong tuần</div>
+                                <div class="timetable-wrapper mb-2">
+                                        <table class="timetable-grid">
+                                            <thead>
+                                                <tr>
+                                                    <th class="time-col">Khung giờ</th>
+                                                    @foreach (var d in week2Dates)
+                                                    {
+                                                        <th>
+                                                            <div>@FormatShortDay(d.DayOfWeek)</div>
+                                                            <div class="small text-muted" style="font-size:10px;">@d.ToString("dd/MM")</div>
+                                                        </th>
+                                                    }
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @foreach (var block in blocksList)
+                                                {
+                                                    <tr>
+                                                        <th class="time-col">@block.Label</th>
+                                                        @foreach (var d in week2Dates)
+                                                        {
+                                                            var matchingSlot = allSlots.FirstOrDefault(s =>
+                                                                DateOnly.FromDateTime(s.SlotUtc.AddHours(7)) == d
+                                                                && s.StartTime.Hour == block.Start);
+
+                                                            <td>
+                                                                @if (matchingSlot != null)
+                                                                {
+                                                                    <button type="button"
+                                                                            class="slot-cell-btn trial-slot-picker-btn"
+                                                                            data-iso="@matchingSlot.IsoValue"
+                                                                            data-date="@matchingSlot.DateLabel"
+                                                                            data-time="@matchingSlot.TimeRange"
+                                                                            data-display="@matchingSlot.DisplayText"
+                                                                            title="Bấm để chọn: @matchingSlot.DisplayText (2 tiếng)">
+                                                                        <span>@matchingSlot.StartTime.ToString("HH:mm") – @matchingSlot.EndTime.ToString("HH:mm")</span>
+                                                                        <span class="duration-tag"><i class="bi bi-check-circle me-1"></i>2 tiếng</span>
+                                                                    </button>
+                                                                }
+                                                                else
+                                                                {
+                                                                    <div class="slot-cell-empty">-</div>
+                                                                }
+                                                            </td>
+                                                        }
+                                                    </tr>
+                                                }
+                                            </tbody>
+                                        </table>
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
                                     </div>
                                 </div>
                             }
@@ -531,6 +893,15 @@
                                             </div>
                                             <h6 class="fw-bold mb-1">@cls.Name</h6>
                                             <p class="text-muted small mb-2">@cls.Description</p>
+<<<<<<< HEAD
+=======
+                                            @if (!string.IsNullOrWhiteSpace(cls.ScheduleSummary))
+                                            {
+                                                <div class="mb-2 p-2 bg-white rounded border small">
+                                                    <i class="bi bi-calendar-event text-danger me-1"></i><strong>Lịch học:</strong> @cls.ScheduleSummary
+                                                </div>
+                                            }
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
                                         </div>
                                         <div class="d-flex justify-content-between align-items-center pt-2 border-top small text-muted">
                                             <span><i class="bi bi-people me-1"></i> @cls.StudentCount / @cls.MaxStudents học viên</span>
@@ -641,6 +1012,11 @@
                             <input type="hidden" asp-for="Request.TutorId" value="@Model.TutorId" />
                             <input type="hidden" asp-for="Request.SubjectId" id="hiddenSubjectId" value="@Model.Request.SubjectId" />
                             <input type="hidden" asp-for="Request.GradeLevelId" id="hiddenGradeLevelId" value="@Model.Request.GradeLevelId" />
+<<<<<<< HEAD
+=======
+                            <input type="hidden" asp-for="Request.ProposedTrialSlotUtc" id="hiddenProposedTrialSlotUtc" />
+                            <div id="hiddenSlotsContainer"></div>
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
 
                             <!-- Chọn môn học & cấp học -->
                             <div class="mb-3">
@@ -671,6 +1047,7 @@
                                 </div>
                             </div>
 
+<<<<<<< HEAD
                             <!-- Dropdown chọn lớp nhóm nếu có -->
                             @if (Model.ClassroomOptions.Count > 0)
                             {
@@ -685,6 +1062,76 @@
                                     </select>
                                 </div>
                             }
+=======
+                            <!-- Khi chọn 1 kèm 1: Chọn slot học từ lịch rảnh thực tế của gia sư (Bắt buộc đủ 4 tiếng: 2 buổi, mỗi buổi 2 tiếng) -->
+                            <div class="mb-3" id="trialSlotSection">
+                                <label class="form-label small fw-semibold d-flex justify-content-between align-items-center mb-1">
+                                    <span><i class="bi bi-clock-history text-danger me-1"></i> Khung giờ học đề xuất (1 kèm 1) <span class="text-danger">*</span></span>
+                                    <span class="badge bg-danger-subtle text-danger border border-danger-subtle" id="hoursCountBadge" style="font-size:10px;">0 / 4 tiếng (0/2 buổi)</span>
+                                </label>
+
+                                <!-- Thanh tiến độ chọn giờ -->
+                                <div class="progress mb-2" style="height: 6px;">
+                                    <div id="slotProgressBar" class="progress-bar bg-danger" role="progressbar" style="width: 0%; transition: width .3s ease;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+                                </div>
+
+                                <div id="noSlotSelectedNotice" class="p-3 border rounded-3 bg-light text-center">
+                                    <i class="bi bi-calendar-event text-danger fs-3 d-block mb-1"></i>
+                                    <div class="small fw-semibold text-dark">Chưa chọn đủ lịch học</div>
+                                    <p class="text-muted small mb-0 mt-1" style="font-size: 11px;">
+                                        Bắt buộc chọn <strong>đủ 4 tiếng (2 buổi, mỗi buổi 2 tiếng)</strong> trực tiếp trên <strong>Khung lịch rảnh</strong> bên cạnh để chia đều trong tuần.
+                                    </p>
+                                </div>
+
+                                <div id="slotSelectedCard" class="p-3 border rounded-3 d-none">
+                                    <div class="d-flex align-items-center justify-content-between mb-2">
+                                        <span class="small fw-bold text-dark" style="font-size: 12px;">Các buổi học đã chọn:</span>
+                                        <button type="button" class="btn btn-sm btn-link text-danger p-0 text-decoration-none" id="clearAllSlotsBtn" style="font-size: 11px;">
+                                            <i class="bi bi-trash3 me-1"></i>Xóa tất cả
+                                        </button>
+                                    </div>
+                                    <div id="selectedSlotsList" class="d-flex flex-column gap-2 mb-2">
+                                        <!-- Rendered via JS -->
+                                    </div>
+                                    <div id="slotStatusAlert">
+                                        <!-- Alert status via JS -->
+                                    </div>
+                                </div>
+
+                                <div class="form-text small text-muted mt-1" style="font-size: 11px;">
+                                    <i class="bi bi-shield-check text-success me-1"></i>Lớp 1 kèm 1 yêu cầu chọn đúng 2 buổi (mỗi buổi 2 tiếng) để đạt đủ 4 tiếng/tuần.
+                                </div>
+                            </div>
+
+                            <!-- Khi chọn Lớp nhóm: Chọn lớp nhóm có sẵn kèm thông tin lịch học cố định -->
+                            <div class="mb-3 d-none" id="classroomSelectBox">
+                                <label class="form-label small fw-semibold" asp-for="Request.ClassroomId">
+                                    <i class="bi bi-easel text-danger me-1"></i> Chọn lớp nhóm gia sư đang tuyển sinh <span class="text-danger">*</span>
+                                </label>
+                                @if (Model.Classrooms.Count == 0)
+                                {
+                                    <div class="alert alert-warning small p-2 mb-0">
+                                        Gia sư hiện chưa mở lớp nhóm nào còn chỗ. Vui lòng chọn hình thức <strong>1 kèm 1</strong>.
+                                    </div>
+                                }
+                                else
+                                {
+                                    <select asp-for="Request.ClassroomId" class="form-select form-select-sm" id="classroomSelect">
+                                        <option value="">-- Chọn lớp nhóm mở sẵn --</option>
+                                        @foreach (var cls in Model.Classrooms)
+                                        {
+                                            <option value="@cls.Id" data-schedule="@cls.ScheduleSummary" data-fee="@cls.Fee.ToString("N0", money)">
+                                                @cls.Name (@cls.SubjectName - @cls.GradeLevelName) · Còn @cls.AvailableSeats chỗ
+                                            </option>
+                                        }
+                                    </select>
+                                    <div id="classroomScheduleBadge" class="mt-2 p-2 bg-light border rounded small d-none">
+                                        <div class="text-danger fw-semibold"><i class="bi bi-calendar-check me-1"></i>Lịch học cố định:</div>
+                                        <div class="text-dark" id="classroomScheduleText"></div>
+                                    </div>
+                                }
+                            </div>
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
 
                             <!-- Lời nhắn -->
                             <div class="mb-3">
@@ -747,6 +1194,24 @@
             const radioOneToOne = document.getElementById('typeOneToOne');
             const radioGroup = document.getElementById('typeGroup');
             const classroomBox = document.getElementById('classroomSelectBox');
+<<<<<<< HEAD
+=======
+            const trialSlotSection = document.getElementById('trialSlotSection');
+            const hiddenTrialSlot = document.getElementById('hiddenProposedTrialSlotUtc');
+            const classroomSelect = document.getElementById('classroomSelect');
+            const scheduleBadge = document.getElementById('classroomScheduleBadge');
+            const scheduleText = document.getElementById('classroomScheduleText');
+
+            const noSlotNotice = document.getElementById('noSlotSelectedNotice');
+            const slotSelectedCard = document.getElementById('slotSelectedCard');
+            const clearAllSlotsBtn = document.getElementById('clearAllSlotsBtn');
+            const selectedSlotsList = document.getElementById('selectedSlotsList');
+            const slotStatusAlert = document.getElementById('slotStatusAlert');
+            const hoursCountBadge = document.getElementById('hoursCountBadge');
+            const slotProgressBar = document.getElementById('slotProgressBar');
+            const hiddenSlotsContainer = document.getElementById('hiddenSlotsContainer');
+            const sendRequestForm = document.getElementById('sendRequestForm');
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
 
             function syncSubjectGrade() {
                 if (!select) return;
@@ -763,12 +1228,230 @@
                 syncSubjectGrade();
             }
 
+<<<<<<< HEAD
             if (radioGroup && radioOneToOne && classroomBox) {
                 radioGroup.addEventListener('change', function () {
                     if (this.checked) classroomBox.classList.remove('d-none');
                 });
                 radioOneToOne.addEventListener('change', function () {
                     if (this.checked) classroomBox.classList.add('d-none');
+=======
+            function toggleType() {
+                if (radioGroup && radioGroup.checked) {
+                    if (classroomBox) classroomBox.classList.remove('d-none');
+                    if (trialSlotSection) trialSlotSection.classList.add('d-none');
+                } else {
+                    if (classroomBox) classroomBox.classList.add('d-none');
+                    if (trialSlotSection) trialSlotSection.classList.remove('d-none');
+                    if (classroomSelect) classroomSelect.value = '';
+                    if (scheduleBadge) scheduleBadge.classList.add('d-none');
+                }
+            }
+
+            if (radioGroup) radioGroup.addEventListener('change', toggleType);
+            if (radioOneToOne) radioOneToOne.addEventListener('change', toggleType);
+
+            const slotBtns = document.querySelectorAll('.trial-slot-picker-btn');
+
+            // Quản lý danh sách các slot đã chọn (Bắt buộc đủ 4 tiếng: 2 buổi, mỗi buổi 2 tiếng)
+            let selectedSlots = [];
+            const MAX_SLOTS = 2; // 2 buổi x 2 tiếng = 4 tiếng/tuần
+
+            function updateSlotsUi() {
+                // 1. Cập nhật giao diện trên các nút trong bảng lịch
+                slotBtns.forEach(btn => {
+                    const btnIso = btn.dataset.iso;
+                    const slotIndex = selectedSlots.findIndex(s => s.iso === btnIso);
+                    const tagEl = btn.querySelector('.duration-tag');
+                    if (slotIndex >= 0) {
+                        btn.classList.add('is-selected');
+                        if (tagEl) tagEl.innerHTML = `<i class="bi bi-check-circle-fill me-1"></i>Buổi ${slotIndex + 1}`;
+                    } else {
+                        btn.classList.remove('is-selected');
+                        if (tagEl) tagEl.innerHTML = `<i class="bi bi-clock me-1"></i>2 tiếng`;
+                    }
+                });
+
+                // 2. Cập nhật các input hidden gửi lên server
+                if (hiddenSlotsContainer) {
+                    hiddenSlotsContainer.innerHTML = '';
+                    selectedSlots.forEach(s => {
+                        const input = document.createElement('input');
+                        input.type = 'hidden';
+                        input.name = 'Request.ProposedTrialSlotsUtc';
+                        input.value = s.iso;
+                        hiddenSlotsContainer.appendChild(input);
+                    });
+                }
+                if (hiddenTrialSlot) {
+                    hiddenTrialSlot.value = selectedSlots.length > 0 ? selectedSlots[0].iso : '';
+                }
+
+                // 3. Cập nhật tiến độ & huy hiệu
+                const count = selectedSlots.length;
+                const hours = count * 2;
+                const percent = Math.min(100, Math.round((hours / 4) * 100));
+
+                if (hoursCountBadge) {
+                    hoursCountBadge.textContent = `${hours} / 4 tiếng (${count}/2 buổi)`;
+                    if (count >= 2) {
+                        hoursCountBadge.className = 'badge bg-success text-white border border-success';
+                    } else if (count === 1) {
+                        hoursCountBadge.className = 'badge bg-warning-subtle text-warning-emphasis border border-warning-subtle';
+                    } else {
+                        hoursCountBadge.className = 'badge bg-danger-subtle text-danger border border-danger-subtle';
+                    }
+                }
+
+                if (slotProgressBar) {
+                    slotProgressBar.style.width = `${percent}%`;
+                    if (count >= 2) {
+                        slotProgressBar.className = 'progress-bar bg-success';
+                    } else if (count === 1) {
+                        slotProgressBar.className = 'progress-bar bg-warning';
+                    } else {
+                        slotProgressBar.className = 'progress-bar bg-danger';
+                    }
+                }
+
+                // 4. Render danh sách buổi đã chọn trong card
+                if (count === 0) {
+                    if (noSlotNotice) noSlotNotice.classList.remove('d-none');
+                    if (slotSelectedCard) slotSelectedCard.classList.add('d-none');
+                } else {
+                    if (noSlotNotice) noSlotNotice.classList.add('d-none');
+                    if (slotSelectedCard) {
+                        slotSelectedCard.classList.remove('d-none');
+                        if (count >= 2) {
+                            slotSelectedCard.className = 'p-3 border border-success rounded-3 bg-success-subtle';
+                        } else {
+                            slotSelectedCard.className = 'p-3 border border-warning rounded-3 bg-warning-subtle';
+                        }
+                    }
+
+                    if (selectedSlotsList) {
+                        selectedSlotsList.innerHTML = selectedSlots.map((s, idx) => `
+                            <div class="d-flex align-items-center justify-content-between p-2 rounded bg-white border">
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="badge ${idx === 0 ? 'bg-primary' : 'bg-success'} text-white rounded-circle d-flex align-items-center justify-content-center" style="width:20px;height:20px;font-size:10px;">${idx + 1}</span>
+                                    <div>
+                                        <div class="fw-bold text-dark" style="font-size:12px;">${s.date}</div>
+                                        <div class="text-secondary small" style="font-size:11px;">${s.time} (Khối 2 tiếng)</div>
+                                    </div>
+                                </div>
+                                <button type="button" class="btn btn-sm btn-outline-danger py-0 px-2 btn-remove-single-slot" data-iso="${s.iso}" title="Bỏ chọn buổi này" style="font-size:11px;">
+                                    <i class="bi bi-x"></i>
+                                </button>
+                            </div>
+                        `).join('');
+
+                        selectedSlotsList.querySelectorAll('.btn-remove-single-slot').forEach(btn => {
+                            btn.addEventListener('click', function (e) {
+                                e.stopPropagation();
+                                const isoToRemove = this.dataset.iso;
+                                selectedSlots = selectedSlots.filter(s => s.iso !== isoToRemove);
+                                updateSlotsUi();
+                            });
+                        });
+                    }
+
+                    if (slotStatusAlert) {
+                        if (count >= 2) {
+                            slotStatusAlert.className = 'small p-2 rounded bg-success text-white d-flex align-items-center gap-2 mt-2';
+                            slotStatusAlert.innerHTML = '<i class="bi bi-check-circle-fill fs-6"></i><span><strong>Đã chọn đủ 4 tiếng (2 buổi/tuần)!</strong> Bạn đã sẵn sàng gửi yêu cầu.</span>';
+                        } else {
+                            slotStatusAlert.className = 'small p-2 rounded bg-warning text-dark d-flex align-items-center gap-2 mt-2';
+                            slotStatusAlert.innerHTML = '<i class="bi bi-exclamation-circle-fill fs-6"></i><span><strong>Đã chọn 2/4 tiếng.</strong> Vui lòng bấm chọn thêm 1 buổi (2 tiếng) nữa trên lịch rảnh để đủ 4 tiếng.</span>';
+                        }
+                    }
+                }
+            }
+
+            function deselectAllSlots() {
+                selectedSlots = [];
+                updateSlotsUi();
+            }
+
+            slotBtns.forEach(btn => {
+                btn.addEventListener('click', function () {
+                    const isoVal = this.dataset.iso;
+                    const dateText = this.dataset.date;
+                    const timeText = this.dataset.time;
+                    const displayText = this.dataset.display || `${dateText} ${timeText}`;
+
+                    const existingIndex = selectedSlots.findIndex(s => s.iso === isoVal);
+                    if (existingIndex >= 0) {
+                        // Bấm lại ô đang chọn để hủy chọn
+                        selectedSlots.splice(existingIndex, 1);
+                        updateSlotsUi();
+                        return;
+                    }
+
+                    // Nếu đã chọn đủ 2 buổi (4 tiếng) mà cố chọn thêm
+                    if (selectedSlots.length >= MAX_SLOTS) {
+                        alert('Bạn đã chọn đủ 4 tiếng (2 buổi/tuần). Nếu muốn đổi khung giờ, vui lòng bấm nút (X) bỏ chọn bớt 1 buổi trước.');
+                        return;
+                    }
+
+                    selectedSlots.push({
+                        iso: isoVal,
+                        date: dateText,
+                        time: timeText,
+                        display: displayText
+                    });
+
+                    // Tự động chuyển radio sang 1 kèm 1 nếu đang ở nhóm
+                    if (radioOneToOne && !radioOneToOne.checked) {
+                        radioOneToOne.checked = true;
+                        toggleType();
+                    }
+
+                    updateSlotsUi();
+
+                    // Cuộn nhẹ tới form nếu trên màn hình nhỏ
+                    if (window.innerWidth < 992 && slotSelectedCard) {
+                        slotSelectedCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    }
+                });
+            });
+
+            if (clearAllSlotsBtn) {
+                clearAllSlotsBtn.addEventListener('click', function () {
+                    deselectAllSlots();
+                });
+            }
+
+            // Kiểm tra ràng buộc khi gửi form: 1 kèm 1 bắt buộc phải chọn ĐỦ 4 TIẾNG (2 buổi x 2 tiếng)
+            if (sendRequestForm) {
+                sendRequestForm.addEventListener('submit', function (e) {
+                    if (radioOneToOne && radioOneToOne.checked) {
+                        if (selectedSlots.length < 2) {
+                            e.preventDefault();
+                            const currentHours = selectedSlots.length * 2;
+                            alert(`Lớp 1 kèm 1 bắt buộc phải chọn đủ 4 tiếng (2 buổi học, mỗi buổi 2 tiếng) chia đều trong tuần.\nHiện tại bạn mới chọn ${currentHours}/4 tiếng (${selectedSlots.length}/2 buổi).`);
+                            const schedCard = document.getElementById('tutorScheduleCard');
+                            if (schedCard) {
+                                schedCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                schedCard.classList.add('border-danger', 'shadow');
+                                setTimeout(() => schedCard.classList.remove('border-danger', 'shadow'), 2500);
+                            }
+                            return false;
+                        }
+                    }
+                });
+            }
+
+            if (classroomSelect && scheduleBadge && scheduleText) {
+                classroomSelect.addEventListener('change', function () {
+                    const opt = this.options[this.selectedIndex];
+                    const sched = opt ? opt.getAttribute('data-schedule') : null;
+                    if (sched) {
+                        scheduleText.textContent = sched;
+                        scheduleBadge.classList.remove('d-none');
+                    } else {
+                        scheduleBadge.classList.add('d-none');
+                    }
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
                 });
             }
         });

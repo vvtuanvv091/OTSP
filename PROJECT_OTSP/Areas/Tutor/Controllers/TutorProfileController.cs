@@ -18,11 +18,25 @@ namespace PROJECT_OTSP.Areas.Tutor.Controllers
         private readonly ApplicationDbContext _dbcontext;
         private readonly IWebHostEnvironment _environment;
         private readonly IMemoryCache _cache;
+<<<<<<< HEAD
         public TutorProfileController(ApplicationDbContext dbcontext, IWebHostEnvironment env, IMemoryCache cache)
+=======
+        private readonly PROJECT_OTSP.Services.IImageStorageService _imageStorage;
+
+        public TutorProfileController(
+            ApplicationDbContext dbcontext,
+            IWebHostEnvironment env,
+            IMemoryCache cache,
+            PROJECT_OTSP.Services.IImageStorageService imageStorage)
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
         {
             _dbcontext = dbcontext;
             _environment = env;
             _cache = cache;
+<<<<<<< HEAD
+=======
+            _imageStorage = imageStorage;
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
         }
 
         private string? GetCurrentUserId()
@@ -153,5 +167,70 @@ namespace PROJECT_OTSP.Areas.Tutor.Controllers
             TempData["Success"] = "Cập nhật thông tin thành công.";
             return RedirectToAction(nameof(Index));
         }
+<<<<<<< HEAD
+=======
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        [RequestSizeLimit(5 * 1024 * 1024)]
+        public async Task<IActionResult> UploadAvatar(IFormFile? avatarFile, CancellationToken cancellationToken)
+        {
+            var userId = GetCurrentUserId();
+            if (string.IsNullOrWhiteSpace(userId))
+                return Unauthorized(new { ok = false, message = "Phiên đăng nhập đã hết hạn." });
+
+            if (avatarFile is null || avatarFile.Length == 0)
+                return BadRequest(new { ok = false, message = "Vui lòng chọn ảnh đại diện hợp lệ." });
+
+            try
+            {
+                var stored = await _imageStorage.UploadAvatarAsync(avatarFile, cancellationToken);
+                var user = await _dbcontext.Users.FirstOrDefaultAsync(u => u.Id == userId, cancellationToken);
+                if (user is null)
+                    return NotFound(new { ok = false, message = "Không tìm thấy thông tin tài khoản." });
+
+                user.AvatarUrl = stored.Url;
+                await _dbcontext.SaveChangesAsync(cancellationToken);
+
+                // Xóa cache header và trang chủ để cập nhật ảnh mới ngay lập tức
+                _cache.Remove($"hdr_summary_{userId}");
+                _cache.Remove($"hdr_user_{userId}");
+                _cache.Remove(global::PROJECT_OTSP.Controllers.HomeController.HomeCacheKey);
+
+                var isAjax = Request.Headers["X-Requested-With"] == "XMLHttpRequest"
+                    || (Request.Headers.Accept.ToString() ?? string.Empty).Contains("application/json");
+
+                if (isAjax)
+                {
+                    return Json(new { ok = true, avatarUrl = stored.Url, message = "Cập nhật ảnh đại diện thành công!" });
+                }
+
+                TempData["Success"] = "Cập nhật ảnh đại diện thành công!";
+                return RedirectToAction(nameof(Index));
+            }
+            catch (ArgumentException ex)
+            {
+                var isAjax = Request.Headers["X-Requested-With"] == "XMLHttpRequest"
+                    || (Request.Headers.Accept.ToString() ?? string.Empty).Contains("application/json");
+
+                if (isAjax)
+                    return BadRequest(new { ok = false, message = ex.Message });
+
+                TempData["Error"] = ex.Message;
+                return RedirectToAction(nameof(Index));
+            }
+            catch (Exception ex)
+            {
+                var isAjax = Request.Headers["X-Requested-With"] == "XMLHttpRequest"
+                    || (Request.Headers.Accept.ToString() ?? string.Empty).Contains("application/json");
+
+                if (isAjax)
+                    return StatusCode(500, new { ok = false, message = "Lỗi khi lưu ảnh: " + ex.Message });
+
+                TempData["Error"] = "Lỗi khi lưu ảnh: " + ex.Message;
+                return RedirectToAction(nameof(Index));
+            }
+        }
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
     }
 }

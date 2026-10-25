@@ -1,4 +1,18 @@
 using Microsoft.AspNetCore.Identity;
+<<<<<<< HEAD
+using Microsoft.AspNetCore.Localization;
+=======
+<<<<<<< HEAD
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
+using Microsoft.EntityFrameworkCore;
+using PROJECT_OTSP.Data;
+using PROJECT_OTSP.Hubs;
+using PROJECT_OTSP.Models;
+<<<<<<< HEAD
+using PROJECT_OTSP.Services;
+using System.Globalization;
+=======
+=======
 using Microsoft.AspNetCore.Localization;
 using Microsoft.EntityFrameworkCore;
 using PROJECT_OTSP.Data;
@@ -6,6 +20,8 @@ using PROJECT_OTSP.Hubs;
 using PROJECT_OTSP.Models;
 using PROJECT_OTSP.Services;
 using System.Globalization;
+>>>>>>> eb30c869e0525d8bf651bfa9c0aee3191384d225
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -14,6 +30,12 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
     ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
 
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+    options.UseNpgsql(connectionString));
+=======
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
     options.UseNpgsql(connectionString, npgsqlOptions =>
     {
         npgsqlOptions.EnableRetryOnFailure(
@@ -21,6 +43,10 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
             maxRetryDelay: TimeSpan.FromSeconds(10),
             errorCodesToAdd: null);
     }));
+<<<<<<< HEAD
+=======
+>>>>>>> eb30c869e0525d8bf651bfa9c0aee3191384d225
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
 
 // Hiển thị lỗi migration chi tiết khi đang phát triển
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
@@ -34,6 +60,7 @@ builder.Services.AddDefaultIdentity<ApplicationUser>(options =>
 // ===== 3. MVC, Razor Pages, API =====
 builder.Services.AddControllersWithViews();
 builder.Services.AddRazorPages();
+<<<<<<< HEAD
 builder.Services.AddSignalR();
 builder.Services.AddLocalization();
 builder.Services.AddMemoryCache();
@@ -63,6 +90,44 @@ builder.Services.Configure<RequestLocalizationOptions>(options =>
 
 var app = builder.Build();
 
+=======
+<<<<<<< HEAD
+
+var app = builder.Build();
+
+=======
+builder.Services.AddSignalR();
+builder.Services.AddLocalization();
+builder.Services.AddMemoryCache();
+builder.Services.AddDistributedMemoryCache();
+builder.Services.AddSession(options =>
+{
+    options.IdleTimeout = TimeSpan.FromMinutes(60);
+    options.Cookie.HttpOnly = true;
+    options.Cookie.IsEssential = true;
+});
+
+// ===== 3.1 Services =====
+builder.Services.AddScoped<ISearchService, SearchService>();
+builder.Services.AddSingleton<IScheduleBlockService, ScheduleBlockService>();
+builder.Services.AddScoped<IOpenGroupClassroomService, OpenGroupClassroomService>();
+builder.Services.AddScoped<IAvailabilitySlotService, AvailabilitySlotService>();
+builder.Services.AddScoped<IChatService, ChatService>();
+builder.Services.Configure<CloudinarySettings>(builder.Configuration.GetSection("Cloudinary"));
+builder.Services.AddSingleton<IImageStorageService, CloudinaryImageStorageService>();
+
+var supportedCultures = new[] { new CultureInfo("vi"), new CultureInfo("en") };
+builder.Services.Configure<RequestLocalizationOptions>(options =>
+{
+    options.DefaultRequestCulture = new RequestCulture("vi");
+    options.SupportedCultures = supportedCultures;
+    options.SupportedUICultures = supportedCultures;
+});
+
+
+var app = builder.Build();
+
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -79,6 +144,10 @@ if (args.Contains("--seed-only"))
     return;
 }
 
+<<<<<<< HEAD
+=======
+>>>>>>> eb30c869e0525d8bf651bfa9c0aee3191384d225
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
 // ===== 4. Seed dữ liệu mẫu (chỉ khi đang phát triển) =====
 if (app.Environment.IsDevelopment())
 {
@@ -99,11 +168,23 @@ else
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();
+<<<<<<< HEAD
 app.UseRequestLocalization();
 
 
 app.UseRouting();
 app.UseSession();
+=======
+<<<<<<< HEAD
+app.UseRouting();
+=======
+app.UseRequestLocalization();
+
+
+app.UseRouting();
+app.UseSession();
+>>>>>>> eb30c869e0525d8bf651bfa9c0aee3191384d225
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
 
 app.UseAuthentication();   // phải đứng trước UseAuthorization
 app.UseAuthorization();
@@ -111,6 +192,11 @@ app.UseAuthorization();
 app.MapStaticAssets();
 
 app.MapControllers();      // API có [Route] (attribute routing)
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+=======
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
 app.MapHub<ConnectionRequestHub>("/hubs/connection-requests");
 app.MapHub<ChatHub>("/hubs/chat");
 
@@ -118,6 +204,10 @@ app.MapControllerRoute(
     name: "areas",
     pattern: "{area:exists}/{controller=Home}/{action=Index}/{id?}");
 
+<<<<<<< HEAD
+=======
+>>>>>>> eb30c869e0525d8bf651bfa9c0aee3191384d225
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
 app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}")
@@ -126,4 +216,12 @@ app.MapControllerRoute(
 app.MapRazorPages()        // trang Identity: /Identity/Account/Login, Register...
    .WithStaticAssets();
 
+<<<<<<< HEAD
 app.Run();
+=======
+<<<<<<< HEAD
+app.Run();
+=======
+app.Run();
+>>>>>>> eb30c869e0525d8bf651bfa9c0aee3191384d225
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc

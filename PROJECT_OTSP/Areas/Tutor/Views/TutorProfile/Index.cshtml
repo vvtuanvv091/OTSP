@@ -24,6 +24,7 @@
 }
 
 <style>
+<<<<<<< HEAD
     :root {
         --brand: #DB303A;
         --brand-dark: #B7212B;
@@ -43,12 +44,16 @@
         box-shadow: 0 10px 30px rgba(0, 0, 0, .06);
         padding: 1.75rem;
     }
+=======
+    .profile-wrap { padding-top: 1.5rem; padding-bottom: 3.5rem; }
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
 
     /* Sidebar dính khi cuộn */
     @@media (min-width: 992px) {
         .sticky-side { position: sticky; top: 90px; }
     }
 
+<<<<<<< HEAD
     /* Avatar */
     .avatar-ring {
         width: 128px;
@@ -80,11 +85,14 @@
     .status-rejected { background: rgba(220,53,69,.14); color: #dc3545; }
     .status-pending  { background: rgba(255,193,7,.18); color: #b58100; }
 
+=======
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
     .rating-line {
         font-size: .9rem;
         color: var(--bs-secondary-color);
     }
 
+<<<<<<< HEAD
     /* Tiêu đề mục */
     .section-head {
         display: flex;
@@ -173,6 +181,8 @@
     }
     .empty-box i { font-size: 1.4rem; color: var(--brand); }
 
+=======
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
     /* Bằng cấp */
     .qual-item {
         display: flex;
@@ -203,6 +213,7 @@
         flex-shrink: 0;
     }
 
+<<<<<<< HEAD
     /* Nút */
     .btn-brand {
         background: linear-gradient(120deg, var(--brand), var(--brand-dark));
@@ -234,13 +245,18 @@
         padding: 1.25rem;
     }
 
+=======
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
     .save-bar {
         display: flex;
         justify-content: flex-end;
         margin: .5rem 0 1.5rem;
     }
+<<<<<<< HEAD
 
     .alert { border-radius: var(--radius-md); }
+=======
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
 </style>
 
 <div class="container profile-wrap">
@@ -266,8 +282,22 @@
         <aside class="col-lg-4">
             <div class="sticky-side">
                 <div class="pro-card text-center">
+<<<<<<< HEAD
                     <div class="avatar-ring">
                         <img src="@avatarUrl" alt="Ảnh đại diện gia sư" />
+=======
+                    <div class="avatar-wrapper">
+                        <div class="avatar-ring">
+                            <img id="tutorAvatarImg" src="@avatarUrl" alt="Ảnh đại diện gia sư" />
+                        </div>
+                        <div id="avatarSpinner" class="avatar-loading-overlay">
+                            <div class="spinner-border spinner-border-sm text-light" role="status"></div>
+                        </div>
+                        <label for="avatarFileInput" class="avatar-upload-btn" title="Đổi ảnh đại diện">
+                            <i class="bi bi-camera-fill"></i>
+                        </label>
+                        <input type="file" id="avatarFileInput" accept="image/jpeg,image/png,image/webp" class="d-none" />
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
                     </div>
 
                     <h2 class="h5 fw-bold mb-2">@Model.User.FullName</h2>
@@ -499,6 +529,7 @@
 
 <script>
 (() => {
+<<<<<<< HEAD
     const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value ?? '';
 
     let toastBox = document.getElementById('ajaxAlert');
@@ -509,12 +540,18 @@
         toastBox.style.cssText = 'z-index:1080; max-width:360px;';
         document.body.appendChild(toastBox);
     }
+=======
+    const notify = OTSP.notify;
+    const send = OTSP.send;
+    const esc = OTSP.escapeHtml;
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
 
     const subjectList = document.getElementById('subjectList');
     const subjectForm = document.getElementById('subjectForm');
     const qualList = document.getElementById('qualList');
     const qualForm = document.getElementById('qualificationForm');
 
+<<<<<<< HEAD
     const esc = s => String(s ?? '').replace(/[&<>"']/g, c =>
         ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
@@ -546,6 +583,8 @@
         return data;
     }
 
+=======
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
     function syncEmpty(list, emptyId) {
         document.getElementById(emptyId).classList.toggle('d-none', list.children.length > 0);
     }
@@ -638,5 +677,46 @@
             btn.disabled = false;
         }
     });
+<<<<<<< HEAD
+=======
+
+    const avatarInput = document.getElementById('avatarFileInput');
+    const avatarImg = document.getElementById('tutorAvatarImg');
+    const avatarSpinner = document.getElementById('avatarSpinner');
+
+    if (avatarInput && avatarImg) {
+        avatarInput.addEventListener('change', async () => {
+            const file = avatarInput.files?.[0];
+            if (!file) return;
+
+            if (file.size > 5 * 1024 * 1024) {
+                notify('danger', 'Kích thước ảnh tối đa là 5 MB.');
+                avatarInput.value = '';
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('avatarFile', file);
+
+            avatarSpinner.style.display = 'flex';
+            try {
+                const res = await send('@Url.Action("UploadAvatar", "TutorProfile")', formData);
+                if (res.avatarUrl) {
+                    avatarImg.src = res.avatarUrl;
+                    document.querySelectorAll('[data-role="avatar-img"], [data-role="avatar"]').forEach(img => {
+                        img.src = res.avatarUrl;
+                        img.classList.remove('d-none');
+                    });
+                }
+                notify('success', res.message || 'Cập nhật ảnh đại diện thành công!');
+            } catch (err) {
+                notify('danger', err.message || 'Không thể tải ảnh lên.');
+            } finally {
+                avatarSpinner.style.display = 'none';
+                avatarInput.value = '';
+            }
+        });
+    }
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
 })();
 </script>

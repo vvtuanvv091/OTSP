@@ -2,8 +2,15 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+<<<<<<< HEAD
 using PROJECT_OTSP.Data;
 using PROJECT_OTSP.Models;
+=======
+using Microsoft.Extensions.Caching.Memory;
+using PROJECT_OTSP.Data;
+using PROJECT_OTSP.Models;
+using PROJECT_OTSP.Services;
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
 
 namespace PROJECT_OTSP.Areas.Student_Parent.Controllers
 {
@@ -14,10 +21,24 @@ namespace PROJECT_OTSP.Areas.Student_Parent.Controllers
         private const int MinorAge = 18;
 
         private readonly ApplicationDbContext _dbcontext;
+<<<<<<< HEAD
 
         public Student_Parent_ProfileController(ApplicationDbContext dbcontext)
         {
             _dbcontext = dbcontext;
+=======
+        private readonly IImageStorageService _imageStorage;
+        private readonly IMemoryCache _cache;
+
+        public Student_Parent_ProfileController(
+            ApplicationDbContext dbcontext,
+            IImageStorageService imageStorage,
+            IMemoryCache cache)
+        {
+            _dbcontext = dbcontext;
+            _imageStorage = imageStorage;
+            _cache = cache;
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
         }
 
         private string? CurrentUserId => User.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -291,5 +312,69 @@ namespace PROJECT_OTSP.Areas.Student_Parent.Controllers
                 age--;
             return age < MinorAge;
         }
+<<<<<<< HEAD
+=======
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        [RequestSizeLimit(5 * 1024 * 1024)]
+        public async Task<IActionResult> UploadAvatar(IFormFile? avatarFile, CancellationToken cancellationToken)
+        {
+            var userId = CurrentUserId;
+            if (string.IsNullOrWhiteSpace(userId))
+                return Unauthorized(new { ok = false, message = "Phiên đăng nhập đã hết hạn." });
+
+            if (avatarFile is null || avatarFile.Length == 0)
+                return BadRequest(new { ok = false, message = "Vui lòng chọn ảnh đại diện hợp lệ." });
+
+            try
+            {
+                var stored = await _imageStorage.UploadAvatarAsync(avatarFile, cancellationToken);
+                var user = await _dbcontext.Users.FirstOrDefaultAsync(u => u.Id == userId, cancellationToken);
+                if (user is null)
+                    return NotFound(new { ok = false, message = "Không tìm thấy thông tin tài khoản." });
+
+                user.AvatarUrl = stored.Url;
+                await _dbcontext.SaveChangesAsync(cancellationToken);
+
+                // Xóa cache header để cập nhật ngay trên thanh điều hướng
+                _cache.Remove($"hdr_summary_{userId}");
+                _cache.Remove($"hdr_user_{userId}");
+
+                var isAjax = Request.Headers["X-Requested-With"] == "XMLHttpRequest"
+                    || (Request.Headers.Accept.ToString() ?? string.Empty).Contains("application/json");
+
+                if (isAjax)
+                {
+                    return Json(new { ok = true, avatarUrl = stored.Url, message = "Cập nhật ảnh đại diện thành công!" });
+                }
+
+                TempData["Success"] = "Cập nhật ảnh đại diện thành công!";
+                return RedirectToAction(nameof(Index));
+            }
+            catch (ArgumentException ex)
+            {
+                var isAjax = Request.Headers["X-Requested-With"] == "XMLHttpRequest"
+                    || (Request.Headers.Accept.ToString() ?? string.Empty).Contains("application/json");
+
+                if (isAjax)
+                    return BadRequest(new { ok = false, message = ex.Message });
+
+                TempData["Error"] = ex.Message;
+                return RedirectToAction(nameof(Index));
+            }
+            catch (Exception ex)
+            {
+                var isAjax = Request.Headers["X-Requested-With"] == "XMLHttpRequest"
+                    || (Request.Headers.Accept.ToString() ?? string.Empty).Contains("application/json");
+
+                if (isAjax)
+                    return StatusCode(500, new { ok = false, message = "Lỗi khi lưu ảnh: " + ex.Message });
+
+                TempData["Error"] = "Lỗi khi lưu ảnh: " + ex.Message;
+                return RedirectToAction(nameof(Index));
+            }
+        }
+>>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
     }
 }
