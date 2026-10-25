@@ -1,0 +1,278 @@
+@using PROJECT_OTSP.Models
+@model StudentProfile
+@{
+    ViewData["Title"] = "Hồ sơ học viên";
+
+    var avatarUrl = string.IsNullOrWhiteSpace(Model.User.AvatarUrl)
+        ? Url.Content("~/assets/img/default-avatar.svg")
+        : Model.User.AvatarUrl;
+
+    bool isMinor = ViewBag.IsMinor is bool m && m;
+    bool needsGuardian = isMinor && Model.Guardians.Count == 0;
+}
+
+<div class="container profile-wrap">
+
+    @if (TempData["Success"] is string success)
+    {
+        <div class="alert alert-success alert-dismissible fade show shadow-sm" role="alert">
+            <i class="bi bi-check-circle me-2"></i>@success
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Đóng"></button>
+        </div>
+    }
+
+    @if (TempData["Error"] is string error)
+    {
+        <div class="alert alert-danger alert-dismissible fade show shadow-sm" role="alert">
+            <i class="bi bi-exclamation-triangle me-2"></i>@error
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Đóng"></button>
+        </div>
+    }
+
+    @if (TempData["Warning"] is string warning)
+    {
+        <div class="alert alert-warning alert-dismissible fade show shadow-sm" role="alert">
+            <i class="bi bi-person-exclamation me-2"></i>@warning
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Đóng"></button>
+        </div>
+    }
+
+    <div class="row g-4">
+
+        <aside class="col-lg-4">
+            <div class="sticky-side">
+                <div class="pro-card text-center">
+                    <div class="avatar-wrapper">
+                        <div class="avatar-ring">
+                            <img id="studentAvatarImg" src="@avatarUrl" alt="Ảnh đại diện" />
+                        </div>
+                        <div id="avatarSpinner" class="avatar-loading-overlay">
+                            <div class="spinner-border spinner-border-sm text-light" role="status"></div>
+                        </div>
+                        <label for="avatarFileInput" class="avatar-upload-btn" title="Đổi ảnh đại diện">
+                            <i class="bi bi-camera-fill"></i>
+                        </label>
+                        <input type="file" id="avatarFileInput" accept="image/jpeg,image/png,image/webp" class="d-none" />
+                    </div>
+
+                    <h2 class="h5 fw-bold mb-2">@Model.User.FullName</h2>
+
+                    @if (isMinor)
+                    {
+                        <span class="badge rounded-pill bg-info-subtle text-info-emphasis px-3 py-2">Học viên dưới 18 tuổi</span>
+                    }
+                    else
+                    {
+                        <span class="badge rounded-pill bg-secondary-subtle text-secondary-emphasis px-3 py-2">Học viên / Phụ huynh</span>
+                    }
+
+                    <div class="small text-secondary mt-3">
+                        Người giám hộ: <strong>@Model.Guardians.Count</strong>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <main class="col-lg-8">
+
+            <form asp-action="UpdateProfile" method="post">
+                <section class="pro-card mb-4">
+                    <div class="section-head">
+                        <h2 class="section-title">
+                            <span class="section-icon"><i class="bi bi-person-vcard"></i></span>
+                            Thông tin cá nhân
+                        </h2>
+                    </div>
+
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label for="fullName" class="form-label">Họ và tên</label>
+                            <input id="fullName" name="fullName" class="form-control"
+                                   value="@Model.User.FullName" maxlength="150" required />
+                        </div>
+                        <div class="col-md-6">
+                            <label for="citizenIdNumber" class="form-label">Số CCCD (12 chữ số)</label>
+                            <input id="citizenIdNumber" name="citizenIdNumber" class="form-control" inputmode="numeric"
+                                   value="@Model.User.CitizenIdNumber" maxlength="12" pattern="[0-9]{12}" required />
+                        </div>
+                        <div class="col-12">
+                            <label for="residenceAddress" class="form-label">Nơi ở hiện tại</label>
+                            <input id="residenceAddress" name="residenceAddress" class="form-control"
+                                   value="@Model.User.ResidenceAddress" maxlength="500" required />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Email</label>
+                            <input class="form-control" value="@Model.User.Email" readonly />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Số điện thoại</label>
+                            <input class="form-control" value="@Model.User.PhoneNumber" readonly />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Ngày sinh</label>
+                            <input class="form-control" value="@(Model.User.DateOfBirth?.ToString("dd/MM/yyyy"))" readonly />
+                        </div>
+                    </div>
+                </section>
+
+                <section class="pro-card mb-4">
+                    <div class="section-head">
+                        <h2 class="section-title">
+                            <span class="section-icon"><i class="bi bi-search"></i></span>
+                            Nhu cầu học tập
+                        </h2>
+                    </div>
+
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label for="interestedSubjects" class="form-label">Môn học quan tâm</label>
+                            <input id="interestedSubjects" name="interestedSubjects" class="form-control"
+                                   value="@Model.InterestedSubjects" maxlength="500"
+                                   placeholder="Ví dụ: Toán, Tiếng Anh" />
+                        </div>
+                        <div class="col-md-6">
+                            <label for="area" class="form-label">Khu vực học mong muốn</label>
+                            <input id="area" name="area" class="form-control"
+                                   value="@Model.Area" maxlength="200" placeholder="Ví dụ: Biên Hòa" />
+                        </div>
+                        <div class="col-md-6">
+                            <label for="freeSchedule" class="form-label">Lịch rảnh</label>
+                            <input id="freeSchedule" name="freeSchedule" class="form-control"
+                                   value="@Model.FreeSchedule" maxlength="500"
+                                   placeholder="Ví dụ: Thứ 3, Thứ 5 buổi tối" />
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-end mt-4">
+                        <button type="submit" class="btn btn-brand">
+                            <i class="bi bi-check2-circle me-2"></i>Lưu hồ sơ
+                        </button>
+                    </div>
+                </section>
+            </form>
+
+            <section class="pro-card mb-4">
+                <div class="section-head">
+                    <h2 class="section-title">
+                        <span class="section-icon"><i class="bi bi-people"></i></span>
+                        Người giám hộ
+                    </h2>
+                </div>
+
+                @if (Model.Guardians.Any())
+                {
+                    @foreach (var guardian in Model.Guardians)
+                    {
+                        <div class="guardian-item d-block">
+                            <form asp-action="UpdateGuardian" method="post">
+                                <input type="hidden" name="id" value="@guardian.Id" />
+                                <div class="row g-3 align-items-end">
+                                    <div class="col-md-6">
+                                        <label class="form-label">Họ và tên</label>
+                                        <input name="fullName" class="form-control" value="@guardian.FullName" maxlength="150" required />
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Số điện thoại hoặc email</label>
+                                        <input name="contactInfo" class="form-control" value="@guardian.ContactInfo" maxlength="100" required />
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">CCCD người giám hộ (12 chữ số)</label>
+                                        <input name="citizenIdNumber" class="form-control" value="@guardian.CitizenIdNumber" inputmode="numeric" maxlength="12" pattern="[0-9]{12}" required />
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Nơi ở người giám hộ</label>
+                                        <input name="residenceAddress" class="form-control" value="@guardian.ResidenceAddress" maxlength="500" required />
+                                    </div>
+                                    <div class="col-12 d-flex justify-content-end gap-2">
+                                        <button type="submit" class="btn btn-outline-primary btn-sm px-3">Lưu</button>
+                                    </div>
+                                </div>
+                            </form>
+                            <form asp-action="RemoveGuardian" method="post" class="mt-2 text-end"
+                                  onsubmit="return confirm('Xóa người giám hộ này?');">
+                                <input type="hidden" name="id" value="@guardian.Id" />
+                                <button type="submit" class="btn btn-outline-danger btn-sm px-3">Xóa</button>
+                            </form>
+                        </div>
+                    }
+                }
+                else
+                {
+                    <div class="empty-box mb-3">
+                        <i class="bi bi-person-plus"></i>
+                        <span>Chưa có người giám hộ. @(isMinor ? "Học viên dưới 18 tuổi cần thêm ít nhất một người giám hộ." : "Không bắt buộc nếu bạn đã trên 18 tuổi.")</span>
+                    </div>
+                }
+
+                <form asp-action="AddGuardian" method="post" class="upload-box mt-4">
+                    <div class="row g-3 align-items-end">
+                        <div class="col-md-5">
+                            <label for="guardianName" class="form-label">Họ và tên người giám hộ</label>
+                            <input id="guardianName" name="fullName" class="form-control" maxlength="150" required />
+                        </div>
+                        <div class="col-md-4">
+                            <label for="guardianContact" class="form-label">Số điện thoại hoặc email</label>
+                            <input id="guardianContact" name="contactInfo" class="form-control" maxlength="100" required />
+                        </div>
+                        <div class="col-md-4">
+                            <label for="guardianCitizenIdNumber" class="form-label">CCCD (12 chữ số)</label>
+                            <input id="guardianCitizenIdNumber" name="citizenIdNumber" class="form-control" inputmode="numeric" maxlength="12" pattern="[0-9]{12}" required />
+                        </div>
+                        <div class="col-md-4">
+                            <label for="guardianResidenceAddress" class="form-label">Nơi ở</label>
+                            <input id="guardianResidenceAddress" name="residenceAddress" class="form-control" maxlength="500" required />
+                        </div>
+                        <div class="col-12 d-grid">
+                            <button type="submit" class="btn btn-brand">Thêm</button>
+                        </div>
+                    </div>
+                </form>
+            </section>
+
+        </main>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+    (() => {
+        const avatarInput = document.getElementById('avatarFileInput');
+        const avatarImg = document.getElementById('studentAvatarImg');
+        const avatarSpinner = document.getElementById('avatarSpinner');
+
+        if (avatarInput && avatarImg) {
+            avatarInput.addEventListener('change', async () => {
+                const file = avatarInput.files?.[0];
+                if (!file) return;
+
+                if (file.size > 5 * 1024 * 1024) {
+                    OTSP.notify('danger', 'Kích thước ảnh tối đa là 5 MB.');
+                    avatarInput.value = '';
+                    return;
+                }
+
+                const formData = new FormData();
+                formData.append('avatarFile', file);
+
+                if (avatarSpinner) avatarSpinner.style.display = 'flex';
+                try {
+                    const res = await OTSP.send('@Url.Action("UploadAvatar", "Student_Parent_Profile")', formData);
+                    if (res.avatarUrl) {
+                        avatarImg.src = res.avatarUrl;
+                        document.querySelectorAll('[data-role="avatar-img"], [data-role="avatar"]').forEach(img => {
+                            img.src = res.avatarUrl;
+                            img.classList.remove('d-none');
+                        });
+                    }
+                    OTSP.notify('success', res.message || 'Cập nhật ảnh đại diện thành công!');
+                } catch (err) {
+                    OTSP.notify('danger', err.message || 'Không thể tải ảnh lên.');
+                } finally {
+                    if (avatarSpinner) avatarSpinner.style.display = 'none';
+                    avatarInput.value = '';
+                }
+            });
+        }
+    })();
+    </script>
+}
