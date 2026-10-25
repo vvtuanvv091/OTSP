@@ -11,11 +11,12 @@
 using System;
 using System.Reflection;
 
+[assembly: Microsoft.AspNetCore.Identity.UI.UIFrameworkAttribute("Bootstrap5")]
 [assembly: Microsoft.Extensions.Configuration.UserSecrets.UserSecretsIdAttribute("aspnet-PROJECT_OTSP-cccc7f55-6652-4421-b6f3-d9216af7ef4d")]
 [assembly: System.Reflection.AssemblyCompanyAttribute("PROJECT_OTSP")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+8a7a6485cabbc918cd67b3892587358f930ea2ca")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+85362cf56c4666635d253a531d59eaa132d82ce6")]
 [assembly: System.Reflection.AssemblyProductAttribute("PROJECT_OTSP")]
 [assembly: System.Reflection.AssemblyTitleAttribute("PROJECT_OTSP")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

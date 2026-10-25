@@ -72,12 +72,8 @@
         },
         {
           "DockedWidth": 100,
-          "SelectedChildIndex": 2,
+          "SelectedChildIndex": 1,
           "Children": [
-            {
-              "$type": "Bookmark",
-              "Name": "ST:0:0:{40ea2e6b-2121-4bb8-a43e-c83c04b51041}"
-            },
             {
               "$type": "Document",
               "DocumentIndex": 1,
@@ -88,8 +84,7 @@
               "RelativeToolTip": "Areas\\Student_Parent\\Views\\Shared\\_Layout_Student.cshtml",
               "ViewState": "AgIAABUAAAAAAAAAAAAAADAAAAAxAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
-              "WhenOpened": "2026-10-20T07:09:24.701Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-10-20T07:09:24.701Z"
             },
             {
               "$type": "Document",
@@ -99,7 +94,7 @@
               "RelativeDocumentMoniker": "Views\\Shared\\_LoginPartial.cshtml",
               "ToolTip": "C:\\tai_lieu_hoc_thuat_cua_tuan\\mauthietkephanmem\\OTSP\\PROJECT_OTSP\\Views\\Shared\\_LoginPartial.cshtml",
               "RelativeToolTip": "Views\\Shared\\_LoginPartial.cshtml",
-              "ViewState": "AgIAAEIAAAAAAAAAAAAswFQAAAA1AAAAAAAAAA==",
+              "ViewState": "AgIAAEkAAAAAAAAAAAAswHUBAAA1AAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
               "WhenOpened": "2026-10-20T07:08:36.865Z",
               "EditorCaption": ""
@@ -114,8 +109,7 @@
               "RelativeToolTip": "Views\\Shared\\_ValidationScriptsPartial.cshtml",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
-              "WhenOpened": "2026-10-20T07:08:35.321Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-10-20T07:08:35.321Z"
             },
             {
               "$type": "Document",
@@ -127,8 +121,7 @@
               "RelativeToolTip": "Views\\Shared\\_PortalHero.cshtml",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
-              "WhenOpened": "2026-10-20T07:08:29.571Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-10-20T07:08:29.571Z"
             },
             {
               "$type": "Document",
@@ -140,8 +133,7 @@
               "RelativeToolTip": "Views\\Shared\\_Layout.cshtml",
               "ViewState": "AgIAAEsAAAAAAAAAAAAAAFEAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
-              "WhenOpened": "2026-10-20T07:05:50.506Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-10-20T07:05:50.506Z"
             },
             {
               "$type": "Document",
@@ -153,8 +145,7 @@
               "RelativeToolTip": "Areas\\Student_Parent\\Views\\Search\\Index.cshtml",
               "ViewState": "AgIAAFQAAAAAAAAAAAAuwHQAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
-              "WhenOpened": "2026-10-20T07:02:11.242Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-10-20T07:02:11.242Z"
             },
             {
               "$type": "Document",
@@ -166,8 +157,7 @@
               "RelativeToolTip": "Areas\\Tutor\\Views\\TutorSchedule\\Index.cshtml",
               "ViewState": "AgIAALQCAAAAAAAAAAAuwMYCAAA2AAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
-              "WhenOpened": "2026-10-20T06:50:20.623Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-10-20T06:50:20.623Z"
             },
             {
               "$type": "Document",
@@ -179,8 +169,7 @@
               "RelativeToolTip": "Areas\\Tutor\\Controllers\\TutorScheduleController.cs",
               "ViewState": "AgIAAEIBAAAAAAAAAADwv2IBAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-10-20T06:49:59.658Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-10-20T06:49:59.658Z"
             },
             {
               "$type": "Document",
@@ -192,8 +181,7 @@
               "RelativeToolTip": "Controllers\\ClassSessionController.cs",
               "ViewState": "AgIAAOQAAAAAAAAAAAAmwAEBAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-10-20T06:49:29.548Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-10-20T06:49:29.548Z"
             },
             {
               "$type": "Document",
@@ -205,8 +193,7 @@
               "RelativeToolTip": "Controllers\\SetLanguageController.cs",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAAAYAAAAFAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-10-19T06:04:46.612Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-10-19T06:04:46.612Z"
             },
             {
               "$type": "Document",
@@ -218,8 +205,11 @@
               "RelativeToolTip": "Program.cs",
               "ViewState": "AgIAAGMAAAAAAAAAAAAqwHsAAAAYAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-10-19T05:59:58.095Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-10-19T05:59:58.095Z"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{40ea2e6b-2121-4bb8-a43e-c83c04b51041}"
             }
           ]
         }
