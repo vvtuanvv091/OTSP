@@ -20,8 +20,7 @@ using PROJECT_OTSP.Hubs;
 using PROJECT_OTSP.Models;
 using PROJECT_OTSP.Services;
 using System.Globalization;
->>>>>>> eb30c869e0525d8bf651bfa9c0aee3191384d225
->>>>>>> 9910af6bd9154ada3623a89ce0eeb13217dcc6cc
+
 
 var builder = WebApplication.CreateBuilder(args);
 
