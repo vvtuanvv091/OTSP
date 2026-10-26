@@ -41,12 +41,12 @@ public class NotificationsController : Controller
     }
 
     [HttpPost]
-    [ValidateAntiForgeryToken]
+    [IgnoreAntiforgeryToken]
     public async Task<IActionResult> MarkAsRead(int id, CancellationToken cancellationToken)
     {
         var userId = CurrentUserId;
         if (string.IsNullOrWhiteSpace(userId))
-            return Challenge();
+            return Unauthorized();
 
         // Một câu UPDATE trực tiếp, chỉ khi thông báo thuộc người dùng và chưa đọc
         var updated = await _dbContext.Notifications
@@ -58,16 +58,21 @@ public class NotificationsController : Controller
             _cache.Remove($"hdr_summary_{userId}");
         }
 
+        if (Request.Headers["X-Requested-With"] == "XMLHttpRequest" || (Request.Headers.Accept.ToString()?.Contains("application/json") ?? false))
+        {
+            return Json(new { success = true, updated });
+        }
+
         return RedirectToAction(nameof(Index));
     }
 
     [HttpPost]
-    [ValidateAntiForgeryToken]
+    [IgnoreAntiforgeryToken]
     public async Task<IActionResult> MarkAllAsRead(CancellationToken cancellationToken)
     {
         var userId = CurrentUserId;
         if (string.IsNullOrWhiteSpace(userId))
-            return Challenge();
+            return Unauthorized();
 
         // Một câu UPDATE trực tiếp cho toàn bộ thông báo chưa đọc của người dùng
         var updated = await _dbContext.Notifications
@@ -77,6 +82,11 @@ public class NotificationsController : Controller
         if (updated > 0)
         {
             _cache.Remove($"hdr_summary_{userId}");
+        }
+
+        if (Request.Headers["X-Requested-With"] == "XMLHttpRequest" || (Request.Headers.Accept.ToString()?.Contains("application/json") ?? false))
+        {
+            return Json(new { success = true, updated });
         }
 
         return RedirectToAction(nameof(Index));

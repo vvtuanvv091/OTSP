@@ -152,10 +152,10 @@
 
                             <!-- Môn học & Cấp -->
                             <div class="mb-2">
-                                <span class="badge bg-light text-dark border">
+                                <span class="badge bg-body-secondary text-body border">
                                     <i class="bi bi-book me-1 text-danger"></i> @item.SubjectName · @item.GradeLevelName
                                 </span>
-                                <span class="badge bg-light text-dark border ms-1">
+                                <span class="badge bg-body-secondary text-body border ms-1">
                                     @(item.PreferredType == ClassroomType.OneToOne ? "1 kèm 1" : "Lớp nhóm")
                                 </span>
                             </div>
@@ -205,8 +205,8 @@
 
                             @if (!string.IsNullOrWhiteSpace(item.Message))
                             {
-                                <div class="bg-light p-2 rounded-2 small text-secondary mb-3 border">
-                                    <span class="fw-semibold text-dark">Lời nhắn:</span> "@item.Message"
+                                <div class="bg-body-tertiary p-2 rounded-2 small text-secondary mb-3 border">
+                                    <span class="fw-semibold text-body">Lời nhắn:</span> "@item.Message"
                                 </div>
                             }
                         </div>

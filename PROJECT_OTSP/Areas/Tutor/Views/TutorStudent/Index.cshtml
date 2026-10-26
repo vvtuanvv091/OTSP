@@ -1,0 +1,166 @@
+@using static PROJECT_OTSP.Models.Enums
+@model IReadOnlyList<PROJECT_OTSP.Dtos.TutorStudentItemVm>
+@{
+    ViewData["Title"] = "Học viên của tôi";
+}
+
+<div class="tutor-page-container">
+    <!-- Header -->
+    <div class="tutor-page-header">
+        <h1 class="tutor-page-title">Học viên của tôi</h1>
+        <p class="tutor-page-subtitle">Quản lý danh sách học viên theo từng lớp học và theo dõi tiến độ buổi dạy.</p>
+    </div>
+
+    <!-- Alerts -->
+    @if (TempData["Success"] is string successMsg)
+    {
+        <div class="alert alert-success alert-dismissible fade show shadow-sm" role="alert">
+            <i class="bi bi-check-circle-fill me-2"></i>@successMsg
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Đóng"></button>
+        </div>
+    }
+
+    @if (TempData["Error"] is string errorMsg)
+    {
+        <div class="alert alert-warning alert-dismissible fade show shadow-sm" role="alert">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>@errorMsg
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Đóng"></button>
+        </div>
+    }
+
+    @if (Model.Count == 0)
+    {
+        <div class="tutor-card-table-wrapper p-5 text-center">
+            <i class="bi bi-people fs-1 text-muted d-block mb-3"></i>
+            <h5 class="fw-semibold">Chưa có học viên nào</h5>
+            <p class="text-secondary small mb-0">Khi bạn chấp nhận yêu cầu kết nối hoặc xếp lớp cho học viên, danh sách sẽ hiển thị tại đây.</p>
+        </div>
+    }
+    else
+    {
+        <!-- ==================== DESKTOP TABLE VIEW (>= 768px) ==================== -->
+        <div class="d-none d-md-block tutor-card-table-wrapper">
+            <table class="tutor-custom-table">
+                <thead>
+                    <tr>
+                        <th scope="col" style="width: 20%;">Học viên</th>
+                        <th scope="col" style="width: 25%;">Lớp học</th>
+                        <th scope="col" style="width: 15%;">Môn</th>
+                        <th scope="col" style="width: 14%;">Tiến độ</th>
+                        <th scope="col" style="width: 16%;">Buổi tiếp theo</th>
+                        <th scope="col" style="width: 10%; text-align: right;"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var student in Model)
+                    {
+                        <tr>
+                            <td>
+                                <div class="cell-student-name">@student.StudentName</div>
+                            </td>
+                            <td>
+                                <div class="fw-medium">@student.ClassroomName</div>
+                                @if (student.ClassroomType == ClassroomType.Group)
+                                {
+                                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle py-0.5 px-1.5 mt-1" style="font-size: 11px;">
+                                        <i class="bi bi-people me-1"></i>Lớp nhóm
+                                    </span>
+                                }
+                                else if (student.ClassroomType == ClassroomType.OneToOne)
+                                {
+                                    <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle py-0.5 px-1.5 mt-1" style="font-size: 11px;">
+                                        <i class="bi bi-person me-1"></i>1 kèm 1
+                                    </span>
+                                }
+                            </td>
+                            <td>@student.SubjectName</td>
+                            <td>
+                                <span class="fw-semibold text-danger">@student.Progress</span>
+                            </td>
+                            <td>
+                                <div class="slot-time-text" style="font-size: 12.5px;">@student.NextSessionFormatted</div>
+                            </td>
+                            <td style="text-align: right;">
+                                @if (student.RequestId.HasValue)
+                                {
+                                    <a asp-area="" asp-controller="Chat" asp-action="Conversation" asp-route-requestId="@student.RequestId.Value" class="btn-tutor-outline-red">
+                                        Nhắn tin
+                                    </a>
+                                }
+                                else
+                                {
+                                    <a href="javascript:void(0)" onclick="alert('Đang mở hộp thoại tin nhắn với @student.StudentName');" class="btn-tutor-outline-red">
+                                        Nhắn tin
+                                    </a>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <!-- ==================== MOBILE CARD VIEW (< 768px) ==================== -->
+        <div class="d-block d-md-none tutor-mobile-list">
+            @foreach (var student in Model)
+            {
+                <div class="tutor-mobile-card">
+                    <div class="tutor-m-card-header">
+                        <div class="tutor-m-student-info">
+                            <div class="student-avatar-circle">
+                                @(string.IsNullOrWhiteSpace(student.StudentName) ? "H" : student.StudentName.Trim().Substring(0, 1).ToUpper())
+                            </div>
+                            <div>
+                                <div class="tutor-m-name">@student.StudentName</div>
+                                <div class="tutor-m-subject">@student.SubjectName</div>
+                            </div>
+                        </div>
+                        <span class="badge bg-danger-subtle text-danger border border-danger-subtle py-1 px-2 fw-semibold">
+                            @student.Progress
+                        </span>
+                    </div>
+
+                    <div class="tutor-m-card-body">
+                        <div class="tutor-m-data-row">
+                            <span class="tutor-m-label"><i class="bi bi-mortarboard me-1"></i>Lớp học:</span>
+                            <span class="tutor-m-value fw-semibold">
+                                @student.ClassroomName
+                                @if (student.ClassroomType == ClassroomType.Group)
+                                {
+                                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle ms-1" style="font-size: 10px;">Nhóm</span>
+                                }
+                                else if (student.ClassroomType == ClassroomType.OneToOne)
+                                {
+                                    <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle ms-1" style="font-size: 10px;">1-1</span>
+                                }
+                            </span>
+                        </div>
+                        <div class="tutor-m-data-row">
+                            <span class="tutor-m-label"><i class="bi bi-book me-1"></i>Môn:</span>
+                            <span class="tutor-m-value">@student.SubjectName</span>
+                        </div>
+                        <div class="tutor-m-data-row">
+                            <span class="tutor-m-label"><i class="bi bi-calendar-event me-1"></i>Buổi tiếp theo:</span>
+                            <span class="tutor-m-value">@student.NextSessionFormatted</span>
+                        </div>
+                    </div>
+
+                    <div class="tutor-m-card-footer">
+                        @if (student.RequestId.HasValue)
+                        {
+                            <a asp-area="" asp-controller="Chat" asp-action="Conversation" asp-route-requestId="@student.RequestId.Value" class="btn-tutor-outline-red w-100">
+                                <i class="bi bi-chat-dots me-1"></i> Nhắn tin
+                            </a>
+                        }
+                        else
+                        {
+                            <button type="button" onclick="alert('Đang mở hộp thoại tin nhắn với @student.StudentName');" class="btn-tutor-outline-red w-100">
+                                <i class="bi bi-chat-dots me-1"></i> Nhắn tin
+                            </button>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>

@@ -110,6 +110,39 @@
   min-width: 36px;
 }
 
+.header-circle-btn {
+  align-items: center;
+  border: 1px solid color-mix(in srgb, var(--default-color), transparent 82%);
+  border-radius: 50% !important;
+  background: var(--surface-color);
+  color: var(--default-color);
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 16px;
+  justify-content: center;
+  line-height: 1;
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  min-height: 36px;
+  max-width: 36px;
+  max-height: 36px;
+  padding: 0;
+  text-decoration: none;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.header-circle-btn:hover,
+.header-circle-btn.active,
+.header-circle-btn[aria-expanded="true"] {
+  border-color: var(--accent-color);
+  color: var(--accent-color);
+  background: color-mix(in srgb, var(--accent-color), transparent 92%);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--accent-color), transparent 85%);
+  transform: translateY(-1px);
+}
+
 .header-auth-links form {
   margin: 0;
 }
