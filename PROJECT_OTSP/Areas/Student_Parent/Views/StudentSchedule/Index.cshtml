@@ -54,9 +54,14 @@
     }
 
     .schedule-card {
-        background: #ffffff;
+        background: var(--bs-card-bg, #ffffff);
         border: 1px solid var(--availability-border);
         border-radius: 8px;
+    }
+
+    [data-bs-theme="dark"] .schedule-card {
+        background: #1e293b !important;
+        border-color: #334155 !important;
     }
 
     .schedule-table-wrap {
@@ -248,7 +253,7 @@
     <!-- Header -->
     <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
         <div>
-            <h1 class="h3 mb-1 fw-bold text-dark">Lịch học sinh viên</h1>
+            <h1 class="h3 mb-1 fw-bold">Lịch học sinh viên</h1>
             <p class="text-body-secondary mb-0">Thời khóa biểu học tập của bạn theo giờ Việt Nam (GMT+7). Mỗi buổi học được xếp theo khối 2 tiếng.</p>
         </div>
         <div class="d-flex flex-wrap gap-2">

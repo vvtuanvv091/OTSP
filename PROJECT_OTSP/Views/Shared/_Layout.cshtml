@@ -69,10 +69,10 @@
                 <form asp-area="" asp-controller="SetLanguage" asp-action="SetPreferences" method="post" class="header-theme-form">
                     <input type="hidden" name="returnUrl" value="@returnUrl" />
                     <button type="submit" id="themeToggleBtn" name="theme" value="@(theme == "dark" ? "light" : "dark")"
-                            class="header-control header-theme-toggle"
+                            class="header-circle-btn header-theme-toggle"
                             aria-label="@(theme == "dark" ? (isVietnamese ? "Chuyển sang giao diện sáng" : "Switch to light theme") : (isVietnamese ? "Chuyển sang giao diện tối" : "Switch to dark theme"))"
                             title="@(theme == "dark" ? (isVietnamese ? "Giao diện sáng" : "Light theme") : (isVietnamese ? "Giao diện tối" : "Dark theme"))">
-                        <i class="bi @(theme == "dark" ? "bi-sun-fill text-warning" : "bi-moon-stars-fill text-primary")" aria-hidden="true"></i>
+                        <i class="bi @(theme == "dark" ? "bi-sun-fill text-warning" : "bi-moon-stars")" aria-hidden="true"></i>
                     </button>
                 </form>
 
@@ -240,7 +240,7 @@
                     if (nextTheme === 'dark') {
                         icon.className = 'bi bi-sun-fill text-warning';
                     } else {
-                        icon.className = 'bi bi-moon-stars-fill text-primary';
+                        icon.className = 'bi bi-moon-stars';
                     }
                 }
                 toggleBtn.value = nextTheme === 'dark' ? 'light' : 'dark';

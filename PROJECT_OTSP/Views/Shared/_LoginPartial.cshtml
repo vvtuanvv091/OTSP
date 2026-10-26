@@ -9,6 +9,307 @@
     var logoutReturnUrl = Url.Action("Index", "Home", new { area = "" });
 }
 
+<style>
+/* Notification & Account Tools scoped styles */
+.header-account-tools {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+}
+.header-notifications {
+    position: relative;
+}
+.header-circle-btn,
+.header-notification-trigger {
+    width: 36px !important;
+    height: 36px !important;
+    min-width: 36px !important;
+    min-height: 36px !important;
+    max-width: 36px !important;
+    max-height: 36px !important;
+    border-radius: 50% !important;
+    border: 1px solid #e2e8f0 !important;
+    background: #ffffff !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    position: relative !important;
+    color: #475569 !important;
+    font-size: 16px !important;
+    cursor: pointer !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    line-height: 1 !important;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04) !important;
+}
+.header-circle-btn:hover,
+.header-circle-btn[aria-expanded="true"],
+.header-notification-trigger:hover,
+.header-notification-trigger[aria-expanded="true"] {
+    background-color: #fff5f5 !important;
+    border-color: #dc3545 !important;
+    color: #dc3545 !important;
+    box-shadow: 0 2px 8px rgba(220, 53, 69, 0.15) !important;
+    transform: translateY(-1px);
+}
+.header-circle-btn:active,
+.header-notification-trigger:active {
+    transform: translateY(0);
+}
+[data-bs-theme="dark"] .header-circle-btn,
+[data-bs-theme="dark"] .header-notification-trigger {
+    background: #1e293b !important;
+    border-color: #334155 !important;
+    color: #cbd5e1 !important;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2) !important;
+}
+[data-bs-theme="dark"] .header-circle-btn:hover,
+[data-bs-theme="dark"] .header-circle-btn[aria-expanded="true"],
+[data-bs-theme="dark"] .header-notification-trigger:hover,
+[data-bs-theme="dark"] .header-notification-trigger[aria-expanded="true"] {
+    border-color: #ef4444 !important;
+    color: #ef4444 !important;
+    background-color: rgba(239, 68, 68, 0.15) !important;
+}
+.header-mark-read {
+    background: transparent !important;
+    border: none !important;
+    color: #4f46e5 !important;
+    font-size: 13px !important;
+    font-weight: 500 !important;
+    cursor: pointer !important;
+    padding: 0 !important;
+    text-decoration: none !important;
+    transition: opacity 0.15s ease !important;
+}
+.header-mark-read:hover {
+    color: #4338ca !important;
+    opacity: 0.85;
+    text-decoration: underline !important;
+}
+[data-bs-theme="dark"] .header-mark-read {
+    color: #818cf8 !important;
+}
+[data-bs-theme="dark"] .header-mark-read:hover {
+    color: #a5b4fc !important;
+}
+.header-notification-count {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    background: #dc3545;
+    color: #ffffff;
+    font-size: 11px;
+    font-weight: 700;
+    min-width: 18px;
+    height: 18px;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 4px;
+    border: 2px solid #ffffff;
+    line-height: 1;
+}
+[data-bs-theme="dark"] .header-notification-count {
+    border-color: #1e293b;
+}
+.header-notification-menu {
+    width: min(380px, calc(100vw - 24px)) !important;
+    max-width: 400px;
+    padding: 0 !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 14px !important;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.12) !important;
+    background: #ffffff !important;
+    overflow: hidden !important;
+}
+[data-bs-theme="dark"] .header-notification-menu {
+    background: #1e293b !important;
+    border-color: #334155 !important;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35) !important;
+}
+.header-dropdown-heading {
+    padding: 13px 18px;
+    border-bottom: 1px solid #f1f5f9;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #ffffff;
+}
+[data-bs-theme="dark"] .header-dropdown-heading {
+    background: #1e293b;
+    border-bottom-color: #334155;
+}
+.header-dropdown-heading strong {
+    font-size: 15px;
+    font-weight: 700;
+    color: #1e293b;
+}
+[data-bs-theme="dark"] .header-dropdown-heading strong {
+    color: #f8fafc;
+}
+.header-notification-list {
+    max-height: 380px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+}
+.header-notification-item {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: flex-start !important;
+    gap: 12px !important;
+    padding: 13px 18px !important;
+    border-bottom: 1px solid #f1f5f9 !important;
+    text-decoration: none !important;
+    color: inherit !important;
+    background: #ffffff !important;
+    transition: background-color 0.15s ease !important;
+    border-left: 3px solid transparent !important;
+}
+.header-notification-item:last-child {
+    border-bottom: none !important;
+}
+.header-notification-item:hover {
+    background-color: #f8fafc !important;
+}
+.header-notification-item.is-unread {
+    background-color: #f8faff !important;
+    border-left: 3px solid #6366f1 !important;
+}
+.header-notification-item.is-unread:hover {
+    background-color: #eff6ff !important;
+}
+[data-bs-theme="dark"] .header-notification-item {
+    background: #1e293b !important;
+    border-bottom-color: #334155 !important;
+}
+[data-bs-theme="dark"] .header-notification-item:hover {
+    background-color: #27354a !important;
+}
+[data-bs-theme="dark"] .header-notification-item.is-unread {
+    background-color: #1e2238 !important;
+    border-left-color: #818cf8 !important;
+}
+[data-bs-theme="dark"] .header-notification-item.is-unread:hover {
+    background-color: #262c4a !important;
+}
+.header-notif-icon-wrap {
+    width: 36px !important;
+    height: 36px !important;
+    min-width: 36px !important;
+    min-height: 36px !important;
+    border-radius: 50% !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 15px !important;
+    flex-shrink: 0 !important;
+    margin-top: 2px !important;
+    background: #f1f5f9 !important;
+    color: #94a3b8 !important;
+}
+.header-notif-icon-wrap.is-unread,
+.header-notification-item.is-unread .header-notif-icon-wrap {
+    background: #eef2ff !important;
+    color: #4f46e5 !important;
+}
+[data-bs-theme="dark"] .header-notif-icon-wrap {
+    background: #334155 !important;
+    color: #94a3b8 !important;
+}
+[data-bs-theme="dark"] .header-notif-icon-wrap.is-unread,
+[data-bs-theme="dark"] .header-notification-item.is-unread .header-notif-icon-wrap {
+    background: rgba(99, 102, 241, 0.2) !important;
+    color: #a5b4fc !important;
+}
+.header-notification-copy {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 3px !important;
+    flex: 1 !important;
+    min-width: 0 !important;
+}
+.header-notif-title {
+    font-size: 13.5px !important;
+    font-weight: 600 !important;
+    color: #1e293b !important;
+    line-height: 1.35 !important;
+    display: block !important;
+    margin-bottom: 2px !important;
+}
+.header-notification-item.is-unread .header-notif-title {
+    font-weight: 700 !important;
+    color: #0f172a !important;
+}
+[data-bs-theme="dark"] .header-notif-title {
+    color: #e2e8f0 !important;
+}
+[data-bs-theme="dark"] .header-notification-item.is-unread .header-notif-title {
+    color: #ffffff !important;
+}
+.header-notif-body {
+    font-size: 12.5px !important;
+    font-weight: 400 !important;
+    color: #475569 !important;
+    line-height: 1.45 !important;
+    display: block !important;
+    word-break: break-word !important;
+}
+[data-bs-theme="dark"] .header-notif-body {
+    color: #94a3b8 !important;
+}
+.header-notif-time {
+    font-size: 11.5px !important;
+    color: #94a3b8 !important;
+    margin-top: 3px !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 4px !important;
+}
+[data-bs-theme="dark"] .header-notif-time {
+    color: #64748b !important;
+}
+.header-notifications-empty {
+    padding: 36px 16px !important;
+    text-align: center !important;
+    color: #94a3b8 !important;
+    font-size: 14px !important;
+    margin: 0 !important;
+}
+[data-bs-theme="dark"] .header-notifications-empty {
+    color: #64748b !important;
+}
+.header-notifications-all {
+    display: block !important;
+    text-align: center !important;
+    padding: 12px 16px !important;
+    font-size: 13.5px !important;
+    font-weight: 500 !important;
+    color: #4f46e5 !important;
+    text-decoration: none !important;
+    background-color: #ffffff !important;
+    border-top: 1px solid #f1f5f9 !important;
+    transition: all 0.15s ease !important;
+}
+.header-notifications-all:hover {
+    background-color: #f8fafc !important;
+    color: #4338ca !important;
+    text-decoration: none !important;
+}
+[data-bs-theme="dark"] .header-notifications-all {
+    background-color: #1e293b !important;
+    border-top-color: #334155 !important;
+    color: #818cf8 !important;
+}
+[data-bs-theme="dark"] .header-notifications-all:hover {
+    background-color: #27354a !important;
+    color: #a5b4fc !important;
+}
+</style>
+
 <div class="header-auth-links">
 @if (isSignedIn)
 {
@@ -19,16 +320,16 @@
 
         <!-- Notification Bell Dropdown -->
         <div class="dropdown header-notifications">
-            <button type="button" class="header-notification-trigger" data-bs-toggle="dropdown" aria-expanded="false"
+            <button type="button" class="header-circle-btn header-notification-trigger" data-bs-toggle="dropdown" aria-expanded="false"
                     aria-label="@(isVietnamese ? "Thông báo" : "Notifications")">
-                <i class="bi bi-bell-fill" aria-hidden="true"></i>
+                <i class="bi bi-bell" aria-hidden="true"></i>
                 <span class="header-notification-count d-none" data-role="unread"></span>
             </button>
 
-            <div class="dropdown-menu dropdown-menu-end header-notification-menu">
+            <div class="dropdown-menu dropdown-menu-end header-notification-menu shadow">
                 <div class="header-dropdown-heading">
                     <strong>@(isVietnamese ? "Thông báo" : "Notifications")</strong>
-                    <button type="button" class="header-mark-read d-none" data-role="mark-read">
+                    <button type="button" class="header-mark-read" data-role="mark-read">
                         @(isVietnamese ? "Đánh dấu đã đọc hết" : "Mark all as read")
                     </button>
                 </div>
@@ -140,28 +441,68 @@
                 }
             }
 
-            if (unread > 0) {
-                const badge = q('[data-role="unread"]');
-                if (badge) {
+            const badge = q('[data-role="unread"]');
+            if (badge) {
+                if (unread > 0) {
                     badge.textContent = unread > 99 ? '99+' : String(unread);
                     badge.classList.remove('d-none');
-                }
-                const heading = q('[data-role="unread-heading"]');
-                if (heading) {
-                    heading.textContent = String(unread);
-                    heading.classList.remove('d-none');
+                } else {
+                    badge.textContent = '';
+                    badge.classList.add('d-none');
                 }
             }
 
-            if (items && items.length) {
-                const emptyEl = q('[data-role="empty"]');
+            const emptyEl = q('[data-role="empty"]');
+            const list = q('[data-role="list"]');
+            if (items && items.length > 0) {
                 if (emptyEl) emptyEl.classList.add('d-none');
-                const list = q('[data-role="list"]');
                 if (list) {
                     list.innerHTML = '';
+                    list.classList.remove('d-none');
                     items.forEach(n => list.appendChild(notificationItem(n)));
                 }
+            } else {
+                if (emptyEl) emptyEl.classList.remove('d-none');
+                if (list) {
+                    list.innerHTML = '';
+                    list.classList.add('d-none');
+                }
             }
+        }
+
+        const markReadBtn = q('[data-role="mark-read"]');
+        if (markReadBtn) {
+            markReadBtn.addEventListener('click', async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                try {
+                    const res = await fetch('/Notifications/MarkAllAsRead', {
+                        method: 'POST',
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest'
+                        }
+                    });
+                    if (res.ok) {
+                        const badge = q('[data-role="unread"]');
+                        if (badge) {
+                            badge.textContent = '';
+                            badge.classList.add('d-none');
+                        }
+                        box.querySelectorAll('.header-notification-item').forEach(el => {
+                            el.classList.remove('is-unread');
+                            el.classList.add('is-read');
+                            const iconWrap = el.querySelector('.header-notif-icon-wrap');
+                            if (iconWrap) {
+                                iconWrap.classList.remove('is-unread');
+                                iconWrap.classList.add('is-read');
+                            }
+                        });
+                    }
+                } catch (err) {
+                    console.error('Mark all read error:', err);
+                }
+            });
         }
 
         function notificationItem(n) {
@@ -169,24 +510,40 @@
             a.className = 'header-notification-item ' + (n.isRead ? 'is-read' : 'is-unread');
             a.href = box.dataset.notificationsUrl;
 
-            const dot = document.createElement('span');
-            dot.className = 'header-notification-dot';
-            dot.setAttribute('aria-hidden', 'true');
+            // Icon wrap
+            const iconWrap = document.createElement('div');
+            iconWrap.className = 'header-notif-icon-wrap ' + (n.isRead ? 'is-read' : 'is-unread');
+            iconWrap.innerHTML = '<i class="bi bi-bell-fill"></i>';
 
-            const copy = document.createElement('span');
+            // Content copy
+            const copy = document.createElement('div');
             copy.className = 'header-notification-copy';
 
-            const title = document.createElement('strong');
-            title.textContent = n.title || '';
+            const title = document.createElement('div');
+            title.className = 'header-notif-title';
+            title.textContent = n.title || (isVi ? 'Thông báo mới' : 'Notification');
 
-            const content = document.createElement('span');
+            const content = document.createElement('div');
+            content.className = 'header-notif-body';
             content.textContent = n.content || '';
 
-            const time = document.createElement('small');
-            time.textContent = new Date(n.createdAt).toLocaleString(isVi ? 'vi-VN' : 'en-GB');
+            const time = document.createElement('div');
+            time.className = 'header-notif-time';
+            const dateStr = new Date(n.createdAt).toLocaleString(isVi ? 'vi-VN' : 'en-GB');
+            time.innerHTML = '<i class="bi bi-clock me-1"></i> ' + dateStr;
 
             copy.append(title, content, time);
-            a.append(dot, copy);
+            a.append(iconWrap, copy);
+
+            a.addEventListener('click', () => {
+                if (!n.isRead) {
+                    fetch('/Notifications/MarkAsRead?id=' + n.id, {
+                        method: 'POST',
+                        headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+                    }).catch(() => {});
+                }
+            });
+
             return a;
         }
     })();
