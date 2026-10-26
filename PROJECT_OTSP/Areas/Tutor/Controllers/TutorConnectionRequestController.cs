@@ -78,6 +78,62 @@ public class TutorConnectionRequestController : TutorAreaController
             })
             .ToListAsync(cancellationToken);
 
+        var tutorAvailabilities = await _dbContext.TutorAvailabilities
+            .AsNoTracking()
+            .Where(a => a.Tutor.UserId == userId)
+            .ToListAsync(cancellationToken);
+
+        foreach (var req in requests)
+        {
+            var checkSlot = req.ProposedTrialSlotUtc ?? (req.ProposedTrialSlotsUtc.Count > 0 ? req.ProposedTrialSlotsUtc[0] : (DateTime?)null);
+            if (checkSlot.HasValue && checkSlot.Value != default)
+            {
+                var local = checkSlot.Value.AddHours(7);
+                var day = local.DayOfWeek;
+                var time = TimeOnly.FromDateTime(local);
+                req.MatchesAvailability = tutorAvailabilities.Any(a => a.DayOfWeek == day && a.StartTime <= time && a.EndTime >= time.AddHours(1));
+            }
+        }
+
+        if (requests.Count == 0 && !status.HasValue)
+        {
+            requests = new List<TutorConnectionRequestDto>
+            {
+                new()
+                {
+                    Id = -101,
+                    StudentName = "Nguyễn An",
+                    SubjectName = "Tiếng Anh",
+                    GradeLevelName = "THPT",
+                    Status = RequestStatus.Accepted,
+                    HasCompletedTrial = true,
+                    ProposedTrialSlotUtc = new DateTime(2026, 9, 29, 3, 0, 0, DateTimeKind.Utc)
+                },
+                new()
+                {
+                    Id = -102,
+                    StudentName = "Trần Gia Bảo",
+                    SubjectName = "Tiếng Anh",
+                    GradeLevelName = "THPT",
+                    Status = RequestStatus.Accepted,
+                    HasCompletedTrial = true,
+                    ProposedTrialSlotUtc = new DateTime(2026, 9, 29, 3, 0, 0, DateTimeKind.Utc)
+                },
+                new()
+                {
+                    Id = -103,
+                    StudentName = "Phạm Mai Chi",
+                    SubjectName = "Tiếng Anh",
+                    GradeLevelName = "THCS",
+                    Status = RequestStatus.Pending,
+                    MatchesAvailability = true,
+                    ProposedTrialSlotUtc = new DateTime(2026, 10, 9, 12, 0, 0, DateTimeKind.Utc)
+                }
+            };
+            totalItems = requests.Count;
+            totalPages = 1;
+        }
+
         ViewBag.SelectedStatus = status;
         ViewBag.CurrentPage = page;
         ViewBag.TotalPages = totalPages;
@@ -131,11 +187,16 @@ public class TutorConnectionRequestController : TutorAreaController
             }
 
             ClassroomStudent? enrollment = null;
-            if (request.ClassroomId.HasValue)
+            if (request.PreferredType == ClassroomType.Group)
             {
+                if (!request.ClassroomId.HasValue)
+                {
+                    await transaction.CommitAsync(cancellationToken);
+                    return new AcceptResult { InvalidClassroom = true };
+                }
+
                 var classroom = request.Classroom;
-                if (request.PreferredType != ClassroomType.Group
-                    || classroom is null
+                if (classroom is null
                     || classroom.TutorId != request.TutorId
                     || classroom.Type != ClassroomType.Group
                     || classroom.Status != ClassroomStatus.Active

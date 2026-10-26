@@ -13,12 +13,19 @@
     }
 
     .classroom-card {
-        background: #ffffff;
-        border: 1px solid #e5e7eb;
+        background: var(--bs-card-bg, #ffffff);
+        border: 1px solid var(--bs-border-color, #e5e7eb);
         border-radius: 12px;
         box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
         margin-bottom: 24px;
         overflow: hidden;
+        transition: background-color 0.2s ease, border-color 0.2s ease;
+    }
+
+    [data-bs-theme="dark"] .classroom-card {
+        background: #1e293b !important;
+        border-color: #334155 !important;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25) !important;
     }
 
     .classroom-card-header {
@@ -27,7 +34,7 @@
 
     .session-row {
         padding: 14px 24px;
-        border-top: 1px solid #f1f5f9;
+        border-top: 1px solid var(--bs-border-color, #f1f5f9);
         display: flex;
         align-items: center;
         justify-content: space-between;
@@ -36,19 +43,32 @@
     }
 
     .session-row:hover {
-        background-color: #fbfcfd;
+        background-color: var(--bs-tertiary-bg, #fbfcfd);
+    }
+
+    [data-bs-theme="dark"] .session-row {
+        border-top-color: #334155 !important;
+    }
+
+    [data-bs-theme="dark"] .session-row:hover {
+        background-color: #263347 !important;
     }
 
     .session-label {
         font-size: 14px;
-        color: #1e293b;
+        color: var(--bs-body-color, #1e293b);
+        font-weight: 500;
+    }
+
+    [data-bs-theme="dark"] .session-label {
+        color: #f1f5f9 !important;
     }
 
     .badge-status-done {
         background-color: #15803d !important;
         color: #ffffff !important;
         font-size: 11px;
-        font-weight: 500;
+        font-weight: 600;
         padding: 4px 8px;
         border-radius: 4px;
     }
@@ -57,35 +77,40 @@
         background-color: #475569 !important;
         color: #ffffff !important;
         font-size: 11px;
-        font-weight: 500;
+        font-weight: 600;
         padding: 4px 8px;
         border-radius: 4px;
+    }
+
+    [data-bs-theme="dark"] .badge-status-upcoming {
+        background-color: #334155 !important;
+        color: #cbd5e1 !important;
     }
 
     .badge-status-inprogress {
         background-color: #0284c7 !important;
         color: #ffffff !important;
         font-size: 11px;
-        font-weight: 500;
+        font-weight: 600;
         padding: 4px 8px;
         border-radius: 4px;
     }
 
     .btn-danger-custom {
-        background-color: #b91c1c !important;
-        border-color: #b91c1c !important;
+        background-color: #dc3545 !important;
+        border-color: #dc3545 !important;
         color: #ffffff !important;
         border-radius: 6px;
         padding: 6px 18px;
         font-size: 13px;
-        font-weight: 500;
+        font-weight: 600;
         transition: all 0.15s ease-in-out;
     }
 
     .btn-danger-custom:hover {
-        background-color: #991b1b !important;
-        border-color: #991b1b !important;
-        box-shadow: 0 2px 6px rgba(185, 28, 28, 0.25);
+        background-color: #b02a37 !important;
+        border-color: #b02a37 !important;
+        box-shadow: 0 2px 6px rgba(220, 53, 69, 0.25);
     }
 
     .btn-outline-danger-disabled {
@@ -98,6 +123,12 @@
         font-weight: 500;
         opacity: 0.85;
         cursor: not-allowed;
+    }
+
+    [data-bs-theme="dark"] .btn-outline-danger-disabled {
+        border-color: rgba(239, 68, 68, 0.4) !important;
+        background: rgba(239, 68, 68, 0.08) !important;
+        color: #fca5a5 !important;
     }
 
     .live-dot {
@@ -143,8 +174,8 @@
 <div class="student-classroom-shell py-4">
     <!-- Header theo mẫu Figma -->
     <div class="mb-4">
-        <h1 class="h3 fw-bold mb-1 text-dark">Lớp của tôi</h1>
-        <p class="text-secondary small mb-0">Khu học tập của học viên/phụ huynh</p>
+        <h1 class="h3 fw-bold mb-1">Lớp của tôi</h1>
+        <p class="text-muted small mb-0">Khu học tập của học viên/phụ huynh</p>
     </div>
 
     @if (TempData["Success"] is string successMsg)
@@ -159,8 +190,8 @@
     {
         <div class="classroom-card p-5 text-center">
             <i class="bi bi-mortarboard fs-1 text-secondary opacity-50 mb-3 d-block"></i>
-            <h2 class="h5 fw-bold text-dark">Bạn chưa tham gia lớp học nào</h2>
-            <p class="text-secondary small mb-4">Các lớp học sau khi học thử thành công và được gia sư nhận vào lớp sẽ hiển thị tại đây.</p>
+            <h2 class="h5 fw-bold">Bạn chưa tham gia lớp học nào</h2>
+            <p class="text-muted small mb-4">Các lớp học sau khi học thử thành công và được gia sư nhận vào lớp sẽ hiển thị tại đây.</p>
             <a asp-area="Student_Parent" asp-controller="Search" asp-action="Index" class="btn btn-danger-custom">
                 <i class="bi bi-search me-1"></i>Tìm kiếm gia sư
             </a>
@@ -172,15 +203,15 @@
         {
             <div class="classroom-card">
                 <div class="classroom-card-header d-flex align-items-center justify-content-between flex-wrap gap-2">
-                    <h2 class="h5 fw-bold text-dark mb-0">@cls.TutorName · @cls.SubjectName</h2>
-                    <span class="badge text-bg-light border small text-secondary">
+                    <h2 class="h5 fw-bold mb-0">@cls.TutorName · @cls.SubjectName</h2>
+                    <span class="badge bg-body-secondary border small text-body">
                         @(cls.Type == ClassroomType.OneToOne ? "Lớp 1-1" : "Lớp nhóm") · @cls.GradeLevelName
                     </span>
                 </div>
 
                 @if (!cls.Sessions.Any())
                 {
-                    <div class="p-4 text-center text-muted small border-top">
+                    <div class="p-4 text-center text-muted small border-top" style="border-color: var(--bs-border-color) !important;">
                         <em>Chưa có buổi học nào được lên lịch cho lớp này.</em>
                     </div>
                 }
@@ -277,7 +308,7 @@
                                                               placeholder="Chia sẻ cảm nhận về mức độ hiểu bài, phong cách giảng dạy của gia sư...">@s.ReviewComment</textarea>
                                                 </div>
                                             </div>
-                                            <div class="modal-footer bg-light py-2">
+                                            <div class="modal-footer bg-body-tertiary py-2">
                                                 <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Đóng</button>
                                                 <button type="submit" class="btn btn-sm btn-danger-custom">Gửi đánh giá</button>
                                             </div>

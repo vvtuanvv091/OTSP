@@ -19,4 +19,6 @@ public class TutorConnectionRequestDto
     public DateTime CreatedAt { get; set; }
     public DateTime? ProposedTrialSlotUtc { get; set; }
     public List<DateTime> ProposedTrialSlotsUtc { get; set; } = new();
+    public bool MatchesAvailability { get; set; }
+    public bool HasCompletedTrial { get; set; }
 }

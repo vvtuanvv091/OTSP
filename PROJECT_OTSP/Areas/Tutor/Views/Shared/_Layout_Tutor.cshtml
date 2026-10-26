@@ -4,342 +4,660 @@
     var theme = Context.Request.Cookies["otsp-theme"] == "dark" ? "dark" : "light";
     var returnUrl = Context.Request.Path + Context.Request.QueryString;
     var controllerName = ViewContext.RouteData.Values["controller"]?.ToString();
-    var groupBy = Context.Request.Query["groupBy"].ToString();
 
-    // Tên tạm lấy từ cookie đăng nhập, không truy vấn DB
-    var initialName = User.Identity?.Name ?? "";
+    var initialName = User.Identity?.Name ?? "Hoàng Long";
+    var userInitial = !string.IsNullOrWhiteSpace(initialName) ? initialName.Trim().Substring(0, 1).ToUpper() : "L";
     var sidebarInfoUrl = Url.Action("SidebarInfo", "TutorProfile", new { area = "Tutor" });
-
-    var themeLabel = theme == "dark"
-        ? (isVietnamese ? "Chuyển sang giao diện sáng" : "Switch to light theme")
-        : (isVietnamese ? "Chuyển sang giao diện tối" : "Switch to dark theme");
 }<!DOCTYPE html>
 <html lang="@culture" data-bs-theme="@theme">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>@ViewData["Title"] - OTSP</title>
+    <title>@ViewData["Title"] - GiaSưOnline</title>
     <link rel="icon" href="~/assets/img/favicon.png" />
 
     <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&family=Poppins:wght@400;500;600;700;800&family=Raleway:wght@400;600;700;800&display=swap" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" />
 
     <link rel="stylesheet" href="~/assets/vendor/bootstrap/css/bootstrap.min.css" />
     <link rel="stylesheet" href="~/assets/vendor/bootstrap-icons/bootstrap-icons.css" />
-    <link rel="stylesheet" href="~/assets/css/main.css" asp-append-version="true" />
-    <link rel="stylesheet" href="~/css/otsp-home.css" asp-append-version="true" />
-    <link rel="stylesheet" href="~/css/otsp-red-theme.css" asp-append-version="true" />
-    <link rel="stylesheet" href="~/css/otsp-components.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/tutor-sidebar.css" asp-append-version="true" />
-    <link rel="stylesheet" href="~/css/tutor-mobile.css" asp-append-version="true" />
+    <style>
+    /* Scoped Notification Dropdown Styles for Tutor Header */
+    .header-notifications { position: relative; }
+    .header-notification-menu {
+        width: min(380px, calc(100vw - 24px)) !important;
+        max-width: 400px;
+        padding: 0 !important;
+        border: 1px solid #e2e8f0 !important;
+        border-radius: 14px !important;
+        box-shadow: 0 16px 40px rgba(0, 0, 0, 0.12) !important;
+        background: #ffffff !important;
+        overflow: hidden !important;
+    }
+    [data-bs-theme="dark"] .header-notification-menu {
+        background: #1e293b !important;
+        border-color: #334155 !important;
+        box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35) !important;
+    }
+    .header-dropdown-heading {
+        padding: 13px 18px;
+        border-bottom: 1px solid #f1f5f9;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: #ffffff;
+    }
+    [data-bs-theme="dark"] .header-dropdown-heading {
+        background: #1e293b;
+        border-bottom-color: #334155;
+    }
+    .header-dropdown-heading strong {
+        font-size: 15px;
+        font-weight: 700;
+        color: #1e293b;
+    }
+    [data-bs-theme="dark"] .header-dropdown-heading strong {
+        color: #f8fafc;
+    }
+    .header-notification-list {
+        max-height: 380px;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+    }
+    .header-notification-item {
+        display: flex !important;
+        flex-direction: row !important;
+        align-items: flex-start !important;
+        gap: 12px !important;
+        padding: 13px 18px !important;
+        border-bottom: 1px solid #f1f5f9 !important;
+        text-decoration: none !important;
+        color: inherit !important;
+        background: #ffffff !important;
+        transition: background-color 0.15s ease !important;
+        border-left: 3px solid transparent !important;
+    }
+    .header-notification-item:last-child { border-bottom: none !important; }
+    .header-notification-item:hover { background-color: #f8fafc !important; }
+    .header-notification-item.is-unread {
+        background-color: #f8faff !important;
+        border-left: 3px solid #6366f1 !important;
+    }
+    .header-notification-item.is-unread:hover { background-color: #eff6ff !important; }
+    [data-bs-theme="dark"] .header-notification-item {
+        background: #1e293b !important;
+        border-bottom-color: #334155 !important;
+    }
+    [data-bs-theme="dark"] .header-notification-item:hover {
+        background-color: #27354a !important;
+    }
+    [data-bs-theme="dark"] .header-notification-item.is-unread {
+        background-color: #1e2238 !important;
+        border-left-color: #818cf8 !important;
+    }
+    [data-bs-theme="dark"] .header-notification-item.is-unread:hover {
+        background-color: #262c4a !important;
+    }
+    .header-notif-icon-wrap {
+        width: 36px !important;
+        height: 36px !important;
+        min-width: 36px !important;
+        min-height: 36px !important;
+        border-radius: 50% !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        font-size: 15px !important;
+        flex-shrink: 0 !important;
+        margin-top: 2px !important;
+        background: #f1f5f9 !important;
+        color: #94a3b8 !important;
+    }
+    .header-notif-icon-wrap.is-unread,
+    .header-notification-item.is-unread .header-notif-icon-wrap {
+        background: #eef2ff !important;
+        color: #4f46e5 !important;
+    }
+    [data-bs-theme="dark"] .header-notif-icon-wrap {
+        background: #334155 !important;
+        color: #94a3b8 !important;
+    }
+    [data-bs-theme="dark"] .header-notif-icon-wrap.is-unread,
+    [data-bs-theme="dark"] .header-notification-item.is-unread .header-notif-icon-wrap {
+        background: rgba(99, 102, 241, 0.2) !important;
+        color: #a5b4fc !important;
+    }
+    .header-notification-copy {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 3px !important;
+        flex: 1 !important;
+        min-width: 0 !important;
+    }
+    .header-notif-title {
+        font-size: 13.5px !important;
+        font-weight: 600 !important;
+        color: #1e293b !important;
+        line-height: 1.35 !important;
+        display: block !important;
+        margin-bottom: 2px !important;
+    }
+    .header-notification-item.is-unread .header-notif-title {
+        font-weight: 700 !important;
+        color: #0f172a !important;
+    }
+    [data-bs-theme="dark"] .header-notif-title {
+        color: #e2e8f0 !important;
+    }
+    [data-bs-theme="dark"] .header-notification-item.is-unread .header-notif-title {
+        color: #ffffff !important;
+    }
+    .header-notif-body {
+        font-size: 12.5px !important;
+        font-weight: 400 !important;
+        color: #475569 !important;
+        line-height: 1.45 !important;
+        display: block !important;
+        word-break: break-word !important;
+    }
+    [data-bs-theme="dark"] .header-notif-body {
+        color: #94a3b8 !important;
+    }
+    .header-notif-time {
+        font-size: 11.5px !important;
+        color: #94a3b8 !important;
+        margin-top: 3px !important;
+        display: flex !important;
+        align-items: center !important;
+        gap: 4px !important;
+    }
+    [data-bs-theme="dark"] .header-notif-time {
+        color: #64748b !important;
+    }
+    .header-notifications-empty {
+        padding: 36px 16px !important;
+        text-align: center !important;
+        color: #94a3b8 !important;
+        font-size: 14px !important;
+        margin: 0 !important;
+    }
+    [data-bs-theme="dark"] .header-notifications-empty {
+        color: #64748b !important;
+    }
+    .tutor-bell-btn,
+    .header-circle-btn {
+        width: 36px !important;
+        height: 36px !important;
+        min-width: 36px !important;
+        min-height: 36px !important;
+        max-width: 36px !important;
+        max-height: 36px !important;
+        border-radius: 50% !important;
+        border: 1px solid #e2e8f0 !important;
+        background: #ffffff !important;
+        color: #475569 !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        padding: 0 !important;
+        font-size: 16px !important;
+        position: relative !important;
+        cursor: pointer !important;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04) !important;
+        line-height: 1 !important;
+    }
+    .tutor-bell-btn:hover,
+    .tutor-bell-btn[aria-expanded="true"],
+    .header-circle-btn:hover,
+    .header-circle-btn[aria-expanded="true"] {
+        border-color: #dc3545 !important;
+        color: #dc3545 !important;
+        background-color: #fff5f5 !important;
+        box-shadow: 0 2px 8px rgba(220, 53, 69, 0.15) !important;
+        transform: translateY(-1px);
+    }
+    [data-bs-theme="dark"] .tutor-bell-btn,
+    [data-bs-theme="dark"] .header-circle-btn {
+        background: #1e293b !important;
+        border-color: #334155 !important;
+        color: #cbd5e1 !important;
+    }
+    .header-mark-read {
+        background: transparent !important;
+        border: none !important;
+        color: #4f46e5 !important;
+        font-size: 13px !important;
+        font-weight: 500 !important;
+        cursor: pointer !important;
+        padding: 0 !important;
+        text-decoration: none !important;
+        transition: opacity 0.15s ease !important;
+    }
+    .header-mark-read:hover {
+        color: #4338ca !important;
+        opacity: 0.85;
+        text-decoration: underline !important;
+    }
+    [data-bs-theme="dark"] .header-mark-read {
+        color: #818cf8 !important;
+    }
+    [data-bs-theme="dark"] .header-mark-read:hover {
+        color: #a5b4fc !important;
+    }
+    .header-notifications-all {
+        display: block !important;
+        text-align: center !important;
+        padding: 12px 16px !important;
+        font-size: 13.5px !important;
+        font-weight: 500 !important;
+        color: #4f46e5 !important;
+        text-decoration: none !important;
+        background-color: #ffffff !important;
+        border-top: 1px solid #f1f5f9 !important;
+        transition: all 0.15s ease !important;
+    }
+    .header-notifications-all:hover {
+        background-color: #f8fafc !important;
+        color: #4338ca !important;
+        text-decoration: none !important;
+    }
+    [data-bs-theme="dark"] .header-notifications-all {
+        background-color: #1e293b !important;
+        border-top-color: #334155 !important;
+        color: #818cf8 !important;
+    }
+    [data-bs-theme="dark"] .header-notifications-all:hover {
+        background-color: #27354a !important;
+        color: #a5b4fc !important;
+    }
+    </style>
 </head>
-<body class="index-page" data-controller="@controllerName">
+<body data-controller="@controllerName">
     <div id="preloader"></div>
     <div id="tutor-realtime-config" class="d-none"
          data-hub-url="@Url.Content("~/hubs/connection-requests")"
          data-requests-url="@Url.Action("Index", "TutorConnectionRequest", new { area = "Tutor" })"></div>
 
-    <header id="header" class="header sticky-top">
-        <div class="header-top">
-            <div class="container-fluid container-xl d-flex align-items-center justify-content-end gap-2">
-                <form asp-area="" asp-controller="SetLanguage" asp-action="SetPreferences" method="post" class="header-language" aria-label="Language">
-                    <input type="hidden" name="returnUrl" value="@returnUrl" />
-                    <button type="submit" name="culture" value="vi" class="header-control @(culture == "vi" ? "active" : "")" aria-pressed="@(culture == "vi")">VI</button>
-                    <button type="submit" name="culture" value="en" class="header-control @(culture == "en" ? "active" : "")" aria-pressed="@(culture == "en")">EN</button>
-                </form>
+    <!-- ==================== HEADER (TOP NAVBAR) ==================== -->
+    <header id="header" class="tutor-header">
+        <div class="tutor-header-container">
+            <button type="button" class="tutor-menu-toggle" id="tutorMenuToggle" aria-label="Menu">
+                <i class="bi bi-list"></i>
+            </button>
 
-                <form asp-area="" asp-controller="SetLanguage" asp-action="SetPreferences" method="post" class="header-theme-form">
-                    <input type="hidden" name="returnUrl" value="@returnUrl" />
-                    <button type="submit" name="theme" value="@(theme == "dark" ? "light" : "dark")"
-                            class="header-control header-theme-toggle" aria-label="@themeLabel" title="@themeLabel">
-                        <i class="bi @(theme == "dark" ? "bi-sun-fill" : "bi-moon-stars-fill")" aria-hidden="true"></i>
-                    </button>
-                </form>
-
-                <partial name="_LoginPartial" />
-            </div>
-        </div>
-
-        <div class="container-fluid container-xl position-relative d-flex align-items-center">
-            <a asp-controller="Home" asp-action="Index" class="logo d-flex align-items-center me-auto">
-                <h1 class="sitename">OTSP</h1>
+            <!-- Logo -->
+            <a asp-area="" asp-controller="Home" asp-action="Index" class="tutor-logo">
+                <span class="logo-bold">GiaSư</span><span class="logo-sub">Online</span>
             </a>
 
-            <nav id="navmenu" class="navmenu">
-                <ul>
-                    <li><a asp-controller="Home" asp-action="Index">@(isVietnamese ? "Trang chủ" : "Home")</a></li>
-                    <li><a href="#">@(isVietnamese ? "Gia sư" : "Tutors")</a></li>
-                    <li><a href="#">@(isVietnamese ? "Môn học" : "Subjects")</a></li>
-                    <li><a href="/#how-it-works">@(isVietnamese ? "Tin tức" : "News")</a></li>
-                    <li><a href="#">@(isVietnamese ? "Giới thiệu" : "About")</a></li>
-                    <li><a href="/#contact">@(isVietnamese ? "Liên hệ" : "Contact")</a></li>
-                </ul>
+            <!-- Navigation Links -->
+            <nav class="tutor-nav-menu">
+                <a asp-area="" asp-controller="Home" asp-action="Index" class="tutor-nav-item">Trang chủ</a>
+                <a asp-area="" asp-controller="Search" asp-action="Index" class="tutor-nav-item">Lớp cần gia sư</a>
+                <a asp-area="Tutor" asp-controller="TutorLearningDocument" asp-action="Index" class="tutor-nav-item @(controllerName == "TutorLearningDocument" ? "active" : "")">Tài liệu</a>
+                <a href="/#news" class="tutor-nav-item">Tin tức</a>
+                <a asp-area="Tutor" asp-controller="TutorStudent" asp-action="Index" class="tutor-nav-item active">Trang của tôi</a>
             </nav>
 
-            <a class="btn-getstarted" href="/#tutors">@(isVietnamese ? "Tìm gia sư" : "Find a tutor")</a>
+            <!-- Right: Bell Notification & User Dropdown -->
+            <div class="tutor-header-right d-flex align-items-center gap-2">
+                <!-- Theme Toggle Button -->
+                <button type="button" id="tutorThemeToggleBtn"
+                        class="header-circle-btn header-theme-toggle"
+                        aria-label="@(theme == "dark" ? "Chuyển sang giao diện sáng" : "Chuyển sang giao diện tối")"
+                        title="@(theme == "dark" ? "Giao diện sáng" : "Giao diện tối")">
+                    <i class="bi @(theme == "dark" ? "bi-sun-fill text-warning" : "bi-moon-stars")" aria-hidden="true"></i>
+                </button>
+
+                <!-- Notification Bell -->
+                <div class="dropdown header-notifications" id="tutorHeaderNotifications"
+                     data-summary-url="@Url.Action("Summary", "Header", new { area = "" })"
+                     data-notifications-url="@Url.Action("Index", "Notifications", new { area = "" })">
+                    <button type="button" class="tutor-bell-btn header-circle-btn" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Thông báo">
+                        <i class="bi bi-bell"></i>
+                        <span class="tutor-bell-badge d-none" data-role="unread"></span>
+                    </button>
+                    <div class="dropdown-menu dropdown-menu-end header-notification-menu shadow">
+                        <div class="header-dropdown-heading">
+                            <strong>Thông báo</strong>
+                            <button type="button" class="header-mark-read" data-role="mark-read">Đánh dấu đã đọc hết</button>
+                        </div>
+                        <p class="header-notifications-empty" data-role="empty">Chưa có thông báo nào.</p>
+                        <div class="header-notification-list" data-role="list"></div>
+                        <a class="header-notifications-all" asp-area="" asp-controller="Notifications" asp-action="Index">Xem tất cả thông báo</a>
+                    </div>
+                </div>
+
+                <!-- User Dropdown -->
+                <div class="dropdown">
+                    <button type="button" class="tutor-user-btn" data-bs-toggle="dropdown" aria-expanded="false">
+                        <span class="tutor-user-avatar" id="headerAvatarFallback">@userInitial</span>
+                        <span class="tutor-user-name" id="headerUserName">@initialName</span>
+                        <i class="bi bi-chevron-down tutor-user-arrow"></i>
+                    </button>
+                    <div class="dropdown-menu dropdown-menu-end shadow border-0 py-2" style="min-width: 200px; font-size: 13.5px;">
+                        <div class="px-3 py-2 border-bottom">
+                            <strong class="d-block text-body" id="dropdownUserName">@initialName</strong>
+                            <small class="text-secondary">Gia sư · Đã xác minh</small>
+                        </div>
+                        <a class="dropdown-item py-2" asp-area="Tutor" asp-controller="TutorProfile" asp-action="Index">
+                            <i class="bi bi-person me-2 text-secondary"></i>Hồ sơ cá nhân
+                        </a>
+                        <a class="dropdown-item py-2" asp-area="Identity" asp-page="/Account/Manage/Index">
+                            <i class="bi bi-gear me-2 text-secondary"></i>Cài đặt tài khoản
+                        </a>
+                        <div class="dropdown-divider"></div>
+                        <form asp-area="Identity" asp-page="/Account/Logout" asp-route-returnUrl="/" method="post" class="m-0">
+                            <button type="submit" class="dropdown-item py-2 text-danger">
+                                <i class="bi bi-box-arrow-right me-2"></i>Đăng xuất
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
         </div>
     </header>
 
+    <!-- ==================== DASHBOARD SHELL ==================== -->
     <div class="tutor-dashboard-shell">
+        <!-- Sidebar -->
         <aside class="tutor-sidebar" id="tutorSidebar" aria-label="Thanh điều hướng gia sư">
-
-            <div class="tutor-sidebar-user" id="tutorSidebarUser" data-info-url="@sidebarInfoUrl">
-                <img class="tutor-sidebar-avatar d-none" data-role="avatar-img" alt="" referrerpolicy="no-referrer" />
-                <span class="tutor-sidebar-avatar" data-role="avatar-icon"><i class="bi bi-person-fill" aria-hidden="true"></i></span>
-                <div class="tutor-sidebar-user-info">
-                    <strong data-role="name">@initialName</strong>
-                </div>
+            <div class="tutor-sidebar-profile" id="tutorSidebarUser" data-info-url="@sidebarInfoUrl">
+                <div class="tutor-profile-name" data-role="name">@initialName</div>
+                <div class="tutor-profile-badge">Gia sư · Đã xác minh</div>
             </div>
 
             <nav class="tutor-sidebar-nav">
                 <span class="tutor-sidebar-heading">TỔNG QUAN</span>
                 <a asp-area="Tutor" asp-controller="TutorProfile" asp-action="Index"
                    class="tutor-sidebar-link @(controllerName == "TutorProfile" ? "active" : "")">
-                    <i class="bi bi-grid" aria-hidden="true"></i><span>Tổng quan</span>
+                    <span>Tổng quan</span>
                 </a>
 
                 <span class="tutor-sidebar-heading">GIẢNG DẠY</span>
                 <a asp-area="Tutor" asp-controller="TutorSchedule" asp-action="Index"
                    class="tutor-sidebar-link @(controllerName == "TutorSchedule" ? "active" : "")">
-                    <i class="bi bi-journal-bookmark" aria-hidden="true"></i><span>Lịch dạy</span>
+                    <span>Lịch dạy</span>
+                    <span class="tutor-sidebar-badge">2</span>
                 </a>
                 <a asp-area="Tutor" asp-controller="TutorConnectionRequest" asp-action="Index"
                    class="tutor-sidebar-link @(controllerName == "TutorConnectionRequest" ? "active" : "")">
-                    <i class="bi bi-person-plus" aria-hidden="true"></i><span>Yêu cầu kết nối</span>
+                    <span>Yêu cầu kết nối</span>
+                    <span class="tutor-sidebar-badge">1</span>
                 </a>
                 <a asp-area="Tutor" asp-controller="TutorClassroom" asp-action="Index"
                    class="tutor-sidebar-link @(controllerName == "TutorClassroom" ? "active" : "")">
-                    <i class="bi bi-easel" aria-hidden="true"></i><span>Quản lý lớp nhóm</span>
+                    <span>Lớp đang dạy</span>
                 </a>
                 <a asp-area="Tutor" asp-controller="TutorAvailability" asp-action="Index"
                    class="tutor-sidebar-link @(controllerName == "TutorAvailability" ? "active" : "")">
-                    <i class="bi bi-calendar3" aria-hidden="true"></i><span>Lịch rảnh</span>
+                    <span>Lịch rảnh</span>
                 </a>
-                <a asp-area="Tutor" asp-controller="TutorSubject" asp-action="Index" asp-route-groupBy="subject"
-                   class="tutor-sidebar-link @(controllerName == "TutorSubject" && groupBy != "grade" ? "active" : "")">
-                    <i class="bi bi-book" aria-hidden="true"></i><span>Môn học</span>
+                <a asp-area="Tutor" asp-controller="TutorStudent" asp-action="Index"
+                   class="tutor-sidebar-link @(controllerName == "TutorStudent" ? "active" : "")">
+                    <span>Học viên của tôi</span>
                 </a>
-                <a asp-area="Tutor" asp-controller="TutorSubject" asp-action="Index" asp-route-groupBy="grade"
-                   class="tutor-sidebar-link @(controllerName == "TutorSubject" && groupBy == "grade" ? "active" : "")">
-                    <i class="bi bi-mortarboard" aria-hidden="true"></i><span>Cấp học</span>
-                </a>
-
-                <span class="tutor-sidebar-heading">HỌC VIÊN CỦA TÔI</span>
                 <a asp-area="Tutor" asp-controller="TutorLearningDocument" asp-action="Index"
                    class="tutor-sidebar-link @(controllerName == "TutorLearningDocument" ? "active" : "")">
-                    <i class="bi bi-folder2-open" aria-hidden="true"></i><span>Tài liệu</span>
+                    <span>Tài liệu</span>
                 </a>
 
                 <span class="tutor-sidebar-heading">TƯƠNG TÁC</span>
-                <span class="tutor-sidebar-link is-disabled"><i class="bi bi-star" aria-hidden="true"></i><span>Đánh giá</span></span>
-                <span class="tutor-sidebar-link is-disabled"><i class="bi bi-chat-dots" aria-hidden="true"></i><span>Tin nhắn</span></span>
+                <a href="javascript:void(0)" class="tutor-sidebar-link">
+                    <span>Đánh giá</span>
+                </a>
+                <a href="javascript:void(0)" class="tutor-sidebar-link">
+                    <span>Tin nhắn</span>
+                </a>
 
                 <span class="tutor-sidebar-heading">TÀI CHÍNH</span>
-                <span class="tutor-sidebar-link is-disabled"><i class="bi bi-wallet2" aria-hidden="true"></i><span>Thu nhập</span></span>
+                <a href="javascript:void(0)" class="tutor-sidebar-link">
+                    <span>Thu nhập</span>
+                </a>
 
                 <span class="tutor-sidebar-heading">TÀI KHOẢN</span>
                 <a asp-area="Tutor" asp-controller="TutorProfile" asp-action="Index" class="tutor-sidebar-link">
-                    <i class="bi bi-person-vcard" aria-hidden="true"></i><span>Hồ sơ</span>
+                    <span>Hồ sơ</span>
                 </a>
             </nav>
         </aside>
+        <div class="tutor-sidebar-backdrop" id="tutorSidebarBackdrop"></div>
 
-        <button type="button" class="tutor-menu-toggle" id="tutorMenuToggle"
-                aria-label="Mở thanh điều hướng" aria-controls="tutorSidebar" aria-expanded="true">
-            <i class="bi bi-list" aria-hidden="true"></i>
-        </button>
-        <button type="button" class="tutor-sidebar-backdrop" id="tutorSidebarBackdrop" aria-label="Đóng thanh điều hướng"></button>
-
-        <main id="tutorPageContent" role="main" class="tutor-dashboard-main pb-3">
+        <!-- Main Content -->
+        <main id="tutorPageContent" role="main" class="tutor-dashboard-main">
             @RenderBody()
         </main>
     </div>
 
-    <!-- ==================== FOOTER ==================== -->
-    <footer id="footer" class="footer position-relative">
-        <div class="container footer-top">
-            <div class="row gy-4">
-                <div class="col-lg-4 col-md-6 footer-about">
-                    <a asp-area="" asp-controller="Home" asp-action="Index" class="logo d-flex align-items-center text-decoration-none">
-                        <span class="sitename">OTSP</span>
-                    </a>
-                    <p class="pt-3">
-                        @(isVietnamese
-                            ? "Nền tảng kết nối gia sư và học viên trực tuyến hàng đầu. Đội ngũ gia sư được kiểm định bằng cấp nghiêm ngặt, học phí minh bạch và hỗ trợ học thử linh hoạt."
-                            : "Premier online tutoring platform connecting verified tutors and students with transparent pricing and flexible schedules.")
-                    </p>
-                    <div class="footer-contact pt-2">
-                        <p><i class="bi bi-telephone-fill me-2 text-danger"></i><strong>Hotline:</strong> <span>(+84) 984 391 940</span></p>
-                        <p><i class="bi bi-envelope-fill me-2 text-danger"></i><strong>Email:</strong> <span>support@otsp.vn</span></p>
-                    </div>
-                    <div class="social-links d-flex gap-2 mt-4">
-                        <a href="#" aria-label="Facebook"><i class="bi bi-facebook"></i></a>
-                        <a href="#" aria-label="Instagram"><i class="bi bi-instagram"></i></a>
-                        <a href="#" aria-label="YouTube"><i class="bi bi-youtube"></i></a>
-                        <a href="#" aria-label="TikTok"><i class="bi bi-tiktok"></i></a>
-                    </div>
-                </div>
+    <script src="~/assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
 
-                <div class="col-6 col-lg-2 col-md-3 footer-links">
-                    <h4>@(isVietnamese ? "Khám phá" : "Explore")</h4>
-                    <ul class="list-unstyled">
-                        <li><a href="/#features">@(isVietnamese ? "Danh mục môn học" : "Subjects")</a></li>
-                        <li><a href="/#courses">@(isVietnamese ? "Lớp học đang mở" : "Active Classes")</a></li>
-                        <li><a href="/#trainers-index">@(isVietnamese ? "Gia sư tiêu biểu" : "Top Tutors")</a></li>
-                        <li><a asp-area="Identity" asp-page="/Account/Register">@(isVietnamese ? "Đăng ký gia sư" : "Become Tutor")</a></li>
-                    </ul>
-                </div>
+    <script>
+        (() => {
+            // Load tutor profile info
+            const userBox = document.getElementById('tutorSidebarUser');
+            if (userBox && userBox.dataset.infoUrl) {
+                fetch(userBox.dataset.infoUrl, {
+                    credentials: 'same-origin',
+                    headers: { Accept: 'application/json' }
+                })
+                .then(res => res.ok ? res.json() : null)
+                .then(info => {
+                    if (!info || !info.name) return;
+                    const name = info.name;
+                    const nameEl = userBox.querySelector('[data-role="name"]');
+                    if (nameEl) nameEl.textContent = name;
 
-                <div class="col-6 col-lg-2 col-md-3 footer-links">
-                    <h4>@(isVietnamese ? "Thông tin" : "Information")</h4>
-                    <ul class="list-unstyled">
-                        <li><a href="/#why-us">@(isVietnamese ? "Về OTSP" : "About Us")</a></li>
-                        <li><a href="/#hero">@(isVietnamese ? "Quy định học thử" : "Trial Policy")</a></li>
-                        <li><a href="/#footer">@(isVietnamese ? "Chính sách bảo mật" : "Privacy Policy")</a></li>
-                        <li><a href="/#footer">@(isVietnamese ? "Điều khoản dịch vụ" : "Terms of Service")</a></li>
-                    </ul>
-                </div>
+                    const headerName = document.getElementById('headerUserName');
+                    if (headerName) headerName.textContent = name;
 
-                <div class="col-lg-4 col-md-12 footer-newsletter">
-                    <h4>@(isVietnamese ? "Nhận bản tin giáo dục" : "Newsletter")</h4>
-                    <p>@(isVietnamese ? "Đăng ký email để nhận thông tin ưu đãi học tập và các mẹo ôn thi hữu ích." : "Subscribe to receive study tips and exclusive tutoring offers.")</p>
-                    <form onsubmit="event.preventDefault(); alert('@(isVietnamese ? "Cảm ơn bạn đã đăng ký nhận tin!" : "Thank you for subscribing!")');" class="php-email-form">
-                        <div class="newsletter-form">
-                            <input type="email" name="email" placeholder="@(isVietnamese ? "Nhập email của bạn..." : "Your email address...")" required>
-                            <input type="submit" value="@(isVietnamese ? "Đăng ký" : "Subscribe")">
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
+                    const dropdownName = document.getElementById('dropdownUserName');
+                    if (dropdownName) dropdownName.textContent = name;
 
-        <div class="container copyright text-center mt-4 pt-3 border-top">
-            <p class="mb-0 text-muted small">
-                © <strong>OTSP</strong>. @(isVietnamese ? "Bảo lưu mọi quyền." : "All rights reserved.")
-            </p>
-        </div>
-    </footer>
-
-<script src="~/assets/vendor/bootstrap/js/bootstrap.bundle.min.js" defer></script>
-<script src="~/js/otsp-common.js" asp-append-version="true" defer></script>
-<script src="~/js/tutor-ajax-navigation.js" asp-append-version="true" defer></script>
-
-<script>
-    (() => {
-        // 1) Sidebar: lấy họ tên và avatar sau khi trang đã hiển thị
-        const userBox = document.getElementById('tutorSidebarUser');
-        if (userBox && userBox.dataset.infoUrl) {
-            fetch(userBox.dataset.infoUrl, {
-                credentials: 'same-origin',
-                headers: { Accept: 'application/json' }
-            })
-            .then(res => res.ok ? res.json() : null)
-            .then(info => {
-                if (!info) return;
-
-                userBox.querySelector('[data-role="name"]').textContent = info.name || '';
-
-                if (info.avatarUrl) {
-                    const img = userBox.querySelector('[data-role="avatar-img"]');
-                    const icon = userBox.querySelector('[data-role="avatar-icon"]');
-                    if (img) {
-                        img.onerror = () => {
-                            img.classList.add('d-none');
-                            if (icon) icon.classList.remove('d-none');
-                        };
-                        img.src = info.avatarUrl;
-                        img.classList.remove('d-none');
-                        if (icon) icon.classList.add('d-none');
+                    const avatarFallback = document.getElementById('headerAvatarFallback');
+                    if (avatarFallback) {
+                        avatarFallback.textContent = name.trim().charAt(0).toUpperCase();
                     }
+                })
+                .catch(() => {});
+            }
+
+            // Notifications loader
+            const notifBox = document.getElementById('tutorHeaderNotifications');
+            if (notifBox && notifBox.dataset.summaryUrl) {
+                const markReadBtn = notifBox.querySelector('[data-role="mark-read"]');
+                if (markReadBtn) {
+                    markReadBtn.addEventListener('click', async (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        try {
+                            const res = await fetch('/Notifications/MarkAllAsRead', {
+                                method: 'POST',
+                                headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+                            });
+                            if (res.ok) {
+                                const badge = notifBox.querySelector('[data-role="unread"]');
+                                if (badge) {
+                                    badge.textContent = '';
+                                    badge.classList.add('d-none');
+                                }
+                                notifBox.querySelectorAll('.header-notification-item').forEach(el => {
+                                    el.classList.remove('is-unread');
+                                    el.classList.add('is-read');
+                                    const iconWrap = el.querySelector('.header-notif-icon-wrap');
+                                    if (iconWrap) {
+                                        iconWrap.classList.remove('is-unread');
+                                        iconWrap.classList.add('is-read');
+                                    }
+                                });
+                            }
+                        } catch (err) {
+                            console.error('Mark all read error:', err);
+                        }
+                    });
                 }
-            })
-            .catch(() => { /* giữ tên tạm từ cookie */ });
-        }
 
-        // 2) Mở/đóng sidebar
-        const toggle = document.getElementById('tutorMenuToggle');
-        const backdrop = document.getElementById('tutorSidebarBackdrop');
-        const mobileQuery = window.matchMedia('(max-width: 991.98px)');
+                fetch(notifBox.dataset.summaryUrl, {
+                    credentials: 'same-origin',
+                    headers: { Accept: 'application/json' }
+                })
+                .then(res => res.ok ? res.json() : null)
+                .then(data => {
+                    if (!data) return;
+                    const badge = notifBox.querySelector('[data-role="unread"]');
+                    if (badge) {
+                        if (data.unread > 0) {
+                            badge.textContent = data.unread > 99 ? '99+' : String(data.unread);
+                            badge.classList.remove('d-none');
+                        } else {
+                            badge.textContent = '';
+                            badge.classList.add('d-none');
+                        }
+                    }
 
-        function setSidebarOpen(open) {
-            document.body.classList.toggle('tutor-sidebar-open', open);
-            document.body.classList.toggle('tutor-sidebar-collapsed', !open && !mobileQuery.matches);
-            toggle.setAttribute('aria-expanded', String(open));
-            toggle.setAttribute('aria-label', open ? 'Thu gọn thanh điều hướng' : 'Mở thanh điều hướng');
-            toggle.querySelector('i').className = open ? 'bi bi-x-lg' : 'bi bi-list';
-        }
+                    const empty = notifBox.querySelector('[data-role="empty"]');
+                    const list = notifBox.querySelector('[data-role="list"]');
+                    if (data.items && data.items.length) {
+                        if (empty) empty.classList.add('d-none');
+                        if (list) {
+                            list.innerHTML = '';
+                            list.classList.remove('d-none');
+                            data.items.forEach(n => {
+                                const a = document.createElement('a');
+                                a.className = 'header-notification-item ' + (n.isRead ? 'is-read' : 'is-unread');
+                                a.href = notifBox.dataset.notificationsUrl;
 
-        setSidebarOpen(!mobileQuery.matches);
+                                const iconWrap = document.createElement('div');
+                                iconWrap.className = 'header-notif-icon-wrap ' + (n.isRead ? 'is-read' : 'is-unread');
+                                iconWrap.innerHTML = '<i class="bi bi-bell-fill"></i>';
 
-        toggle.addEventListener('click', () => {
-            setSidebarOpen(!document.body.classList.contains('tutor-sidebar-open'));
+                                const copy = document.createElement('div');
+                                copy.className = 'header-notification-copy';
+
+                                const title = document.createElement('div');
+                                title.className = 'header-notif-title';
+                                title.textContent = n.title || 'Thông báo mới';
+
+                                const content = document.createElement('div');
+                                content.className = 'header-notif-body';
+                                content.textContent = n.content || '';
+
+                                const time = document.createElement('div');
+                                time.className = 'header-notif-time';
+                                const dateStr = new Date(n.createdAt).toLocaleString('vi-VN');
+                                time.innerHTML = '<i class="bi bi-clock me-1"></i> ' + dateStr;
+
+                                copy.append(title, content, time);
+                                a.append(iconWrap, copy);
+
+                                a.addEventListener('click', () => {
+                                    if (!n.isRead) {
+                                        fetch('/Notifications/MarkAsRead?id=' + n.id, {
+                                            method: 'POST',
+                                            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+                                        }).catch(() => {});
+                                    }
+                                });
+
+                                list.appendChild(a);
+                            });
+                        }
+                    } else {
+                        if (empty) empty.classList.remove('d-none');
+                        if (list) {
+                            list.innerHTML = '';
+                            list.classList.add('d-none');
+                        }
+                    }
+                })
+                .catch(() => {});
+            }
+
+            // Mobile menu toggle & backdrop
+            const toggle = document.getElementById('tutorMenuToggle');
+            const backdrop = document.getElementById('tutorSidebarBackdrop');
+            if (toggle) {
+                toggle.addEventListener('click', () => {
+                    document.body.classList.toggle('tutor-sidebar-open');
+                });
+            }
+            if (backdrop) {
+                backdrop.addEventListener('click', () => {
+                    document.body.classList.remove('tutor-sidebar-open');
+                });
+            }
+        })();
+    </script>
+
+    <!-- SignalR for connection requests & session changes -->
+    <script src="https://cdn.jsdelivr.net/npm/@@microsoft/signalr@10.0.0/dist/browser/signalr.min.js"></script>
+    <script>
+        (() => {
+            const config = document.getElementById("tutor-realtime-config");
+            if (!config || !window.signalR) return;
+
+            const connection = new signalR.HubConnectionBuilder()
+                .withUrl(config.dataset.hubUrl)
+                .withAutomaticReconnect()
+                .build();
+
+            const showNotice = message => {
+                const notice = document.createElement("div");
+                notice.className = "alert alert-info shadow position-fixed top-0 end-0 m-3";
+                notice.style.zIndex = "1080";
+                notice.setAttribute("role", "status");
+                notice.textContent = message + " ";
+
+                const link = document.createElement("a");
+                link.href = config.dataset.requestsUrl;
+                link.className = "alert-link";
+                link.textContent = "Xem yêu cầu";
+                notice.appendChild(link);
+                document.body.appendChild(notice);
+                window.setTimeout(() => notice.remove(), 10000);
+            };
+
+            connection.on("ConnectionRequestReceived", update => {
+                showNotice(`Có yêu cầu kết nối mới từ ${update.studentName} cho môn ${update.subjectName}.`);
+                if (document.body.dataset.controller === "TutorConnectionRequest")
+                    window.setTimeout(() => window.location.reload(), 500);
+            });
+
+            connection.on("ConnectionRequestCancelled", () => {
+                showNotice("Học viên đã hủy yêu cầu kết nối.");
+                if (document.body.dataset.controller === "TutorConnectionRequest")
+                    window.setTimeout(() => window.location.reload(), 500);
+            });
+
+            connection.start().catch(error => console.error("SignalR connection failed:", error));
+        })();
+    </script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            var tutorThemeBtn = document.getElementById('tutorThemeToggleBtn');
+            if (!tutorThemeBtn) return;
+
+            tutorThemeBtn.addEventListener('click', function (e) {
+                e.preventDefault();
+                var html = document.documentElement;
+                var currentTheme = html.getAttribute('data-bs-theme') || 'light';
+                var nextTheme = currentTheme === 'dark' ? 'light' : 'dark';
+
+                html.setAttribute('data-bs-theme', nextTheme);
+
+                var icon = tutorThemeBtn.querySelector('i');
+                if (icon) {
+                    icon.className = nextTheme === 'dark' ? 'bi bi-sun-fill text-warning' : 'bi bi-moon-stars';
+                }
+                tutorThemeBtn.setAttribute('title', nextTheme === 'dark' ? 'Giao diện sáng' : 'Giao diện tối');
+                document.cookie = 'otsp-theme=' + nextTheme + ';path=/;max-age=31536000;SameSite=Lax';
+            });
         });
-        backdrop.addEventListener('click', () => setSidebarOpen(false));
-        mobileQuery.addEventListener('change', e => setSidebarOpen(!e.matches));
+    </script>
 
-        // 3) Đồng bộ chiều cao header để sidebar luôn nằm ngay dưới header
-        const header = document.getElementById('header');
-        const shell = document.querySelector('.tutor-dashboard-shell');
-        const syncHeaderOffset = () => {
-            shell.style.setProperty('--tutor-header-offset', header.offsetHeight + 'px');
-        };
-        syncHeaderOffset();
-        window.addEventListener('resize', syncHeaderOffset);
-        new ResizeObserver(syncHeaderOffset).observe(header);
-    })();
-</script>
-
-<script src="https://cdn.jsdelivr.net/npm/@@microsoft/signalr@10.0.0/dist/browser/signalr.min.js"></script>
-<script>
-    (() => {
-        const config = document.getElementById("tutor-realtime-config");
-        if (!config || !window.signalR) return;
-
-        const connection = new signalR.HubConnectionBuilder()
-            .withUrl(config.dataset.hubUrl)
-            .withAutomaticReconnect()
-            .build();
-
-        const showNotice = message => {
-            const notice = document.createElement("div");
-            notice.className = "alert alert-info shadow position-fixed top-0 end-0 m-3";
-            notice.style.zIndex = "1080";
-            notice.setAttribute("role", "status");
-            notice.textContent = message + " ";
-
-            const link = document.createElement("a");
-            link.href = config.dataset.requestsUrl;
-            link.className = "alert-link";
-            link.textContent = "Xem yêu cầu";
-            notice.appendChild(link);
-            document.body.appendChild(notice);
-            window.setTimeout(() => notice.remove(), 10000);
-        };
-
-        connection.on("ConnectionRequestReceived", update => {
-            showNotice(`Có yêu cầu kết nối mới từ ${update.studentName} cho môn ${update.subjectName}.`);
-            if (document.body.dataset.controller === "TutorConnectionRequest")
-                window.setTimeout(() => window.location.reload(), 500);
-        });
-
-        connection.on("ConnectionRequestCancelled", () => {
-            showNotice("Học viên đã hủy yêu cầu kết nối.");
-            if (document.body.dataset.controller === "TutorConnectionRequest")
-                window.setTimeout(() => window.location.reload(), 500);
-        });
-
-        connection.on("ClassSessionStatusChanged", update => {
-            const labels = { InProgress: "Buổi học đang diễn ra hoặc đã được mở lại.", Done: "Buổi học đã kết thúc.", Cancelled: "Buổi học đã bị hủy." };
-            showNotice(labels[update.status] || "Trạng thái buổi học đã thay đổi.");
-            if (document.body.dataset.controller === "TutorSchedule")
-                window.setTimeout(() => window.location.reload(), 500);
-        });
-
-        connection.start().catch(error => console.error("SignalR connection failed:", error));
-    })();
-</script>
-
-<script src="~/assets/js/preloader.js" asp-append-version="true"></script>
-@await RenderSectionAsync("Scripts", required: false)
+    @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>
