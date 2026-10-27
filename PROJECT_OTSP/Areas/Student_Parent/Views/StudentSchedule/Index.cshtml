@@ -184,18 +184,44 @@
     .session-time {
         font-size: 11px;
         font-weight: 600;
-        color: #1e293b;
+        color: var(--bs-body-color, #1e293b);
     }
 
     .session-tutor {
         font-weight: 600;
-        color: #0f172a;
+        color: var(--bs-heading-color, #0f172a);
         margin-top: 2px;
     }
 
     .session-sub {
         font-size: 10px;
-        color: #64748b;
+        color: var(--bs-secondary-color, #64748b);
+    }
+
+    [data-bs-theme="dark"] .schedule-session-card {
+        background: #1e293b !important;
+        border-color: #334155 !important;
+    }
+    [data-bs-theme="dark"] .schedule-session-card.status-inprogress {
+        border-left-color: #38bdf8 !important;
+        background: rgba(2, 132, 199, 0.2) !important;
+    }
+    [data-bs-theme="dark"] .schedule-session-card.status-done {
+        border-left-color: #22c55e !important;
+        background: rgba(21, 128, 61, 0.2) !important;
+    }
+    [data-bs-theme="dark"] .schedule-session-card.status-trial {
+        border-left-color: #f87171 !important;
+        background: rgba(220, 38, 38, 0.2) !important;
+    }
+    [data-bs-theme="dark"] .session-time {
+        color: #f1f5f9 !important;
+    }
+    [data-bs-theme="dark"] .session-tutor {
+        color: #ffffff !important;
+    }
+    [data-bs-theme="dark"] .session-sub {
+        color: #94a3b8 !important;
     }
 
     .btn-danger-custom {
@@ -396,13 +422,13 @@
                                                 var isInProgress = session.Status == SessionStatus.InProgress;
                                                 var isCancelled = session.Status == SessionStatus.Cancelled;
 
-                                                var statusBadgeClass = isDone ? "text-bg-secondary" 
+                                                var statusBadgeClass = isDone ? "text-bg-success" 
                                                     : isInProgress ? "text-bg-primary" 
                                                     : isCancelled ? "text-bg-danger" 
                                                     : session.IsMakeup ? "text-bg-info text-white" 
                                                     : "text-bg-dark";
 
-                                                var statusBadgeLabel = isDone ? "Đã kết thúc" 
+                                                var statusBadgeLabel = isDone ? "Đã học" 
                                                     : isInProgress ? "Đang diễn ra" 
                                                     : isCancelled ? "Gia sư báo bận" 
                                                     : session.IsMakeup ? "Buổi học bù" 

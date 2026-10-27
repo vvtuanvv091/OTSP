@@ -12,9 +12,9 @@
     --tutor-text-body: #374151;
     --tutor-text-muted: #64748b;
     --tutor-text-subtle: #9ca3af;
-    --tutor-border: #eaedf1;
-    --tutor-border-light: #f1f5f9;
-    --tutor-bg-body: #fafafa;
+    --tutor-border: var(--bs-border-color, #eaedf1);
+    --tutor-border-light: var(--bs-border-color-translucent, #f1f5f9);
+    --tutor-bg-body: var(--bs-body-bg, #fafafa);
     --tutor-green: #16a34a;
     --tutor-green-hover: #15803d;
     --tutor-green-light: #dcfce7;
@@ -22,7 +22,8 @@
     --tutor-amber-light: #fef9c3;
 }
 
-body {
+/* body styles overridden by _Layout.cshtml */
+.tutor-legacy-body {
     background-color: var(--tutor-bg-body);
     color: var(--tutor-text-body);
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;

@@ -1,34 +1,43 @@
-/* OTSP red brand layer. Loaded after Bootstrap and the page stylesheets. */
+/* OTSP Brand Theme & Dark/Light Mode Layer. Loaded after Bootstrap and page stylesheets. */
 :root,
-[data-bs-theme="light"],
-[data-bs-theme="dark"] {
+[data-bs-theme="light"] {
   --bs-primary: #DB303A;
   --bs-primary-rgb: 219, 48, 58;
-  --bs-success: #DB303A;
-  --bs-success-rgb: 219, 48, 58;
-  --bs-info: #DB303A;
-  --bs-info-rgb: 219, 48, 58;
   --bs-danger: #DB303A;
   --bs-danger-rgb: 219, 48, 58;
+  
+  /* Green color matching user specification (#15803D) */
+  --bs-success: #15803D;
+  --bs-success-rgb: 21, 128, 61;
+  --bs-success-text-emphasis: #15803D;
+  --bs-success-bg-subtle: #DCFCE7;
+  --bs-success-border-subtle: #86EFAC;
+  
+  /* Deep Rich Amber / Gold for Stars & Warning (#E8A317 / #D97706) */
+  --bs-warning: #D97706;
+  --bs-warning-rgb: 217, 119, 6;
+  --bs-warning-text-emphasis: #B45309;
+  --bs-warning-bg-subtle: #FEF3C7;
+  --bs-warning-border-subtle: #FCD34D;
+  --otsp-star-gold: #E8A317;
+
+  --bs-info: #0284C7;
+  --bs-info-rgb: 2, 132, 199;
+  
   --bs-link-color: #B7212B;
   --bs-link-color-rgb: 183, 33, 43;
   --bs-link-hover-color: #941A23;
   --bs-link-hover-color-rgb: 148, 26, 35;
   --bs-focus-ring-color: rgba(219, 48, 58, .25);
-  --bs-form-valid-color: #B7212B;
-  --bs-form-valid-border-color: #DB303A;
+  --bs-form-valid-color: #15803D;
+  --bs-form-valid-border-color: #15803D;
   --swiper-theme-color: #DB303A;
+
   --bs-primary-text-emphasis: #842029;
-  --bs-success-text-emphasis: #842029;
-  --bs-info-text-emphasis: #842029;
   --bs-danger-text-emphasis: #842029;
   --bs-primary-bg-subtle: #F8D7DA;
-  --bs-success-bg-subtle: #F8D7DA;
-  --bs-info-bg-subtle: #F8D7DA;
   --bs-danger-bg-subtle: #F8D7DA;
   --bs-primary-border-subtle: #F1AEB5;
-  --bs-success-border-subtle: #F1AEB5;
-  --bs-info-border-subtle: #F1AEB5;
   --bs-danger-border-subtle: #F1AEB5;
 }
 
@@ -40,26 +49,44 @@
   --bs-card-border-color: #334155;
   --bs-card-color: #e2e8f0;
   --bs-secondary-color: #94a3b8;
-  --bs-tertiary-bg: #1e293b;
+  --bs-tertiary-bg: #162032;
   --bs-dark-rgb: 248, 250, 252;
+  
+  --bs-primary: #E95760;
   --bs-primary-text-emphasis: #FF9CA2;
-  --bs-success-text-emphasis: #FF9CA2;
-  --bs-info-text-emphasis: #FF9CA2;
-  --bs-danger-text-emphasis: #FF9CA2;
   --bs-primary-bg-subtle: #49272A;
-  --bs-success-bg-subtle: #49272A;
-  --bs-info-bg-subtle: #49272A;
-  --bs-danger-bg-subtle: #49272A;
   --bs-primary-border-subtle: #754046;
-  --bs-success-border-subtle: #754046;
-  --bs-info-border-subtle: #754046;
-  --bs-danger-border-subtle: #754046;
+
+  --bs-danger: #EF4444;
+  --bs-danger-text-emphasis: #FCA5A5;
+  --bs-danger-bg-subtle: rgba(239, 68, 68, 0.2);
+  --bs-danger-border-subtle: rgba(239, 68, 68, 0.35);
+
+  /* Dark mode green */
+  --bs-success: #22C55E;
+  --bs-success-rgb: 34, 197, 94;
+  --bs-success-text-emphasis: #4ADE80;
+  --bs-success-bg-subtle: rgba(21, 128, 61, 0.25);
+  --bs-success-border-subtle: rgba(34, 197, 94, 0.35);
+
+  /* Dark mode deep amber */
+  --bs-warning: #F59E0B;
+  --bs-warning-rgb: 245, 158, 11;
+  --bs-warning-text-emphasis: #FBBF24;
+  --bs-warning-bg-subtle: rgba(217, 119, 6, 0.25);
+  --bs-warning-border-subtle: rgba(245, 158, 11, 0.4);
+  --otsp-star-gold: #E8A317;
+
+  --bs-info: #38BDF8;
+  --bs-info-text-emphasis: #7DD3FC;
+  --bs-info-bg-subtle: rgba(2, 132, 199, 0.2);
+  --bs-info-border-subtle: rgba(56, 189, 248, 0.35);
 }
 
-/* ==================== GLOBAL DARK THEME FIXES ==================== */
+/* ==================== GLOBAL DARK THEME FIXES (UNIFIED CONTRAST) ==================== */
 html[data-bs-theme="dark"] body {
-  background-color: #0f172a;
-  color: #e2e8f0;
+  background-color: #0f172a !important;
+  color: #e2e8f0 !important;
 }
 
 /* Text and Headings */
@@ -87,15 +114,19 @@ html[data-bs-theme="dark"] h6 {
 /* Cards & Containers across Student and Tutor dashboards */
 html[data-bs-theme="dark"] .card,
 html[data-bs-theme="dark"] .bg-white,
+html[data-bs-theme="dark"] .bg-body,
 html[data-bs-theme="dark"] .classroom-card,
 html[data-bs-theme="dark"] .tutor-card-table-wrapper,
+html[data-bs-theme="dark"] .tutor-mobile-card,
 html[data-bs-theme="dark"] .schedule-card,
 html[data-bs-theme="dark"] .pro-card,
 html[data-bs-theme="dark"] .tutor-m-card,
 [data-bs-theme="dark"] .card,
 [data-bs-theme="dark"] .bg-white,
+[data-bs-theme="dark"] .bg-body,
 [data-bs-theme="dark"] .classroom-card,
 [data-bs-theme="dark"] .tutor-card-table-wrapper,
+[data-bs-theme="dark"] .tutor-mobile-card,
 [data-bs-theme="dark"] .schedule-card,
 [data-bs-theme="dark"] .pro-card,
 [data-bs-theme="dark"] .tutor-m-card {
@@ -104,10 +135,24 @@ html[data-bs-theme="dark"] .tutor-m-card,
   color: #e2e8f0 !important;
 }
 
-html[data-bs-theme="dark"] .bg-light,
-[data-bs-theme="dark"] .bg-light {
+html[data-bs-theme="dark"] .card-header,
+html[data-bs-theme="dark"] .card-footer,
+[data-bs-theme="dark"] .card-header,
+[data-bs-theme="dark"] .card-footer {
   background-color: #162032 !important;
   border-color: #334155 !important;
+  color: #e2e8f0 !important;
+}
+
+html[data-bs-theme="dark"] .bg-light,
+html[data-bs-theme="dark"] .bg-body-secondary,
+html[data-bs-theme="dark"] .bg-body-tertiary,
+[data-bs-theme="dark"] .bg-light,
+[data-bs-theme="dark"] .bg-body-secondary,
+[data-bs-theme="dark"] .bg-body-tertiary {
+  background-color: #162032 !important;
+  border-color: #334155 !important;
+  color: #cbd5e1 !important;
 }
 
 /* Badges */
@@ -121,20 +166,33 @@ html[data-bs-theme="dark"] .badge.text-bg-light,
 }
 
 /* Table styling for dark theme */
+html[data-bs-theme="dark"] .table,
+[data-bs-theme="dark"] .table {
+  --bs-table-bg: transparent;
+  --bs-table-color: #e2e8f0;
+  border-color: #334155;
+}
+
+html[data-bs-theme="dark"] .table th,
 html[data-bs-theme="dark"] .tutor-custom-table th,
+[data-bs-theme="dark"] .table th,
 [data-bs-theme="dark"] .tutor-custom-table th {
   background: #1e293b !important;
   color: #f8fafc !important;
   border-bottom-color: #334155 !important;
 }
 
+html[data-bs-theme="dark"] .table td,
 html[data-bs-theme="dark"] .tutor-custom-table td,
+[data-bs-theme="dark"] .table td,
 [data-bs-theme="dark"] .tutor-custom-table td {
   color: #e2e8f0 !important;
   border-bottom-color: #334155 !important;
 }
 
+html[data-bs-theme="dark"] .table-hover tbody tr:hover td,
 html[data-bs-theme="dark"] .tutor-custom-table tr:hover td,
+[data-bs-theme="dark"] .table-hover tbody tr:hover td,
 [data-bs-theme="dark"] .tutor-custom-table tr:hover td {
   background-color: #263347 !important;
 }
@@ -145,7 +203,7 @@ html[data-bs-theme="dark"] .student-avatar-circle,
   color: #f1f5f9 !important;
 }
 
-/* Sidebars and Navigation */
+/* Sidebars and Navigation in Dark Mode */
 html[data-bs-theme="dark"] .student-sidebar,
 html[data-bs-theme="dark"] .tutor-sidebar,
 [data-bs-theme="dark"] .student-sidebar,
@@ -154,64 +212,48 @@ html[data-bs-theme="dark"] .tutor-sidebar,
   border-right-color: #334155 !important;
 }
 
-html[data-bs-theme="dark"] .tutor-header,
-[data-bs-theme="dark"] .tutor-header {
+html[data-bs-theme="dark"] .student-dashboard-shell,
+html[data-bs-theme="dark"] .tutor-dashboard-shell,
+[data-bs-theme="dark"] .student-dashboard-shell,
+[data-bs-theme="dark"] .tutor-dashboard-shell {
   background-color: #0f172a !important;
-  border-bottom-color: #334155 !important;
-}
-
-html[data-bs-theme="dark"] .student-sidebar-link,
-html[data-bs-theme="dark"] .tutor-sidebar-link,
-[data-bs-theme="dark"] .student-sidebar-link,
-[data-bs-theme="dark"] .tutor-sidebar-link {
-  color: #cbd5e1 !important;
-}
-
-html[data-bs-theme="dark"] .student-sidebar-link:hover,
-html[data-bs-theme="dark"] .tutor-sidebar-link:hover,
-[data-bs-theme="dark"] .student-sidebar-link:hover,
-[data-bs-theme="dark"] .tutor-sidebar-link:hover {
-  background: rgba(220, 53, 69, 0.15) !important;
-  color: #ff7a82 !important;
-}
-
-html[data-bs-theme="dark"] .student-sidebar-link.active,
-html[data-bs-theme="dark"] .tutor-sidebar-link.active,
-[data-bs-theme="dark"] .student-sidebar-link.active,
-[data-bs-theme="dark"] .tutor-sidebar-link.active {
-  background: rgba(220, 53, 69, 0.22) !important;
-  color: #ff7a82 !important;
-}
-
-html[data-bs-theme="dark"] .student-sidebar-link.active i,
-html[data-bs-theme="dark"] .tutor-sidebar-link.active i,
-[data-bs-theme="dark"] .student-sidebar-link.active i,
-[data-bs-theme="dark"] .tutor-sidebar-link.active i {
-  color: #ff7a82 !important;
 }
 
 html[data-bs-theme="dark"] .student-menu-toggle,
-[data-bs-theme="dark"] .student-menu-toggle {
-  background-color: #1e293b !important;
-  border-color: #334155 !important;
-  color: #f8fafc !important;
-}
-
-/* Modals & Forms */
-html[data-bs-theme="dark"] .modal-content,
-[data-bs-theme="dark"] .modal-content {
+html[data-bs-theme="dark"] .tutor-menu-toggle,
+[data-bs-theme="dark"] .student-menu-toggle,
+[data-bs-theme="dark"] .tutor-menu-toggle {
   background-color: #1e293b !important;
   border-color: #334155 !important;
   color: #e2e8f0 !important;
 }
 
-html[data-bs-theme="dark"] .modal-header,
-html[data-bs-theme="dark"] .modal-footer,
-[data-bs-theme="dark"] .modal-header,
-[data-bs-theme="dark"] .modal-footer {
-  border-color: #334155 !important;
+html[data-bs-theme="dark"] .student-sidebar-user,
+html[data-bs-theme="dark"] .tutor-sidebar-profile,
+[data-bs-theme="dark"] .student-sidebar-user,
+[data-bs-theme="dark"] .tutor-sidebar-profile {
+  border-bottom-color: #334155 !important;
 }
 
+html[data-bs-theme="dark"] .header,
+[data-bs-theme="dark"] .header {
+  background-color: #0f172a !important;
+  border-bottom-color: #334155 !important;
+}
+
+html[data-bs-theme="dark"] .header-top,
+[data-bs-theme="dark"] .header-top {
+  background-color: #0b1120 !important;
+  border-bottom-color: #1e293b !important;
+}
+
+html[data-bs-theme="dark"] .footer,
+[data-bs-theme="dark"] .footer {
+  background-color: #0b1120 !important;
+  border-top-color: #1e293b !important;
+}
+
+/* Form Controls in Dark Mode */
 html[data-bs-theme="dark"] .form-control,
 html[data-bs-theme="dark"] .form-select,
 [data-bs-theme="dark"] .form-control,
@@ -221,26 +263,11 @@ html[data-bs-theme="dark"] .form-select,
   color: #f8fafc !important;
 }
 
-html[data-bs-theme="dark"] .form-control:focus,
-html[data-bs-theme="dark"] .form-select:focus,
-[data-bs-theme="dark"] .form-control:focus,
-[data-bs-theme="dark"] .form-select:focus {
-  border-color: #dc3545 !important;
-  box-shadow: 0 0 0 0.25rem rgba(220, 53, 69, 0.25) !important;
-}
-
-html[data-bs-theme="dark"] .btn-close,
-[data-bs-theme="dark"] .btn-close {
-  filter: invert(1) grayscale(100%) brightness(200%);
-}
-
-/* Dropdown menus */
 html[data-bs-theme="dark"] .dropdown-menu,
 [data-bs-theme="dark"] .dropdown-menu {
   background-color: #1e293b !important;
   border-color: #334155 !important;
   color: #e2e8f0 !important;
-  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.4) !important;
 }
 
 html[data-bs-theme="dark"] .dropdown-item,
@@ -259,8 +286,9 @@ html[data-bs-theme="dark"] .dropdown-divider,
   border-color: #334155 !important;
 }
 
-/* Bootstrap buttons, links, form states, tabs and utility colors. */
-.btn-primary, .btn-success, .btn-info, .btn-danger {
+/* ==================== BUTTONS & UTILITIES ==================== */
+/* Primary & Danger buttons (Red brand) */
+.btn-primary, .btn-danger {
   --bs-btn-color: #fff;
   --bs-btn-bg: #DB303A;
   --bs-btn-border-color: #DB303A;
@@ -276,7 +304,7 @@ html[data-bs-theme="dark"] .dropdown-divider,
   --bs-btn-disabled-border-color: #DB303A;
 }
 
-.btn-outline-primary, .btn-outline-success, .btn-outline-info, .btn-outline-danger {
+.btn-outline-primary, .btn-outline-danger {
   --bs-btn-color: #B7212B;
   --bs-btn-border-color: #DB303A;
   --bs-btn-hover-color: #fff;
@@ -290,12 +318,90 @@ html[data-bs-theme="dark"] .dropdown-divider,
   --bs-btn-disabled-border-color: #DB303A;
 }
 
-.text-primary, .text-success, .text-info, .text-danger,
-.link-primary, .link-success, .link-info, .link-danger {
+/* Success Buttons (Green #15803D as specified by user) */
+.btn-success {
+  --bs-btn-color: #fff;
+  --bs-btn-bg: #15803D;
+  --bs-btn-border-color: #15803D;
+  --bs-btn-hover-color: #fff;
+  --bs-btn-hover-bg: #166534;
+  --bs-btn-hover-border-color: #14532D;
+  --bs-btn-focus-shadow-rgb: 21, 128, 61;
+  --bs-btn-active-color: #fff;
+  --bs-btn-active-bg: #14532D;
+  --bs-btn-active-border-color: #14532D;
+  --bs-btn-disabled-color: #fff;
+  --bs-btn-disabled-bg: #15803D;
+  --bs-btn-disabled-border-color: #15803D;
+}
+
+.btn-outline-success {
+  --bs-btn-color: #15803D;
+  --bs-btn-border-color: #15803D;
+  --bs-btn-hover-color: #fff;
+  --bs-btn-hover-bg: #15803D;
+  --bs-btn-hover-border-color: #15803D;
+  --bs-btn-focus-shadow-rgb: 21, 128, 61;
+  --bs-btn-active-color: #fff;
+  --bs-btn-active-bg: #166534;
+  --bs-btn-active-border-color: #166534;
+  --bs-btn-disabled-color: #15803D;
+  --bs-btn-disabled-border-color: #15803D;
+}
+
+/* Colors and Links */
+.text-primary, .text-danger,
+.link-primary, .link-danger {
   color: #B7212B !important;
 }
-.bg-primary, .bg-success, .bg-info, .bg-danger { background-color: #DB303A !important; }
-.border-primary, .border-success, .border-info, .border-danger { border-color: #DB303A !important; }
+
+.bg-primary, .bg-danger { background-color: #DB303A !important; }
+.border-primary, .border-danger { border-color: #DB303A !important; }
+
+/* GREEN SPECIFICATION (#15803D) FOR SUCCESS & "ĐÃ HỌC" */
+.text-success, .link-success {
+  color: #15803D !important;
+}
+[data-bs-theme="dark"] .text-success,
+[data-bs-theme="dark"] .link-success {
+  color: #4ADE80 !important;
+}
+
+.bg-success,
+.text-bg-success,
+.badge-done,
+.badge-green {
+  background-color: #15803D !important;
+  color: #ffffff !important;
+}
+
+.border-success {
+  border-color: #15803D !important;
+}
+
+/* DEEP GOLD / AMBER (#E8A317) FOR STARS & WARNING */
+.star-gold,
+.text-warning,
+.bi-star-fill.text-warning,
+i.bi-star-fill {
+  color: #E8A317 !important;
+}
+
+.badge.text-bg-warning,
+.badge.bg-warning,
+.tutor-pill-pending {
+  background-color: #FEF3C7 !important;
+  color: #B45309 !important;
+  border: 1px solid #FCD34D !important;
+}
+[data-bs-theme="dark"] .badge.text-bg-warning,
+[data-bs-theme="dark"] .badge.bg-warning,
+[data-bs-theme="dark"] .tutor-pill-pending {
+  background-color: rgba(217, 119, 6, 0.25) !important;
+  color: #FBBF24 !important;
+  border-color: rgba(245, 158, 11, 0.4) !important;
+}
+
 .nav-pills .nav-link.active, .dropdown-item.active, .dropdown-item:active,
 .page-item.active .page-link, .page-link.active { color: #fff; background-color: #DB303A; border-color: #DB303A; }
 .form-check-input:checked { border-color: #DB303A; background-color: #DB303A; }

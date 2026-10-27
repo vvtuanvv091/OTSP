@@ -534,14 +534,14 @@
                                                 var sessionBadgeClass = session.Status switch
                                                 {
                                                     SessionStatus.InProgress => "text-bg-primary",
-                                                    SessionStatus.Done => "text-bg-secondary",
+                                                    SessionStatus.Done => "text-bg-success",
                                                     SessionStatus.Cancelled => "text-bg-danger",
                                                     _ => session.IsMakeup ? "text-bg-info text-white" : "text-bg-success"
                                                 };
                                                 var sessionBadgeLabel = session.Status switch
                                                 {
                                                     SessionStatus.InProgress => "Đang diễn ra",
-                                                    SessionStatus.Done => "Đã kết thúc",
+                                                    SessionStatus.Done => "Đã học",
                                                     SessionStatus.Cancelled => "Báo bận / Hủy",
                                                     _ => session.IsMakeup ? "Lịch dạy bù" : "Đã xác nhận"
                                                 };
@@ -661,14 +661,14 @@
                                     var sessionBadge = item.ClassSessionStatus switch
                                     {
                                         SessionStatus.InProgress => "text-bg-primary",
-                                        SessionStatus.Done => "text-bg-secondary",
+                                        SessionStatus.Done => "text-bg-success",
                                         SessionStatus.Cancelled => "text-bg-danger",
                                         _ => "text-bg-success"
                                     };
                                     var sessionLabel = item.ClassSessionStatus switch
                                     {
                                         SessionStatus.InProgress => "Đang diễn ra",
-                                        SessionStatus.Done => "Đã kết thúc",
+                                        SessionStatus.Done => "Đã học",
                                         SessionStatus.Cancelled => "Báo bận / Đã hủy",
                                         _ => "Đã xác nhận lịch học thử"
                                     };
