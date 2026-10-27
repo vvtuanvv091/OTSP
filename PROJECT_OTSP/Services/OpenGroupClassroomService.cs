@@ -43,7 +43,6 @@ public sealed class OpenGroupClassroomService : IOpenGroupClassroomService
                 WeeklySchedules = classroom.WeeklySchedules
                     .OrderBy(w => w.SessionIndex)
                     .Select(w => new { w.SessionIndex, w.DayOfWeek, w.StartTime, w.EndTime })
-                    .ToList()
             })
             .ToListAsync(cancellationToken);
 

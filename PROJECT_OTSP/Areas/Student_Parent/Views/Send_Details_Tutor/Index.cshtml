@@ -1016,20 +1016,6 @@
                                 </div>
                             </div>
 
-                            <!-- Dropdown chọn lớp nhóm nếu có -->
-                            @if (Model.ClassroomOptions.Count > 0)
-                            {
-                                <div class="mb-3 d-none" id="classroomSelectBox">
-                                    <label class="form-label small fw-semibold" asp-for="Request.ClassroomId">Lớp học nhóm gia sư đang mở</label>
-                                    <select asp-for="Request.ClassroomId" class="form-select form-select-sm">
-                                        <option value="">-- Chọn lớp học mở sẵn (tùy chọn) --</option>
-                                        @foreach (var cls in Model.ClassroomOptions)
-                                        {
-                                            <option value="@cls.Value">@cls.Text</option>
-                                        }
-                                    </select>
-                                </div>
-                            }
                             <!-- Khi chọn 1 kèm 1: Chọn slot học từ lịch rảnh thực tế của gia sư (Bắt buộc đủ 4 tiếng: 2 buổi, mỗi buổi 2 tiếng) -->
                             <div class="mb-3" id="trialSlotSection">
                                 <label class="form-label small fw-semibold d-flex justify-content-between align-items-center mb-1">

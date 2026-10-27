@@ -16,8 +16,11 @@
         --brand-soft: rgba(219, 48, 58, .10);
         --radius-lg: 1.15rem;
         --radius-md: .85rem;
+        --bg-accepted: #15803d;
     }
-
+    .bg-accepted {
+        background-color: var(--bg-accepted);
+    }
     .pro-card {
         background: var(--bs-body-bg, #fff);
         border: 1px solid var(--bs-border-color, #e9ecef);
@@ -250,7 +253,7 @@
     }
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/@@microsoft/signalr@10.0.0/dist/browser/signalr.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@@microsoft/signalr@latest/dist/browser/signalr.min.js"></script>
 <script>
     (() => {
         const page = document.getElementById("my-requests-page");
@@ -259,7 +262,7 @@
 
         const labels = { Accepted: "Đã chấp nhận", Rejected: "Đã từ chối", Cancelled: "Đã hủy" };
         const badgeClasses = {
-            Accepted: "bg-success",
+            Accepted: "bg-accepted",
             Rejected: "bg-secondary",
             Cancelled: "bg-dark"
         };

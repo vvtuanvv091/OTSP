@@ -1,12 +1,18 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 
-namespace PROJECT_OTSP.Controllers
+namespace PROJECT_OTSP.Controllers;
+
+[AllowAnonymous]
+public class DetailsController : Controller
 {
-    public class DetailsController : Controller
+    [HttpGet]
+    public IActionResult Index(int? id)
     {
-        public IActionResult Index()
+        if (id.HasValue && id.Value > 0)
         {
-            return View();
+            return RedirectToAction("Details", "Search", new { id = id.Value });
         }
+        return RedirectToAction("Index", "Search");
     }
 }

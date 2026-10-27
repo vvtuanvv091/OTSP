@@ -1,4 +1,4 @@
-﻿using System.Security.Claims;
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -10,7 +10,7 @@ namespace PROJECT_OTSP.Areas.Student_Parent.Controllers;
 
 
 [Area("Student_Parent")]
-//[Authorize(Roles = "Student_Parent")]  
+[Authorize(Roles = "Student_Parent")]
 public class SearchController : Controller
 {
     private readonly ISearchService _search;
