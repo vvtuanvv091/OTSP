@@ -1,0 +1,93 @@
+@model PROJECT_OTSP.Dtos.TutorReviewPageVm
+@{
+    ViewData["Title"] = "Đánh giá từ học viên";
+}
+
+<style>
+    .review-score-num {
+        font-size: 3.5rem;
+        font-weight: 700;
+        line-height: 1;
+        color: #DB303A;
+        letter-spacing: -1px;
+    }
+    .star-gold i {
+        color: #E8A317 !important;
+        font-size: 1.15rem;
+    }
+    .star-gold i.star-muted {
+        color: var(--bs-border-color, #cbd5e1) !important;
+    }
+    .review-item {
+        transition: background-color .15s ease;
+    }
+    .review-item:hover {
+        background-color: rgba(var(--bs-tertiary-bg-rgb, 240, 240, 240), 0.35);
+    }
+</style>
+
+<div class="tutor-page-container review-page py-3">
+    <!-- Header -->
+    <div class="mb-4">
+        <h1 class="h3 fw-bold mb-1 text-body">Đánh giá từ học viên</h1>
+        <div class="text-secondary small">Khu làm việc của gia sư</div>
+    </div>
+
+    <!-- Layout Grid -->
+    <div class="row g-4 align-items-stretch">
+        <!-- Left: Overall Rating Box -->
+        <div class="col-lg-3 col-md-4">
+            <div class="card h-100 border shadow-sm rounded-3 p-4 text-center d-flex flex-column align-items-center justify-content-center">
+                <div class="review-score-num mb-2">@Model.AverageRating.ToString("0.0", new System.Globalization.CultureInfo("vi-VN"))</div>
+                <div class="star-gold mb-2 d-flex justify-content-center gap-1">
+                    @for (int i = 1; i <= 5; i++)
+                    {
+                        if (i <= Math.Round(Model.AverageRating))
+                        {
+                            <i class="bi bi-star-fill"></i>
+                        }
+                        else
+                        {
+                            <i class="bi bi-star-fill star-muted opacity-50"></i>
+                        }
+                    }
+                </div>
+                <div class="text-secondary small">@Model.TotalReviews đánh giá</div>
+            </div>
+        </div>
+
+        <!-- Right: Reviews List Card -->
+        <div class="col-lg-9 col-md-8">
+            <div class="card h-100 border shadow-sm rounded-3 p-4">
+                <div class="review-list">
+                    @for (int i = 0; i < Model.Reviews.Count; i++)
+                    {
+                        var r = Model.Reviews[i];
+                        var isLast = i == Model.Reviews.Count - 1;
+                        <div class="review-item py-3 @(!isLast ? "border-bottom" : "")">
+                            <div class="d-flex align-items-center gap-2 mb-1 flex-wrap">
+                                <strong class="text-body fw-bold">@r.StudentName</strong>
+                                <div class="star-gold d-inline-flex gap-1 small">
+                                    @for (int s = 1; s <= 5; s++)
+                                    {
+                                        if (s <= r.Score)
+                                        {
+                                            <i class="bi bi-star-fill" style="font-size: 0.9rem;"></i>
+                                        }
+                                        else
+                                        {
+                                            <i class="bi bi-star-fill star-muted opacity-50" style="font-size: 0.9rem;"></i>
+                                        }
+                                    }
+                                </div>
+                                <span class="text-secondary small ms-1">@r.ReviewedAt.ToString("dd/MM")</span>
+                            </div>
+                            <div class="text-body mt-1" style="font-size: 0.95rem; line-height: 1.5;">@r.Comment</div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+

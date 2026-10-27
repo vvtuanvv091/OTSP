@@ -8,12 +8,22 @@
     var totalItems = (int)ViewBag.TotalItems;
     ViewData["Title"] = "Tài liệu ôn tập";
 }
+<style>
+    .h1_left_le.mb-1 {
+        margin-bottom: .25rem !important;
+        margin-left: 20px;
+    }
 
+    .textleft_le.text-body-secondary {
+        margin-left: 20px;
+    }
+
+</style>
 <div class="container-fluid py-4">
     <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
         <div>
-            <h1 class="h3 mb-1">Tài liệu ôn tập</h1>
-            <p class="text-body-secondary mb-0">Quản lý tài liệu theo môn học và cấp học bạn đang dạy.</p>
+            <h1 class="h3 mb-1 h1_left_le">Tài liệu ôn tập</h1>
+            <p class="textleft_le text-body-secondary mb-0">Quản lý tài liệu theo môn học và cấp học bạn đang dạy.</p>
         </div>
         <span class="badge text-bg-success rounded-pill px-3 py-2">@totalItems tài liệu</span>
     </div>

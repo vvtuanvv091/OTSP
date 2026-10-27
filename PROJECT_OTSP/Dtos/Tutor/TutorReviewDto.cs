@@ -24,3 +24,13 @@ public class TutorReviewDto
         }
     }
 }
+
+/// <summary>
+/// Dữ liệu hiển thị trang đánh giá từ học viên cho gia sư.
+/// </summary>
+public class TutorReviewPageVm
+{
+    public double AverageRating { get; set; } = 4.8;
+    public int TotalReviews { get; set; } = 98;
+    public List<TutorReviewDto> Reviews { get; set; } = new();
+}
