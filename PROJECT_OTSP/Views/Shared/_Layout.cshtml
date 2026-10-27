@@ -46,9 +46,13 @@
     <link href="~/css/otsp-pages.css" rel="stylesheet" asp-append-version="true">
     <link href="~/css/otsp-red-theme.css" rel="stylesheet" asp-append-version="true">
     <link href="~/css/otsp-components.css" rel="stylesheet" asp-append-version="true">
-    @if (ViewContext.RouteData.Values["area"]?.ToString() == "Student_Parent")
+    @if (ViewContext.RouteData.Values["area"]?.ToString() == "Student_Parent" || ViewContext.RouteData.Values["area"]?.ToString() == "Tutor")
     {
         <link href="~/css/student-sidebar.css" rel="stylesheet" asp-append-version="true">
+        @if (ViewContext.RouteData.Values["area"]?.ToString() == "Tutor")
+        {
+            <link href="~/css/tutor-sidebar.css" rel="stylesheet" asp-append-version="true">
+        }
     }
 </head>
 <body class="index-page">
