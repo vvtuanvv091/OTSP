@@ -86,6 +86,7 @@ public class TutorStudentController : TutorAreaController
                 studentsList.Add(new TutorStudentItemVm
                 {
                     StudentId = cs.StudentId,
+                    StudentUserId = cs.Student?.UserId ?? cs.Student?.User?.Id ?? "",
                     StudentName = cs.Student?.User?.FullName ?? cs.Student?.User?.UserName ?? "Học viên",
                     StudentAvatarUrl = cs.Student?.User?.AvatarUrl,
                     ClassroomId = cs.ClassroomId,
@@ -136,6 +137,7 @@ public class TutorStudentController : TutorAreaController
                     studentsList.Add(new TutorStudentItemVm
                     {
                         StudentId = student.Id,
+                        StudentUserId = student.UserId ?? student.User?.Id ?? "",
                         StudentName = student.User?.FullName ?? student.User?.UserName ?? "Học viên",
                         StudentAvatarUrl = student.User?.AvatarUrl,
                         ClassroomId = null,
@@ -155,6 +157,7 @@ public class TutorStudentController : TutorAreaController
             studentsList.Add(new TutorStudentItemVm
             {
                 StudentId = 1,
+                StudentUserId = "",
                 StudentName = "Nguyễn An",
                 ClassroomId = 1,
                 ClassroomName = "Lớp Tiếng Anh 10 - Nhóm A",
@@ -167,6 +170,7 @@ public class TutorStudentController : TutorAreaController
             studentsList.Add(new TutorStudentItemVm
             {
                 StudentId = 2,
+                StudentUserId = "",
                 StudentName = "Trần Gia Bảo",
                 ClassroomId = 2,
                 ClassroomName = "Lớp Kèm 1-1 Tiếng Anh THPT",

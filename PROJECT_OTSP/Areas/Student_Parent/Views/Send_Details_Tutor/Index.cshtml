@@ -1117,12 +1117,28 @@
                         <h2 class="h6 fw-bold mb-0" id="tutorChatTitle">
                             <i class="bi bi-chat-dots text-danger me-1"></i> Trò chuyện
                         </h2>
-                        <span class="small text-muted">Chưa kết nối</span>
+                        @if (Model.ExistingRequestStatus == RequestStatus.Accepted)
+                        {
+                            <span class="badge bg-success-subtle text-success">Đã kết nối</span>
+                        }
+                        else
+                        {
+                            <span class="small text-muted">Chưa kết nối</span>
+                        }
                     </div>
                     <p class="small text-muted mb-3">
                         <i class="bi bi-lock me-1"></i> Bạn có thể trò chuyện sau khi gia sư chấp nhận yêu cầu.
                     </p>
-                    <div class="tutor-chat-history mb-2" role="status">Chưa có tin nhắn</div>
+                    @if (Model.ExistingRequestStatus == RequestStatus.Accepted)
+                    {
+                        <a asp-area="" asp-controller="Chat" asp-action="Index" asp-route-contactId="@Model.UserId" class="btn btn-sm btn-danger w-100 mb-2">
+                            <i class="bi bi-chat-dots-fill me-1"></i> Mở trò chuyện với gia sư
+                        </a>
+                    }
+                    else
+                    {
+                        <div class="tutor-chat-history mb-2" role="status">Chưa có tin nhắn</div>
+                    }
                     <div class="input-group input-group-sm">
                         <input type="text" class="form-control" placeholder="Nhập tin nhắn..." aria-label="Tin nhắn" disabled />
                         <button class="btn btn-outline-secondary" type="button" aria-label="Gửi tin nhắn" disabled>

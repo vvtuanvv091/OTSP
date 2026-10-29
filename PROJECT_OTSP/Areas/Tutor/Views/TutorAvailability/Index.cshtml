@@ -48,6 +48,8 @@
 
 <style>
     .availability-page {
+        padding: 1.75rem 2rem;
+        border-radius: 12px;
         --availability-accent: var(--bs-success);
         --availability-accent-text: var(--bs-success-text-emphasis);
         --availability-accent-soft: var(--bs-success-bg-subtle);
@@ -55,7 +57,7 @@
         --availability-border: var(--bs-border-color);
         --availability-busy-bg: var(--bs-secondary-bg);
         min-height: calc(100vh - 148px);
-        background: var(--bs-tertiary-bg);
+            background: var(--bs-tertiary-bg);
         color: var(--bs-body-color);
     }
 
@@ -121,11 +123,10 @@
         .availability-page .availability-table td.rest-cell {
             padding: 5px 4px;
             border-radius: 3px;
-            background: var(--bs-tertiary-bg);
+                background: var(--bs-tertiary-bg);
             color: var(--bs-secondary-color);
             font-size: 11px;
         }
-
         .availability-page .availability-slot {
             position: relative;
             display: flex;
@@ -144,7 +145,7 @@
 
             .availability-page .availability-slot.is-selected {
                 border-color: var(--availability-accent-border);
-                background: var(--availability-accent-soft);
+                background-color: #E6F4EA;
                 color: var(--availability-accent-text);
             }
 
@@ -232,7 +233,11 @@
         .availability-page .save-action:hover {
             filter: brightness(.9);
         }
-
+        .availability-slot.is-busy{
+              background-color: #DB303A !important;
+              border-color: #DB303A !important;
+              color: #ffffff !important;
+        }
     @@media (max-width: 991.98px) {
         .availability-page .availability-layout {
             grid-template-columns: minmax(0, 1fr);
@@ -260,6 +265,8 @@
 
     @@media (max-width: 767.98px) {
         .availability-page {
+        padding: 1.75rem 2rem;
+        border-radius: 12px;
             min-height: 0;
             padding: 1rem .65rem !important;
         }
@@ -409,7 +416,7 @@
                                                                                   && x.EndTime >= slotEnd);
                                         if (isBusy)
                                         {
-                                            <td data-day-column="@((int)day)"><div class="availability-slot is-busy" title="Đã có lớp trong khung giờ này"><span>Có lớp</span></div></td>
+                                            <td data-day-column="@((int)day)"><div class="availability-slot is-busy" title="Đã có lớp trong khung giờ này"><span class="slot_color_text">Có lớp</span></div></td>
                                         }
                                         else
                                         {

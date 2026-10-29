@@ -1,10 +1,12 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Localization;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using PROJECT_OTSP.Data;
 using PROJECT_OTSP.Hubs;
 using PROJECT_OTSP.Models;
 using PROJECT_OTSP.Services;
+using PROJECT_OTSP.Services.Events;
 using System.Globalization;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -14,13 +16,16 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
     ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
 
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
+{
     options.UseNpgsql(connectionString, npgsqlOptions =>
     {
         npgsqlOptions.EnableRetryOnFailure(
             maxRetryCount: 5,
             maxRetryDelay: TimeSpan.FromSeconds(10),
             errorCodesToAdd: null);
-    }));
+    });
+    options.ConfigureWarnings(w => w.Ignore(RelationalEventId.PendingModelChangesWarning));
+});
 
 // Hiển thị lỗi migration chi tiết khi đang phát triển
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
@@ -50,6 +55,8 @@ builder.Services.AddScoped<ISearchService, SearchService>();
 builder.Services.AddScoped<IOpenGroupClassroomService, OpenGroupClassroomService>();
 builder.Services.AddScoped<IAvailabilitySlotService, AvailabilitySlotService>();
 builder.Services.AddScoped<IChatService, ChatService>();
+builder.Services.AddSingleton<IChatEventBus, ChatEventBus>();
+builder.Services.AddHostedService<ChatNotificationWorker>();
 builder.Services.AddSingleton<IScheduleBlockService, ScheduleBlockService>();
 builder.Services.Configure<CloudinarySettings>(builder.Configuration.GetSection("Cloudinary"));
 builder.Services.AddSingleton<IImageStorageService, CloudinaryImageStorageService>();
@@ -62,30 +69,17 @@ builder.Services.Configure<RequestLocalizationOptions>(options =>
     options.SupportedUICultures = supportedCultures;
 });
 
-
 var app = builder.Build();
 
+// Khởi tạo Database & Seed dữ liệu ban đầu
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
     await db.Database.MigrateAsync();
-}
-
-// Hỗ trợ cờ dòng lệnh --seed-only nếu muốn chạy nạp dữ liệu một lần rồi thoát
-if (args.Contains("--seed-only"))
-{
-    using var scope = app.Services.CreateScope();
-    await DbSeeder.SeedAsync(scope.ServiceProvider, forceBulk: true);
-    var seedLogger = scope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Program");
-    seedLogger.LogInformation("Đã hoàn tất nạp dữ liệu lên cơ sở dữ liệu (--seed-only). Kết thúc tiến trình.");
-    return;
-}
-
-// ===== 4. Seed dữ liệu mẫu (chỉ khi đang phát triển) =====
-if (app.Environment.IsDevelopment())
-{
-    using var scope = app.Services.CreateScope();
-    await DbSeeder.SeedAsync(scope.ServiceProvider);
+    if (app.Environment.IsDevelopment())
+    {
+        await DbSeeder.SeedAsync(scope.ServiceProvider);
+    }
 }
 
 // ===== 5. Pipeline xử lý request =====

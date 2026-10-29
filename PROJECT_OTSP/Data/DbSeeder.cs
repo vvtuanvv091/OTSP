@@ -82,9 +82,9 @@
             const string adminEmail = "admin@otsp.local";
             const string tutorEmail = "tutor1@otsp.local";
             const string studentEmail = "hocvien1@otsp.local";
-            const string adminAvatar = "https://randomuser.me/api/portraits/men/99.jpg";
-            const string tutorAvatar = "https://randomuser.me/api/portraits/men/98.jpg";
-            const string studentAvatar = "https://randomuser.me/api/portraits/women/98.jpg";
+            const string adminAvatar = "https://i.pinimg.com/236x/fa/ea/5e/faea5eb18e957a502b867fa4681d7367.jpg";
+            const string tutorAvatar = "";
+            const string studentAvatar = "";
             var coreEmails = new[] { adminEmail, tutorEmail, studentEmail };
 
             var existingCoreUsers = await userManager.Users
