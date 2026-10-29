@@ -46,6 +46,7 @@ public sealed class StudentClassroomController : Controller
                 Classroom = cs.Classroom,
                 SubjectName = cs.Classroom.Subject.Name,
                 GradeLevelName = cs.Classroom.GradeLevel.Name,
+                TutorUserId = cs.Classroom.Tutor.UserId,
                 TutorName = cs.Classroom.Tutor.User.FullName,
                 TutorAvatarUrl = cs.Classroom.Tutor.User.AvatarUrl,
                 WeeklySchedules = cs.Classroom.WeeklySchedules.OrderBy(ws => ws.SessionIndex).ToList(),
@@ -129,6 +130,7 @@ public sealed class StudentClassroomController : Controller
             items.Add(new StudentClassroomItemDto
             {
                 ClassroomId = e.ClassroomId,
+                TutorUserId = e.TutorUserId,
                 Name = e.Classroom.Name,
                 SubjectName = e.SubjectName,
                 GradeLevelName = e.GradeLevelName,

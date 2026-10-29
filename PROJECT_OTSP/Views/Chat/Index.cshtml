@@ -1,0 +1,1089 @@
+@model PROJECT_OTSP.Dtos.Chat.ChatWorkspaceVm
+
+@{
+    ViewData["Title"] = "Tin nhắn";
+    Layout = User.IsInRole("Tutor")
+        ? "~/Areas/Tutor/Views/Shared/_Layout_Tutor.cshtml"
+        : (User.IsInRole("Student_Parent")
+            ? "~/Areas/Student_Parent/Views/Shared/_Layout_Student.cshtml"
+            : "~/Views/Shared/_Layout.cshtml");
+    var isTutor = User.IsInRole("Tutor");
+    var isStudent = User.IsInRole("Student_Parent");
+    var areaSubtitle = isTutor ? "Khu vực trao đổi của gia sư" : (isStudent ? "Khu học tập của học viên/phụ huynh" : "Khu vực trao đổi và hỗ trợ");
+    var hasActiveChat = !string.IsNullOrWhiteSpace(Model.SelectedContactId);
+}
+
+<div class="chat-workspace-page @(hasActiveChat ? "is-chatting-mobile" : "")" id="chatWorkspace"
+     data-current-user-id="@Model.CurrentUserId"
+     data-selected-contact-id="@Model.SelectedContactId"
+     data-hub-url="@Url.Content("~/hubs/chat")">
+
+    <!-- Page Header (ẩn trên mobile để tối đa diện tích màn hình) -->
+    <div class="chat-page-header mb-3">
+        <h1 class="h4 fw-bold mb-1 text-body">Tin nhắn</h1>
+        <p class="text-secondary small mb-0">@areaSubtitle</p>
+    </div>
+
+    <!-- Main Chat Workspace Card -->
+    <div class="chat-workspace-card shadow-sm">
+        <div class="row g-0 h-100 flex-nowrap flex-md-wrap">
+
+            <!-- ==================== LEFT COLUMN: CONVERSATION LIST ==================== -->
+            <aside class="col-12 col-md-5 col-lg-4 chat-sidebar-column border-end" id="chatSidebarCol" aria-label="Danh sách cuộc trò chuyện">
+                <!-- Search Box -->
+                <div class="chat-search-wrap p-3 border-bottom">
+                    <div class="chat-search-input-group">
+                        <i class="bi bi-search text-secondary" aria-hidden="true"></i>
+                        <input type="text" id="conversationSearchInput" class="form-control form-control-sm chat-search-input"
+                               placeholder="Tìm cuộc trò chuyện..." aria-label="Tìm cuộc trò chuyện" />
+                    </div>
+                </div>
+
+                <!-- Conversation Items -->
+                <div class="chat-conversations-list" id="conversationsListContainer" role="tablist">
+                    @if (Model.Conversations.Count == 0)
+                    {
+                        <div class="p-4 text-center text-secondary small" id="noConversationsNotice">
+                            <i class="bi bi-chat-square-dots fs-3 d-block mb-2 text-muted"></i>
+                            Chưa có cuộc trò chuyện nào. Khi có yêu cầu kết nối hoặc tham gia lớp, bạn có thể trao đổi trực tiếp tại đây.
+                        </div>
+                    }
+                    else
+                    {
+                        @foreach (var conv in Model.Conversations)
+                        {
+                            var isActive = conv.ContactUserId == Model.SelectedContactId;
+                            var preview = conv.LastMessageContent;
+                            if (preview.StartsWith("[img]") || preview.StartsWith("/uploads/chat/"))
+                            {
+                                preview = "📷 [Hình ảnh]";
+                            }
+                            <div class="chat-conv-item @(isActive ? "is-active" : "")"
+                                 data-contact-id="@conv.ContactUserId"
+                                 data-contact-name="@conv.ContactName"
+                                 data-contact-avatar="@(conv.ContactAvatarUrl ?? "")"
+                                 data-role-label="@conv.RoleLabel"
+                                 role="button" tabindex="0">
+                                <div class="chat-avatar-wrap position-relative">
+                                    @if (!string.IsNullOrWhiteSpace(conv.ContactAvatarUrl))
+                                    {
+                                        <img src="@conv.ContactAvatarUrl" alt="@conv.ContactName" class="chat-avatar-img" onerror="this.onerror=null;this.src='/assets/img/default-avatar.svg';" />
+                                    }
+                                    else
+                                    {
+                                        <div class="chat-avatar-fallback">
+                                            @(string.IsNullOrWhiteSpace(conv.ContactName) ? "U" : conv.ContactName.Substring(0, 1).ToUpper())
+                                        </div>
+                                    }
+                                </div>
+
+                                <div class="chat-conv-info flex-grow-1 min-w-0">
+                                    <div class="d-flex align-items-center justify-content-between mb-1">
+                                        <span class="chat-conv-name text-truncate">@conv.ContactName</span>
+                                        @if (!string.IsNullOrWhiteSpace(conv.RoleLabel))
+                                        {
+                                            <span class="badge bg-secondary-subtle text-secondary border small px-2 py-0.5 ms-1" style="font-size: 0.68rem; font-weight: 500;">@conv.RoleLabel</span>
+                                        }
+                                    </div>
+                                    <p class="chat-conv-preview text-truncate mb-0">@preview</p>
+                                </div>
+
+                                @if (conv.UnreadCount > 0)
+                                {
+                                    <span class="chat-unread-badge ms-2" data-unread-count="@conv.UnreadCount">
+                                        @conv.UnreadCount
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span class="chat-unread-badge ms-2 d-none" data-unread-count="0">0</span>
+                                }
+                            </div>
+                        }
+                    }
+                </div>
+            </aside>
+
+            <!-- ==================== RIGHT COLUMN: ACTIVE CHAT ROOM ==================== -->
+            <section class="col-12 col-md-7 col-lg-8 chat-main-column d-flex flex-column" id="chatMainCol" aria-label="Nội dung cuộc trò chuyện">
+                <!-- 1. Màn hình rỗng (khi chưa chọn người chat trên Desktop) -->
+                <div class="chat-empty-panel @(hasActiveChat ? "d-none" : "d-flex") flex-column align-items-center justify-content-center flex-grow-1 text-center p-4 p-md-5" id="chatEmptyPanel">
+                    <i class="bi bi-chat-heart text-secondary display-4 mb-3"></i>
+                    <h5 class="fw-semibold text-body">Chào mừng đến với Hộp thư OTSP</h5>
+                    <p class="text-secondary small max-w-sm mb-0">Chọn một người liên hệ từ danh sách bên trái để bắt đầu trao đổi học tập và thời khóa biểu.</p>
+                </div>
+
+                <!-- 2. Khung chat chi tiết (luôn luôn có trong DOM để tương tác trơn tru) -->
+                <div class="chat-active-panel @(hasActiveChat ? "d-flex" : "d-none") flex-column flex-grow-1 h-100 overflow-hidden" id="chatActivePanel">
+                    <!-- Chat Header -->
+                    <div class="chat-room-header d-flex align-items-center justify-content-between p-2 p-md-3 border-bottom">
+                        <div class="d-flex align-items-center gap-2 min-w-0">
+                            <!-- Nút quay lại danh sách trên điện thoại -->
+                            <button type="button" class="btn btn-sm btn-light border d-md-none me-1 flex-shrink-0" id="btnBackToConversations" title="Quay lại danh sách trò chuyện" aria-label="Quay lại">
+                                <i class="bi bi-chevron-left"></i>
+                            </button>
+
+                            <div class="chat-avatar-wrap flex-shrink-0">
+                                <img id="activeContactAvatar" src="@(Model.SelectedContactAvatarUrl ?? "")" alt="@(Model.SelectedContactName ?? "Người dùng")" class="chat-avatar-img @(string.IsNullOrWhiteSpace(Model.SelectedContactAvatarUrl) ? "d-none" : "")" onerror="this.onerror=null;this.src='/assets/img/default-avatar.svg';" />
+                                <div id="activeContactFallback" class="chat-avatar-fallback @(string.IsNullOrWhiteSpace(Model.SelectedContactAvatarUrl) ? "" : "d-none")">
+                                    @(string.IsNullOrWhiteSpace(Model.SelectedContactName) ? "U" : Model.SelectedContactName.Substring(0, 1).ToUpper())
+                                </div>
+                            </div>
+                            <div class="min-w-0">
+                                <div class="d-flex align-items-center gap-1 gap-md-2 flex-wrap">
+                                    <h2 class="h6 fw-bold mb-0 text-body text-truncate" id="activeContactName">@(Model.SelectedContactName ?? "Người dùng")</h2>
+                                    <span class="badge bg-secondary-subtle text-secondary border small px-2 py-0.5" id="activeContactRole" style="font-size: 0.68rem;">@(Model.SelectedContactRole ?? "Thành viên OTSP")</span>
+                                </div>
+                                <span class="chat-status-indicator small text-success">
+                                    <span class="chat-online-dot" aria-hidden="true">●</span> Đang hoạt động
+                                </span>
+                            </div>
+                        </div>
+
+                        <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                            <span class="badge text-bg-light border text-secondary small d-none d-sm-inline" id="activeRequestBadge" style="@(Model.SelectedRequestId.HasValue && Model.SelectedRequestId.Value > 0 ? "" : "display:none !important;")">
+                                Yêu cầu #@(Model.SelectedRequestId ?? 0)
+                            </span>
+                            <span id="chatConnectionIndicator" class="badge rounded-pill text-bg-success px-2 py-1" style="font-size: 11px;">
+                                Trực tuyến
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Messages Scrollable Body -->
+                    <div class="chat-messages-body flex-grow-1 p-2 p-md-3" id="chatMessagesBox" role="log" aria-live="polite">
+                        @if (Model.Messages.Count == 0)
+                        {
+                            <div class="text-center text-secondary small my-auto py-5" id="noMessagesPlaceholder">
+                                <i class="bi bi-chat-text fs-2 d-block mb-2 text-muted"></i>
+                                Chưa có tin nhắn nào. Hãy gửi lời chào để bắt đầu cuộc trò chuyện!
+                            </div>
+                        }
+
+                        @foreach (var msg in Model.Messages)
+                        {
+                            var isImg = (msg.Content.StartsWith("[img]") && msg.Content.EndsWith("[/img]")) || msg.Content.StartsWith("/uploads/chat/");
+                            var imgSrc = isImg
+                                ? (msg.Content.StartsWith("[img]") ? msg.Content.Substring(5, msg.Content.Length - 11) : msg.Content)
+                                : null;
+
+                            <div class="chat-message-row @(msg.IsOwn ? "is-mine" : "is-theirs")" data-message-id="@msg.Id">
+                                <div class="chat-bubble @(isImg ? "chat-bubble-image" : "")">
+                                    @if (isImg && !string.IsNullOrWhiteSpace(imgSrc))
+                                    {
+                                        <a href="@imgSrc" target="_blank" rel="noopener noreferrer">
+                                            <img src="@imgSrc" alt="Hình ảnh" class="chat-message-img" onerror="this.onerror=null;this.parentElement.innerHTML='<span class=\'text-danger small\'>Lỗi tải ảnh</span>';" />
+                                        </a>
+                                    }
+                                    else
+                                    {
+                                        <div class="chat-bubble-text">@msg.Content</div>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    </div>
+
+                    <!-- Chat Input Footer -->
+                    <div class="chat-room-footer p-2 p-md-3 border-top position-relative">
+                        <!-- Emoji Popover -->
+                        <div class="chat-emoji-popover shadow-sm d-none" id="chatEmojiPopover">
+                            <div class="chat-emoji-header d-flex align-items-center justify-content-between p-2 border-bottom">
+                                <span class="small fw-semibold text-secondary">Biểu tượng cảm xúc</span>
+                                <button type="button" class="btn-close btn-close-sm" id="closeEmojiBtn" aria-label="Đóng"></button>
+                            </div>
+                            <div class="chat-emoji-grid p-2">
+                                <button type="button" class="btn-emoji" data-emoji="😊">😊</button>
+                                <button type="button" class="btn-emoji" data-emoji="😂">😂</button>
+                                <button type="button" class="btn-emoji" data-emoji="👍">👍</button>
+                                <button type="button" class="btn-emoji" data-emoji="❤️">❤️</button>
+                                <button type="button" class="btn-emoji" data-emoji="📚">📚</button>
+                                <button type="button" class="btn-emoji" data-emoji="🎓">🎓</button>
+                                <button type="button" class="btn-emoji" data-emoji="💡">💡</button>
+                                <button type="button" class="btn-emoji" data-emoji="🔥">🔥</button>
+                                <button type="button" class="btn-emoji" data-emoji="⭐">⭐</button>
+                                <button type="button" class="btn-emoji" data-emoji="👏">👏</button>
+                                <button type="button" class="btn-emoji" data-emoji="✍️">✍️</button>
+                                <button type="button" class="btn-emoji" data-emoji="🎯">🎯</button>
+                                <button type="button" class="btn-emoji" data-emoji="💯">💯</button>
+                                <button type="button" class="btn-emoji" data-emoji="🤝">🤝</button>
+                                <button type="button" class="btn-emoji" data-emoji="🙏">🙏</button>
+                                <button type="button" class="btn-emoji" data-emoji="📅">📅</button>
+                                <button type="button" class="btn-emoji" data-emoji="⏰">⏰</button>
+                                <button type="button" class="btn-emoji" data-emoji="🙋‍♂️">🙋‍♂️</button>
+                                <button type="button" class="btn-emoji" data-emoji="🙋‍♀️">🙋‍♀️</button>
+                                <button type="button" class="btn-emoji" data-emoji="🎉">🎉</button>
+                            </div>
+                        </div>
+
+                        <form id="chatSendForm" class="d-flex align-items-center gap-1 gap-md-2" autocomplete="off">
+                            <!-- Emoji Button -->
+                            <button type="button" id="emojiToggleBtn" class="btn btn-chat-tool" title="Chèn icon / emoji">
+                                <i class="bi bi-emoji-smile fs-5"></i>
+                            </button>
+
+                            <!-- Image Upload Button -->
+                            <label for="chatImageInput" class="btn btn-chat-tool mb-0" title="Gửi ảnh">
+                                <i class="bi bi-image fs-5"></i>
+                                <input type="file" id="chatImageInput" accept="image/png,image/jpeg,image/webp,image/gif" class="d-none" />
+                            </label>
+
+                            <!-- Message Input -->
+                            <input type="text" id="chatMessageInput" class="form-control chat-input-rounded"
+                                   placeholder="Nhập tin nhắn..." maxlength="2000" aria-label="Nội dung tin nhắn" />
+
+                            <!-- Send Button -->
+                            <button type="submit" id="chatSendButton" class="btn btn-chat-send" title="Gửi tin nhắn">
+                                <i class="bi bi-send-fill me-1 d-none d-sm-inline"></i><span class="d-none d-sm-inline">Gửi</span><i class="bi bi-send-fill d-sm-none"></i>
+                            </button>
+                        </form>
+                        <div id="chatErrorMessage" class="small text-danger mt-1" role="alert"></div>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+</div>
+
+<style>
+/* ==================== CHAT WORKSPACE DESKTOP STYLING ==================== */
+.chat-workspace-page {
+    width: 100%;
+    max-width: 100%;
+    margin: 0;
+    padding: 0;
+}
+
+.chat-workspace-card {
+    background-color: var(--bs-card-bg, #ffffff);
+    border: 1px solid var(--bs-border-color, #eaedf1);
+    border-radius: 16px;
+    overflow: hidden;
+    height: calc(100vh - 180px);
+    min-height: 520px;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Sidebar Column */
+.chat-sidebar-column {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    background-color: var(--bs-body-bg, #ffffff);
+}
+
+.chat-search-input-group {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.chat-search-input-group i {
+    position: absolute;
+    left: 12px;
+    font-size: 13px;
+    pointer-events: none;
+}
+
+.chat-search-input {
+    border-radius: 20px;
+    padding-left: 34px;
+    padding-right: 14px;
+    font-size: 13px;
+    background-color: var(--bs-tertiary-bg, #f8fafc);
+    border: 1px solid var(--bs-border-color, #e2e8f0);
+}
+
+.chat-conversations-list {
+    flex-grow: 1;
+    overflow-y: auto;
+    padding: 8px 12px;
+}
+
+/* Conversation Items */
+.chat-conv-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+    margin-bottom: 4px;
+    user-select: none;
+}
+
+.chat-conv-item:hover {
+    background-color: var(--bs-tertiary-bg, #f1f5f9);
+}
+
+.chat-conv-item.is-active {
+    background-color: #f3e8ff;
+    border-left: 3px solid #8b5cf6;
+}
+
+[data-bs-theme="dark"] .chat-conv-item.is-active {
+    background-color: #2e1065;
+    border-left: 3px solid #a855f7;
+}
+
+.chat-avatar-wrap {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    overflow: hidden;
+    flex-shrink: 0;
+    background-color: #e2e8f0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.chat-avatar-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.chat-avatar-fallback {
+    font-size: 16px;
+    font-weight: 700;
+    color: #475569;
+}
+
+[data-bs-theme="dark"] .chat-avatar-fallback {
+    color: #cbd5e1;
+    background-color: #334155;
+}
+
+.chat-conv-name {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--bs-body-color, #0f172a);
+}
+
+.chat-conv-preview {
+    font-size: 12px;
+    color: var(--bs-secondary-color, #64748b);
+}
+
+.chat-unread-badge {
+    background-color: #ea580c;
+    color: #ffffff;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 12px;
+    flex-shrink: 0;
+}
+
+/* Main Column */
+.chat-main-column {
+    height: 100%;
+    background-color: var(--bs-body-bg, #ffffff);
+}
+
+.chat-room-header {
+    background-color: var(--bs-body-bg, #ffffff);
+}
+
+.chat-online-dot {
+    font-size: 8px;
+    vertical-align: middle;
+}
+
+.chat-messages-body {
+    background-color: var(--bs-tertiary-bg, #f8fafc);
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.chat-message-row {
+    display: flex;
+    width: 100%;
+}
+
+.chat-message-row.is-mine {
+    justify-content: flex-end;
+}
+
+.chat-message-row.is-theirs {
+    justify-content: flex-start;
+}
+
+.chat-bubble {
+    max-width: 72%;
+    padding: 10px 16px;
+    border-radius: 18px;
+    font-size: 14px;
+    line-height: 1.5;
+    word-break: break-word;
+}
+
+.chat-message-row.is-mine .chat-bubble {
+    background-color: #dc2626;
+    color: #ffffff;
+    border-bottom-right-radius: 4px;
+}
+
+.chat-message-row.is-theirs .chat-bubble {
+    background-color: var(--bs-card-bg, #f3f4f6);
+    color: var(--bs-body-color, #1e293b);
+    border-bottom-left-radius: 4px;
+    border: 1px solid var(--bs-border-color, #e5e7eb);
+}
+
+/* Image in chat bubble */
+.chat-bubble-image {
+    padding: 4px;
+    background: transparent !important;
+    border: none !important;
+}
+
+.chat-message-img {
+    max-width: 260px;
+    max-height: 260px;
+    border-radius: 12px;
+    display: block;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    transition: transform 0.15s ease;
+}
+
+.chat-message-img:hover {
+    transform: scale(1.02);
+}
+
+/* Footer tools & input */
+.chat-room-footer {
+    background-color: var(--bs-body-bg, #ffffff);
+}
+
+.btn-chat-tool {
+    border: none;
+    background: transparent;
+    color: var(--bs-secondary-color, #64748b);
+    padding: 6px 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    min-width: 36px;
+    height: 36px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-chat-tool:hover {
+    color: #dc2626;
+    background-color: var(--bs-tertiary-bg, #f1f5f9);
+}
+
+.chat-input-rounded {
+    border-radius: 24px;
+    padding: 9px 18px;
+    font-size: 14px;
+    background-color: var(--bs-tertiary-bg, #f8fafc);
+    border: 1px solid var(--bs-border-color, #e2e8f0);
+}
+
+.btn-chat-send {
+    background-color: #dc2626;
+    color: #ffffff;
+    border-radius: 24px;
+    padding: 8px 18px;
+    font-size: 14px;
+    font-weight: 600;
+    border: none;
+    transition: background-color 0.15s ease;
+    flex-shrink: 0;
+    height: 38px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-chat-send:hover {
+    background-color: #b91c1c;
+    color: #ffffff;
+}
+
+/* Emoji Popover */
+.chat-emoji-popover {
+    position: absolute;
+    bottom: 65px;
+    left: 15px;
+    width: 290px;
+    background-color: var(--bs-card-bg, #ffffff);
+    border: 1px solid var(--bs-border-color, #e2e8f0);
+    border-radius: 12px;
+    z-index: 1050;
+}
+
+.chat-emoji-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 6px;
+    max-height: 180px;
+    overflow-y: auto;
+}
+
+.btn-emoji {
+    font-size: 20px;
+    background: transparent;
+    border: none;
+    border-radius: 6px;
+    padding: 4px;
+    cursor: pointer;
+    transition: background-color 0.1s ease;
+}
+
+.btn-emoji:hover {
+    background-color: var(--bs-tertiary-bg, #f1f5f9);
+    transform: scale(1.15);
+}
+
+/* ==================== TỐI ƯU HÓA MÀN HÌNH ĐIỆN THOẠI (< 768px) ==================== */
+@@media (max-width: 767.98px) {
+    .chat-workspace-page {
+        padding: 0 !important;
+        margin: 0 !important;
+        max-width: 100% !important;
+    }
+
+    .chat-page-header {
+        display: none !important; /* Ẩn bớt tiêu đề lớn để nhường toàn bộ diện tích cho màn hình chat */
+    }
+
+    .chat-workspace-card {
+        height: calc(100dvh - 110px) !important;
+        min-height: calc(100dvh - 110px) !important;
+        max-height: calc(100dvh - 110px) !important;
+        border-radius: 0 !important;
+        border: none !important;
+        margin: 0 !important;
+    }
+
+    /* Chế độ 1: Xem danh sách trò chuyện */
+    #chatWorkspace:not(.is-chatting-mobile) #chatSidebarCol {
+        display: flex !important;
+        width: 100% !important;
+        height: 100% !important;
+        border-right: none !important;
+    }
+    #chatWorkspace:not(.is-chatting-mobile) #chatMainCol {
+        display: none !important;
+    }
+
+    /* Chế độ 2: Đang mở khung chat chi tiết */
+    #chatWorkspace.is-chatting-mobile #chatSidebarCol {
+        display: none !important;
+    }
+    #chatWorkspace.is-chatting-mobile #chatMainCol {
+        display: flex !important;
+        width: 100% !important;
+        height: 100% !important;
+    }
+
+    .chat-room-header {
+        padding: 8px 10px !important;
+    }
+
+    .chat-room-header h2 {
+        font-size: 0.92rem !important;
+    }
+
+    .chat-avatar-wrap {
+        width: 36px;
+        height: 36px;
+    }
+
+    .chat-messages-body {
+        padding: 10px 8px !important;
+        gap: 8px;
+    }
+
+    .chat-bubble {
+        max-width: 86%;
+        font-size: 14px;
+        padding: 8px 12px;
+        border-radius: 16px;
+    }
+
+    .chat-message-img {
+        max-width: 100%;
+        max-height: 200px;
+    }
+
+    .chat-room-footer {
+        padding: 8px 8px !important;
+    }
+
+    .btn-chat-tool {
+        padding: 4px;
+        min-width: 34px;
+        height: 34px;
+    }
+
+    .chat-input-rounded {
+        font-size: 16px !important; /* Tránh tự động zoom phiền toái trên iOS Safari */
+        padding: 7px 12px;
+        border-radius: 20px;
+    }
+
+    .btn-chat-send {
+        padding: 6px 12px;
+        font-size: 13px;
+        border-radius: 20px;
+        height: 34px;
+    }
+
+    .chat-emoji-popover {
+        width: calc(100% - 16px);
+        left: 8px;
+        bottom: 56px;
+        max-width: 320px;
+    }
+
+    .chat-emoji-grid {
+        grid-template-columns: repeat(6, 1fr);
+        max-height: 160px;
+    }
+
+    .btn-emoji {
+        font-size: 22px;
+        padding: 6px 2px;
+    }
+}
+</style>
+
+@section Scripts {
+    <!-- SignalR từ CDN chính thức, giống với _Layout_Tutor và Conversation.cshtml -->
+    <script src="https://cdn.jsdelivr.net/npm/@@microsoft/signalr@10.0.0/dist/browser/signalr.min.js"></script>
+    <script>
+        (function () {
+            "use strict";
+
+            const workspace = document.getElementById("chatWorkspace");
+            if (!workspace) return;
+
+            const currentUserId = workspace.dataset.currentUserId;
+            let activeContactId = workspace.dataset.selectedContactId;
+            const hubUrl = workspace.dataset.hubUrl || "/hubs/chat";
+
+            const sendForm = document.getElementById("chatSendForm");
+            const messageInput = document.getElementById("chatMessageInput");
+            const messagesBox = document.getElementById("chatMessagesBox");
+            const sendBtn = document.getElementById("chatSendButton");
+            const errorMsg = document.getElementById("chatErrorMessage");
+            const connectionIndicator = document.getElementById("chatConnectionIndicator");
+            const searchInput = document.getElementById("conversationSearchInput");
+            const convListContainer = document.getElementById("conversationsListContainer");
+
+            const emojiToggleBtn = document.getElementById("emojiToggleBtn");
+            const emojiPopover = document.getElementById("chatEmojiPopover");
+            const closeEmojiBtn = document.getElementById("closeEmojiBtn");
+            const chatImageInput = document.getElementById("chatImageInput");
+            const btnBackToConversations = document.getElementById("btnBackToConversations");
+
+            // Nút Quay lại danh sách hội thoại trên điện thoại
+            if (btnBackToConversations) {
+                btnBackToConversations.addEventListener("click", () => {
+                    workspace.classList.remove("is-chatting-mobile");
+                    if (window.history && window.history.replaceState) {
+                        window.history.replaceState({}, document.title, "/Chat");
+                    }
+                });
+            }
+
+            // Tự động cuộn xuống tin nhắn cuối cùng
+            const scrollToBottom = () => {
+                if (messagesBox) {
+                    messagesBox.scrollTop = messagesBox.scrollHeight;
+                }
+            };
+            scrollToBottom();
+
+            // Thêm bubble tin nhắn vào khung chat
+            const appendMessage = (content, isOwn, messageId) => {
+                if (!messagesBox) return;
+
+                if (messageId && messagesBox.querySelector(`.chat-message-row[data-message-id="${messageId}"]`)) {
+                    return;
+                }
+
+                const noMsg = document.getElementById("noMessagesPlaceholder");
+                if (noMsg) noMsg.remove();
+
+                const row = document.createElement("div");
+                row.className = `chat-message-row ${isOwn ? "is-mine" : "is-theirs"}`;
+                if (messageId) row.dataset.messageId = messageId;
+
+                const isImg = (content.startsWith("[img]") && content.endsWith("[/img]")) || content.startsWith("/uploads/chat/");
+                let innerHtml = "";
+                if (isImg) {
+                    const src = content.startsWith("[img]") ? content.substring(5, content.length - 6) : content;
+                    innerHtml = `<a href="${src}" target="_blank" rel="noopener noreferrer"><img src="${src}" alt="Hình ảnh" class="chat-message-img" onerror="this.onerror=null;this.parentElement.innerHTML='<span class=\\'text-danger small\\'>Lỗi tải ảnh</span>';" /></a>`;
+                } else {
+                    const safeDiv = document.createElement("div");
+                    safeDiv.textContent = content;
+                    innerHtml = `<div class="chat-bubble-text">${safeDiv.innerHTML}</div>`;
+                }
+
+                row.innerHTML = `<div class="chat-bubble ${isImg ? 'chat-bubble-image' : ''}">${innerHtml}</div>`;
+                messagesBox.appendChild(row);
+                scrollToBottom();
+            };
+
+            // Cập nhật preview cuộc trò chuyện bên sidebar
+            const updateConversationItem = (contactId, lastMsg, incrementUnread) => {
+                const item = document.querySelector(`.chat-conv-item[data-contact-id="${contactId}"]`);
+                if (!item) return;
+
+                const preview = item.querySelector(".chat-conv-preview");
+                if (preview) {
+                    const displayMsg = (lastMsg.startsWith("[img]") || lastMsg.startsWith("/uploads/chat/")) ? "📷 [Hình ảnh]" : lastMsg;
+                    preview.textContent = displayMsg;
+                }
+
+                if (incrementUnread) {
+                    const badge = item.querySelector(".chat-unread-badge");
+                    if (badge) {
+                        let count = parseInt(badge.dataset.unreadCount || "0", 10) + 1;
+                        badge.dataset.unreadCount = count;
+                        badge.textContent = count;
+                        badge.classList.remove("d-none");
+                    }
+                }
+
+                if (convListContainer && item !== convListContainer.firstElementChild) {
+                    convListContainer.prepend(item);
+                }
+            };
+
+            // 1. Khởi tạo SignalR Hub Connection an toàn (có fallback nếu offline)
+            let connection = null;
+            if (typeof signalR !== "undefined" && signalR && signalR.HubConnectionBuilder) {
+                connection = new signalR.HubConnectionBuilder()
+                    .withUrl(hubUrl)
+                    .withAutomaticReconnect()
+                    .build();
+
+                // 2. Lắng nghe tin nhắn realtime qua SignalR
+                connection.on("ReceiveDirectMessage", (msg) => {
+                    const isFromActiveContact = (msg.senderId === activeContactId && msg.receiverId === currentUserId);
+                    const isSentByMe = (msg.senderId === currentUserId && msg.receiverId === activeContactId);
+
+                    if (isFromActiveContact) {
+                        appendMessage(msg.content, false, msg.id);
+                        connection.invoke("MarkRead", activeContactId).catch(() => {});
+                        updateConversationItem(msg.senderId, msg.content, false);
+                    } else if (isSentByMe) {
+                        const lastMsg = messagesBox.querySelector(".chat-message-row.is-mine:last-child");
+                        if (lastMsg && !lastMsg.dataset.messageId) {
+                            lastMsg.dataset.messageId = msg.id;
+                        }
+                        updateConversationItem(msg.receiverId, msg.content, false);
+                    } else if (msg.receiverId === currentUserId) {
+                        updateConversationItem(msg.senderId, msg.content, true);
+                    }
+                });
+
+                connection.on("ConversationUpdated", (data) => {
+                    const isCurrentActive = data.contactId === activeContactId;
+                    updateConversationItem(data.contactId, data.lastMessage, !isCurrentActive);
+                });
+
+                // Trạng thái kết nối SignalR
+                connection.onreconnecting(() => {
+                    if (connectionIndicator) {
+                        connectionIndicator.textContent = "Đang kết nối lại...";
+                        connectionIndicator.className = "badge rounded-pill text-bg-warning px-2 py-1";
+                    }
+                });
+
+                connection.onreconnected(() => {
+                    if (connectionIndicator) {
+                        connectionIndicator.textContent = "Trực tuyến";
+                        connectionIndicator.className = "badge rounded-pill text-bg-success px-2 py-1";
+                    }
+                    if (activeContactId) {
+                        connection.invoke("JoinUserRoom", activeContactId).catch(() => {});
+                    }
+                });
+
+                connection.onclose(() => {
+                    if (connectionIndicator) {
+                        connectionIndicator.textContent = "Mất kết nối";
+                        connectionIndicator.className = "badge rounded-pill text-bg-secondary px-2 py-1";
+                    }
+                });
+
+                // Khởi động SignalR
+                connection.start()
+                    .then(() => {
+                        if (connectionIndicator) {
+                            connectionIndicator.textContent = "Trực tuyến";
+                            connectionIndicator.className = "badge rounded-pill text-bg-success px-2 py-1";
+                        }
+                        if (activeContactId) {
+                            connection.invoke("JoinUserRoom", activeContactId).catch(() => {});
+                        }
+                    })
+                    .catch(err => {
+                        console.warn("SignalR fallback to HTTP:", err);
+                        if (connectionIndicator) {
+                            connectionIndicator.textContent = "Trực tuyến (HTTP)";
+                            connectionIndicator.className = "badge rounded-pill text-bg-info px-2 py-1";
+                        }
+                    });
+            } else {
+                console.warn("Thư viện SignalR không tải được. Ứng dụng chạy ở chế độ HTTP API.");
+                if (connectionIndicator) {
+                    connectionIndicator.textContent = "Chế độ HTTP";
+                    connectionIndicator.className = "badge rounded-pill text-bg-info px-2 py-1";
+                }
+            }
+
+            // 3. Xử lý Gửi tin nhắn Text
+            if (sendForm && messageInput) {
+                sendForm.addEventListener("submit", async (e) => {
+                    e.preventDefault();
+                    const text = messageInput.value.trim();
+                    if (!text || !activeContactId) return;
+
+                    messageInput.value = "";
+                    if (errorMsg) errorMsg.textContent = "";
+
+                    // Optimistic UI: vẽ ngay trên màn hình người gửi
+                    appendMessage(text, true);
+                    updateConversationItem(activeContactId, text, false);
+
+                    try {
+                        let sentViaHub = false;
+                        const isConnected = connection && typeof signalR !== "undefined" && connection.state === signalR.HubConnectionState.Connected;
+                        if (isConnected) {
+                            try {
+                                await connection.invoke("SendMessageToUser", activeContactId, text);
+                                sentViaHub = true;
+                            } catch (hubEx) {
+                                console.warn("Lỗi gửi qua SignalR, tự động chuyển HTTP POST:", hubEx);
+                            }
+                        }
+                        if (!sentViaHub) {
+                            const res = await fetch("/Chat/SendMessage", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ receiverUserId: activeContactId, content: text })
+                            });
+                            const result = await res.json();
+                            if (!result.success) throw new Error(result.error || "Gửi tin nhắn thất bại");
+                        }
+                    } catch (err) {
+                        if (errorMsg) errorMsg.textContent = err.message || "Gửi tin nhắn thất bại.";
+                    }
+                });
+            }
+
+            // 4. Xử lý Emoji Picker
+            if (emojiToggleBtn && emojiPopover) {
+                emojiToggleBtn.addEventListener("click", (e) => {
+                    e.stopPropagation();
+                    emojiPopover.classList.toggle("d-none");
+                });
+
+                if (closeEmojiBtn) {
+                    closeEmojiBtn.addEventListener("click", () => {
+                        emojiPopover.classList.add("d-none");
+                    });
+                }
+
+                document.querySelectorAll(".btn-emoji").forEach(btn => {
+                    btn.addEventListener("click", (e) => {
+                        e.stopPropagation();
+                        const emoji = btn.dataset.emoji;
+                        if (emoji && messageInput) {
+                            messageInput.value += emoji;
+                            messageInput.focus();
+                        }
+                    });
+                });
+
+                document.addEventListener("click", (e) => {
+                    if (!emojiPopover.contains(e.target) && e.target !== emojiToggleBtn) {
+                        emojiPopover.classList.add("d-none");
+                    }
+                });
+            }
+
+            // 5. Xử lý Gửi Ảnh
+            if (chatImageInput) {
+                chatImageInput.addEventListener("change", async () => {
+                    const file = chatImageInput.files && chatImageInput.files[0];
+                    if (!file || !activeContactId) return;
+
+                    chatImageInput.value = "";
+
+                    if (file.size > 10 * 1024 * 1024) {
+                        alert("Dung lượng ảnh tối đa là 10MB.");
+                        return;
+                    }
+
+                    const formData = new FormData();
+                    formData.append("file", file);
+
+                    try {
+                        if (errorMsg) errorMsg.textContent = "";
+                        appendMessage("Đang tải ảnh lên...", true);
+
+                        const res = await fetch("/Chat/UploadImage", {
+                            method: "POST",
+                            body: formData
+                        });
+                        const data = await res.json();
+                        if (!res.ok || !data.success || !data.fileUrl) {
+                            throw new Error(data.error || "Không thể tải ảnh lên.");
+                        }
+
+                        // Xóa tin nhắn tạm
+                        const tempRows = messagesBox.querySelectorAll(".chat-message-row.is-mine");
+                        if (tempRows.length > 0) {
+                            const lastRow = tempRows[tempRows.length - 1];
+                            if (lastRow.textContent.includes("Đang tải ảnh lên...")) {
+                                lastRow.remove();
+                            }
+                        }
+
+                        const imgTag = `[img]${data.fileUrl}[/img]`;
+                        appendMessage(imgTag, true);
+                        updateConversationItem(activeContactId, "📷 [Hình ảnh]", false);
+
+                        let sentViaHub = false;
+                        const isConnected = connection && typeof signalR !== "undefined" && connection.state === signalR.HubConnectionState.Connected;
+                        if (isConnected) {
+                            try {
+                                await connection.invoke("SendMessageToUser", activeContactId, imgTag);
+                                sentViaHub = true;
+                            } catch (hubEx) {
+                                console.warn("Lỗi gửi ảnh qua SignalR, tự động chuyển HTTP POST:", hubEx);
+                            }
+                        }
+                        if (!sentViaHub) {
+                            await fetch("/Chat/SendMessage", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ receiverUserId: activeContactId, content: imgTag })
+                            });
+                        }
+                    } catch (err) {
+                        if (errorMsg) errorMsg.textContent = err.message || "Gửi ảnh thất bại.";
+                    }
+                });
+            }
+
+            // 6. Chuyển đổi cuộc trò chuyện khi click vào item bên trái
+            document.querySelectorAll(".chat-conv-item").forEach(item => {
+                item.addEventListener("click", async () => {
+                    const contactId = item.dataset.contactId;
+                    const contactName = item.dataset.contactName;
+                    const contactAvatar = item.dataset.contactAvatar;
+                    const contactRole = item.dataset.roleLabel || "Thành viên OTSP";
+
+                    // Hiện khung chat chi tiết, ẩn màn hình chờ
+                    const emptyPanel = document.getElementById("chatEmptyPanel");
+                    const activePanel = document.getElementById("chatActivePanel");
+                    if (emptyPanel) emptyPanel.classList.add("d-none");
+                    if (activePanel) {
+                        activePanel.classList.remove("d-none");
+                        activePanel.classList.add("d-flex");
+                    }
+
+                    // Kích hoạt giao diện chat trên điện thoại
+                    workspace.classList.add("is-chatting-mobile");
+
+                    if (!contactId || contactId === activeContactId) {
+                        return;
+                    }
+
+                    document.querySelectorAll(".chat-conv-item").forEach(i => i.classList.remove("is-active"));
+                    item.classList.add("is-active");
+
+                    const badge = item.querySelector(".chat-unread-badge");
+                    if (badge) {
+                        badge.dataset.unreadCount = "0";
+                        badge.classList.add("d-none");
+                    }
+
+                    activeContactId = contactId;
+                    workspace.dataset.selectedContactId = contactId;
+
+                    const headerName = document.getElementById("activeContactName");
+                    if (headerName) headerName.textContent = contactName;
+
+                    const headerRole = document.getElementById("activeContactRole");
+                    if (headerRole) headerRole.textContent = contactRole;
+
+                    const headerAvatar = document.getElementById("activeContactAvatar");
+                    const headerFallback = document.getElementById("activeContactFallback");
+                    if (headerAvatar && contactAvatar) {
+                        headerAvatar.src = contactAvatar;
+                        headerAvatar.classList.remove("d-none");
+                        if (headerFallback) headerFallback.classList.add("d-none");
+                    } else if (headerFallback) {
+                        headerFallback.textContent = contactName ? contactName.charAt(0).toUpperCase() : "U";
+                        headerFallback.classList.remove("d-none");
+                        if (headerAvatar) headerAvatar.classList.add("d-none");
+                    }
+
+                    const isConnected = connection && typeof signalR !== "undefined" && connection.state === signalR.HubConnectionState.Connected;
+                    if (isConnected) {
+                        connection.invoke("JoinUserRoom", contactId).catch(() => {});
+                        connection.invoke("MarkRead", contactId).catch(() => {});
+                    }
+
+                    if (messagesBox) {
+                        messagesBox.innerHTML = '<div class="text-center text-secondary small py-5"><div class="spinner-border spinner-border-sm me-2" role="status"></div>Đang tải tin nhắn...</div>';
+                    }
+
+                    try {
+                        const res = await fetch(`/Chat/GetMessages?contactId=${encodeURIComponent(contactId)}`);
+                        if (!res.ok) throw new Error();
+                        const msgs = await res.json();
+                        if (messagesBox) {
+                            messagesBox.innerHTML = "";
+                            if (msgs.length === 0) {
+                                messagesBox.innerHTML = '<div class="text-center text-secondary small my-auto py-5" id="noMessagesPlaceholder"><i class="bi bi-chat-text fs-2 d-block mb-2 text-muted"></i>Chưa có tin nhắn nào. Hãy gửi lời chào để bắt đầu cuộc trò chuyện!</div>';
+                            } else {
+                                msgs.forEach(m => appendMessage(m.content, m.isOwn, m.id));
+                            }
+                            scrollToBottom();
+                        }
+                    } catch (e) {
+                        if (messagesBox) {
+                            messagesBox.innerHTML = '<div class="text-center text-danger small py-5">Không thể tải tin nhắn. Vui lòng thử lại.</div>';
+                        }
+                    }
+                });
+            });
+
+            // 7. Tìm kiếm tức thì bên danh sách cuộc trò chuyện
+            if (searchInput) {
+                searchInput.addEventListener("input", () => {
+                    const query = searchInput.value.toLowerCase().trim();
+                    document.querySelectorAll(".chat-conv-item").forEach(item => {
+                        const name = (item.dataset.contactName || "").toLowerCase();
+                        const role = (item.dataset.roleLabel || "").toLowerCase();
+                        if (!query || name.includes(query) || role.includes(query)) {
+                            item.style.display = "flex";
+                        } else {
+                            item.style.display = "none";
+                        }
+                    });
+                });
+            }
+        })();
+    </script>
+}

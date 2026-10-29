@@ -119,6 +119,7 @@ namespace PROJECT_OTSP.Data
                 .HasOne(m => m.Receiver).WithMany(u => u.ReceivedMessagers)
                 .HasForeignKey(m => m.ReceiverId).OnDelete(DeleteBehavior.Restrict);
 
+
             // ===== 7. Complaint: tương tự Message =====
             b.Entity<Complaint>()
                 .HasOne(c => c.Sender).WithMany(u => u.SentComplaints)

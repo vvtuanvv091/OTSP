@@ -8,6 +8,7 @@ namespace PROJECT_OTSP.Dtos;
 public class TutorStudentItemVm
 {
     public int StudentId { get; set; }
+    public string StudentUserId { get; set; } = string.Empty;
     public string StudentName { get; set; } = string.Empty;
     public string? StudentAvatarUrl { get; set; }
     public int? ClassroomId { get; set; }

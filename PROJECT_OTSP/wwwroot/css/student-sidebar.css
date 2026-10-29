@@ -16,6 +16,8 @@
     width: 100%;
     max-width: 100%;
     min-width: 0;
+    padding: 1.25rem 1.75rem 2.5rem;
+    box-sizing: border-box;
 }
 
 .student-sidebar {
@@ -45,6 +47,8 @@
     display: inline-flex;
     width: 40px;
     height: 40px;
+    max-width: 40px;
+    max-height: 40px;
     flex: 0 0 40px;
     align-items: center;
     justify-content: center;
@@ -54,6 +58,19 @@
     background: rgba(219, 48, 58, .12);
     color: #B7212B;
     font-size: 1.15rem;
+}
+
+/* Đảm bảo ảnh đại diện luôn luôn là 40x40 tròn, không bao giờ bị vỡ tràn giao diện */
+img.student-sidebar-avatar,
+.student-sidebar-avatar img {
+    width: 40px !important;
+    height: 40px !important;
+    max-width: 40px !important;
+    max-height: 40px !important;
+    border-radius: 50% !important;
+    object-fit: cover !important;
+    display: block !important;
+    flex-shrink: 0 !important;
 }
 
 .student-sidebar-user-info { min-width: 0; }
@@ -112,6 +129,8 @@
     display: inline-flex;
     width: 40px;
     height: 40px;
+    max-width: 40px;
+    max-height: 40px;
     align-items: center;
     justify-content: center;
     border: 1px solid var(--bs-border-color);
@@ -166,4 +185,24 @@ html[data-bs-theme="dark"] .student-sidebar-link.active i { color: #FF9CA2; }
     }
 
     body.student-sidebar-open .student-sidebar-backdrop { display: block; }
+}
+
+/* ==================== TỐI ƯU HÓA MÀN HÌNH ĐIỆN THOẠI (< 768px) ==================== */
+@media (max-width: 767.98px) {
+    .student-dashboard-main {
+        padding: 0.75rem 0.6rem 1.5rem !important;
+    }
+
+    body:not(.student-sidebar-open) .student-dashboard-main {
+        padding-top: 48px !important;
+    }
+
+    .student-menu-toggle {
+        top: calc(var(--student-header-offset) + 6px) !important;
+        left: 10px !important;
+        width: 36px !important;
+        height: 36px !important;
+        font-size: 1.15rem !important;
+        border-radius: 8px !important;
+    }
 }

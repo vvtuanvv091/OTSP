@@ -67,14 +67,15 @@ public class HeaderController : Controller
             .AsNoTracking()
             .Where(n => n.UserId == userId)
             .OrderByDescending(n => n.CreatedAt)
-            .Take(5)
+            .Take(8)
             .Select(n => new
             {
                 id = n.Id,
                 title = n.Title,
                 content = n.Content,
                 createdAt = n.CreatedAt,
-                isRead = n.IsRead
+                isRead = n.IsRead,
+                targetUrl = $"/Notifications/Open?id={n.Id}"
             })
             .ToListAsync(cancellationToken);
 

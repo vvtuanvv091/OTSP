@@ -1,44 +1,40 @@
 /* OTSP Brand Theme & Dark/Light Mode Layer. Loaded after Bootstrap and page stylesheets. */
 :root,
 [data-bs-theme="light"] {
-  --bs-primary: #DB303A;
-  --bs-primary-rgb: 219, 48, 58;
-  --bs-danger: #DB303A;
-  --bs-danger-rgb: 219, 48, 58;
-  
-  /* Green color matching user specification (#15803D) */
-  --bs-success: #15803D;
-  --bs-success-rgb: 21, 128, 61;
-  --bs-success-text-emphasis: #15803D;
-  --bs-success-bg-subtle: #DCFCE7;
-  --bs-success-border-subtle: #86EFAC;
-  
-  /* Deep Rich Amber / Gold for Stars & Warning (#E8A317 / #D97706) */
-  --bs-warning: #D97706;
-  --bs-warning-rgb: 217, 119, 6;
-  --bs-warning-text-emphasis: #B45309;
-  --bs-warning-bg-subtle: #FEF3C7;
-  --bs-warning-border-subtle: #FCD34D;
-  --otsp-star-gold: #E8A317;
-
-  --bs-info: #0284C7;
-  --bs-info-rgb: 2, 132, 199;
-  
-  --bs-link-color: #B7212B;
-  --bs-link-color-rgb: 183, 33, 43;
-  --bs-link-hover-color: #941A23;
-  --bs-link-hover-color-rgb: 148, 26, 35;
-  --bs-focus-ring-color: rgba(219, 48, 58, .25);
-  --bs-form-valid-color: #15803D;
-  --bs-form-valid-border-color: #15803D;
-  --swiper-theme-color: #DB303A;
-
-  --bs-primary-text-emphasis: #842029;
-  --bs-danger-text-emphasis: #842029;
-  --bs-primary-bg-subtle: #F8D7DA;
-  --bs-danger-bg-subtle: #F8D7DA;
-  --bs-primary-border-subtle: #F1AEB5;
-  --bs-danger-border-subtle: #F1AEB5;
+    --bs-primary: #DB303A;
+    --bs-primary-rgb: 219, 48, 58;
+    --bs-danger: #DB303A;
+    --bs-danger-rgb: 219, 48, 58;
+    /* Green color matching user specification (#15803D) */
+    --bs-success: #166534;
+    --bs-success-rgb: 22, 101, 52;
+    --bs-success-text-emphasis: #166534;
+    --bs-success-bg-subtle: #166534;
+    --bs-success-red: #DB303A;
+    --bs-success-border-subtle: #166534;
+    /* Deep Rich Amber / Gold for Stars & Warning (#E8A317 / #D97706) */
+    --bs-warning: #D97706;
+    --bs-warning-rgb: 217, 119, 6;
+    --bs-warning-text-emphasis: #B45309;
+    --bs-warning-bg-subtle: #FEF3C7;
+    --bs-warning-border-subtle: #FCD34D;
+    --otsp-star-gold: #E8A317;
+    --bs-info: #0284C7;
+    --bs-info-rgb: 2, 132, 199;
+    --bs-link-color: #B7212B;
+    --bs-link-color-rgb: 183, 33, 43;
+    --bs-link-hover-color: #941A23;
+    --bs-link-hover-color-rgb: 148, 26, 35;
+    --bs-focus-ring-color: rgba(219, 48, 58, .25);
+    --bs-form-valid-color: #166534;
+    --bs-form-valid-border-color: #166534;
+    --swiper-theme-color: #DB303A;
+    --bs-primary-text-emphasis: #842029;
+    --bs-danger-text-emphasis: #842029;
+    --bs-primary-bg-subtle: #F8D7DA;
+    --bs-danger-bg-subtle: #F8D7DA;
+    --bs-primary-border-subtle: #F1AEB5;
+    --bs-danger-border-subtle: #F1AEB5;
 }
 
 [data-bs-theme="dark"] {
@@ -66,7 +62,7 @@
   --bs-success: #22C55E;
   --bs-success-rgb: 34, 197, 94;
   --bs-success-text-emphasis: #4ADE80;
-  --bs-success-bg-subtle: rgba(21, 128, 61, 0.25);
+  --bs-success-bg-subtle: #166534;
   --bs-success-border-subtle: rgba(34, 197, 94, 0.35);
 
   /* Dark mode deep amber */
@@ -321,8 +317,8 @@ html[data-bs-theme="dark"] .dropdown-divider,
 /* Success Buttons (Green #15803D as specified by user) */
 .btn-success {
   --bs-btn-color: #fff;
-  --bs-btn-bg: #15803D;
-  --bs-btn-border-color: #15803D;
+  --bs-btn-bg: #166534;
+  --bs-btn-border-color: #166534;
   --bs-btn-hover-color: #fff;
   --bs-btn-hover-bg: #166534;
   --bs-btn-hover-border-color: #14532D;
@@ -331,22 +327,22 @@ html[data-bs-theme="dark"] .dropdown-divider,
   --bs-btn-active-bg: #14532D;
   --bs-btn-active-border-color: #14532D;
   --bs-btn-disabled-color: #fff;
-  --bs-btn-disabled-bg: #15803D;
-  --bs-btn-disabled-border-color: #15803D;
+  --bs-btn-disabled-bg: #166534;
+  --bs-btn-disabled-border-color: #166534;
 }
 
 .btn-outline-success {
-  --bs-btn-color: #15803D;
-  --bs-btn-border-color: #15803D;
+  --bs-btn-color: #166534;
+  --bs-btn-border-color: #166534;
   --bs-btn-hover-color: #fff;
-  --bs-btn-hover-bg: #15803D;
-  --bs-btn-hover-border-color: #15803D;
-  --bs-btn-focus-shadow-rgb: 21, 128, 61;
+  --bs-btn-hover-bg: #166534;
+  --bs-btn-hover-border-color: #166534;
+  --bs-btn-focus-shadow-rgb: 22, 101, 52;
   --bs-btn-active-color: #fff;
-  --bs-btn-active-bg: #166534;
-  --bs-btn-active-border-color: #166534;
-  --bs-btn-disabled-color: #15803D;
-  --bs-btn-disabled-border-color: #15803D;
+  --bs-btn-active-bg: #14532D;
+  --bs-btn-active-border-color: #14532D;
+  --bs-btn-disabled-color: #166534;
+  --bs-btn-disabled-border-color: #166534;
 }
 
 /* Colors and Links */
@@ -358,9 +354,9 @@ html[data-bs-theme="dark"] .dropdown-divider,
 .bg-primary, .bg-danger { background-color: #DB303A !important; }
 .border-primary, .border-danger { border-color: #DB303A !important; }
 
-/* GREEN SPECIFICATION (#15803D) FOR SUCCESS & "ĐÃ HỌC" */
+/* GREEN SPECIFICATION (#166534) FOR SUCCESS, ACCEPTED & STATUS BADGES */
 .text-success, .link-success {
-  color: #15803D !important;
+  color: #166534 !important;
 }
 [data-bs-theme="dark"] .text-success,
 [data-bs-theme="dark"] .link-success {
@@ -370,13 +366,67 @@ html[data-bs-theme="dark"] .dropdown-divider,
 .bg-success,
 .text-bg-success,
 .badge-done,
-.badge-green {
-  background-color: #15803D !important;
+.badge-green,
+.badge-status-done,
+.tutor-pill-accepted,
+.bg-accepted,
+.badge.bg-accepted,
+.status-approved,
+.badge.bg-success-subtle,
+.badge.text-bg-success,
+.badge.bg-success {
+  background-color: #166534 !important;
+  color: #ffffff !important;
+  border-color: #166534 !important;
+}
+
+.tutor-pill-accepted,
+.badge.bg-success-subtle,
+.badge.bg-accepted,
+.bg-accepted,
+.status-approved {
+  color: #ffffff !important;
+  font-weight: 600;
+}
+
+.tutor-pill-accepted *,
+.badge.bg-success-subtle *,
+.badge.bg-accepted *,
+.bg-accepted *,
+.status-approved * {
+  color: #ffffff !important;
+}
+
+[data-bs-theme="dark"] .bg-success,
+[data-bs-theme="dark"] .text-bg-success,
+[data-bs-theme="dark"] .badge-done,
+[data-bs-theme="dark"] .badge-green,
+[data-bs-theme="dark"] .badge-status-done,
+[data-bs-theme="dark"] .tutor-pill-accepted,
+[data-bs-theme="dark"] .bg-accepted,
+[data-bs-theme="dark"] .badge.bg-accepted,
+[data-bs-theme="dark"] .status-approved,
+[data-bs-theme="dark"] .badge.bg-success-subtle,
+[data-bs-theme="dark"] .badge.text-bg-success,
+[data-bs-theme="dark"] .badge.bg-success {
+  background-color: #166534 !important;
+  color: #ffffff !important;
+  border-color: #166534 !important;
+}
+
+[data-bs-theme="dark"] .tutor-pill-accepted *,
+[data-bs-theme="dark"] .badge.bg-success-subtle *,
+[data-bs-theme="dark"] .badge.bg-accepted *,
+[data-bs-theme="dark"] .bg-accepted *,
+[data-bs-theme="dark"] .status-approved * {
   color: #ffffff !important;
 }
 
 .border-success {
-  border-color: #15803D !important;
+  border-color: #166534 !important;
+}
+[data-bs-theme="dark"] .border-success {
+  border-color: #22C55E !important;
 }
 
 /* DEEP GOLD / AMBER (#E8A317) FOR STARS & WARNING */

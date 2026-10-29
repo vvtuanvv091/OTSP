@@ -987,8 +987,8 @@ section,
 # Global Section Titles
 --------------------------------------------------------------*/
 .section-title {
-  padding-bottom: 60px;
-  position: relative;
+    padding-bottom: 10px;
+    position: relative;
 }
 
 .section-title h2 {
