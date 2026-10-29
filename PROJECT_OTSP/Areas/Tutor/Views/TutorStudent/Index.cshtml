@@ -81,18 +81,9 @@
                                 <div class="slot-time-text" style="font-size: 12.5px;">@student.NextSessionFormatted</div>
                             </td>
                             <td style="text-align: right;">
-                                @if (student.RequestId.HasValue)
-                                {
-                                    <a asp-area="" asp-controller="Chat" asp-action="Conversation" asp-route-requestId="@student.RequestId.Value" class="btn-tutor-outline-red">
-                                        Nhắn tin
-                                    </a>
-                                }
-                                else
-                                {
-                                    <a href="javascript:void(0)" onclick="alert('Đang mở hộp thoại tin nhắn với @student.StudentName');" class="btn-tutor-outline-red">
-                                        Nhắn tin
-                                    </a>
-                                }
+                                <a asp-area="" asp-controller="Chat" asp-action="Index" asp-route-contactId="@student.StudentUserId" asp-route-requestId="@student.RequestId" class="btn-tutor-outline-red">
+                                    <i class="bi bi-chat-dots me-1"></i> Nhắn tin
+                                </a>
                             </td>
                         </tr>
                     }
@@ -146,18 +137,9 @@
                     </div>
 
                     <div class="tutor-m-card-footer">
-                        @if (student.RequestId.HasValue)
-                        {
-                            <a asp-area="" asp-controller="Chat" asp-action="Conversation" asp-route-requestId="@student.RequestId.Value" class="btn-tutor-outline-red w-100">
-                                <i class="bi bi-chat-dots me-1"></i> Nhắn tin
-                            </a>
-                        }
-                        else
-                        {
-                            <button type="button" onclick="alert('Đang mở hộp thoại tin nhắn với @student.StudentName');" class="btn-tutor-outline-red w-100">
-                                <i class="bi bi-chat-dots me-1"></i> Nhắn tin
-                            </button>
-                        }
+                        <a asp-area="" asp-controller="Chat" asp-action="Index" asp-route-contactId="@student.StudentUserId" asp-route-requestId="@student.RequestId" class="btn-tutor-outline-red w-100">
+                            <i class="bi bi-chat-dots me-1"></i> Nhắn tin
+                        </a>
                     </div>
                 </div>
             }

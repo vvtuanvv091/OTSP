@@ -1712,8 +1712,8 @@ body, .header, .card, .btn, .features-item, .course-item, .member, .stats-item, 
     font-weight: 600;
 }
 .status-approved {
-    background: rgba(47, 158, 110, 0.14);
-    color: #2f9e6e;
+    background: #166534 !important;
+    color: #ffffff !important;
 }
 .status-rejected {
     background: rgba(219, 48, 58, 0.14);

@@ -19,6 +19,7 @@ public sealed class StudentClassroomSessionDto
 public sealed class StudentClassroomItemDto
 {
     public int ClassroomId { get; init; }
+    public string TutorUserId { get; init; } = string.Empty;
     public string Name { get; init; } = string.Empty;
     public string SubjectName { get; init; } = string.Empty;
     public string GradeLevelName { get; init; } = string.Empty;

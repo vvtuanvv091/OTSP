@@ -65,7 +65,7 @@
     }
 
     .badge-status-done {
-        background-color: #15803d !important;
+        background-color: #166534 !important;
         color: #ffffff !important;
         font-size: 11px;
         font-weight: 600;
@@ -203,7 +203,15 @@
         {
             <div class="classroom-card">
                 <div class="classroom-card-header d-flex align-items-center justify-content-between flex-wrap gap-2">
-                    <h2 class="h5 fw-bold mb-0">@cls.TutorName · @cls.SubjectName</h2>
+                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                        <h2 class="h5 fw-bold mb-0">@cls.TutorName · @cls.SubjectName</h2>
+                        @if (!string.IsNullOrWhiteSpace(cls.TutorUserId))
+                        {
+                            <a asp-area="" asp-controller="Chat" asp-action="Index" asp-route-contactId="@cls.TutorUserId" class="btn btn-sm btn-outline-primary py-0 px-2" style="font-size: 0.78rem;" title="Nhắn tin riêng cho gia sư">
+                                <i class="bi bi-chat-dots me-1"></i>Nhắn tin
+                            </a>
+                        }
+                    </div>
                     <span class="badge bg-body-secondary border small text-body">
                         @(cls.Type == ClassroomType.OneToOne ? "Lớp 1-1" : "Lớp nhóm") · @cls.GradeLevelName
                     </span>

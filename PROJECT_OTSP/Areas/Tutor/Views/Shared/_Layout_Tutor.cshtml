@@ -9,6 +9,9 @@
     var summaryUrl = Url.Action("Summary", "Header", new { area = "" }) ?? "/Header/Summary";
 }
 
+<link href="~/css/student-sidebar.css" rel="stylesheet" asp-append-version="true" />
+<link href="~/css/tutor-sidebar.css" rel="stylesheet" asp-append-version="true" />
+
 <div id="tutor-realtime-config" class="d-none"
      data-hub-url="@Url.Content("~/hubs/connection-requests")"
      data-requests-url="@Url.Action("Index", "TutorConnectionRequest", new { area = "Tutor" })"></div>
@@ -17,7 +20,7 @@
     <aside class="student-sidebar" id="studentSidebar" aria-label="Thanh điều hướng gia sư">
 
         <div class="student-sidebar-user" id="studentSidebarUser" data-info-url="@summaryUrl">
-            <img class="student-sidebar-avatar d-none" data-role="avatar-img" alt="" referrerpolicy="no-referrer" />
+            <img class="student-sidebar-avatar d-none" style="width: 40px; height: 40px; max-width: 40px; max-height: 40px; object-fit: cover; border-radius: 50%;" data-role="avatar-img" alt="" referrerpolicy="no-referrer" />
             <span class="student-sidebar-avatar" data-role="avatar-icon"><i class="bi bi-person-fill" aria-hidden="true"></i></span>
             <div class="student-sidebar-user-info">
                 <strong data-role="name">@initialName</strong>
@@ -63,7 +66,10 @@
                class="student-sidebar-link @(inTutorArea && controllerName == "TutorReview" ? "active" : "")">
                 <i class="bi bi-star" aria-hidden="true"></i><span>Đánh giá</span>
             </a>
-            <span class="student-sidebar-link is-disabled" aria-disabled="true"><i class="bi bi-chat-dots" aria-hidden="true"></i><span>Tin nhắn</span></span>
+            <a asp-area="" asp-controller="Chat" asp-action="Index"
+               class="student-sidebar-link @(controllerName == "Chat" ? "active" : "")">
+                <i class="bi bi-chat-dots" aria-hidden="true"></i><span>Tin nhắn</span>
+            </a>
             <a asp-area="" asp-controller="Notifications" asp-action="Index"
                class="student-sidebar-link @(controllerName == "Notifications" ? "active" : "")">
                 <i class="bi bi-bell" aria-hidden="true"></i><span>Thông báo</span>

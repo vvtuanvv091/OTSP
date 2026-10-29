@@ -30,8 +30,8 @@
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        color: var(--bs-success-text-emphasis);
-        background: var(--bs-success-bg-subtle);
+        color: var(--bs-body-color);
+        background: var(--bs-success-red);
         border-radius: 1rem;
         font-size: 1.5rem;
     }
@@ -55,9 +55,17 @@
         border: 0;
     }
 
+    #login-submit {
+        background-color: #DB303A !important;
+        border-color: #DB303A !important;
+    }
+
     .auth-password-toggle:hover,
     .auth-password-toggle:focus-visible { color: var(--bs-success); }
-    .auth-links a { color: var(--bs-success-text-emphasis); }
+
+    .auth-links a {
+        color: var(--bs-success-red);
+    }
     .auth-divider { display: flex; align-items: center; gap: .75rem; color: var(--bs-secondary-color); }
     .auth-divider::before,
     .auth-divider::after { content: ""; height: 1px; flex: 1; background: var(--bs-border-color); }

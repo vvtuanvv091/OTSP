@@ -39,17 +39,17 @@
     <link href="~/assets/vendor/aos/aos.css" rel="stylesheet">
     <link href="~/assets/vendor/glightbox/css/glightbox.min.css" rel="stylesheet">
     <link href="~/assets/vendor/swiper/swiper-bundle.min.css" rel="stylesheet">
-
+    
     <!-- Theme & Custom CSS Files -->
     <link href="~/assets/css/main.css" rel="stylesheet" asp-append-version="true">
     <link href="~/css/otsp-home.css" rel="stylesheet" asp-append-version="true">
     <link href="~/css/otsp-pages.css" rel="stylesheet" asp-append-version="true">
     <link href="~/css/otsp-red-theme.css" rel="stylesheet" asp-append-version="true">
     <link href="~/css/otsp-components.css" rel="stylesheet" asp-append-version="true">
-    @if (ViewContext.RouteData.Values["area"]?.ToString() == "Student_Parent" || ViewContext.RouteData.Values["area"]?.ToString() == "Tutor")
+    @if (true)
     {
         <link href="~/css/student-sidebar.css" rel="stylesheet" asp-append-version="true">
-        @if (ViewContext.RouteData.Values["area"]?.ToString() == "Tutor")
+        @if (ViewContext.RouteData.Values["area"]?.ToString() == "Tutor" || User.IsInRole("Tutor"))
         {
             <link href="~/css/tutor-sidebar.css" rel="stylesheet" asp-append-version="true">
         }

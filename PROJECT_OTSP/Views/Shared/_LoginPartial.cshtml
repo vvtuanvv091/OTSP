@@ -508,7 +508,7 @@
         function notificationItem(n) {
             const a = document.createElement('a');
             a.className = 'header-notification-item ' + (n.isRead ? 'is-read' : 'is-unread');
-            a.href = box.dataset.notificationsUrl;
+            a.href = n.targetUrl || ('/Notifications/Open?id=' + n.id);
 
             // Icon wrap
             const iconWrap = document.createElement('div');
