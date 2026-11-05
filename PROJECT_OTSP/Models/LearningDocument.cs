@@ -1,5 +1,6 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using static PROJECT_OTSP.Models.Enums;
 
 namespace PROJECT_OTSP.Models
 {
@@ -39,5 +40,15 @@ namespace PROJECT_OTSP.Models
         public int GradeLevelId { get; set; }
         public GradeLevel GradeLevel { get; set; } = null!;
 
+        // Phạm vi chia sẻ: Lớp học hoặc Công khai
+        public DocumentScope Scope { get; set; } = DocumentScope.Classroom;
+
+        // Lớp học được chia sẻ tài liệu (nếu Scope == Classroom)
+        [ForeignKey("Classroom")]
+        public int? ClassroomId { get; set; }
+        public Classroom? Classroom { get; set; }
+
+        // Trạng thái tài liệu: Pending (Chờ duyệt) hoặc Approved (Đã duyệt)
+        public VerificationStatus Status { get; set; } = VerificationStatus.Approved;
     }
 }

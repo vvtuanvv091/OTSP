@@ -24,6 +24,7 @@ public class Send_Details_TutorController : Controller
     private readonly ILogger<Send_Details_TutorController> _logger;
     private readonly IOpenGroupClassroomService _openGroupClassroomService;
     private readonly IAvailabilitySlotService _availabilitySlotService;
+    private readonly IConnectionRequestService _connectionRequestService;
     private readonly IHubContext<ConnectionRequestHub> _hubContext;
 
     public Send_Details_TutorController(
@@ -31,12 +32,14 @@ public class Send_Details_TutorController : Controller
         ILogger<Send_Details_TutorController> logger,
         IOpenGroupClassroomService openGroupClassroomService,
         IAvailabilitySlotService availabilitySlotService,
+        IConnectionRequestService connectionRequestService,
         IHubContext<ConnectionRequestHub> hubContext)
     {
         _db = db;
         _logger = logger;
         _openGroupClassroomService = openGroupClassroomService;
         _availabilitySlotService = availabilitySlotService;
+        _connectionRequestService = connectionRequestService;
         _hubContext = hubContext;
     }
 
@@ -119,38 +122,30 @@ public class Send_Details_TutorController : Controller
             .Select(ts => new SelectListItem
             {
                 Value = $"{ts.SubjectId}_{ts.GradeLevelId}",
-                Text = $"{ts.Subject.Name} - {ts.GradeLevel.Name}"
+                Text = $"{ts.Subject.Name} - {ts.GradeLevel.Name}" + (ts.HourlyFee > 0 ? $" ({ts.HourlyFee:N0} đ/h)" : "")
             })
             .ToList();
 
-        // Chỉ tải các lớp nhóm đang tuyển sinh và còn chỗ.
-        var openClassrooms = await _openGroupClassroomService.GetOpenGroupClassroomsAsync(tutor.Id, cancellationToken);
-        var classroomOptions = openClassrooms
-            .Select(classroom => new SelectListItem
-            {
-                Value = classroom.Id.ToString(),
-                Text = $"{classroom.Name} ({classroom.SubjectName} - {classroom.GradeLevelName}) - Còn {classroom.AvailableSeats} chỗ"
-            })
-            .ToList();
+        // Lấy các lớp nhóm đang mở tuyển sinh của gia sư
+        var classrooms = await _openGroupClassroomService.GetOpenGroupClassroomsAsync(targetTutorId.Value, cancellationToken);
+
+        // Danh sách các khung giờ học rảnh (14 ngày tới)
+        var availableSlots = await _availabilitySlotService.GetAvailableSlotsAsync(targetTutorId.Value, 14, cancellationToken);
 
         var firstSubject = tutor.TutorSubjects.FirstOrDefault();
 
-        var vm = new TutorDetailsVm
+        var viewModel = new TutorDetailsVm
         {
             TutorId = tutor.Id,
-            UserId = tutor.UserId,
             FullName = tutor.User.FullName,
             AvatarUrl = tutor.User.AvatarUrl,
-            Email = tutor.User.Email,
-            PhoneNumber = tutor.User.PhoneNumber,
             Area = tutor.User.Address,
-            HourlyFee = tutor.HourlyFee,
             TeachingFormat = tutor.TeachingFormat,
-            AverageRating = tutor.AverageRating,
+            HourlyFee = tutor.HourlyFee,
             Introduction = tutor.Introduction,
+            AverageRating = tutor.AverageRating,
             TotalCompletedSessions = completedSessions,
             TotalStudents = studentCount,
-
             Qualifications = tutor.Qualifications.Select(q => new TutorQualificationDto
             {
                 Id = q.Id,
@@ -158,56 +153,43 @@ public class Send_Details_TutorController : Controller
                 FileUrl = q.FileUrl,
                 Status = q.Status
             }).ToList(),
-
             TeachingSubjects = tutor.TutorSubjects.Select(ts => new SubjectGradeDto
             {
                 SubjectId = ts.SubjectId,
                 SubjectName = ts.Subject.Name,
                 GradeLevelId = ts.GradeLevelId,
-                GradeName = ts.GradeLevel.Name
+                GradeName = ts.GradeLevel.Name,
+                HourlyFee = ts.HourlyFee > 0 ? ts.HourlyFee : tutor.HourlyFee
             }).ToList(),
-
-            Availabilities = tutor.Availabilities
-                .OrderBy(a => a.DayOfWeek)
-                .ThenBy(a => a.StartTime)
-                .Select(a => new TutorAvailabilityDto
-                {
-                    DayOfWeek = a.DayOfWeek,
-                    StartTime = a.StartTime,
-                    EndTime = a.EndTime
-                }).ToList(),
-
-            Classrooms = openClassrooms,
-            AvailableTrialSlots = await _availabilitySlotService.GetAvailableSlotsAsync(tutor.Id, 14, cancellationToken),
-
             Reviews = reviews,
+            Classrooms = classrooms,
             SubjectOptions = subjectOptions,
-            ClassroomOptions = classroomOptions,
-
+            AvailableTrialSlots = availableSlots,
             HasExistingPendingRequest = recentRequest != null && recentRequest.Status == RequestStatus.Pending,
-            ExistingRequestStatus = recentRequest?.Status,
             ExistingRequestDate = recentRequest?.CreatedAt,
             ExistingRequestSubject = recentRequest?.Subject?.Name,
-
             Request = new SendConnectionRequestDto
             {
                 TutorId = tutor.Id,
                 SubjectId = firstSubject?.SubjectId ?? 0,
                 GradeLevelId = firstSubject?.GradeLevelId ?? 0,
-                PreferredType = ClassroomType.OneToOne
+                PreferredType = ClassroomType.OneToOne,
+                IsTrial = true
             }
         };
 
-        return View(vm);
+        return View(viewModel);
     }
 
     /// <summary>
-    /// Tiếp nhận và xử lý gửi yêu cầu kết nối từ học viên/phụ huynh tới gia sư.
-    /// Hỗ trợ cả AJAX call và Postback tiêu chuẩn.
+    /// Xử lý gửi yêu cầu kết nối học tập từ học viên tới gia sư.
+    /// URL: POST /Student_Parent/Send_Details_Tutor/SendRequest
     /// </summary>
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> SendRequest([Bind(Prefix = "Request")] SendConnectionRequestDto model, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> SendRequest(
+        [Bind(Prefix = "Request")] SendConnectionRequestDto model,
+        CancellationToken cancellationToken = default)
     {
         if (!ModelState.IsValid)
         {
@@ -227,187 +209,29 @@ public class Send_Details_TutorController : Controller
         if (string.IsNullOrWhiteSpace(userId))
             return Challenge();
 
-        var student = await _db.StudentProfiles
-            .Include(s => s.User)
-            .FirstOrDefaultAsync(s => s.UserId == userId, cancellationToken);
-
-        if (student == null)
+        var result = await _connectionRequestService.CreateRequestAsync(model, userId, cancellationToken);
+        if (!result.Success)
         {
-            student = new StudentProfile { UserId = userId };
-            _db.StudentProfiles.Add(student);
-            await _db.SaveChangesAsync(cancellationToken);
-        }
+            if (IsAjaxRequest())
+                return Json(new { success = false, message = result.Message });
 
-        var tutor = await _db.TutorProfiles
-            .Include(t => t.User)
-            .FirstOrDefaultAsync(t => t.Id == model.TutorId
-                                   && t.VerificationStatus == VerificationStatus.Approved
-                                   && t.User.Status == AccountStatus.Active, cancellationToken);
-
-        if (tutor == null)
-        {
-            const string msg = "Gia sư không tồn tại hoặc hiện không nhận học viên mới.";
-            if (IsAjaxRequest()) return Json(new { success = false, message = msg });
-            TempData["Error"] = msg;
-            return RedirectToAction("Index", "Search", new { area = "Student_Parent" });
-        }
-
-        if (model.PreferredType == ClassroomType.Group)
-        {
-            if (!model.ClassroomId.HasValue || model.ClassroomId.Value <= 0)
-            {
-                const string msg = "Vui lòng chọn lớp học nhóm đang mở tuyển sinh của gia sư.";
-                if (IsAjaxRequest()) return Json(new { success = false, message = msg });
-                TempData["Error"] = msg;
-                return RedirectToAction(nameof(Index), new { id = model.TutorId });
-            }
-
-            if (!await _openGroupClassroomService.IsOpenGroupClassroomAsync(
-                tutor.Id,
-                model.ClassroomId.Value,
-                model.SubjectId,
-                model.GradeLevelId,
-                cancellationToken))
-            {
-                const string msg = "Lớp đã chọn không còn tuyển sinh, đã hết chỗ hoặc không khớp môn học và cấp học.";
-                if (IsAjaxRequest()) return Json(new { success = false, message = msg });
-                TempData["Error"] = msg;
-                return RedirectToAction(nameof(Index), new { id = model.TutorId });
-            }
-        }
-
-        // Kiểm tra xem đã có yêu cầu kết nối nào đang chờ phản hồi cho môn này chưa
-        var hasPendingRequest = await _db.ConnectionRequests.AnyAsync(cr =>
-            cr.StudentId == student.Id &&
-            cr.TutorId == tutor.Id &&
-            cr.SubjectId == model.SubjectId &&
-            cr.Status == RequestStatus.Pending, cancellationToken);
-
-        if (hasPendingRequest)
-        {
-            const string msg = "Bạn đã có một yêu cầu kết nối đang chờ gia sư phản hồi. Vui lòng chờ phản hồi trước khi gửi yêu cầu mới.";
-            if (IsAjaxRequest()) return Json(new { success = false, message = msg });
-            TempData["Warning"] = msg;
+            TempData["Error"] = result.Message;
             return RedirectToAction(nameof(Index), new { id = model.TutorId });
         }
 
-        var selectedSlots = (model.ProposedTrialSlotsUtc ?? new List<DateTime>())
-            .Where(s => s > DateTime.UtcNow)
-            .Distinct()
-            .OrderBy(s => s)
-            .ToList();
-
-        if (selectedSlots.Count == 0 && model.ProposedTrialSlotUtc.HasValue && model.ProposedTrialSlotUtc.Value > DateTime.UtcNow)
-        {
-            selectedSlots.Add(model.ProposedTrialSlotUtc.Value);
-        }
-
-        if (model.PreferredType == ClassroomType.OneToOne)
-        {
-            if (selectedSlots.Count < 2)
-            {
-                var msg = selectedSlots.Count == 0
-                    ? "Vui lòng chọn đủ 4 tiếng (2 buổi, mỗi buổi 2 tiếng) trực tiếp trên khung lịch rảnh của gia sư."
-                    : "Bạn mới chọn 1 buổi (2 tiếng). Lớp 1 kèm 1 bắt buộc phải chọn đủ 4 tiếng (2 buổi, mỗi buổi 2 tiếng) chia đều trong tuần.";
-
-                if (IsAjaxRequest()) return Json(new { success = false, message = msg });
-                TempData["Error"] = msg;
-                return RedirectToAction(nameof(Index), new { id = model.TutorId });
-            }
-        }
-
-        // Định dạng lịch đề xuất vào Message
-        var baseMessage = model.Message?.Trim();
-        string? finalMessage = baseMessage;
-        if (model.PreferredType == ClassroomType.OneToOne && selectedSlots.Count > 0)
-        {
-            var slotStrings = selectedSlots.Select((slotUtc, idx) =>
-            {
-                var vn = slotUtc.AddHours(7);
-                return $"Buổi {idx + 1}: {vn.ToString("dddd, dd/MM/yyyy HH:mm", new System.Globalization.CultureInfo("vi-VN"))}";
-            });
-            var scheduleHeader = $"[Lịch học 1 kèm 1 đề xuất ({selectedSlots.Count * 2} tiếng/tuần): {string.Join(" | ", slotStrings)}]";
-            finalMessage = string.IsNullOrWhiteSpace(baseMessage)
-                ? scheduleHeader
-                : $"{scheduleHeader}\n{baseMessage}";
-        }
-
-        // Tạo yêu cầu kết nối mới
-        var connectionRequest = new ConnectionRequest
-        {
-            StudentId = student.Id,
-            TutorId = tutor.Id,
-            SubjectId = model.SubjectId,
-            GradeLevelId = model.GradeLevelId,
-            PreferredType = model.PreferredType,
-            ClassroomId = model.PreferredType == ClassroomType.Group ? model.ClassroomId : null,
-            ProposedTrialSlotUtc = model.PreferredType == ClassroomType.OneToOne ? selectedSlots.FirstOrDefault() : null,
-            Message = finalMessage,
-            Status = RequestStatus.Pending,
-            CreatedAt = DateTime.UtcNow
-        };
-
-        if (model.PreferredType == ClassroomType.OneToOne)
-        {
-            foreach (var slotUtc in selectedSlots)
-            {
-                connectionRequest.TrialSchedules.Add(new TrialSchedule
-                {
-                    ScheduledAt = slotUtc,
-                    Status = ScheduleStatus.Pending
-                });
-            }
-        }
-
-        _db.ConnectionRequests.Add(connectionRequest);
-
-        // Tạo thông báo cho gia sư
-        var studentName = student.User?.FullName ?? "Học viên";
-        var subject = await _db.Subjects.FindAsync(new object[] { model.SubjectId }, cancellationToken);
-        var subjectName = subject?.Name ?? "môn học";
-
-        var notification = new Notification
-        {
-            UserId = tutor.UserId,
-            Title = "Yêu cầu kết nối mới",
-            Content = $"Học viên {studentName} vừa gửi cho bạn một yêu cầu kết nối học môn {subjectName}. Hãy xem chi tiết và phản hồi nhé!",
-            CreatedAt = DateTime.UtcNow,
-            IsRead = false
-        };
-
-        _db.Notifications.Add(notification);
-
-        await _db.SaveChangesAsync(cancellationToken);
-
-        try
-        {
-            await _hubContext.Clients.User(tutor.UserId).SendAsync(
-                "ConnectionRequestReceived",
-                new
-                {
-                    requestId = connectionRequest.Id,
-                    studentName,
-                    subjectName
-                },
-                cancellationToken);
-        }
-        catch (Exception exception)
-        {
-            _logger.LogWarning(exception, "Could not send realtime alert for ConnectionRequest {RequestId}", connectionRequest.Id);
-        }
-
-        _logger.LogInformation("Student {StudentId} sent ConnectionRequest {RequestId} to Tutor {TutorId}",
-            student.Id, connectionRequest.Id, tutor.Id);
-
-        const string successMessage = "Đã gửi yêu cầu kết nối thành công! Gia sư đã nhận được thông báo và sẽ sớm phản hồi cho bạn.";
-
         if (IsAjaxRequest())
         {
-            return Json(new { success = true, message = successMessage });
+            return Json(new
+            {
+                success = true,
+                message = result.Message,
+                requestId = result.RequestId,
+                redirectUrl = Url.Action("MyRequests", "Send_Details_Tutor", new { area = "Student_Parent" })
+            });
         }
 
-        TempData["Success"] = successMessage;
-        return RedirectToAction(nameof(Index), new { id = model.TutorId });
+        TempData["Success"] = result.Message;
+        return RedirectToAction(nameof(MyRequests));
     }
 
     /// <summary>
@@ -415,11 +239,13 @@ public class Send_Details_TutorController : Controller
     /// URL: /Student_Parent/Send_Details_Tutor/MyRequests
     /// </summary>
     [HttpGet]
-    public async Task<IActionResult> MyRequests(RequestStatus? status, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> MyRequests(RequestStatus? status, int page = 1, CancellationToken cancellationToken = default)
     {
         var studentId = await GetStudentIdAsync(cancellationToken);
         if (studentId == null)
             return RedirectToAction("Index", "Search", new { area = "Student_Parent" });
+
+        const int pageSize = 9; // 3 hàng x 3 cột
 
         var query = _db.ConnectionRequests.AsNoTracking()
             .Where(cr => cr.StudentId == studentId.Value);
@@ -427,8 +253,14 @@ public class Send_Details_TutorController : Controller
         if (status.HasValue)
             query = query.Where(cr => cr.Status == status.Value);
 
+        var totalItems = await query.CountAsync(cancellationToken);
+        var totalPages = Math.Max(1, (int)Math.Ceiling(totalItems / (double)pageSize));
+        page = Math.Clamp(page, 1, totalPages);
+
         var requests = await query
             .OrderByDescending(cr => cr.CreatedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .Select(cr => new StudentConnectionRequestDto
             {
                 Id = cr.Id,
@@ -464,6 +296,20 @@ public class Send_Details_TutorController : Controller
             })
             .ToListAsync(cancellationToken);
 
+        var pagination = new PaginationVm
+        {
+            CurrentPage = page,
+            TotalPages = totalPages,
+            TotalItems = totalItems,
+            PageSize = pageSize,
+            BaseUrl = Url.Action("MyRequests", "Send_Details_Tutor", new { area = "Student_Parent" }) ?? ""
+        };
+        if (status.HasValue)
+        {
+            pagination.QueryParams["status"] = status.Value.ToString();
+        }
+
+        ViewBag.Pagination = pagination;
         ViewBag.SelectedStatus = status;
         return View(requests);
     }

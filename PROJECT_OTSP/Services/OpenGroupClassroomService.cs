@@ -34,6 +34,8 @@ public sealed class OpenGroupClassroomService : IOpenGroupClassroomService
                 classroom.CoverImageUrl,
                 classroom.Fee,
                 classroom.Type,
+                classroom.SubjectId,
+                classroom.GradeLevelId,
                 StudentCount = classroom.ClassroomStudents.Count,
                 classroom.MaxStudents,
                 SubjectName = classroom.Subject.Name,
@@ -52,9 +54,10 @@ public sealed class OpenGroupClassroomService : IOpenGroupClassroomService
                 $"Buổi {w.SessionIndex}: {ToVnDay(w.DayOfWeek)} ({w.StartTime:HH\\:mm} – {w.EndTime:HH\\:mm})"
             ).ToList();
 
+            var safeHours = classroom.HoursPerSession >= 10.0 ? classroom.HoursPerSession / 10.0 : (classroom.HoursPerSession > 0 ? classroom.HoursPerSession : 2.0);
             var summary = scheduleItems.Count > 0
-                ? $"{classroom.SessionsPerWeek} buổi/tuần ({string.Join(", ", classroom.WeeklySchedules.Select(w => $"{ToShortVnDay(w.DayOfWeek)} {w.StartTime:HH\\:mm}"))} · {classroom.HoursPerSession}h/buổi)"
-                : $"{classroom.SessionsPerWeek} buổi/tuần ({classroom.HoursPerSession}h/buổi)";
+                ? $"{classroom.SessionsPerWeek} buổi/tuần ({string.Join(", ", classroom.WeeklySchedules.Select(w => $"{ToShortVnDay(w.DayOfWeek)} {w.StartTime:HH\\:mm}"))} · {safeHours:0.#}h/buổi)"
+                : $"{classroom.SessionsPerWeek} buổi/tuần ({safeHours:0.#}h/buổi)";
 
             return new TutorClassroomDto
             {
@@ -64,12 +67,14 @@ public sealed class OpenGroupClassroomService : IOpenGroupClassroomService
                 CoverImageUrl = classroom.CoverImageUrl,
                 Fee = classroom.Fee,
                 Type = classroom.Type,
+                SubjectId = classroom.SubjectId,
+                GradeLevelId = classroom.GradeLevelId,
                 StudentCount = classroom.StudentCount,
                 MaxStudents = classroom.MaxStudents,
                 SubjectName = classroom.SubjectName,
                 GradeLevelName = classroom.GradeLevelName,
                 SessionsPerWeek = classroom.SessionsPerWeek,
-                HoursPerSession = classroom.HoursPerSession,
+                HoursPerSession = safeHours,
                 ScheduleSummary = summary,
                 WeeklyScheduleItems = scheduleItems
             };

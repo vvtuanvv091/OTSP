@@ -26,8 +26,8 @@
 
         <nav class="student-sidebar-nav">
             <span class="student-sidebar-heading">TỔNG QUAN</span>
-            <a asp-area="Student_Parent" asp-controller="StudentProfile" asp-action="Index"
-               class="student-sidebar-link @(inStudentArea && controllerName == "StudentProfile" ? "active" : "")">
+            <a asp-area="Student_Parent" asp-controller="StudentDashboard" asp-action="Index"
+               class="student-sidebar-link @(inStudentArea && controllerName == "StudentDashboard" ? "active" : "")">
                 <i class="bi bi-grid" aria-hidden="true"></i><span>Tổng quan</span>
             </a>
 
@@ -44,8 +44,10 @@
                class="student-sidebar-link @(inStudentArea && controllerName == "Send_Details_Tutor" ? "active" : "")">
                 <i class="bi bi-person-plus" aria-hidden="true"></i><span>Yêu cầu kết nối</span>
             </a>
-            <span class="student-sidebar-link is-disabled" aria-disabled="true"><i class="bi bi-journal-check" aria-hidden="true"></i><span>Lớp đã đăng</span></span>
-            <span class="student-sidebar-link is-disabled" aria-disabled="true"><i class="bi bi-folder2-open" aria-hidden="true"></i><span>Tài liệu</span></span>
+            <a asp-area="Student_Parent" asp-controller="StudentLearningDocument" asp-action="Index"
+               class="student-sidebar-link @(inStudentArea && controllerName == "StudentLearningDocument" ? "active" : "")">
+                <i class="bi bi-folder2-open" aria-hidden="true"></i><span>Tài liệu</span>
+            </a>
 
             <span class="student-sidebar-heading">TƯƠNG TÁC</span>
             <a asp-area="" asp-controller="Chat" asp-action="Index"
@@ -58,9 +60,12 @@
             </a>
 
             <span class="student-sidebar-heading">TÀI CHÍNH &amp; GIA ĐÌNH</span>
-            <span class="student-sidebar-link is-disabled" aria-disabled="true"><i class="bi bi-credit-card" aria-hidden="true"></i><span>Học phí &amp; thanh toán</span></span>
-            <a asp-area="Student_Parent" asp-controller="StudentProfile" asp-action="Index" asp-fragment="guardians"
-               class="student-sidebar-link @(inStudentArea && controllerName == "StudentProfile" ? "active" : "")">
+            <a asp-area="Student_Parent" asp-controller="StudentParent_Payment" asp-action="Index"
+               class="student-sidebar-link @(inStudentArea && controllerName == "StudentParent_Payment" ? "active" : "")">
+                <i class="bi bi-credit-card-2-front" aria-hidden="true"></i><span>Học phí &amp; thanh toán</span>
+            </a>
+            <a asp-area="Student_Parent" asp-controller="Student_Parent_Profile" asp-action="Index" asp-fragment="guardians"
+               class="student-sidebar-link @(inStudentArea && controllerName == "Student_Parent_Profile" ? "active" : "")">
                 <i class="bi bi-people" aria-hidden="true"></i><span>Người giám hộ</span>
             </a>
 

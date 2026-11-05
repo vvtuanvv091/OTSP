@@ -2,45 +2,140 @@
 
 @{
     ViewData["Title"] = $"Lớp học trực tuyến - {Model.ClassroomName}";
-    Layout = User.IsInRole("Tutor")
+    Layout = Model.IsTutor || User.IsInRole("Tutor")
         ? "~/Areas/Tutor/Views/Shared/_Layout_Tutor.cshtml"
         : "~/Areas/Student_Parent/Views/Shared/_Layout_Student.cshtml";
-    var backUrl = User.IsInRole("Tutor")
+
+    var isTutor = Model.IsTutor || User.IsInRole("Tutor");
+    var backUrl = isTutor
         ? Url.Action("Index", "TutorSchedule", new { area = "Tutor" })
         : Url.Action("MyRequests", "Send_Details_Tutor", new { area = "Student_Parent" });
 }
 
-<div id="class-room-page" class="container-fluid py-4"
+<div id="class-room-page" class="container-fluid py-3"
+     data-session-id="@Model.SessionId"
      data-room-name="@Model.RoomName"
      data-display-name="@Model.DisplayName"
-     data-session-id="@Model.SessionId"
+     data-is-tutor="@isTutor.ToString().ToLowerInvariant()"
      data-hub-url="@Url.Content("~/hubs/connection-requests")"
+     data-api-base="/api/class-session/@Model.SessionId"
      data-back-url="@backUrl">
-    <div class="card border-0 shadow-sm">
-        <div class="card-header bg-body d-flex flex-wrap justify-content-between align-items-center gap-2">
+
+    <!-- Card Phòng Học -->
+    <div class="card border-0 shadow-sm rounded-3 overflow-hidden">
+        <!-- Header -->
+        <div class="card-header bg-white border-bottom py-3 px-4 d-flex flex-wrap justify-content-between align-items-center gap-3">
             <div>
-                <h1 class="h5 mb-1">@Model.ClassroomName</h1>
-                <div class="small text-body-secondary">@Model.SubjectName · @Model.ScheduledAtUtc.AddHours(7).ToString("dd/MM/yyyy HH:mm") (GMT+7)</div>
+                <div class="d-flex align-items-center gap-2 mb-1">
+                    <span class="badge @(isTutor ? "bg-primary" : "bg-success") px-2 py-1">
+                        <i class="bi @(isTutor ? "bi-mortarboard" : "bi-person") me-1"></i>@(isTutor ? "Gia sư" : "Học viên")
+                    </span>
+                    <h1 class="h5 mb-0 fw-bold text-dark">@Model.ClassroomName</h1>
+                </div>
+                <div class="small text-muted d-flex align-items-center gap-2 flex-wrap">
+                    <span><i class="bi bi-book me-1"></i>@Model.SubjectName</span>
+                    <span>•</span>
+                    <span><i class="bi bi-clock me-1"></i>@Model.ScheduledAtUtc.AddHours(7).ToString("dd/MM/yyyy HH:mm") (GMT+7)</span>
+                    <span>•</span>
+                    <span id="jitsiStatusBadge" class="badge bg-warning text-dark">
+                        <i class="bi bi-hourglass-split me-1"></i>Đang kết nối...
+                    </span>
+                </div>
             </div>
-            <a href="@backUrl" class="btn btn-sm btn-outline-secondary">Quay lại lịch học</a>
+
+            <!-- Controls góc phải -->
+            <div class="d-flex align-items-center gap-2">
+                <button type="button" id="btnToggleFullscreen" class="btn btn-sm btn-outline-secondary" title="Toàn màn hình">
+                    <i class="bi bi-arrows-fullscreen me-1"></i>Toàn màn hình
+                </button>
+                <a href="@backUrl" class="btn btn-sm btn-outline-secondary" id="btnBackToSchedule">
+                    <i class="bi bi-calendar3 me-1"></i>Lịch học
+                </a>
+            </div>
         </div>
-        <div class="card-body p-0">
-            <div id="jitsiStatus" class="small text-body-secondary p-3" role="status">Đang kết nối phòng học...</div>
-            <div id="jitsiMeeting" style="height:min(75vh, 800px); min-height:480px"></div>
-            <div class="p-3 d-flex justify-content-end align-items-center gap-2">
-                @if (User.IsInRole("Tutor"))
+
+        <!-- Banner cảnh báo thiết bị Webcam / Mic (hiển thị khi có lỗi) -->
+        <div id="deviceAlertBanner" class="alert alert-warning mb-0 rounded-0 d-none d-flex align-items-start gap-2 border-0 border-bottom" role="alert">
+            <i class="bi bi-exclamation-triangle-fill fs-5 flex-shrink-0 text-warning"></i>
+            <div class="flex-grow-1">
+                <strong id="deviceAlertTitle">Cảnh báo thiết bị:</strong>
+                <span id="deviceAlertMessage">Vui lòng kiểm tra quyền Camera/Microphone trong trình duyệt.</span>
+                <div class="mt-1 small text-muted">
+                    Mẹo: Bấm vào biểu tượng ổ khóa 🔒 trên thanh địa chỉ của trình duyệt, bật quyền <b>Camera</b> và <b>Microphone</b>, sau đó tải lại trang.
+                </div>
+            </div>
+            <button type="button" class="btn-close" aria-label="Close" onclick="document.getElementById('deviceAlertBanner').classList.add('d-none');"></button>
+        </div>
+
+        <!-- Khung Video Meeting & Card Rời phòng -->
+        <div class="card-body p-0 position-relative bg-dark" style="min-height: 520px; height: calc(100vh - 240px);">
+            <!-- Jitsi Meet iframe container -->
+            <div id="jitsiMeeting" class="w-100 h-100"></div>
+
+            <!-- Card hiển thị khi người dùng out/rời phòng học -->
+            <div id="roomLeftOverlay" class="d-none position-absolute top-0 start-0 w-100 h-100 bg-light d-flex align-items-center justify-content-center p-4">
+                <div class="text-center p-4 p-md-5 bg-white rounded-4 shadow-sm border" style="max-width: 520px;">
+                    <div class="mb-3 text-secondary">
+                        <span class="d-inline-flex p-3 rounded-circle bg-light border">
+                            <i class="bi bi-door-closed text-primary" style="font-size: 2.5rem;"></i>
+                        </span>
+                    </div>
+                    <h3 class="h4 fw-bold mb-2 text-dark" id="leaveOverlayTitle">Bạn đã rời khỏi phòng học</h3>
+                    <p class="text-muted mb-4 small" id="leaveOverlayDesc">
+                        Bạn có thể tham gia lại phòng học bất kỳ lúc nào nếu buổi học vẫn đang diễn ra, hoặc quay về trang lịch học.
+                    </p>
+                    <div class="d-flex flex-wrap justify-content-center gap-2">
+                        <button type="button" id="btnRejoinRoom" class="btn btn-primary px-4">
+                            <i class="bi bi-arrow-clockwise me-1"></i>Tham gia lại
+                        </button>
+                        <a href="@backUrl" class="btn btn-outline-secondary px-4">
+                            <i class="bi bi-arrow-left me-1"></i>Quay lại lịch học
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Overlay thông báo khi Gia sư kết thúc buổi học -->
+            <div id="sessionEndedOverlay" class="d-none position-absolute top-0 start-0 w-100 h-100 bg-dark bg-opacity-75 d-flex align-items-center justify-content-center p-4" style="z-index: 1050;">
+                <div class="text-center p-4 p-md-5 bg-white rounded-4 shadow-lg border" style="max-width: 500px;">
+                    <div class="mb-3">
+                        <span class="d-inline-flex p-3 rounded-circle bg-success bg-opacity-10 text-success">
+                            <i class="bi bi-check-circle" style="font-size: 2.5rem;"></i>
+                        </span>
+                    </div>
+                    <h3 class="h4 fw-bold mb-2 text-dark">Buổi học đã hoàn thành!</h3>
+                    <p class="text-muted mb-3 small">
+                        Gia sư đã kết thúc buổi học. Cảm ơn bạn đã tham gia buổi học hôm nay.
+                    </p>
+                    <div class="alert alert-info py-2 small mb-4">
+                        Tự động chuyển về lịch học sau <b id="redirectCountdown">3</b> giây...
+                    </div>
+                    <a href="@backUrl" class="btn btn-success px-4">
+                        <i class="bi bi-calendar3 me-1"></i>Về lịch học ngay
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer hành động điều khiển phía dưới -->
+        <div class="card-footer bg-white border-top py-2.5 px-4 d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <!-- Trạng thái thiết bị hiển thị realtime -->
+            <div class="d-flex align-items-center gap-3 small text-muted">
+                <span id="camStatus"><i class="bi bi-camera-video text-success me-1"></i>Webcam: Sẵn sàng</span>
+                <span id="micStatus"><i class="bi bi-mic text-success me-1"></i>Mic: Sẵn sàng</span>
+            </div>
+
+            <!-- Các nút bấm thao tác -->
+            <div class="d-flex align-items-center gap-2 ms-auto">
+                @if (isTutor)
                 {
-                    <form asp-area="" asp-controller="ClassSession" asp-action="End" method="post" onsubmit="return confirm('Bạn có chắc chắn muốn kết thúc buổi học cho tất cả thành viên?');">
-                        @Html.AntiForgeryToken()
-                        <input type="hidden" name="id" value="@Model.SessionId" />
-                        <button type="submit" class="btn btn-danger btn-sm"><i class="bi bi-stop-circle me-1" aria-hidden="true"></i>Kết thúc buổi học</button>
-                    </form>
+                    <button type="button" id="btnEndSession" class="btn btn-sm btn-danger">
+                        <i class="bi bi-stop-circle me-1"></i>Kết thúc buổi học
+                    </button>
                 }
-                <form id="leaveRoomForm" asp-area="" asp-controller="ClassSession" asp-action="Leave" method="post">
-                    @Html.AntiForgeryToken()
-                    <input type="hidden" name="id" value="@Model.SessionId" />
-                    <button type="submit" class="btn btn-outline-secondary btn-sm"><i class="bi bi-box-arrow-right me-1" aria-hidden="true"></i>Rời lớp</button>
-                </form>
+                <button type="button" id="btnLeaveRoom" class="btn btn-sm btn-outline-secondary">
+                    <i class="bi bi-box-arrow-right me-1"></i>Rời lớp
+                </button>
             </div>
         </div>
     </div>
@@ -52,77 +147,362 @@
     <script>
         (() => {
             const page = document.getElementById("class-room-page");
-            const status = document.getElementById("jitsiStatus");
-            const leaveForm = document.getElementById("leaveRoomForm");
-            if (!page || !window.JitsiMeetExternalAPI) {
-                status.textContent = "Không tải được phòng học trực tuyến. Vui lòng thử lại.";
-                return;
-            }
+            if (!page) return;
 
-            const meeting = new JitsiMeetExternalAPI("meet.jit.si", {
-                roomName: page.dataset.roomName,
-                parentNode: document.getElementById("jitsiMeeting"),
-                width: "100%",
-                height: "100%",
-                userInfo: { displayName: page.dataset.displayName }
-            });
-            let leaveRequest;
-            const recordLeave = () => {
-                if (!leaveRequest) {
-                    leaveRequest = fetch(leaveForm.action, {
-                        method: "POST",
-                        body: new FormData(leaveForm),
-                        credentials: "same-origin"
-                    }).then(response => {
-                        if (!response.ok) throw new Error("Không ghi nhận được lượt rời lớp.");
-                    });
-                }
-                return leaveRequest;
+            const sessionId = page.dataset.sessionId;
+            const roomName = page.dataset.roomName;
+            const displayName = page.dataset.displayName || "Thành viên";
+            const isTutor = page.dataset.isTutor === "true";
+            const backUrl = page.dataset.backUrl;
+            const apiBase = page.dataset.apiBase;
+
+            const statusBadge = document.getElementById("jitsiStatusBadge");
+            const meetingContainer = document.getElementById("jitsiMeeting");
+            const roomLeftOverlay = document.getElementById("roomLeftOverlay");
+            const sessionEndedOverlay = document.getElementById("sessionEndedOverlay");
+            const deviceAlert = document.getElementById("deviceAlertBanner");
+            const deviceAlertTitle = document.getElementById("deviceAlertTitle");
+            const deviceAlertMessage = document.getElementById("deviceAlertMessage");
+            const camStatus = document.getElementById("camStatus");
+            const micStatus = document.getElementById("micStatus");
+
+            const btnLeaveRoom = document.getElementById("btnLeaveRoom");
+            const btnEndSession = document.getElementById("btnEndSession");
+            const btnRejoinRoom = document.getElementById("btnRejoinRoom");
+            const btnToggleFullscreen = document.getElementById("btnToggleFullscreen");
+
+            let meeting = null;
+            let hasRecordedLeave = false;
+            let isEndingSession = false;
+
+            // ==========================================
+            // 1. API GỌI RỜI PHÒNG (CLEAN CODE API)
+            // ==========================================
+            const callLeaveApi = () => {
+                if (hasRecordedLeave) return Promise.resolve();
+                hasRecordedLeave = true;
+
+                return fetch(`${apiBase}/leave`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    credentials: "same-origin"
+                }).then(res => {
+                    if (!res.ok) console.warn("Leave API response not OK:", res.status);
+                }).catch(err => console.error("Leave API error:", err));
             };
 
-            leaveForm.addEventListener("submit", async event => {
-                event.preventDefault();
-                const button = leaveForm.querySelector("button");
-                button.disabled = true;
-                try {
-                    await recordLeave();
-                    meeting.executeCommand("hangup");
-                    window.location.assign(page.dataset.backUrl);
-                } catch (exception) {
-                    status.textContent = exception.message;
-                    button.disabled = false;
+            // Gửi Beacon khi đóng tab hoặc reload trình duyệt (an toàn tuyệt đối)
+            const sendLeaveBeacon = () => {
+                if (hasRecordedLeave) return;
+                hasRecordedLeave = true;
+                const leaveUrl = `${apiBase}/leave`;
+                if (navigator.sendBeacon) {
+                    navigator.sendBeacon(leaveUrl);
+                } else {
+                    fetch(leaveUrl, { method: "POST", keepalive: true }).catch(() => {});
+                }
+            };
+
+            window.addEventListener("pagehide", sendLeaveBeacon);
+            window.addEventListener("beforeunload", () => {
+                sendLeaveBeacon();
+                if (meeting) {
+                    try { meeting.dispose(); } catch (e) {}
                 }
             });
 
-            meeting.addEventListener("videoConferenceJoined", () => {
-                status.textContent = "Đã vào lớp. Hãy cho phép trình duyệt sử dụng camera và microphone nếu được yêu cầu.";
-            });
-            meeting.addEventListener("videoConferenceLeft", () => {
-                status.textContent = "Bạn đã rời phòng học. Có thể tham gia lại khi buổi học còn diễn ra.";
-                recordLeave().catch(error => console.error(error));
-            });
-            meeting.addEventListener("readyToClose", () => {
-                status.textContent = "Bạn đã rời phòng học.";
-            });
+            // ==========================================
+            // 2. KHỞI TẠO JITSI MEET EXTERNAL API & WEBCAM
+            // ==========================================
+            const showDeviceError = (title, message) => {
+                if (deviceAlert && deviceAlertTitle && deviceAlertMessage) {
+                    deviceAlertTitle.textContent = title;
+                    deviceAlertMessage.textContent = message;
+                    deviceAlert.classList.remove("d-none");
+                }
+            };
 
-            if (window.signalR) {
-                const connection = new signalR.HubConnectionBuilder()
-                    .withUrl(page.dataset.hubUrl)
-                    .withAutomaticReconnect()
-                    .build();
-                connection.on("ClassSessionStatusChanged", update => {
-                    if (Number(update.classSessionId) !== Number(page.dataset.sessionId)) return;
-                    if (update.status === "Done" || update.status === "Cancelled") {
-                        status.textContent = update.status === "Done" ? "Gia sư đã kết thúc buổi học." : "Buổi học đã bị hủy.";
-                        leaveForm.querySelector("button").disabled = true;
-                        meeting.executeCommand("hangup");
-                        window.setTimeout(() => window.location.assign(page.dataset.backUrl), 1500);
+            const initJitsi = () => {
+                if (!window.JitsiMeetExternalAPI) {
+                    if (statusBadge) {
+                        statusBadge.className = "badge bg-danger";
+                        statusBadge.innerHTML = '<i class="bi bi-x-circle me-1"></i>Không tải được thư viện video';
                     }
+                    showDeviceError("Lỗi kết nối:", "Không thể nạp thư viện Jitsi Meet. Vui lòng kiểm tra kết nối mạng.");
+                    return;
+                }
+
+                hasRecordedLeave = false;
+                roomLeftOverlay.classList.add("d-none");
+                meetingContainer.classList.remove("d-none");
+
+                if (meeting) {
+                    try { meeting.dispose(); } catch (e) {}
+                    meeting = null;
+                }
+
+                const options = {
+                    roomName: roomName,
+                    parentNode: meetingContainer,
+                    width: "100%",
+                    height: "100%",
+                    userInfo: {
+                        displayName: displayName
+                    },
+                    configOverwrite: {
+                        startWithAudioMuted: false,
+                        startWithVideoMuted: false,
+                        prejoinPageEnabled: false,
+                        prejoinConfig: { enabled: false },
+                        disableDeepLinking: true,
+                        enableWelcomePage: false,
+                        enableClosePage: false,
+                        disableInviteFunctions: true,
+                        defaultLanguage: "vi",
+                        toolbarButtons: [
+                            'camera',
+                            'microphone',
+                            'desktop',
+                            'fullscreen',
+                            'chat',
+                            'raisehand',
+                            'tileview',
+                            'settings',
+                            'hangup'
+                        ]
+                    },
+                    interfaceConfigOverwrite: {
+                        SHOW_JITSI_WATERMARK: false,
+                        SHOW_WATERMARK_FOR_GUESTS: false,
+                        DEFAULT_REMOTE_DISPLAY_NAME: "Thành viên",
+                        TOOLBAR_BUTTONS: [
+                            'camera',
+                            'microphone',
+                            'desktop',
+                            'fullscreen',
+                            'chat',
+                            'raisehand',
+                            'tileview',
+                            'settings',
+                            'hangup'
+                        ]
+                    }
+                };
+
+                try {
+                    meeting = new JitsiMeetExternalAPI("meet.jit.si", options);
+
+                    // --- Các sự kiện kết nối & webcam ---
+                    meeting.addEventListener("videoConferenceJoined", () => {
+                        if (statusBadge) {
+                            statusBadge.className = "badge bg-success";
+                            statusBadge.innerHTML = '<i class="bi bi-record-circle me-1"></i>Đang trong lớp học';
+                        }
+                    });
+
+                    // Lắng nghe lỗi thiết bị Webcam
+                    meeting.addEventListener("cameraError", error => {
+                        console.warn("Jitsi Camera Error:", error);
+                        if (camStatus) {
+                            camStatus.innerHTML = '<i class="bi bi-camera-video-off text-danger me-1"></i>Webcam: Bị chặn/Lỗi';
+                        }
+                        showDeviceError(
+                            "Không thể truy cập Webcam:",
+                            "Trình duyệt chưa được cấp quyền sử dụng Camera hoặc Camera đang bị ứng dụng khác sử dụng."
+                        );
+                    });
+
+                    // Lắng nghe lỗi thiết bị Microphone
+                    meeting.addEventListener("micError", error => {
+                        console.warn("Jitsi Mic Error:", error);
+                        if (micStatus) {
+                            micStatus.innerHTML = '<i class="bi bi-mic-mute text-danger me-1"></i>Mic: Bị chặn/Lỗi';
+                        }
+                        showDeviceError(
+                            "Không thể truy cập Microphone:",
+                            "Trình duyệt chưa được cấp quyền sử dụng Mic. Vui lòng cấp quyền trong cài đặt trình duyệt."
+                        );
+                    });
+
+                    // Thiết bị lỗi chung
+                    meeting.addEventListener("deviceError", error => {
+                        console.warn("Jitsi Device Error:", error);
+                        showDeviceError("Lỗi thiết bị phần cứng:", "Vui lòng kiểm tra lại thiết bị Webcam/Microphone của bạn.");
+                    });
+
+                    // Trạng thái bật/tắt Webcam
+                    meeting.addEventListener("videoMuteStatusChanged", event => {
+                        if (camStatus) {
+                            if (event.muted) {
+                                camStatus.innerHTML = '<i class="bi bi-camera-video-off text-secondary me-1"></i>Webcam: Tắt';
+                            } else {
+                                camStatus.innerHTML = '<i class="bi bi-camera-video text-success me-1"></i>Webcam: Bật';
+                            }
+                        }
+                    });
+
+                    // Trạng thái bật/tắt Mic
+                    meeting.addEventListener("audioMuteStatusChanged", event => {
+                        if (micStatus) {
+                            if (event.muted) {
+                                micStatus.innerHTML = '<i class="bi bi-mic-mute text-secondary me-1"></i>Mic: Tắt';
+                            } else {
+                                micStatus.innerHTML = '<i class="bi bi-mic text-success me-1"></i>Mic: Bật';
+                            }
+                        }
+                    });
+
+                    // --- XỬ LÝ KHI NGƯỜI DÙNG OUT / HANGUP TRONG JITSI ---
+                    meeting.addEventListener("videoConferenceLeft", () => {
+                        handleUserLeftRoom();
+                    });
+
+                    meeting.addEventListener("readyToClose", () => {
+                        handleUserLeftRoom();
+                    });
+
+                } catch (ex) {
+                    console.error("Init Jitsi error:", ex);
+                    if (statusBadge) {
+                        statusBadge.className = "badge bg-danger";
+                        statusBadge.innerHTML = '<i class="bi bi-x-circle me-1"></i>Khởi tạo thất bại';
+                    }
+                }
+            };
+
+            // Hàm hiển thị màn hình sau khi rời phòng
+            const handleUserLeftRoom = () => {
+                if (isEndingSession) return;
+
+                if (statusBadge) {
+                    statusBadge.className = "badge bg-secondary";
+                    statusBadge.innerHTML = '<i class="bi bi-door-closed me-1"></i>Đã rời phòng';
+                }
+
+                callLeaveApi();
+
+                meetingContainer.classList.add("d-none");
+                roomLeftOverlay.classList.remove("d-none");
+            };
+
+            // ==========================================
+            // 3. XỬ LÝ CÁC NÚT BẤM (RỜI LỚP / KẾT THÚC / VÀO LẠI)
+            // ==========================================
+
+            // Nút "Rời lớp" ngoài toolbar
+            if (btnLeaveRoom) {
+                btnLeaveRoom.addEventListener("click", async () => {
+                    if (!confirm("Bạn có chắc chắn muốn rời khỏi phòng học này không?")) return;
+
+                    btnLeaveRoom.disabled = true;
+                    await callLeaveApi();
+
+                    if (meeting) {
+                        try { meeting.executeCommand("hangup"); } catch (e) {}
+                    }
+                    window.location.assign(backUrl);
                 });
-                connection.start().catch(error => console.error("Session status connection failed:", error));
             }
 
-            window.addEventListener("beforeunload", () => meeting.dispose());
+            // Nút "Tham gia lại" khi đã out
+            if (btnRejoinRoom) {
+                btnRejoinRoom.addEventListener("click", () => {
+                    // Reload trang để vào lại phòng và kích hoạt API Join ghi nhận điểm danh
+                    window.location.reload();
+                });
+            }
+
+            // Nút "Kết thúc buổi học" (dành cho Gia sư)
+            if (btnEndSession) {
+                btnEndSession.addEventListener("click", async () => {
+                    if (!confirm("Bạn có chắc chắn muốn KẾT THÚC buổi học cho tất cả thành viên? Buổi học sẽ chuyển sang trạng thái Hoàn thành.")) return;
+
+                    btnEndSession.disabled = true;
+                    btnEndSession.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status"></span>Đang kết thúc...';
+
+                    try {
+                        const response = await fetch(`${apiBase}/end`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            credentials: "same-origin"
+                        });
+
+                        const data = await response.json();
+                        if (response.ok && data.success) {
+                            isEndingSession = true;
+                            if (meeting) {
+                                try { meeting.executeCommand("hangup"); } catch (e) {}
+                            }
+                            window.location.assign(backUrl);
+                        } else {
+                            alert(data.message || "Không thể kết thúc buổi học. Vui lòng thử lại.");
+                            btnEndSession.disabled = false;
+                            btnEndSession.innerHTML = '<i class="bi bi-stop-circle me-1"></i>Kết thúc buổi học';
+                        }
+                    } catch (err) {
+                        console.error(err);
+                        alert("Lỗi kết nối khi kết thúc buổi học.");
+                        btnEndSession.disabled = false;
+                        btnEndSession.innerHTML = '<i class="bi bi-stop-circle me-1"></i>Kết thúc buổi học';
+                    }
+                });
+            }
+
+            // Nút toàn màn hình
+            if (btnToggleFullscreen) {
+                btnToggleFullscreen.addEventListener("click", () => {
+                    const card = page.querySelector(".card");
+                    if (!document.fullscreenElement) {
+                        card.requestFullscreen().catch(err => console.error("Fullscreen error:", err));
+                    } else {
+                        document.exitFullscreen().catch(err => console.error("Exit fullscreen error:", err));
+                    }
+                });
+            }
+
+            // ==========================================
+            // 4. SIGNALR THÔNG BÁO THỜI GIAN THỰC KHI GIA SƯ KẾT THÚC LỚP
+            // ==========================================
+            if (window.signalR) {
+                const hubUrl = page.dataset.hubUrl;
+                const connection = new signalR.HubConnectionBuilder()
+                    .withUrl(hubUrl)
+                    .withAutomaticReconnect()
+                    .build();
+
+                connection.on("ClassSessionStatusChanged", update => {
+                    if (Number(update.classSessionId) !== Number(sessionId)) return;
+
+                    if (update.status === "Done" || update.status === "Cancelled") {
+                        isEndingSession = true;
+
+                        if (meeting) {
+                            try { meeting.executeCommand("hangup"); } catch (e) {}
+                        }
+
+                        // Hiển thị overlay kết thúc lớp
+                        sessionEndedOverlay.classList.remove("d-none");
+
+                        let count = 3;
+                        const countdownEl = document.getElementById("redirectCountdown");
+                        const timer = setInterval(() => {
+                            count--;
+                            if (countdownEl) countdownEl.textContent = count;
+                            if (count <= 0) {
+                                clearInterval(timer);
+                                window.location.assign(backUrl);
+                            }
+                        }, 1000);
+                    }
+                });
+
+                connection.start().catch(error => console.error("Session status SignalR connection failed:", error));
+            }
+
+            // Bắt đầu khởi tạo Jitsi
+            initJitsi();
         })();
     </script>
 }

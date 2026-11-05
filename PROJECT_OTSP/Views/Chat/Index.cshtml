@@ -67,7 +67,7 @@
                                 <div class="chat-avatar-wrap position-relative">
                                     @if (!string.IsNullOrWhiteSpace(conv.ContactAvatarUrl))
                                     {
-                                        <img src="@conv.ContactAvatarUrl" alt="@conv.ContactName" class="chat-avatar-img" onerror="this.onerror=null;this.src='/assets/img/default-avatar.svg';" />
+                                        <img src="@conv.ContactAvatarUrl" alt="@conv.ContactName" class="chat-avatar-img" width="44" height="44" loading="lazy" decoding="async" onerror="this.onerror=null;this.src='/assets/img/default-avatar.svg';" />
                                     }
                                     else
                                     {
@@ -124,7 +124,7 @@
                             </button>
 
                             <div class="chat-avatar-wrap flex-shrink-0">
-                                <img id="activeContactAvatar" src="@(Model.SelectedContactAvatarUrl ?? "")" alt="@(Model.SelectedContactName ?? "Người dùng")" class="chat-avatar-img @(string.IsNullOrWhiteSpace(Model.SelectedContactAvatarUrl) ? "d-none" : "")" onerror="this.onerror=null;this.src='/assets/img/default-avatar.svg';" />
+                                <img id="activeContactAvatar" src="@(Model.SelectedContactAvatarUrl ?? "")" alt="@(Model.SelectedContactName ?? "Người dùng")" class="chat-avatar-img @(string.IsNullOrWhiteSpace(Model.SelectedContactAvatarUrl) ? "d-none" : "")" width="44" height="44" fetchpriority="high" decoding="async" onerror="this.onerror=null;this.src='/assets/img/default-avatar.svg';" />
                                 <div id="activeContactFallback" class="chat-avatar-fallback @(string.IsNullOrWhiteSpace(Model.SelectedContactAvatarUrl) ? "" : "d-none")">
                                     @(string.IsNullOrWhiteSpace(Model.SelectedContactName) ? "U" : Model.SelectedContactName.Substring(0, 1).ToUpper())
                                 </div>
@@ -168,6 +168,20 @@
                                 : null;
 
                             <div class="chat-message-row @(msg.IsOwn ? "is-mine" : "is-theirs")" data-message-id="@msg.Id">
+                                @if (msg.IsOwn)
+                                {
+                                    <div class="chat-message-actions">
+                                        @if (!isImg)
+                                        {
+                                            <button type="button" class="btn-msg-action btn-edit-msg" title="Chỉnh sửa tin nhắn" aria-label="Sửa">
+                                                <i class="bi bi-pencil"></i>
+                                            </button>
+                                        }
+                                        <button type="button" class="btn-msg-action btn-delete-msg" title="Xóa / Thu hồi tin nhắn" aria-label="Xóa">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </div>
+                                }
                                 <div class="chat-bubble @(isImg ? "chat-bubble-image" : "")">
                                     @if (isImg && !string.IsNullOrWhiteSpace(imgSrc))
                                     {
@@ -178,6 +192,10 @@
                                     else
                                     {
                                         <div class="chat-bubble-text">@msg.Content</div>
+                                        @if (msg.IsEdited)
+                                        {
+                                            <span class="chat-edited-tag">(đã sửa)</span>
+                                        }
                                     }
                                 </div>
                             </div>
@@ -403,7 +421,9 @@
 
 .chat-message-row {
     display: flex;
+    align-items: center;
     width: 100%;
+    position: relative;
 }
 
 .chat-message-row.is-mine {
@@ -412,6 +432,98 @@
 
 .chat-message-row.is-theirs {
     justify-content: flex-start;
+}
+
+.chat-message-actions {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    opacity: 0;
+    transition: opacity 0.15s ease-in-out;
+    margin-right: 6px;
+    order: 1;
+}
+
+.chat-message-row.is-mine .chat-bubble {
+    order: 2;
+}
+
+.chat-message-row:hover .chat-message-actions,
+.chat-message-row:focus-within .chat-message-actions {
+    opacity: 1;
+}
+
+.btn-msg-action {
+    background: transparent;
+    border: none;
+    color: var(--bs-secondary-color, #94a3b8);
+    padding: 3px 6px;
+    border-radius: 6px;
+    font-size: 13px;
+    cursor: pointer;
+    line-height: 1;
+    transition: all 0.12s ease;
+}
+
+.btn-msg-action:hover {
+    color: #dc2626;
+    background-color: rgba(220, 38, 38, 0.12);
+}
+
+.chat-edited-tag {
+    font-size: 10px;
+    opacity: 0.75;
+    margin-left: 5px;
+    font-style: italic;
+    user-select: none;
+}
+
+.chat-inline-edit-box {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 220px;
+}
+
+.chat-inline-edit-input {
+    border-radius: 10px;
+    font-size: 14px;
+    padding: 6px 10px;
+    border: 1px solid rgba(255,255,255,0.4);
+    background-color: rgba(255,255,255,0.95);
+    color: #0f172a;
+}
+
+.chat-bubble-highlight {
+    animation: highlightFade 1.6s ease-out;
+}
+
+@@keyframes highlightFade {
+    0% { transform: scale(1.03); box-shadow: 0 0 12px rgba(13, 110, 253, 0.6); }
+    100% { transform: scale(1); box-shadow: none; }
+}
+
+.chat-toast-notice {
+    position: absolute;
+    top: 70px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1060;
+    background: rgba(30, 41, 59, 0.9);
+    color: #ffffff;
+    padding: 6px 16px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 500;
+    backdrop-filter: blur(4px);
+    box-shadow: 0 4px 14px rgba(0,0,0,0.2);
+    pointer-events: none;
+    animation: fadeInDown 0.25s ease;
+}
+
+@@keyframes fadeInDown {
+    from { opacity: 0; transform: translate(-50%, -10px); }
+    to { opacity: 1; transform: translate(-50%, 0); }
 }
 
 .chat-bubble {
@@ -707,8 +819,26 @@
             };
             scrollToBottom();
 
-            // Thêm bubble tin nhắn vào khung chat
-            const appendMessage = (content, isOwn, messageId) => {
+            // Hiển thị thông báo Toast nhẹ ở giữa màn hình chat khi có sự kiện (vd: đối phương xóa tin nhắn)
+            const showToastNotification = (msg) => {
+                const activePanel = document.getElementById("chatActivePanel");
+                if (!activePanel) return;
+                const oldNotice = activePanel.querySelector(".chat-toast-notice");
+                if (oldNotice) oldNotice.remove();
+
+                const notice = document.createElement("div");
+                notice.className = "chat-toast-notice";
+                notice.innerHTML = `<i class="bi bi-info-circle me-1"></i>${msg}`;
+                activePanel.appendChild(notice);
+                setTimeout(() => {
+                    notice.style.transition = "opacity 0.3s ease";
+                    notice.style.opacity = "0";
+                    setTimeout(() => notice.remove(), 300);
+                }, 3200);
+            };
+
+            // Thêm bubble tin nhắn vào khung chat (kèm nút Sửa/Xóa cho tin của chính mình)
+            const appendMessage = (content, isOwn, messageId, isEdited = false) => {
                 if (!messagesBox) return;
 
                 if (messageId && messagesBox.querySelector(`.chat-message-row[data-message-id="${messageId}"]`)) {
@@ -730,10 +860,19 @@
                 } else {
                     const safeDiv = document.createElement("div");
                     safeDiv.textContent = content;
-                    innerHtml = `<div class="chat-bubble-text">${safeDiv.innerHTML}</div>`;
+                    innerHtml = `<div class="chat-bubble-text">${safeDiv.innerHTML}</div>${isEdited ? '<span class="chat-edited-tag">(đã sửa)</span>' : ''}`;
                 }
 
-                row.innerHTML = `<div class="chat-bubble ${isImg ? 'chat-bubble-image' : ''}">${innerHtml}</div>`;
+                let actionsHtml = "";
+                if (isOwn) {
+                    actionsHtml = `<div class="chat-message-actions">`;
+                    if (!isImg) {
+                        actionsHtml += `<button type="button" class="btn-msg-action btn-edit-msg" title="Chỉnh sửa tin nhắn" aria-label="Sửa"><i class="bi bi-pencil"></i></button>`;
+                    }
+                    actionsHtml += `<button type="button" class="btn-msg-action btn-delete-msg" title="Xóa / Thu hồi tin nhắn" aria-label="Xóa"><i class="bi bi-trash"></i></button></div>`;
+                }
+
+                row.innerHTML = `${actionsHtml}<div class="chat-bubble ${isImg ? 'chat-bubble-image' : ''}">${innerHtml}</div>`;
                 messagesBox.appendChild(row);
                 scrollToBottom();
             };
@@ -778,7 +917,7 @@
                     const isSentByMe = (msg.senderId === currentUserId && msg.receiverId === activeContactId);
 
                     if (isFromActiveContact) {
-                        appendMessage(msg.content, false, msg.id);
+                        appendMessage(msg.content, false, msg.id, msg.isEdited);
                         connection.invoke("MarkRead", activeContactId).catch(() => {});
                         updateConversationItem(msg.senderId, msg.content, false);
                     } else if (isSentByMe) {
@@ -790,6 +929,54 @@
                     } else if (msg.receiverId === currentUserId) {
                         updateConversationItem(msg.senderId, msg.content, true);
                     }
+                });
+
+                // Lắng nghe sự kiện Sửa tin nhắn từ đối phương (hoặc chính mình từ thiết bị khác)
+                connection.on("MessageEdited", (data) => {
+                    const row = messagesBox.querySelector(`.chat-message-row[data-message-id="${data.messageId}"]`);
+                    if (row) {
+                        const textEl = row.querySelector(".chat-bubble-text");
+                        if (textEl) {
+                            textEl.textContent = data.newContent;
+                        }
+                        const bubble = row.querySelector(".chat-bubble");
+                        if (bubble) {
+                            let editedTag = bubble.querySelector(".chat-edited-tag");
+                            if (!editedTag) {
+                                editedTag = document.createElement("span");
+                                editedTag.className = "chat-edited-tag";
+                                editedTag.textContent = "(đã sửa)";
+                                bubble.appendChild(editedTag);
+                            }
+                            bubble.classList.add("chat-bubble-highlight");
+                            setTimeout(() => bubble.classList.remove("chat-bubble-highlight"), 1800);
+                        }
+                    }
+                    const partnerId = data.senderId === currentUserId ? data.receiverId : data.senderId;
+                    updateConversationItem(partnerId, data.newContent, false);
+                });
+
+                // Lắng nghe sự kiện Xóa tin nhắn từ đối phương (hoặc chính mình)
+                connection.on("MessageDeleted", (data) => {
+                    const row = messagesBox.querySelector(`.chat-message-row[data-message-id="${data.messageId}"]`);
+                    if (row) {
+                        row.style.transition = "opacity 0.25s ease, transform 0.25s ease";
+                        row.style.opacity = "0";
+                        row.style.transform = "scale(0.9)";
+                        setTimeout(() => {
+                            row.remove();
+                            if (!messagesBox.querySelector(".chat-message-row")) {
+                                messagesBox.innerHTML = '<div class="text-center text-secondary small my-auto py-5" id="noMessagesPlaceholder"><i class="bi bi-chat-text fs-2 d-block mb-2 text-muted"></i>Chưa có tin nhắn nào. Hãy gửi lời chào để bắt đầu cuộc trò chuyện!</div>';
+                            }
+                        }, 250);
+
+                        // Nếu là người nhận, thông báo lên giao diện
+                        if (data.senderId !== currentUserId) {
+                            showToastNotification("Đối phương đã thu hồi một tin nhắn");
+                        }
+                    }
+                    const partnerId = data.senderId === currentUserId ? data.receiverId : data.senderId;
+                    updateConversationItem(partnerId, data.lastMessage || "Bắt đầu cuộc trò chuyện...", false);
                 });
 
                 connection.on("ConversationUpdated", (data) => {
@@ -1057,7 +1244,7 @@
                             if (msgs.length === 0) {
                                 messagesBox.innerHTML = '<div class="text-center text-secondary small my-auto py-5" id="noMessagesPlaceholder"><i class="bi bi-chat-text fs-2 d-block mb-2 text-muted"></i>Chưa có tin nhắn nào. Hãy gửi lời chào để bắt đầu cuộc trò chuyện!</div>';
                             } else {
-                                msgs.forEach(m => appendMessage(m.content, m.isOwn, m.id));
+                                msgs.forEach(m => appendMessage(m.content, m.isOwn, m.id, m.isEdited));
                             }
                             scrollToBottom();
                         }
@@ -1069,7 +1256,156 @@
                 });
             });
 
-            // 7. Tìm kiếm tức thì bên danh sách cuộc trò chuyện
+            // 7. Xử lý Chỉnh sửa & Xóa tin nhắn từ Bubble
+            if (messagesBox) {
+                messagesBox.addEventListener("click", async (e) => {
+                    // --- Sửa tin nhắn ---
+                    const editBtn = e.target.closest(".btn-edit-msg");
+                    if (editBtn) {
+                        const row = editBtn.closest(".chat-message-row");
+                        const msgId = row?.dataset.messageId;
+                        if (!msgId) return;
+
+                        const bubble = row.querySelector(".chat-bubble");
+                        const bubbleText = row.querySelector(".chat-bubble-text");
+                        if (!bubble || !bubbleText) return;
+
+                        // Nếu đang có khung sửa thì không tạo thêm
+                        if (bubble.querySelector(".chat-inline-edit-box")) return;
+
+                        const currentText = bubbleText.textContent;
+                        bubbleText.style.display = "none";
+                        const oldActions = row.querySelector(".chat-message-actions");
+                        if (oldActions) oldActions.style.display = "none";
+
+                        const editBox = document.createElement("div");
+                        editBox.className = "chat-inline-edit-box";
+                        editBox.innerHTML = `
+                            <input type="text" class="form-control form-control-sm chat-inline-edit-input" maxlength="2000" />
+                            <div class="d-flex justify-content-end gap-1 mt-1">
+                                <button type="button" class="btn btn-sm btn-light py-0 px-2 btn-cancel-edit" style="font-size:11px;">Hủy</button>
+                                <button type="button" class="btn btn-sm btn-warning py-0 px-2 btn-save-edit" style="font-size:11px; font-weight:600;">Lưu</button>
+                            </div>
+                        `;
+                        const input = editBox.querySelector("input");
+                        input.value = currentText;
+                        bubble.appendChild(editBox);
+                        input.focus();
+                        input.select();
+
+                        const cancel = () => {
+                            editBox.remove();
+                            bubbleText.style.display = "";
+                            if (oldActions) oldActions.style.display = "";
+                        };
+
+                        const save = async () => {
+                            const newText = input.value.trim();
+                            if (!newText || newText === currentText) {
+                                cancel();
+                                return;
+                            }
+
+                            try {
+                                let editedViaHub = false;
+                                const isConnected = connection && typeof signalR !== "undefined" && connection.state === signalR.HubConnectionState.Connected;
+                                if (isConnected) {
+                                    try {
+                                        await connection.invoke("EditMessage", parseInt(msgId, 10), newText);
+                                        editedViaHub = true;
+                                    } catch (hEx) {
+                                        console.warn("Lỗi sửa qua SignalR, fallback HTTP:", hEx);
+                                    }
+                                }
+                                if (!editedViaHub) {
+                                    const res = await fetch("/Chat/EditMessage", {
+                                        method: "POST",
+                                        headers: { "Content-Type": "application/json" },
+                                        body: JSON.stringify({ messageId: parseInt(msgId, 10), content: newText })
+                                    });
+                                    const data = await res.json();
+                                    if (!res.ok || !data.success) {
+                                        throw new Error(data.error || "Không thể sửa tin nhắn.");
+                                    }
+                                }
+
+                                bubbleText.textContent = newText;
+                                let editedTag = bubble.querySelector(".chat-edited-tag");
+                                if (!editedTag) {
+                                    editedTag = document.createElement("span");
+                                    editedTag.className = "chat-edited-tag";
+                                    editedTag.textContent = "(đã sửa)";
+                                    bubble.appendChild(editedTag);
+                                }
+                                cancel();
+                            } catch (err) {
+                                alert(err.message || "Chỉnh sửa tin nhắn thất bại.");
+                            }
+                        };
+
+                        editBox.querySelector(".btn-cancel-edit").onclick = cancel;
+                        editBox.querySelector(".btn-save-edit").onclick = save;
+                        input.onkeydown = (ke) => {
+                            if (ke.key === "Enter" && !ke.shiftKey) {
+                                ke.preventDefault();
+                                save();
+                            } else if (ke.key === "Escape") {
+                                cancel();
+                            }
+                        };
+                        return;
+                    }
+
+                    // --- Xóa tin nhắn ---
+                    const deleteBtn = e.target.closest(".btn-delete-msg");
+                    if (deleteBtn) {
+                        const row = deleteBtn.closest(".chat-message-row");
+                        const msgId = row?.dataset.messageId;
+                        if (!msgId) return;
+
+                        if (!confirm("Bạn có chắc chắn muốn xóa tin nhắn này?")) return;
+
+                        try {
+                            let deletedViaHub = false;
+                            const isConnected = connection && typeof signalR !== "undefined" && connection.state === signalR.HubConnectionState.Connected;
+                            if (isConnected) {
+                                try {
+                                    await connection.invoke("DeleteMessage", parseInt(msgId, 10));
+                                    deletedViaHub = true;
+                                } catch (hEx) {
+                                    console.warn("Lỗi xóa qua SignalR, fallback HTTP:", hEx);
+                                }
+                            }
+                            if (!deletedViaHub) {
+                                const res = await fetch("/Chat/DeleteMessage", {
+                                    method: "POST",
+                                    headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify({ messageId: parseInt(msgId, 10) })
+                                });
+                                const data = await res.json();
+                                if (!res.ok || !data.success) {
+                                    throw new Error(data.error || "Không thể xóa tin nhắn.");
+                                }
+                            }
+
+                            row.style.transition = "opacity 0.25s ease, transform 0.25s ease";
+                            row.style.opacity = "0";
+                            row.style.transform = "scale(0.9)";
+                            setTimeout(() => {
+                                row.remove();
+                                if (!messagesBox.querySelector(".chat-message-row")) {
+                                    messagesBox.innerHTML = '<div class="text-center text-secondary small my-auto py-5" id="noMessagesPlaceholder"><i class="bi bi-chat-text fs-2 d-block mb-2 text-muted"></i>Chưa có tin nhắn nào. Hãy gửi lời chào để bắt đầu cuộc trò chuyện!</div>';
+                                }
+                            }, 250);
+                        } catch (err) {
+                            alert(err.message || "Xóa tin nhắn thất bại.");
+                        }
+                        return;
+                    }
+                });
+            }
+
+            // 8. Tìm kiếm tức thì bên danh sách cuộc trò chuyện
             if (searchInput) {
                 searchInput.addEventListener("input", () => {
                     const query = searchInput.value.toLowerCase().trim();

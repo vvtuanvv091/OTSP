@@ -6,12 +6,15 @@
     var subjects = ViewBag.Subjects as IReadOnlyList<Subject> ?? Array.Empty<Subject>();
     var gradeLevels = ViewBag.GradeLevels as IReadOnlyList<GradeLevel> ?? Array.Empty<GradeLevel>();
     ViewData["Title"] = groupBy == "grade" ? "Cấp học giảng dạy" : "Môn học giảng dạy";
+    var hasItems = Model.Count > 0;
 }
+
+@Html.AntiForgeryToken()
 
 <div class="container-fluid py-4">
     <div class="mb-4">
         <h1 class="h3 mb-1">@ViewData["Title"]</h1>
-        <p class="text-body-secondary mb-0">Mỗi dòng là một cặp môn học và cấp học bạn có thể nhận dạy.</p>
+        <p class="text-body-secondary mb-0">Mỗi dòng là một môn học và cấp học bạn nhận dạy cùng mức học phí mỗi giờ tương ứng.</p>
     </div>
 
     @if (TempData["Success"] is string successMessage)
@@ -40,18 +43,18 @@
 
     <section class="card border-0 shadow-sm mb-4">
         <div class="card-body">
-            <h2 class="h5 mb-3">Thêm môn và cấp học</h2>
+            <h2 class="h5 mb-3">Thêm môn và học phí</h2>
             @if (subjects.Count == 0 || gradeLevels.Count == 0)
             {
                 <p class="text-body-secondary mb-0">Chưa có môn học hoặc cấp học trong danh mục. Hãy thêm danh mục trước.</p>
             }
             else
             {
-                <form asp-area="Tutor" asp-controller="TutorSubject" asp-action="Add" method="post" class="row g-3 align-items-end">
+                <form asp-area="Tutor" asp-controller="TutorSubject" asp-action="Add" method="post" class="row g-3 align-items-end" id="formAddSubject">
                     <input type="hidden" name="returnTo" value="manage" />
                     <input type="hidden" name="groupBy" value="@groupBy" />
-                    <div class="col-12 col-md-5">
-                        <label for="subjectId" class="form-label">Môn học</label>
+                    <div class="col-12 col-md-4">
+                        <label for="subjectId" class="form-label">Môn học <span class="text-danger">*</span></label>
                         <select id="subjectId" name="subjectId" class="form-select" required>
                             @foreach (var subject in subjects)
                             {
@@ -59,8 +62,8 @@
                             }
                         </select>
                     </div>
-                    <div class="col-12 col-md-5">
-                        <label for="gradeLevelId" class="form-label">Cấp học</label>
+                    <div class="col-12 col-md-3">
+                        <label for="gradeLevelId" class="form-label">Cấp học <span class="text-danger">*</span></label>
                         <select id="gradeLevelId" name="gradeLevelId" class="form-select" required>
                             @foreach (var gradeLevel in gradeLevels)
                             {
@@ -68,8 +71,12 @@
                             }
                         </select>
                     </div>
+                    <div class="col-12 col-md-3">
+                        <label for="hourlyFee" class="form-label">Học phí (VNĐ/giờ) <span class="text-danger">*</span></label>
+                        <input type="number" id="hourlyFee" name="hourlyFee" class="form-control" min="10000" step="5000" placeholder="VD: 150000" required />
+                    </div>
                     <div class="col-12 col-md-2 d-grid">
-                        <button type="submit" class="btn btn-success">Thêm</button>
+                        <button type="submit" class="btn btn-success">Thêm môn</button>
                     </div>
                 </form>
             }
@@ -80,47 +87,318 @@
         <div class="card-body">
             <div class="d-flex align-items-center justify-content-between gap-2 mb-3">
                 <h2 class="h5 mb-0">@(groupBy == "grade" ? "Các môn theo cấp học" : "Các cấp theo môn học")</h2>
-                <span class="badge text-bg-success">@Model.Count</span>
+                <span id="pairCount" class="badge text-bg-success">@(ViewBag.TotalItems ?? Model.Count)</span>
             </div>
 
-            @if (Model.Count == 0)
-            {
-                <div class="text-center text-body-secondary py-4">
-                    <i class="bi bi-journal-plus fs-2 d-block mb-2" aria-hidden="true"></i>
-                    Bạn chưa đăng ký môn và cấp học giảng dạy.
-                </div>
-            }
-            else
-            {
-                <div class="table-responsive">
-                    <table class="table align-middle mb-0">
-                        <thead>
-                            <tr>
-                                <th scope="col">Môn học</th>
-                                <th scope="col">Cấp học</th>
-                                <th scope="col" class="text-end">Thao tác</th>
+            <div id="emptyState" class="text-center text-body-secondary py-4 @(hasItems ? "d-none" : "")">
+                <i class="bi bi-journal-plus fs-2 d-block mb-2" aria-hidden="true"></i>
+                Bạn chưa đăng ký môn và cấp học giảng dạy.
+            </div>
+
+            <div id="pairTableWrapper" class="table-responsive @(hasItems ? "" : "d-none")">
+                <table class="table align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th scope="col">Môn học</th>
+                            <th scope="col">Cấp học</th>
+                            <th scope="col">Học phí / giờ</th>
+                            <th scope="col" class="text-end">Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody id="pairTableBody">
+                        @foreach (var pair in Model)
+                        {
+                            <tr data-row-id="@pair.Id">
+                                <td class="fw-semibold">@pair.SubjectName</td>
+                                <td>@pair.GradeLevelName</td>
+                                <td class="text-success fw-bold fee-cell">@pair.HourlyFee.ToString("N0") đ/h</td>
+                                <td class="text-end">
+                                    <button type="button"
+                                            class="btn btn-sm btn-outline-primary btn-edit me-1"
+                                            data-id="@pair.Id"
+                                            data-name="@pair.SubjectName - @pair.GradeLevelName"
+                                            data-fee="@pair.HourlyFee">
+                                        <i class="bi bi-pencil me-1"></i>Sửa
+                                    </button>
+                                    <button type="button"
+                                            class="btn btn-sm btn-outline-danger btn-remove"
+                                            data-id="@pair.Id"
+                                            data-name="@pair.SubjectName - @pair.GradeLevelName">
+                                        <i class="bi bi-trash me-1"></i>Xóa
+                                    </button>
+                                </td>
                             </tr>
-                        </thead>
-                        <tbody>
-                            @foreach (var pair in Model)
-                            {
-                                <tr>
-                                    <td class="fw-semibold">@pair.SubjectName</td>
-                                    <td>@pair.GradeLevelName</td>
-                                    <td class="text-end">
-                                        <form asp-area="Tutor" asp-controller="TutorSubject" asp-action="Remove" method="post" class="d-inline">
-                                            <input type="hidden" name="id" value="@pair.Id" />
-                                            <input type="hidden" name="returnTo" value="manage" />
-                                            <input type="hidden" name="groupBy" value="@groupBy" />
-                                            <button type="submit" class="btn btn-sm btn-outline-danger">Xóa</button>
-                                        </form>
-                                    </td>
-                                </tr>
-                            }
-                        </tbody>
-                    </table>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            @if (ViewBag.Pagination is PROJECT_OTSP.Dtos.PaginationVm pagination)
+            {
+                <div class="mt-4 pt-3 border-top">
+                    @await Html.PartialAsync("_PaginationBar", pagination)
                 </div>
             }
         </div>
     </section>
 </div>
+
+<div class="modal fade" id="confirmRemoveModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Xác nhận xóa</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+            </div>
+            <div class="modal-body">
+                Bạn có chắc chắn muốn xóa <strong id="removeTargetName"></strong> không?
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                <button type="button" class="btn btn-danger" id="confirmRemoveBtn">Xóa</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Chỉnh sửa Học phí -->
+<div class="modal fade" id="editFeeModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Chỉnh sửa học phí</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-3">Môn & cấp học: <strong id="editTargetName" class="text-primary"></strong></p>
+                <div class="mb-3">
+                    <label for="modalHourlyFeeInput" class="form-label">Học phí mới (VNĐ/giờ) <span class="text-danger">*</span></label>
+                    <input type="number" id="modalHourlyFeeInput" class="form-control" min="10000" step="5000" placeholder="VD: 150000" required />
+                    <div class="form-text">Mức học phí này sẽ được áp dụng khi học viên tạo yêu cầu kết nối môn này.</div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                <button type="button" class="btn btn-primary" id="confirmEditBtn">Lưu học phí</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        (function () {
+            const removeModalEl = document.getElementById('confirmRemoveModal');
+            const removeModal = new bootstrap.Modal(removeModalEl);
+            const removeNameEl = document.getElementById('removeTargetName');
+            const confirmRemoveBtn = document.getElementById('confirmRemoveBtn');
+
+            const editModalEl = document.getElementById('editFeeModal');
+            const editModal = new bootstrap.Modal(editModalEl);
+            const editNameEl = document.getElementById('editTargetName');
+            const editFeeInput = document.getElementById('modalHourlyFeeInput');
+            const confirmEditBtn = document.getElementById('confirmEditBtn');
+
+            const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value;
+            let pendingId = null;
+            let pendingRow = null;
+            let pendingBtn = null;
+
+            // Xử lý Xóa môn học
+            function bindRemoveButtons() {
+                document.querySelectorAll('.btn-remove').forEach(btn => {
+                    btn.onclick = () => {
+                        pendingId = btn.dataset.id;
+                        pendingRow = btn.closest('tr');
+                        removeNameEl.textContent = btn.dataset.name;
+                        removeModal.show();
+                    };
+                });
+            }
+
+            // Xử lý Sửa học phí môn học
+            function bindEditButtons() {
+                document.querySelectorAll('.btn-edit').forEach(btn => {
+                    btn.onclick = () => {
+                        pendingId = btn.dataset.id;
+                        pendingRow = btn.closest('tr');
+                        pendingBtn = btn;
+                        editNameEl.textContent = btn.dataset.name;
+                        editFeeInput.value = btn.dataset.fee || "0";
+                        editModal.show();
+                    };
+                });
+            }
+
+            bindRemoveButtons();
+            bindEditButtons();
+
+            confirmRemoveBtn.addEventListener('click', async () => {
+                if (!pendingId) return;
+                confirmRemoveBtn.disabled = true;
+
+                try {
+                    const body = new FormData();
+                    body.append('id', pendingId);
+
+                    const res = await fetch('/Tutor/TutorSubject/Remove', {
+                        method: 'POST',
+                        headers: { 'RequestVerificationToken': token },
+                        body: body
+                    });
+
+                    let data = {};
+                    try { data = await res.json(); } catch { }
+                    if (!res.ok || !data.ok) {
+                        throw new Error(data.message || `Xóa thất bại (${res.status}).`);
+                    }
+
+                    pendingRow?.remove();
+                    updateCount();
+                    showToast(data.message, 'success');
+                } catch (err) {
+                    showToast(err.message, 'warning');
+                } finally {
+                    confirmRemoveBtn.disabled = false;
+                    removeModal.hide();
+                    pendingId = null;
+                    pendingRow = null;
+                }
+            });
+
+            confirmEditBtn.addEventListener('click', async () => {
+                if (!pendingId) return;
+                const newFee = parseFloat(editFeeInput.value);
+                if (isNaN(newFee) || newFee <= 0) {
+                    alert('Vui lòng nhập học phí hợp lệ lớn hơn 0 VNĐ.');
+                    return;
+                }
+
+                confirmEditBtn.disabled = true;
+
+                try {
+                    const body = new FormData();
+                    body.append('id', pendingId);
+                    body.append('hourlyFee', newFee);
+
+                    const res = await fetch('/Tutor/TutorSubject/Edit', {
+                        method: 'POST',
+                        headers: { 'RequestVerificationToken': token },
+                        body: body
+                    });
+
+                    let data = {};
+                    try { data = await res.json(); } catch { }
+                    if (!res.ok || !data.ok) {
+                        throw new Error(data.message || `Cập nhật học phí thất bại (${res.status}).`);
+                    }
+
+                    if (pendingRow) {
+                        const feeCell = pendingRow.querySelector('.fee-cell');
+                        if (feeCell) {
+                            feeCell.textContent = data.formattedFee;
+                        }
+                    }
+                    if (pendingBtn) {
+                        pendingBtn.dataset.fee = newFee;
+                    }
+
+                    showToast(data.message, 'success');
+                    editModal.hide();
+                } catch (err) {
+                    showToast(err.message, 'warning');
+                } finally {
+                    confirmEditBtn.disabled = false;
+                    pendingId = null;
+                    pendingRow = null;
+                    pendingBtn = null;
+                }
+            });
+
+            // Form Thêm môn học qua AJAX để mượt mà không reload trang
+            const formAdd = document.getElementById('formAddSubject');
+            if (formAdd) {
+                formAdd.addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    const submitBtn = formAdd.querySelector('button[type="submit"]');
+                    if (submitBtn) submitBtn.disabled = true;
+
+                    try {
+                        const formData = new FormData(formAdd);
+                        const res = await fetch(formAdd.action, {
+                            method: 'POST',
+                            headers: {
+                                'RequestVerificationToken': token,
+                                'X-Requested-With': 'XMLHttpRequest'
+                            },
+                            body: formData
+                        });
+
+                        const data = await res.json();
+                        if (!res.ok || !data.ok) {
+                            throw new Error(data.message || 'Thêm môn học thất bại.');
+                        }
+
+                        // Thêm hàng mới vào bảng
+                        const tbody = document.getElementById('pairTableBody');
+                        if (tbody && data.item) {
+                            const tr = document.createElement('tr');
+                            tr.setAttribute('data-row-id', data.item.id);
+                            tr.innerHTML = `
+                                <td class="fw-semibold">${data.item.subjectName}</td>
+                                <td>${data.item.gradeName}</td>
+                                <td class="text-success fw-bold fee-cell">${Number(data.item.hourlyFee).toLocaleString('vi-VN')} đ/h</td>
+                                <td class="text-end">
+                                    <button type="button" class="btn btn-sm btn-outline-primary btn-edit me-1"
+                                            data-id="${data.item.id}"
+                                            data-name="${data.item.subjectName} - ${data.item.gradeName}"
+                                            data-fee="${data.item.hourlyFee}">
+                                        <i class="bi bi-pencil me-1"></i>Sửa
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-danger btn-remove"
+                                            data-id="${data.item.id}"
+                                            data-name="${data.item.subjectName} - ${data.item.gradeName}">
+                                        <i class="bi bi-trash me-1"></i>Xóa
+                                    </button>
+                                </td>
+                            `;
+                            tbody.appendChild(tr);
+                            bindRemoveButtons();
+                            bindEditButtons();
+                        }
+
+                        updateCount();
+                        showToast(data.message, 'success');
+                        formAdd.reset();
+                    } catch (err) {
+                        showToast(err.message, 'warning');
+                    } finally {
+                        if (submitBtn) submitBtn.disabled = false;
+                    }
+                });
+            }
+
+            function updateCount() {
+                const rows = document.querySelectorAll('#pairTableBody tr[data-row-id]').length;
+                document.getElementById('pairCount').textContent = rows;
+
+                if (rows === 0) {
+                    document.getElementById('pairTableWrapper').classList.add('d-none');
+                    document.getElementById('emptyState').classList.remove('d-none');
+                } else {
+                    document.getElementById('pairTableWrapper').classList.remove('d-none');
+                    document.getElementById('emptyState').classList.add('d-none');
+                }
+            }
+
+            function showToast(message, type) {
+                const box = document.createElement('div');
+                box.className = `alert alert-${type} alert-dismissible fade show`;
+                box.setAttribute('role', 'alert');
+                box.innerHTML = `${message}<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Đóng"></button>`;
+                document.querySelector('.container-fluid').prepend(box);
+                setTimeout(() => box.remove(), 4000);
+            }
+        })();
+    </script>
+}

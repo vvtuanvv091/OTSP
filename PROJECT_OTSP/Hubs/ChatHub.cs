@@ -94,6 +94,94 @@ public sealed class ChatHub : Hub
         }
     }
 
+    public async Task EditMessage(int messageId, string newContent)
+    {
+        var userId = Context.User?.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrWhiteSpace(userId))
+            throw new HubException("Phiên đăng nhập không hợp lệ.");
+
+        try
+        {
+            var msg = await _chatService.EditMessageAsync(messageId, userId, newContent, Context.ConnectionAborted);
+            var directRoom = GetDirectRoomName(msg.SenderId, msg.ReceiverId);
+
+            var payload = new
+            {
+                messageId = msg.Id,
+                newContent = msg.Content,
+                senderId = msg.SenderId,
+                receiverId = msg.ReceiverId,
+                sentAt = msg.SentAtUtc
+            };
+
+            await Clients.Group(directRoom).SendAsync("MessageEdited", payload, Context.ConnectionAborted);
+            await Clients.Group($"user:{msg.ReceiverId}").SendAsync("MessageEdited", payload, Context.ConnectionAborted);
+            await Clients.Group($"user:{userId}").SendAsync("MessageEdited", payload, Context.ConnectionAborted);
+
+            await Clients.Group($"user:{msg.ReceiverId}").SendAsync("ConversationUpdated", new
+            {
+                contactId = userId,
+                lastMessage = msg.Content,
+                sentAt = msg.SentAtUtc
+            }, Context.ConnectionAborted);
+
+            await Clients.Group($"user:{userId}").SendAsync("ConversationUpdated", new
+            {
+                contactId = msg.ReceiverId,
+                lastMessage = msg.Content,
+                sentAt = msg.SentAtUtc
+            }, Context.ConnectionAborted);
+        }
+        catch (Exception ex)
+        {
+            throw new HubException(ex.Message);
+        }
+    }
+
+    public async Task DeleteMessage(int messageId)
+    {
+        var userId = Context.User?.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrWhiteSpace(userId))
+            throw new HubException("Phiên đăng nhập không hợp lệ.");
+
+        try
+        {
+            var res = await _chatService.DeleteMessageAsync(messageId, userId, Context.ConnectionAborted);
+            var directRoom = GetDirectRoomName(res.SenderId, res.ReceiverId);
+
+            var payload = new
+            {
+                messageId = res.MessageId,
+                senderId = res.SenderId,
+                receiverId = res.ReceiverId,
+                lastMessage = res.LastRemainingMessageContent ?? "Bắt đầu cuộc trò chuyện...",
+                sentAt = res.LastRemainingMessageTimeUtc
+            };
+
+            await Clients.Group(directRoom).SendAsync("MessageDeleted", payload, Context.ConnectionAborted);
+            await Clients.Group($"user:{res.ReceiverId}").SendAsync("MessageDeleted", payload, Context.ConnectionAborted);
+            await Clients.Group($"user:{userId}").SendAsync("MessageDeleted", payload, Context.ConnectionAborted);
+
+            await Clients.Group($"user:{res.ReceiverId}").SendAsync("ConversationUpdated", new
+            {
+                contactId = userId,
+                lastMessage = payload.lastMessage,
+                sentAt = payload.sentAt
+            }, Context.ConnectionAborted);
+
+            await Clients.Group($"user:{userId}").SendAsync("ConversationUpdated", new
+            {
+                contactId = res.ReceiverId,
+                lastMessage = payload.lastMessage,
+                sentAt = payload.sentAt
+            }, Context.ConnectionAborted);
+        }
+        catch (Exception ex)
+        {
+            throw new HubException(ex.Message);
+        }
+    }
+
     // ===== Backward Compatibility cho các màn hình cũ theo requestId =====
     public async Task JoinConversation(int requestId)
     {

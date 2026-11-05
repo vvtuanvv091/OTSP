@@ -181,11 +181,6 @@
                         <div id="tutorBox">
                             <div class="form-section-title">Thông tin giảng dạy</div>
                             <div class="form-floating mb-3">
-                                <input asp-for="Input.HourlyFee" type="number" min="0" step="1000" class="form-control" placeholder="Học phí mỗi giờ" />
-                                <label asp-for="Input.HourlyFee">Học phí mong muốn </label>
-                                <span asp-validation-for="Input.HourlyFee" class="text-danger"></span>
-                            </div>
-                            <div class="form-floating mb-3">
                                 <textarea asp-for="Input.Introduction" class="form-control" placeholder="Giới thiệu" style="height: 110px"></textarea>
                                 <label asp-for="Input.Introduction">Giới thiệu bản thân và kinh nghiệm dạy</label>
                             </div>

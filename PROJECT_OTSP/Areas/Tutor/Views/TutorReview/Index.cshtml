@@ -1,44 +1,63 @@
 @model PROJECT_OTSP.Dtos.TutorReviewPageVm
 @{
-    ViewData["Title"] = "Đánh giá từ học viên";
+    ViewData["Title"] = "Đánh giá & Nhận xét từ học viên";
 }
 
 <style>
-    .review-score-num {
-        font-size: 3.5rem;
-        font-weight: 700;
+    .review-score-big {
+        font-size: 3.75rem;
+        font-weight: 800;
         line-height: 1;
-        color: #DB303A;
-        letter-spacing: -1px;
+        color: #C12026;
+        letter-spacing: -1.5px;
     }
     .star-gold i {
-        color: #E8A317 !important;
+        color: #F59E0B !important;
         font-size: 1.15rem;
     }
     .star-gold i.star-muted {
-        color: var(--bs-border-color, #cbd5e1) !important;
+        color: #E2E8F0 !important;
     }
-    .review-item {
-        transition: background-color .15s ease;
+    .rate-bar-track {
+        height: 6px;
+        background-color: #E2E8F0;
+        border-radius: 999px;
+        overflow: hidden;
+        flex-grow: 1;
     }
-    .review-item:hover {
-        background-color: rgba(var(--bs-tertiary-bg-rgb, 240, 240, 240), 0.35);
+    .rate-bar-fill {
+        height: 100%;
+        background-color: #E85B0F;
+        border-radius: 999px;
+    }
+    .rate-bar-fill.bar-muted {
+        background-color: #64748B;
+    }
+    .review-item-card {
+        transition: all 0.2s ease;
+        border: 1px solid #E2E8F0;
+        background: #FFFFFF;
+    }
+    .review-item-card:hover {
+        border-color: #CBD5E1;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
     }
 </style>
 
 <div class="tutor-page-container review-page py-3">
-    <!-- Header -->
+    <!-- Header chuẩn như thiết kế -->
     <div class="mb-4">
-        <h1 class="h3 fw-bold mb-1 text-body">Đánh giá từ học viên</h1>
-        <div class="text-secondary small">Khu làm việc của gia sư</div>
+        <h1 class="h3 fw-bold mb-1 text-dark">Đánh Giá & Nhận Xét Từ Học Viên</h1>
+        <p class="text-secondary small mb-0">Xem toàn bộ đánh giá 5 sao và phản hồi từ phụ huynh, học viên sau các buổi học.</p>
     </div>
 
-    <!-- Layout Grid -->
-    <div class="row g-4 align-items-stretch">
-        <!-- Left: Overall Rating Box -->
-        <div class="col-lg-3 col-md-4">
-            <div class="card h-100 border shadow-sm rounded-3 p-4 text-center d-flex flex-column align-items-center justify-content-center">
-                <div class="review-score-num mb-2">@Model.AverageRating.ToString("0.0", new System.Globalization.CultureInfo("vi-VN"))</div>
+    <!-- Khối Thống Kê Tổng Quan Đánh Giá (Điểm TB + Tỷ lệ đánh giá chuẩn Hình 1) -->
+    <div class="card border-0 shadow-sm rounded-4 p-4 p-md-5 mb-4 bg-white">
+        <div class="row g-4 align-items-center">
+            <!-- Cột trái: Điểm trung bình -->
+            <div class="col-12 col-md-4 text-center border-end-md">
+                <div class="small fw-semibold text-secondary text-uppercase mb-2" style="letter-spacing: 0.5px;">ĐIỂM TRUNG BÌNH</div>
+                <div class="review-score-big mb-2">@Model.AverageRating.ToString("0.0", new System.Globalization.CultureInfo("vi-VN"))</div>
                 <div class="star-gold mb-2 d-flex justify-content-center gap-1">
                     @for (int i = 1; i <= 5; i++)
                     {
@@ -48,46 +67,128 @@
                         }
                         else
                         {
-                            <i class="bi bi-star-fill star-muted opacity-50"></i>
+                            <i class="bi bi-star-fill star-muted"></i>
                         }
                     }
                 </div>
-                <div class="text-secondary small">@Model.TotalReviews đánh giá</div>
+                <div class="text-secondary small">Dựa trên <b>@Model.TotalReviews</b> lượt đánh giá thực tế</div>
             </div>
-        </div>
 
-        <!-- Right: Reviews List Card -->
-        <div class="col-lg-9 col-md-8">
-            <div class="card h-100 border shadow-sm rounded-3 p-4">
-                <div class="review-list">
-                    @for (int i = 0; i < Model.Reviews.Count; i++)
-                    {
-                        var r = Model.Reviews[i];
-                        var isLast = i == Model.Reviews.Count - 1;
-                        <div class="review-item py-3 @(!isLast ? "border-bottom" : "")">
-                            <div class="d-flex align-items-center gap-2 mb-1 flex-wrap">
-                                <strong class="text-body fw-bold">@r.StudentName</strong>
-                                <div class="star-gold d-inline-flex gap-1 small">
-                                    @for (int s = 1; s <= 5; s++)
-                                    {
-                                        if (s <= r.Score)
-                                        {
-                                            <i class="bi bi-star-fill" style="font-size: 0.9rem;"></i>
-                                        }
-                                        else
-                                        {
-                                            <i class="bi bi-star-fill star-muted opacity-50" style="font-size: 0.9rem;"></i>
-                                        }
-                                    }
-                                </div>
-                                <span class="text-secondary small ms-1">@r.ReviewedAt.ToString("dd/MM")</span>
-                            </div>
-                            <div class="text-body mt-1" style="font-size: 0.95rem; line-height: 1.5;">@r.Comment</div>
+            <!-- Cột phải: Thanh Tỷ Lệ Đánh Giá theo từng mức sao -->
+            <div class="col-12 col-md-8 ps-md-4">
+                <div class="fw-bold text-dark mb-3">Tỷ Lệ Đánh Giá</div>
+                <div class="d-flex flex-column gap-2.5">
+                    <!-- 5 sao -->
+                    <div class="d-flex align-items-center gap-3">
+                        <span class="small text-secondary text-nowrap" style="width: 48px;">5 sao</span>
+                        <div class="rate-bar-track">
+                            <div class="rate-bar-fill" style="width: @Model.Rating5Percent%;"></div>
                         </div>
-                    }
+                        <span class="small fw-semibold text-dark text-end" style="width: 40px;">@Model.Rating5Percent%</span>
+                    </div>
+
+                    <!-- 4 sao -->
+                    <div class="d-flex align-items-center gap-3">
+                        <span class="small text-secondary text-nowrap" style="width: 48px;">4 sao</span>
+                        <div class="rate-bar-track">
+                            <div class="rate-bar-fill" style="width: @Model.Rating4Percent%;"></div>
+                        </div>
+                        <span class="small fw-semibold text-dark text-end" style="width: 40px;">@Model.Rating4Percent%</span>
+                    </div>
+
+                    <!-- 3 sao -->
+                    <div class="d-flex align-items-center gap-3">
+                        <span class="small text-secondary text-nowrap" style="width: 48px;">3 sao</span>
+                        <div class="rate-bar-track">
+                            <div class="rate-bar-fill bar-muted" style="width: @Model.Rating3Percent%;"></div>
+                        </div>
+                        <span class="small fw-semibold text-dark text-end" style="width: 40px;">@Model.Rating3Percent%</span>
+                    </div>
+
+                    <!-- 2 sao -->
+                    <div class="d-flex align-items-center gap-3">
+                        <span class="small text-secondary text-nowrap" style="width: 48px;">2 sao</span>
+                        <div class="rate-bar-track">
+                            <div class="rate-bar-fill bar-muted" style="width: @Model.Rating2Percent%;"></div>
+                        </div>
+                        <span class="small fw-semibold text-dark text-end" style="width: 40px;">@Model.Rating2Percent%</span>
+                    </div>
+
+                    <!-- 1 sao -->
+                    <div class="d-flex align-items-center gap-3">
+                        <span class="small text-secondary text-nowrap" style="width: 48px;">1 sao</span>
+                        <div class="rate-bar-track">
+                            <div class="rate-bar-fill bar-muted" style="width: @Model.Rating1Percent%;"></div>
+                        </div>
+                        <span class="small fw-semibold text-dark text-end" style="width: 40px;">@Model.Rating1Percent%</span>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
-</div>
 
+    <!-- Danh Sách Đánh Giá & Nhận Xét -->
+    <div class="card border-0 shadow-sm rounded-4 p-4 p-md-4 bg-white mb-4">
+        <h2 class="h5 fw-bold mb-3 text-dark">Nhận xét chi tiết từ học viên</h2>
+
+        @if (Model.Reviews.Count == 0)
+        {
+            <div class="text-center py-5 text-secondary">
+                <i class="bi bi-chat-square-text fs-1 d-block mb-2 text-muted"></i>
+                Chưa có đánh giá nào.
+            </div>
+        }
+        else
+        {
+            <div class="d-flex flex-column gap-3">
+                @foreach (var r in Model.Reviews)
+                {
+                    <div class="review-item-card p-3 rounded-3">
+                        <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                            <div class="d-flex align-items-center gap-2">
+                                @if (!string.IsNullOrWhiteSpace(r.StudentAvatarUrl))
+                                {
+                                    <img src="@r.StudentAvatarUrl" alt="" width="36" height="36" class="rounded-circle object-fit-cover border" />
+                                }
+                                else
+                                {
+                                    <span class="rounded-circle bg-danger-subtle text-danger d-inline-flex align-items-center justify-content-center fw-bold" style="width: 36px; height: 36px; font-size: 14px;">
+                                        @(string.IsNullOrWhiteSpace(r.StudentName) ? "H" : r.StudentName.Substring(0, 1).ToUpper())
+                                    </span>
+                                }
+                                <div>
+                                    <div class="fw-bold text-dark" style="font-size: 0.95rem;">@r.StudentName</div>
+                                    <div class="star-gold d-inline-flex gap-1">
+                                        @for (int s = 1; s <= 5; s++)
+                                        {
+                                            if (s <= r.Score)
+                                            {
+                                                <i class="bi bi-star-fill" style="font-size: 0.85rem;"></i>
+                                            }
+                                            else
+                                            {
+                                                <i class="bi bi-star-fill star-muted" style="font-size: 0.85rem;"></i>
+                                            }
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                            <span class="text-secondary small"><i class="bi bi-clock me-1"></i>@r.TimeAgo</span>
+                        </div>
+                        <div class="text-secondary ps-1" style="font-size: 0.925rem; line-height: 1.55;">
+                            @r.Comment
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+
+        <!-- Thanh Phân Trang Đồng Bộ (PaginationVm) -->
+        @if (ViewBag.Pagination is PROJECT_OTSP.Dtos.PaginationVm pagination && pagination.TotalPages > 1)
+        {
+            <div class="mt-4 pt-3 border-top">
+                @await Html.PartialAsync("_PaginationBar", pagination)
+            </div>
+        }
+    </div>
+</div>

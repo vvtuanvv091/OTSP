@@ -11,6 +11,7 @@
 
 <link href="~/css/student-sidebar.css" rel="stylesheet" asp-append-version="true" />
 <link href="~/css/tutor-sidebar.css" rel="stylesheet" asp-append-version="true" />
+<link href="~/css/tutor-ui-refresh.css" rel="stylesheet" asp-append-version="true" />
 
 <div id="tutor-realtime-config" class="d-none"
      data-hub-url="@Url.Content("~/hubs/connection-requests")"
@@ -30,8 +31,8 @@
 
         <nav class="student-sidebar-nav">
             <span class="student-sidebar-heading">TỔNG QUAN</span>
-            <a asp-area="Tutor" asp-controller="TutorProfile" asp-action="Index"
-               class="student-sidebar-link @(inTutorArea && controllerName == "TutorProfile" ? "active" : "")">
+            <a asp-area="Tutor" asp-controller="TutorDashboard" asp-action="Index"
+               class="student-sidebar-link @(inTutorArea && controllerName == "TutorDashboard" ? "active" : "")">
                 <i class="bi bi-grid" aria-hidden="true"></i><span>Tổng quan</span>
             </a>
 
@@ -56,6 +57,10 @@
                class="student-sidebar-link @(inTutorArea && controllerName == "TutorStudent" ? "active" : "")">
                 <i class="bi bi-people" aria-hidden="true"></i><span>Học viên của tôi</span>
             </a>
+            <a asp-area="Tutor" asp-controller="TutorSubject" asp-action="Index"
+               class="student-sidebar-link @(inTutorArea && controllerName == "TutorSubject" ? "active" : "")">
+                <i class="bi bi-book" aria-hidden="true"></i><span>Môn học</span>
+            </a>
             <a asp-area="Tutor" asp-controller="TutorLearningDocument" asp-action="Index"
                class="student-sidebar-link @(inTutorArea && controllerName == "TutorLearningDocument" ? "active" : "")">
                 <i class="bi bi-folder2-open" aria-hidden="true"></i><span>Tài liệu</span>
@@ -76,7 +81,10 @@
             </a>
 
             <span class="student-sidebar-heading">TÀI CHÍNH</span>
-            <span class="student-sidebar-link is-disabled" aria-disabled="true"><i class="bi bi-credit-card" aria-hidden="true"></i><span>Thu nhập</span></span>
+            <a asp-area="Tutor" asp-controller="TutorIncome" asp-action="Index"
+               class="student-sidebar-link @(inTutorArea && controllerName == "TutorIncome" ? "active" : "")">
+                <i class="bi bi-credit-card" aria-hidden="true"></i><span>Thu nhập</span>
+            </a>
 
             <span class="student-sidebar-heading">TÀI KHOẢN</span>
             <a asp-area="Tutor" asp-controller="TutorProfile" asp-action="Index"

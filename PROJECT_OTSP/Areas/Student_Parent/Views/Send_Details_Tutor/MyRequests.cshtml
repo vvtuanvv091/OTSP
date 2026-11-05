@@ -55,6 +55,10 @@
         padding: .35rem 1rem;
         font-size: .88rem;
     }
+
+    .alert-success > * {
+        color:#ffffff;
+    }
 </style>
 
 <div id="my-requests-page" class="container-fluid py-4"
@@ -96,7 +100,7 @@
     <!-- Bộ lọc trạng thái -->
     <div class="d-flex flex-wrap gap-2 mb-4 nav-filter">
         <a asp-action="MyRequests" class="btn @(selectedStatus == null ? "btn-danger" : "btn-outline-secondary")">
-            Tất cả (@Model.Count)
+            Tất cả (@(ViewBag.Pagination != null ? ((PROJECT_OTSP.Dtos.PaginationVm)ViewBag.Pagination).TotalItems : Model.Count))
         </a>
         <a asp-action="MyRequests" asp-route-status="@RequestStatus.Pending"
            class="btn @(selectedStatus == RequestStatus.Pending ? "btn-warning" : "btn-outline-secondary")">
@@ -125,6 +129,7 @@
     }
     else
     {
+        <!-- 3 cột x 3 hàng = tối đa 9 thẻ/trang -->
         <div class="row g-3">
             @foreach (var item in Model)
             {
@@ -136,7 +141,7 @@
                                 <div class="d-flex align-items-center gap-2">
                                     @if (!string.IsNullOrWhiteSpace(item.TutorAvatarUrl))
                                     {
-                                        <img src="@item.TutorAvatarUrl" alt="@item.TutorName" class="tutor-avatar-sm" onerror="this.onerror=null;this.src='/assets/img/default-avatar.svg';" />
+                                        <img src="@item.TutorAvatarUrl" alt="@item.TutorName" class="tutor-avatar-sm" width="48" height="48" loading="lazy" decoding="async" onerror="this.onerror=null;this.src='/assets/img/default-avatar.svg';" />
                                     }
                                     else
                                     {
@@ -175,7 +180,7 @@
                             {
                                 <div class="alert alert-success py-2 mb-3">
                                     <i class="bi bi-calendar-check me-1"></i>
-                                    Lịch học thử: <strong>@item.TrialScheduledAt.Value.AddHours(7).ToString("dd/MM/yyyy HH:mm") (GMT+7)</strong>
+                                    <strong>Lịch học thử: @item.TrialScheduledAt.Value.AddHours(7).ToString("dd/MM/yyyy HH:mm") (GMT+7)</strong>
                                 </div>
                             }
 
@@ -251,6 +256,11 @@
                 </div>
             }
         </div>
+
+        @if (ViewBag.Pagination is PROJECT_OTSP.Dtos.PaginationVm pagination)
+        {
+            @await Html.PartialAsync("_PaginationBar", pagination)
+        }
     }
 </div>
 

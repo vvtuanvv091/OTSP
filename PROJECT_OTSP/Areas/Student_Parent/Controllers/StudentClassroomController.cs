@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PROJECT_OTSP.Data;
+using PROJECT_OTSP.Dtos;
 using PROJECT_OTSP.Dtos.Student;
 using PROJECT_OTSP.Models;
 using static PROJECT_OTSP.Models.Enums;
@@ -14,6 +15,7 @@ namespace PROJECT_OTSP.Areas.Student_Parent.Controllers;
 public sealed class StudentClassroomController : Controller
 {
     private const int VietnamUtcOffsetHours = 7;
+    private const int PageSize = 6;
     private readonly ApplicationDbContext _db;
 
     public StudentClassroomController(ApplicationDbContext db)
@@ -22,7 +24,7 @@ public sealed class StudentClassroomController : Controller
     }
 
     [HttpGet]
-    public async Task<IActionResult> Index(CancellationToken cancellationToken = default)
+    public async Task<IActionResult> Index(ClassroomStatus? status = ClassroomStatus.Active, int page = 1, CancellationToken cancellationToken = default)
     {
         var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (string.IsNullOrWhiteSpace(userId))
@@ -35,10 +37,37 @@ public sealed class StudentClassroomController : Controller
         var nowUtc = DateTime.UtcNow;
         var nowVn = nowUtc.AddHours(VietnamUtcOffsetHours);
 
-        var enrollments = await _db.ClassroomStudents
+        // Thống kê số lượng lớp theo trạng thái cho Tabs
+        var statusCounts = await _db.ClassroomStudents
             .AsNoTracking()
             .Where(cs => cs.Student.UserId == userId)
+            .GroupBy(cs => cs.Classroom.Status)
+            .Select(g => new { Status = g.Key, Count = g.Count() })
+            .ToListAsync(cancellationToken);
+
+        var activeCount = statusCounts.FirstOrDefault(c => c.Status == ClassroomStatus.Active)?.Count ?? 0;
+        var completedCount = statusCounts.FirstOrDefault(c => c.Status == ClassroomStatus.Completed)?.Count ?? 0;
+        var cancelledCount = statusCounts.FirstOrDefault(c => c.Status == ClassroomStatus.Cancelled)?.Count ?? 0;
+
+        var targetStatus = status ?? ClassroomStatus.Active;
+
+        ViewBag.SelectedStatus = targetStatus;
+        ViewBag.ActiveCount = activeCount;
+        ViewBag.CompletedCount = completedCount;
+        ViewBag.CancelledCount = cancelledCount;
+
+        var enrollmentsQuery = _db.ClassroomStudents
+            .AsNoTracking()
+            .Where(cs => cs.Student.UserId == userId && cs.Classroom.Status == targetStatus);
+
+        var totalClasses = await enrollmentsQuery.CountAsync(cancellationToken);
+        var totalPages = Math.Max(1, (int)Math.Ceiling(totalClasses / (double)PageSize));
+        page = Math.Clamp(page, 1, totalPages);
+
+        var enrollments = await enrollmentsQuery
             .OrderByDescending(cs => cs.JoinedAt)
+            .Skip((page - 1) * PageSize)
+            .Take(PageSize)
             .Select(cs => new
             {
                 cs.ClassroomId,
@@ -75,21 +104,35 @@ public sealed class StudentClassroomController : Controller
             [DayOfWeek.Sunday] = "CN"
         };
 
+        var classroomIds = enrollments.Select(e => e.ClassroomId).ToList();
+        var studentPayments = await _db.Payments
+            .AsNoTracking()
+            .Where(p => p.StudentId == studentId && classroomIds.Contains(p.ClassroomId))
+            .ToListAsync(cancellationToken);
+
         var items = new List<StudentClassroomItemDto>();
 
         foreach (var e in enrollments)
         {
+            var rawHours = e.Classroom.HoursPerSession;
+            var safeHours = rawHours >= 10.0 ? rawHours / 10.0 : (rawHours > 0 ? rawHours : 2.0);
+
             var summary = string.Empty;
             if (e.WeeklySchedules.Any())
             {
                 var parts = e.WeeklySchedules.Select(ws =>
                     $"{dayShortNames.GetValueOrDefault(ws.DayOfWeek, ws.DayOfWeek.ToString())} {ws.StartTime:hh\\:mm}");
-                summary = $"{e.WeeklySchedules.Count} buổi/tuần ({string.Join(", ", parts)} · {e.Classroom.HoursPerSession:0.#}h/buổi)";
+                summary = $"{e.WeeklySchedules.Count} buổi/tuần ({string.Join(", ", parts)} · {safeHours:0.#}h/buổi)";
             }
             else if (e.Classroom.SessionsPerWeek > 0)
             {
-                summary = $"{e.Classroom.SessionsPerWeek} buổi/tuần ({e.Classroom.HoursPerSession:0.#}h/buổi)";
+                summary = $"{e.Classroom.SessionsPerWeek} buổi/tuần ({safeHours:0.#}h/buổi)";
             }
+
+            var classPayments = studentPayments.Where(p => p.ClassroomId == e.ClassroomId).ToList();
+            var hasSuccessfulPayment = classPayments.Any(p => p.Status == PaymentStatus.Success);
+            var pendingPayment = classPayments.FirstOrDefault(p => p.Status == PaymentStatus.Pending);
+            var hasPaid = (e.Classroom.Fee <= 0) || hasSuccessfulPayment;
 
             var sessionDtos = new List<StudentClassroomSessionDto>();
             var sessionIndex = 1;
@@ -97,58 +140,63 @@ public sealed class StudentClassroomController : Controller
             foreach (var s in e.Sessions)
             {
                 var sVn = s.ScheduledAt.AddHours(VietnamUtcOffsetHours);
-                var durationHours = e.Classroom.HoursPerSession > 0 ? e.Classroom.HoursPerSession : 2.0;
+                var durationHours = safeHours;
                 var endVn = sVn.AddHours(durationHours);
 
-                // Buổi học đã kết thúc nếu Status == Done hoặc thời gian kết thúc đã qua trong quá khứ
                 var isCompleted = s.Status == SessionStatus.Done || (s.Status != SessionStatus.Cancelled && endVn < nowVn && s.Status != SessionStatus.InProgress);
 
-                // Có thể vào lớp: đang diễn ra hoặc sắp tới trong vòng 45 phút / trong khung giờ học
-                var canJoin = s.Status == SessionStatus.InProgress ||
-                              (s.Status == SessionStatus.Scheduled && nowVn >= sVn.AddMinutes(-45) && nowVn <= endVn);
-
-                // Chưa tới ngày: buổi học chưa diễn ra và chưa tới giờ vào lớp
-                var isFuture = !isCompleted && !canJoin;
+                var canJoin = targetStatus == ClassroomStatus.Active &&
+                              hasPaid &&
+                              (s.Status == SessionStatus.InProgress || (s.Status == SessionStatus.Scheduled && sVn <= nowVn.AddMinutes(45) && nowVn <= endVn));
 
                 sessionDtos.Add(new StudentClassroomSessionDto
                 {
-                    Index = sessionIndex++,
                     SessionId = s.Id,
-                    ScheduledAtUtc = s.ScheduledAt,
+                    Index = sessionIndex++,
                     ScheduledAtVn = sVn,
-                    Status = isCompleted ? SessionStatus.Done : s.Status,
+                    Status = s.Status,
+                    VideoRoom = s.VideoRoom,
                     CanJoin = canJoin,
-                    IsFuture = isFuture,
                     HasReviewed = s.Review != null,
                     ReviewScore = s.Review?.Score,
-                    ReviewComment = s.Review?.Comment
+                    ReviewComment = s.Review?.Comment,
+                    IsCompleted = isCompleted
                 });
             }
-
-            var nextSession = sessionDtos.FirstOrDefault(s => s.Status != SessionStatus.Done && s.Status != SessionStatus.Cancelled);
 
             items.Add(new StudentClassroomItemDto
             {
                 ClassroomId = e.ClassroomId,
-                TutorUserId = e.TutorUserId,
-                Name = e.Classroom.Name,
+                ClassroomName = e.Classroom.Name,
+                Type = e.Classroom.Type,
+                Status = e.Classroom.Status,
                 SubjectName = e.SubjectName,
                 GradeLevelName = e.GradeLevelName,
+                TutorUserId = e.TutorUserId,
                 TutorName = e.TutorName,
                 TutorAvatarUrl = e.TutorAvatarUrl,
-                Type = e.Classroom.Type,
                 Fee = e.Classroom.Fee,
-                SessionsPerWeek = e.Classroom.SessionsPerWeek,
-                HoursPerSession = e.Classroom.HoursPerSession,
-                ScheduleSummary = summary,
-                JoinedAt = e.JoinedAt,
-                TotalSessionsCount = sessionDtos.Count,
-                NextSessionScheduledAtVn = nextSession?.ScheduledAtVn,
-                NextSessionId = nextSession?.SessionId,
-                Status = e.Classroom.Status,
+                HoursPerSession = safeHours,
+                WeeklyScheduleSummary = summary,
+                HasPaid = hasPaid,
+                PendingPaymentId = pendingPayment?.Id,
                 Sessions = sessionDtos
             });
         }
+
+        var pagination = new PaginationVm
+        {
+            CurrentPage = page,
+            TotalPages = totalPages,
+            TotalItems = totalClasses,
+            PageSize = PageSize,
+            BaseUrl = Url.Action("Index", "StudentClassroom", new { area = "Student_Parent" }) ?? ""
+        };
+        if (status.HasValue)
+        {
+            pagination.QueryParams["status"] = status.Value.ToString();
+        }
+        ViewBag.Pagination = pagination;
 
         var viewModel = new StudentClassroomListVm
         {

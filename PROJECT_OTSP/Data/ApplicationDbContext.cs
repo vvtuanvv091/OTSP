@@ -160,6 +160,9 @@ namespace PROJECT_OTSP.Data
             b.Entity<LearningDocument>()
                 .HasOne(x => x.GradeLevel).WithMany(g => g.LearningDocuments)
                 .HasForeignKey(x => x.GradeLevelId).OnDelete(DeleteBehavior.Restrict);
+            b.Entity<LearningDocument>()
+                .HasOne(x => x.Classroom).WithMany(c => c.LearningDocuments)
+                .HasForeignKey(x => x.ClassroomId).OnDelete(DeleteBehavior.SetNull);
 
             b.Entity<Classroom>()
                 .HasOne(x => x.Subject).WithMany(s => s.Classrooms)

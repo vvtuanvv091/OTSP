@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Localization;
+using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using PROJECT_OTSP.Data;
@@ -8,8 +10,48 @@ using PROJECT_OTSP.Models;
 using PROJECT_OTSP.Services;
 using PROJECT_OTSP.Services.Events;
 using System.Globalization;
+using System.IO.Compression;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Hỗ trợ tự động nhận diện PORT trên Render / Cloud PaaS
+var port = Environment.GetEnvironmentVariable("PORT");
+if (!string.IsNullOrEmpty(port))
+{
+    builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
+}
+
+// Cấu hình ForwardedHeaders để tương thích hoàn toàn với SSL Reverse Proxy của Render
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.KnownIPNetworks.Clear();
+    options.KnownProxies.Clear();
+});
+
+// Tối ưu nén phản hồi Brotli + Gzip giúp tải trang nhanh hơn 60-80%
+builder.Services.AddResponseCompression(options =>
+{
+    options.EnableForHttps = true;
+    options.Providers.Add<BrotliCompressionProvider>();
+    options.Providers.Add<GzipCompressionProvider>();
+    options.MimeTypes = ResponseCompressionDefaults.MimeTypes.Concat(new[]
+    {
+        "application/json",
+        "text/css",
+        "application/javascript",
+        "text/javascript",
+        "image/svg+xml"
+    });
+});
+builder.Services.Configure<BrotliCompressionProviderOptions>(options =>
+{
+    options.Level = CompressionLevel.Fastest;
+});
+builder.Services.Configure<GzipCompressionProviderOptions>(options =>
+{
+    options.Level = CompressionLevel.Fastest;
+});
 
 // ===== 1. Cơ sở dữ liệu (PostgreSQL trên Neon) =====
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
@@ -54,12 +96,17 @@ builder.Services.AddSession(options =>
 builder.Services.AddScoped<ISearchService, SearchService>();
 builder.Services.AddScoped<IOpenGroupClassroomService, OpenGroupClassroomService>();
 builder.Services.AddScoped<IAvailabilitySlotService, AvailabilitySlotService>();
+builder.Services.AddScoped<IConnectionRequestService, ConnectionRequestService>();
+builder.Services.AddScoped<IClassSessionService, ClassSessionService>();
 builder.Services.AddScoped<IChatService, ChatService>();
 builder.Services.AddSingleton<IChatEventBus, ChatEventBus>();
 builder.Services.AddHostedService<ChatNotificationWorker>();
 builder.Services.AddSingleton<IScheduleBlockService, ScheduleBlockService>();
 builder.Services.Configure<CloudinarySettings>(builder.Configuration.GetSection("Cloudinary"));
 builder.Services.AddSingleton<IImageStorageService, CloudinaryImageStorageService>();
+builder.Services.AddScoped<IPaymentService, PaymentService>();
+builder.Services.AddSingleton<VietQrService>();
+builder.Services.AddHttpClient();
 
 var supportedCultures = new[] { new CultureInfo("vi"), new CultureInfo("en") };
 builder.Services.Configure<RequestLocalizationOptions>(options =>
@@ -93,8 +140,30 @@ else
     app.UseHsts();
 }
 
+// Bật nén phản hồi trước khi gửi về client
+app.UseResponseCompression();
+
+// ForwardedHeaders bắt buộc phải nằm trước UseHttpsRedirection khi chạy trên Render
+app.UseForwardedHeaders();
+
 app.UseHttpsRedirection();
-app.UseStaticFiles();
+
+// Cấu hình lưu bộ nhớ đệm (Browser Cache) mạnh mẽ cho file tĩnh (30 ngày)
+app.UseStaticFiles(new StaticFileOptions
+{
+    OnPrepareResponse = ctx =>
+    {
+        var path = ctx.Context.Request.Path.Value ?? "";
+        if (path.StartsWith("/uploads/", StringComparison.OrdinalIgnoreCase) ||
+            path.StartsWith("/assets/", StringComparison.OrdinalIgnoreCase) ||
+            path.StartsWith("/css/", StringComparison.OrdinalIgnoreCase) ||
+            path.StartsWith("/js/", StringComparison.OrdinalIgnoreCase) ||
+            path.StartsWith("/lib/", StringComparison.OrdinalIgnoreCase))
+        {
+            ctx.Context.Response.Headers.CacheControl = "public,max-age=2592000,immutable";
+        }
+    }
+});
 app.UseRequestLocalization();
 
 app.UseRouting();

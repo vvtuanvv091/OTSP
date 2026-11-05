@@ -17,5 +17,8 @@ public class TutorStudentItemVm
     public string SubjectName { get; set; } = string.Empty;
     public string Progress { get; set; } = string.Empty;
     public string NextSessionFormatted { get; set; } = string.Empty;
+    public int? NextSessionId { get; set; }
+    public string? VideoRoom { get; set; }
     public int? RequestId { get; set; }
+    public bool IsTrial { get; set; }
 }

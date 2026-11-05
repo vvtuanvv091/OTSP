@@ -9,4 +9,5 @@ public class SubjectGradeDto
     public string SubjectName { get; set; } = string.Empty;
     public int GradeLevelId { get; set; }
     public string GradeName { get; set; } = string.Empty;
+    public decimal HourlyFee { get; set; }
 }

@@ -91,5 +91,130 @@ public class ClassSessionTests
         // ASSERT
         canJoin.Should().BeFalse("Không được phép tham gia buổi học khi lớp đã bị hủy hoặc ngừng hoạt động");
     }
+
+    [Fact]
+    public async Task LeaveSession_WhenUserIsParticipant_ShouldRecordLeftAtUtc()
+    {
+        // ARRANGE
+        using var db = TestDbContextFactory.CreateInMemoryDbContext();
+        var mockHub = new Moq.Mock<Microsoft.AspNetCore.SignalR.IHubContext<PROJECT_OTSP.Hubs.ConnectionRequestHub>>();
+        var mockLogger = new Moq.Mock<Microsoft.Extensions.Logging.ILogger<PROJECT_OTSP.Services.ClassSessionService>>();
+
+        var tutor = new TutorProfile
+        {
+            Id = 101,
+            UserId = "user_tutor_101",
+            Introduction = "Tutor intro"
+        };
+        var classroom = new Classroom
+        {
+            Id = 20,
+            TutorId = 101,
+            Tutor = tutor,
+            Status = ClassroomStatus.Active,
+            Name = "Lớp Toán 12"
+        };
+        var session = new ClassSession
+        {
+            Id = 10,
+            ClassroomId = 20,
+            Classroom = classroom,
+            Status = SessionStatus.InProgress,
+            ScheduledAt = DateTime.UtcNow
+        };
+        var attendance = new ClassSessionAttendance
+        {
+            Id = 1,
+            ClassSessionId = 10,
+            UserId = "user_tutor_101",
+            JoinedAtUtc = DateTime.UtcNow.AddMinutes(-30),
+            LeftAtUtc = null,
+            JoinCount = 1
+        };
+
+        db.TutorProfiles.Add(tutor);
+        db.Classrooms.Add(classroom);
+        db.ClassSessions.Add(session);
+        db.ClassSessionAttendances.Add(attendance);
+        await db.SaveChangesAsync();
+
+        var service = new PROJECT_OTSP.Services.ClassSessionService(db, mockHub.Object, mockLogger.Object);
+
+        // ACT
+        var result = await service.LeaveSessionAsync(10, "user_tutor_101");
+
+        // ASSERT
+        result.Should().BeTrue();
+        var updatedAttendance = await db.ClassSessionAttendances.FindAsync(1);
+        updatedAttendance.Should().NotBeNull();
+        updatedAttendance!.LeftAtUtc.Should().NotBeNull("Thời gian rời phòng phải được ghi nhận khi người dùng out phòng");
+    }
+
+    [Fact]
+    public async Task EndSession_WhenCalledByTutor_ShouldSetStatusDoneAndCloseActiveAttendances()
+    {
+        // ARRANGE
+        using var db = TestDbContextFactory.CreateInMemoryDbContext();
+        var mockHub = new Moq.Mock<Microsoft.AspNetCore.SignalR.IHubContext<PROJECT_OTSP.Hubs.ConnectionRequestHub>>();
+        var mockClients = new Moq.Mock<Microsoft.AspNetCore.SignalR.IHubClients>();
+        var mockClientProxy = new Moq.Mock<Microsoft.AspNetCore.SignalR.IClientProxy>();
+
+        mockHub.Setup(h => h.Clients).Returns(mockClients.Object);
+        mockClients.Setup(c => c.Users(Moq.It.IsAny<IReadOnlyList<string>>())).Returns(mockClientProxy.Object);
+
+        var mockLogger = new Moq.Mock<Microsoft.Extensions.Logging.ILogger<PROJECT_OTSP.Services.ClassSessionService>>();
+
+        var tutor = new TutorProfile
+        {
+            Id = 202,
+            UserId = "tutor_user_202"
+        };
+        var classroom = new Classroom
+        {
+            Id = 30,
+            TutorId = 202,
+            Tutor = tutor,
+            Status = ClassroomStatus.Active,
+            Name = "Lớp Hóa 11"
+        };
+        var session = new ClassSession
+        {
+            Id = 20,
+            ClassroomId = 30,
+            Classroom = classroom,
+            Status = SessionStatus.InProgress,
+            ScheduledAt = DateTime.UtcNow
+        };
+        var attendance = new ClassSessionAttendance
+        {
+            Id = 2,
+            ClassSessionId = 20,
+            UserId = "student_user_303",
+            JoinedAtUtc = DateTime.UtcNow.AddMinutes(-45),
+            LeftAtUtc = null,
+            JoinCount = 1
+        };
+
+        db.TutorProfiles.Add(tutor);
+        db.Classrooms.Add(classroom);
+        db.ClassSessions.Add(session);
+        db.ClassSessionAttendances.Add(attendance);
+        await db.SaveChangesAsync();
+
+        var service = new PROJECT_OTSP.Services.ClassSessionService(db, mockHub.Object, mockLogger.Object);
+
+        // ACT
+        var result = await service.EndSessionAsync(20, "tutor_user_202");
+
+        // ASSERT
+        result.Success.Should().BeTrue();
+        var updatedSession = await db.ClassSessions.FindAsync(20);
+        updatedSession.Should().NotBeNull();
+        updatedSession!.Status.Should().Be(SessionStatus.Done);
+
+        var updatedAttendance = await db.ClassSessionAttendances.FindAsync(2);
+        updatedAttendance.Should().NotBeNull();
+        updatedAttendance!.LeftAtUtc.Should().NotBeNull("Tất cả thành viên đang học phải được đóng thời gian rời phòng khi lớp kết thúc");
+    }
 }
 

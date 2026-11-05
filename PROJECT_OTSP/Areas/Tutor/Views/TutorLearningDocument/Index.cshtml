@@ -1,13 +1,17 @@
 @model IReadOnlyList<PROJECT_OTSP.Dtos.TutorLearningDocumentDto>
+@using static PROJECT_OTSP.Models.Enums
 
 @{
     var teachingPairs = ViewBag.TeachingPairs as IReadOnlyList<PROJECT_OTSP.Dtos.TutorSubjectDto>
         ?? Array.Empty<PROJECT_OTSP.Dtos.TutorSubjectDto>();
-    var currentPage = (int)ViewBag.CurrentPage;
-    var totalPages = (int)ViewBag.TotalPages;
-    var totalItems = (int)ViewBag.TotalItems;
+    var activeClassrooms = ViewBag.ActiveClassrooms as IReadOnlyList<PROJECT_OTSP.Dtos.TutorActiveClassroomOptionDto>
+        ?? Array.Empty<PROJECT_OTSP.Dtos.TutorActiveClassroomOptionDto>();
+    var currentPage = (int)(ViewBag.CurrentPage ?? 1);
+    var totalPages = (int)(ViewBag.TotalPages ?? 1);
+    var totalItems = (int)(ViewBag.TotalItems ?? 0);
     ViewData["Title"] = "Tài liệu ôn tập";
 }
+
 <style>
     .h1_left_le.mb-1 {
         margin-bottom: .25rem !important;
@@ -18,124 +22,497 @@
         margin-left: 20px;
     }
 
+    /* Viền thôi, không dùng nền màu AI / pastel */
+    .alert-outline-success {
+        background-color: #ffffff !important;
+        border: 1px solid #198754 !important;
+        color: #198754 !important;
+    }
+
+    .alert-outline-warning {
+        background-color: #ffffff !important;
+        border: 1px solid #ffc107 !important;
+        color: #997404 !important;
+    }
+
+    .alert-outline-info {
+        background-color: #ffffff !important;
+        border: 1px solid #0dcaf0 !important;
+        color: #087990 !important;
+    }
+
+    /* Phạm vi chia sẻ: Nền trắng, chỉ đổi màu viền khi chọn */
+    .scope-card {
+        cursor: pointer;
+        background-color: #ffffff !important;
+        border: 1px solid #dee2e6;
+        border-radius: 6px;
+        padding: 12px 16px;
+        transition: border-color 0.15s ease-in-out;
+    }
+
+    .scope-card:hover {
+        border-color: #adb5bd;
+    }
+
+    .scope-radio:checked + .scope-card {
+        border: 2px solid #198754 !important;
+        background-color: #ffffff !important;
+    }
+
+    /* Bảng danh sách tài liệu */
+    .table-docs th {
+        font-weight: 600;
+        font-size: 0.88rem;
+        background-color: #ffffff;
+        color: #212529;
+        border-bottom: 2px solid #dee2e6;
+        vertical-align: middle;
+    }
+
+    .table-docs td {
+        vertical-align: middle;
+        font-size: 0.9rem;
+    }
 </style>
+
 <div class="container-fluid py-4">
+    <!-- Header -->
     <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
         <div>
             <h1 class="h3 mb-1 h1_left_le">Tài liệu ôn tập</h1>
-            <p class="textleft_le text-body-secondary mb-0">Quản lý tài liệu theo môn học và cấp học bạn đang dạy.</p>
+            <p class="textleft_le text-body-secondary mb-0">Quản lý và phân phối tài liệu ôn tập theo lớp học hoặc công khai cho cộng đồng.</p>
         </div>
-        <span class="badge text-bg-success rounded-pill px-3 py-2">@totalItems tài liệu</span>
+        <div>
+            <span class="badge border border-success text-success bg-transparent rounded-pill px-3 py-2 fs-6">
+                <i class="bi bi-folder2-open me-1"></i>@totalItems tài liệu
+            </span>
+        </div>
     </div>
 
+    <!-- Thông báo (chỉ viền, nền trắng, không dùng nền màu AI) -->
     @if (TempData["Success"] is string successMessage)
     {
-        <div class="alert alert-success alert-dismissible fade show" role="alert">
-            @successMessage
+        <div class="alert alert-outline-success alert-dismissible fade show shadow-sm" role="alert">
+            <i class="bi bi-check-circle me-2"></i>@successMessage
             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Đóng"></button>
         </div>
     }
     @if (TempData["Error"] is string errorMessage)
     {
-        <div class="alert alert-warning alert-dismissible fade show" role="alert">
-            @errorMessage
+        <div class="alert alert-outline-warning alert-dismissible fade show shadow-sm" role="alert">
+            <i class="bi bi-exclamation-triangle me-2"></i>@errorMessage
             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Đóng"></button>
         </div>
     }
 
     @if (teachingPairs.Count == 0)
     {
-        <div class="alert alert-info d-flex flex-wrap align-items-center justify-content-between gap-2">
-            <span>Thêm cặp môn học và cấp học trước để phân loại tài liệu.</span>
-            <a asp-area="Tutor" asp-controller="TutorSubject" asp-action="Index" class="btn btn-success btn-sm">Quản lý môn và cấp học</a>
+        <div class="alert alert-outline-info d-flex flex-wrap align-items-center justify-content-between gap-2 shadow-sm">
+            <span><i class="bi bi-info-circle me-1"></i>Bạn cần thêm cặp môn học và cấp học trước để bắt đầu tải lên tài liệu.</span>
+            <a asp-area="Tutor" asp-controller="TutorSubject" asp-action="Index" class="btn btn-outline-success btn-sm">Quản lý môn và cấp học</a>
         </div>
     }
     else
     {
-        <section class="card border-0 shadow-sm mb-4">
-            <div class="card-body">
-                <h2 class="h5 mb-3">Tải tài liệu lên</h2>
+        <!-- Form Tải tài liệu lên -->
+        <section class="card border mb-4 shadow-sm bg-white">
+            <div class="card-header bg-white border-bottom py-3">
+                <h2 class="h5 mb-0 fw-semibold text-dark">
+                    <i class="bi bi-cloud-arrow-up text-success me-2"></i>Tải tài liệu lên
+                </h2>
+            </div>
+            <div class="card-body p-4">
                 <form asp-area="Tutor" asp-controller="TutorLearningDocument" asp-action="Upload" method="post" enctype="multipart/form-data" class="row g-3">
-                    <div class="col-12 col-lg-4">
-                        <label for="title" class="form-label">Tên tài liệu</label>
-                        <input id="title" name="title" class="form-control" maxlength="255" required />
+                    
+                    <!-- 1. Phạm vi chia sẻ (Nền trắng, chỉ viền xanh khi chọn, không bubble màu) -->
+                    <div class="col-12">
+                        <label class="form-label fw-bold mb-2">
+                            Phạm vi chia sẻ <span class="text-danger">*</span>
+                        </label>
+                        <div class="row g-3">
+                            <!-- Option 1: Theo lớp học -->
+                            <div class="col-12 col-md-6">
+                                <input type="radio" class="btn-check scope-radio" name="scope" id="scopeClassroom" value="@DocumentScope.Classroom" checked />
+                                <label class="scope-card d-flex align-items-start gap-3 w-100" for="scopeClassroom">
+                                    <div class="pt-1">
+                                        <i class="bi bi-mortarboard fs-4 text-success"></i>
+                                    </div>
+                                    <div>
+                                        <div class="fw-bold text-dark">Theo lớp học (1vs1 hoặc Nhóm)</div>
+                                        <div class="small text-muted">Dành riêng cho lớp học bạn đang dạy có lịch học. Tài liệu tự động hiển thị cho học viên trong lớp.</div>
+                                    </div>
+                                </label>
+                            </div>
+
+                            <!-- Option 2: Công khai -->
+                            <div class="col-12 col-md-6">
+                                <input type="radio" class="btn-check scope-radio" name="scope" id="scopePublic" value="@DocumentScope.Public" />
+                                <label class="scope-card d-flex align-items-start gap-3 w-100" for="scopePublic">
+                                    <div class="pt-1">
+                                        <i class="bi bi-globe fs-4 text-primary"></i>
+                                    </div>
+                                    <div>
+                                        <div class="fw-bold text-dark">Công khai (Cộng đồng)</div>
+                                        <div class="small text-muted">Chia sẻ cho cộng đồng. Tài liệu ở trạng thái <strong>Chờ duyệt</strong> và cần gia sư duyệt để hiển thị.</div>
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
                     </div>
-                    <div class="col-12 col-lg-4">
-                        <label for="tutorSubjectId" class="form-label">Môn và cấp học</label>
+
+                    <!-- Ghi chú khi chọn công khai (viền mỏng, không nền màu) -->
+                    <div class="col-12" id="publicNoticeGroup" style="display: none;">
+                        <div class="border rounded p-3 bg-white" style="border-left: 3px solid #0dcaf0 !important;">
+                            <div class="small text-dark">
+                                <i class="bi bi-info-circle text-info me-1"></i>
+                                <strong>Lưu ý:</strong> Tài liệu công khai ban đầu sẽ ở trạng thái <strong>Chờ duyệt</strong>. Sau khi tải lên, bạn có thể kiểm tra lại và bấm nút <strong>"Duyệt ngay"</strong> ở bảng danh sách để xuất bản.
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 2. Dropdown chọn Lớp học (hiện khi Scope == Classroom) -->
+                    <div class="col-12 col-lg-6" id="classroomSelectGroup">
+                        <label for="classroomId" class="form-label fw-bold">
+                            Chọn lớp học đang dạy <span class="text-danger">*</span>
+                        </label>
+                        <select id="classroomId" name="classroomId" class="form-select" required>
+                            @if (activeClassrooms.Count == 0)
+                            {
+                                <option value="" disabled selected>-- Hiện bạn chưa có lớp học nào đang hoạt động --</option>
+                            }
+                            else
+                            {
+                                <option value="" disabled selected>-- Chọn lớp học áp dụng tài liệu --</option>
+                                @foreach (var room in activeClassrooms)
+                                {
+                                    var typeLabel = room.Type == ClassroomType.OneToOne ? "1 kèm 1" : $"Lớp nhóm ({room.CurrentStudents}/{room.MaxStudents} HV)";
+                                    var schedInfo = !string.IsNullOrWhiteSpace(room.ScheduleSummary) ? $" · Lịch: {room.ScheduleSummary}" : "";
+                                    <option value="@room.Id" 
+                                            data-subject-id="@room.SubjectId" 
+                                            data-grade-id="@room.GradeLevelId"
+                                            data-subject-name="@room.SubjectName"
+                                            data-grade-name="@room.GradeLevelName">
+                                        [@typeLabel] @room.Name (@room.SubjectName · @room.GradeLevelName@schedInfo)
+                                    </option>
+                                }
+                            }
+                        </select>
+                        <div class="form-text text-muted">
+                            Hệ thống sẽ tự động đồng bộ Môn & Cấp học theo lớp học được chọn.
+                        </div>
+                    </div>
+
+                    <!-- 3. Môn và cấp học -->
+                    <div class="col-12 col-lg-6" id="subjectSelectGroup">
+                        <label for="tutorSubjectId" class="form-label fw-bold">
+                            Môn và cấp học <span class="text-danger">*</span>
+                        </label>
                         <select id="tutorSubjectId" name="tutorSubjectId" class="form-select" required>
                             @foreach (var pair in teachingPairs)
                             {
-                                <option value="@pair.Id">@pair.SubjectName · @pair.GradeLevelName</option>
+                                <option value="@pair.Id" data-subject-id="@pair.SubjectId" data-grade-id="@pair.GradeLevelId">
+                                    @pair.SubjectName · @pair.GradeLevelName
+                                </option>
                             }
                         </select>
                     </div>
-                    <div class="col-12 col-lg-4">
-                        <label for="file" class="form-label">Tệp (PDF, Word, PowerPoint, Excel; tối đa 20 MB)</label>
+
+                    <!-- 4. Tên tài liệu -->
+                    <div class="col-12 col-lg-6">
+                        <label for="title" class="form-label fw-bold">
+                            Tên tài liệu <span class="text-danger">*</span>
+                        </label>
+                        <input id="title" name="title" class="form-control" maxlength="255" placeholder="Ví dụ: Đề cương ôn tập Toán giữa kỳ 1, Bài tập thì hiện tại hoàn thành..." required />
+                    </div>
+
+                    <!-- 5. Tệp đính kèm -->
+                    <div class="col-12 col-lg-6">
+                        <label for="file" class="form-label fw-bold">
+                            Tệp tài liệu <span class="text-danger">*</span> <span class="text-muted fw-normal">(Tối đa 20 MB)</span>
+                        </label>
                         <input id="file" name="file" type="file" class="form-control" accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx" required />
+                        <div class="form-text text-muted">Định dạng hỗ trợ: PDF, Word (.doc, .docx), PowerPoint (.ppt, .pptx), Excel (.xls, .xlsx).</div>
                     </div>
+
+                    <!-- 6. Mô tả (không bắt buộc) -->
                     <div class="col-12">
-                        <label for="description" class="form-label">Mô tả <span class="text-body-secondary fw-normal">(không bắt buộc)</span></label>
-                        <textarea id="description" name="description" class="form-control" rows="2" maxlength="2000"></textarea>
+                        <label for="description" class="form-label fw-bold">
+                            Mô tả ghi chú <span class="text-body-secondary fw-normal">(không bắt buộc)</span>
+                        </label>
+                        <textarea id="description" name="description" class="form-control" rows="2" maxlength="2000" placeholder="Ghi chú về nội dung tài liệu, dặn dò học viên làm bài..."></textarea>
                     </div>
-                    <div class="col-12 d-flex justify-content-end">
-                        <button type="submit" class="btn btn-success"><i class="bi bi-cloud-arrow-up me-1" aria-hidden="true"></i>Tải lên</button>
+
+                    <!-- 7. Nút Submit -->
+                    <div class="col-12 d-flex justify-content-end pt-2">
+                        <button type="submit" class="btn btn-success px-4 py-2">
+                            <i class="bi bi-cloud-arrow-up me-2" aria-hidden="true"></i>Tải lên tài liệu
+                        </button>
                     </div>
                 </form>
             </div>
         </section>
     }
 
-    <section class="card border-0 shadow-sm">
-        <div class="card-body">
-            <h2 class="h5 mb-3">Tài liệu đã tải lên</h2>
+    <!-- Bảng danh sách tài liệu đã đăng -->
+    <section class="card border shadow-sm bg-white">
+        <div class="card-header bg-white border-bottom py-3 d-flex flex-wrap align-items-center justify-content-between gap-2">
+            <div>
+                <h2 class="h5 mb-0 fw-semibold text-dark">
+                    <i class="bi bi-list-check text-primary me-2"></i>Danh sách tài liệu đã đăng
+                </h2>
+                <div class="small text-muted mt-1">Danh sách tài liệu đã tải lên, phạm vi áp dụng và trạng thái duyệt.</div>
+            </div>
+            @if (Model.Count > 0)
+            {
+                <span class="text-muted small">Hiển thị @Model.Count trên tổng số @totalItems tài liệu</span>
+            }
+        </div>
+        <div class="card-body p-0">
             @if (Model.Count == 0)
             {
-                <div class="text-center text-body-secondary py-4">
-                    <i class="bi bi-folder2-open fs-2 d-block mb-2" aria-hidden="true"></i>
-                    Chưa có tài liệu nào.
+                <div class="text-center text-body-secondary py-5">
+                    <i class="bi bi-folder2-open display-4 text-muted mb-3 d-block" aria-hidden="true"></i>
+                    <h5 class="fw-semibold text-secondary">Chưa có tài liệu nào</h5>
+                    <p class="text-muted mb-0">Hãy sử dụng form phía trên để bắt đầu tải tài liệu lên cho lớp học hoặc công khai.</p>
                 </div>
             }
             else
             {
-                <div class="d-flex flex-column gap-3">
-                    @foreach (var document in Model)
-                    {
-                        <article class="border rounded-3 p-3">
-                            <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
-                                <div class="min-w-0">
-                                    <h3 class="h6 mb-1 text-break">@document.Title</h3>
-                                    <div class="small text-body-secondary">@document.SubjectName · @document.GradeLevelName · Tải lên @document.UploadedAt.AddHours(7).ToString("dd/MM/yyyy HH:mm") (GMT+7)</div>
-                                    @if (!string.IsNullOrWhiteSpace(document.Description))
-                                    {
-                                        <p class="mb-0 mt-2 text-body-secondary text-break">@document.Description</p>
-                                    }
-                                </div>
-                                <div class="d-flex flex-wrap gap-2 flex-shrink-0">
-                                    <a asp-area="Tutor" asp-controller="TutorLearningDocument" asp-action="Download" asp-route-id="@document.Id" class="btn btn-outline-success btn-sm">Tải xuống</a>
-                                    <form asp-area="Tutor" asp-controller="TutorLearningDocument" asp-action="Delete" asp-route-id="@document.Id" method="post">
-                                        <button type="submit" class="btn btn-outline-danger btn-sm">Xóa</button>
-                                    </form>
-                                </div>
-                            </div>
-                        </article>
-                    }
+                <div class="table-responsive">
+                    <table class="table table-hover table-docs align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th style="width: 45px;" class="text-center">#</th>
+                                <th style="min-width: 230px;">Tên tài liệu</th>
+                                <th style="min-width: 140px;">Môn - Cấp</th>
+                                <th style="min-width: 120px;">Phạm vi</th>
+                                <th style="min-width: 200px;">Lớp học áp dụng</th>
+                                <th style="min-width: 120px;" class="text-center">Trạng thái</th>
+                                <th style="min-width: 130px;">Ngày tải</th>
+                                <th style="min-width: 170px;" class="text-end pe-3">Thao tác</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @{
+                                var idx = (currentPage - 1) * 8;
+                            }
+                            @foreach (var document in Model)
+                            {
+                                idx++;
+                                var ext = (document.FileExtension ?? "").ToLowerInvariant();
+                                <tr>
+                                    <!-- 1. STT -->
+                                    <td class="text-center text-muted">@idx</td>
+
+                                    <!-- 2. Tên tài liệu & Icon -->
+                                    <td>
+                                        <div class="d-flex align-items-start gap-2">
+                                            <div class="flex-shrink-0 pt-1">
+                                                @if (ext == ".pdf")
+                                                {
+                                                    <i class="bi bi-file-earmark-pdf text-danger fs-5" title="Tài liệu PDF"></i>
+                                                }
+                                                else if (ext == ".doc" || ext == ".docx")
+                                                {
+                                                    <i class="bi bi-file-earmark-word text-primary fs-5" title="Tài liệu Word"></i>
+                                                }
+                                                else if (ext == ".xls" || ext == ".xlsx")
+                                                {
+                                                    <i class="bi bi-file-earmark-excel text-success fs-5" title="Tài liệu Excel"></i>
+                                                }
+                                                else if (ext == ".ppt" || ext == ".pptx")
+                                                {
+                                                    <i class="bi bi-file-earmark-ppt text-warning fs-5" title="Tài liệu PowerPoint"></i>
+                                                }
+                                                else
+                                                {
+                                                    <i class="bi bi-file-earmark-text text-secondary fs-5" title="Tệp đính kèm"></i>
+                                                }
+                                            </div>
+                                            <div class="min-w-0">
+                                                <div class="fw-semibold text-dark text-break">@document.Title</div>
+                                                @if (!string.IsNullOrWhiteSpace(document.Description))
+                                                {
+                                                    <div class="text-muted small text-break" style="font-size: 0.82rem;">
+                                                        @document.Description
+                                                    </div>
+                                                }
+                                            </div>
+                                        </div>
+                                    </td>
+
+                                    <!-- 3. Môn - Cấp học -->
+                                    <td class="text-nowrap">
+                                        <span class="text-dark">@document.SubjectName - @document.GradeLevelName</span>
+                                    </td>
+
+                                    <!-- 4. Phạm vi -->
+                                    <td class="text-nowrap">
+                                        @if (document.Scope == DocumentScope.Classroom)
+                                        {
+                                            <span class="badge border border-primary text-primary bg-transparent">
+                                                Theo lớp
+                                            </span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge border border-secondary text-secondary bg-transparent">
+                                                Công khai
+                                            </span>
+                                        }
+                                    </td>
+
+                                    <!-- 5. Tên lớp học áp dụng ("tên của nó") -->
+                                    <td>
+                                        @if (document.Scope == DocumentScope.Classroom)
+                                        {
+                                            <div class="d-flex align-items-center gap-1 flex-wrap">
+                                                <span class="fw-medium text-dark">@(document.ClassroomName ?? "Lớp đang dạy")</span>
+                                                @if (document.ClassroomType == ClassroomType.OneToOne)
+                                                {
+                                                    <span class="badge border border-info text-info bg-transparent" style="font-size: 0.72rem;">1-1</span>
+                                                }
+                                                else if (document.ClassroomType == ClassroomType.Group)
+                                                {
+                                                    <span class="badge border border-dark text-dark bg-transparent" style="font-size: 0.72rem;">Nhóm</span>
+                                                }
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted small fst-italic">Tất cả học viên</span>
+                                        }
+                                    </td>
+
+                                    <!-- 6. Trạng thái (chỉ viền, không nền màu AI) -->
+                                    <td class="text-center text-nowrap">
+                                        @if (document.Status == VerificationStatus.Approved)
+                                        {
+                                            <span class="badge border border-success text-success bg-transparent px-2 py-1">
+                                                <i class="bi bi-check2 me-1"></i>Đã duyệt
+                                            </span>
+                                        }
+                                        else if (document.Status == VerificationStatus.Pending)
+                                        {
+                                            <span class="badge border border-warning text-warning bg-transparent px-2 py-1">
+                                                <i class="bi bi-clock me-1"></i>Chờ duyệt
+                                            </span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge border border-danger text-danger bg-transparent px-2 py-1">
+                                                <i class="bi bi-x me-1"></i>Từ chối
+                                            </span>
+                                        }
+                                    </td>
+
+                                    <!-- 7. Ngày tải -->
+                                    <td class="text-muted small text-nowrap">
+                                        <div>@document.UploadedAt.AddHours(7).ToString("dd/MM/yyyy")</div>
+                                        <div style="font-size: 0.8rem;">@document.UploadedAt.AddHours(7).ToString("HH:mm")</div>
+                                    </td>
+
+                                    <!-- 8. Thao tác -->
+                                    <td class="text-end pe-3 text-nowrap">
+                                        <div class="d-inline-flex align-items-center gap-1">
+                                            <!-- Nút Tải xuống -->
+                                            <a asp-area="Tutor" asp-controller="TutorLearningDocument" asp-action="Download" asp-route-id="@document.Id" class="btn btn-outline-primary btn-sm" title="Tải xuống tài liệu">
+                                                <i class="bi bi-download me-1"></i>Tải xuống
+                                            </a>
+
+                                            <!-- Nút Duyệt ngay (nếu đang Chờ duyệt) -->
+                                            @if (document.Status == VerificationStatus.Pending)
+                                            {
+                                                <form asp-area="Tutor" asp-controller="TutorLearningDocument" asp-action="Approve" asp-route-id="@document.Id" method="post" class="d-inline">
+                                                    @Html.AntiForgeryToken()
+                                                    <button type="submit" class="btn btn-outline-success btn-sm" title="Duyệt tài liệu">
+                                                        <i class="bi bi-check2 me-1"></i>Duyệt ngay
+                                                    </button>
+                                                </form>
+                                            }
+
+                                            <!-- Nút Xóa -->
+                                            <form asp-area="Tutor" asp-controller="TutorLearningDocument" asp-action="Delete" asp-route-id="@document.Id" method="post" class="d-inline" onsubmit="return confirm('Bạn có chắc chắn muốn xóa tài liệu này?');">
+                                                @Html.AntiForgeryToken()
+                                                <button type="submit" class="btn btn-outline-danger btn-sm" title="Xóa tài liệu">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
                 </div>
 
-                @if (totalPages > 1)
+                <!-- Phân trang -->
+                @if (ViewBag.Pagination is PROJECT_OTSP.Dtos.PaginationVm pagination)
                 {
-                    <nav class="mt-4" aria-label="Phân trang tài liệu">
-                        <ul class="pagination justify-content-center mb-0">
-                            <li class="page-item @(currentPage <= 1 ? "disabled" : "")">
-                                <a class="page-link" asp-action="Index" asp-route-page="@(currentPage - 1)">Trước</a>
-                            </li>
-                            <li class="page-item disabled"><span class="page-link">@currentPage / @totalPages</span></li>
-                            <li class="page-item @(currentPage >= totalPages ? "disabled" : "")">
-                                <a class="page-link" asp-action="Index" asp-route-page="@(currentPage + 1)">Sau</a>
-                            </li>
-                        </ul>
-                    </nav>
+                    <div class="card-footer bg-white border-top py-3">
+                        @await Html.PartialAsync("_PaginationBar", pagination)
+                    </div>
                 }
             }
         </div>
     </section>
 </div>
+
+@section Scripts {
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const scopeClassroom = document.getElementById("scopeClassroom");
+        const scopePublic = document.getElementById("scopePublic");
+        const classroomGroup = document.getElementById("classroomSelectGroup");
+        const publicNotice = document.getElementById("publicNoticeGroup");
+        const classroomSelect = document.getElementById("classroomId");
+        const subjectSelect = document.getElementById("tutorSubjectId");
+
+        function updateScopeUI() {
+            if (scopePublic && scopePublic.checked) {
+                if (classroomGroup) classroomGroup.style.display = "none";
+                if (publicNotice) publicNotice.style.display = "block";
+                if (classroomSelect) classroomSelect.removeAttribute("required");
+            } else {
+                if (classroomGroup) classroomGroup.style.display = "block";
+                if (publicNotice) publicNotice.style.display = "none";
+                if (classroomSelect) classroomSelect.setAttribute("required", "required");
+            }
+        }
+
+        if (scopeClassroom) scopeClassroom.addEventListener("change", updateScopeUI);
+        if (scopePublic) scopePublic.addEventListener("change", updateScopeUI);
+
+        // Tự động đồng bộ Môn và cấp học khi chọn Lớp học
+        if (classroomSelect && subjectSelect) {
+            classroomSelect.addEventListener("change", function () {
+                const selectedOption = classroomSelect.options[classroomSelect.selectedIndex];
+                if (!selectedOption) return;
+
+                const targetSubjectId = selectedOption.getAttribute("data-subject-id");
+                const targetGradeId = selectedOption.getAttribute("data-grade-id");
+
+                if (targetSubjectId && targetGradeId) {
+                    for (let i = 0; i < subjectSelect.options.length; i++) {
+                        const opt = subjectSelect.options[i];
+                        const sId = opt.getAttribute("data-subject-id");
+                        const gId = opt.getAttribute("data-grade-id");
+                        if (sId === targetSubjectId && gId === targetGradeId) {
+                            subjectSelect.selectedIndex = i;
+                            break;
+                        }
+                    }
+                }
+            });
+
+            // Nếu đã có lớp được chọn sẵn khi tải trang
+            if (classroomSelect.value) {
+                classroomSelect.dispatchEvent(new Event("change"));
+            }
+        }
+
+        updateScopeUI();
+    });
+</script>
+}

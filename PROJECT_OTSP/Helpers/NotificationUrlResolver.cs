@@ -4,6 +4,21 @@ public static class NotificationUrlResolver
 {
     public static string Resolve(string? title, string? content, bool isTutor)
     {
+        // 0. Nếu trong Content có nhúng link đích trực tiếp [url:...]
+        if (!string.IsNullOrWhiteSpace(content) && content.Contains("[url:"))
+        {
+            var start = content.IndexOf("[url:") + 5;
+            var end = content.IndexOf("]", start);
+            if (end > start)
+            {
+                var directUrl = content.Substring(start, end - start).Trim();
+                if (!string.IsNullOrWhiteSpace(directUrl))
+                {
+                    return directUrl;
+                }
+            }
+        }
+
         var t = title?.ToLowerInvariant() ?? "";
         var c = content?.ToLowerInvariant() ?? "";
 
@@ -29,7 +44,15 @@ public static class NotificationUrlResolver
                 : "/Student_Parent/StudentClassroom";
         }
 
-        // 4. Hồ sơ, duyệt hồ sơ
+        // 4. Tài liệu học tập
+        if (t.Contains("tài liệu") || c.Contains("tài liệu"))
+        {
+            return isTutor 
+                ? "/Tutor/TutorLearningDocument" 
+                : "/Student_Parent/StudentLearningDocument";
+        }
+
+        // 5. Hồ sơ, duyệt hồ sơ
         if (t.Contains("hồ sơ") || c.Contains("duyệt"))
         {
             return isTutor 

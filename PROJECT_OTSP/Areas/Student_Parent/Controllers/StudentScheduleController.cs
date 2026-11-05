@@ -48,6 +48,30 @@ public sealed class StudentScheduleController : Controller
         var nowUtc = DateTime.UtcNow;
         var nowVn = nowUtc.AddHours(VietnamUtcOffsetHours);
 
+        // Kiểm tra trạng thái thanh toán của học viên
+        var paidClassrooms = await _db.Payments
+            .AsNoTracking()
+            .Where(p => p.StudentId == studentId && p.Status == PaymentStatus.Success)
+            .Select(p => p.ClassroomId)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+        var paidSet = paidClassrooms.ToHashSet();
+
+        var pendingPayments = await _db.Payments
+            .AsNoTracking()
+            .Where(p => p.StudentId == studentId && p.Status == PaymentStatus.Pending)
+            .Select(p => new PendingPaymentAlertDto
+            {
+                PaymentId = p.Id,
+                ClassroomId = p.ClassroomId,
+                ClassroomName = p.Classroom.Name,
+                SubjectName = p.Classroom.Subject.Name,
+                TutorName = p.Classroom.Tutor.User.FullName,
+                Amount = p.Amount
+            })
+            .ToListAsync(cancellationToken);
+        var pendingMap = pendingPayments.ToDictionary(p => p.ClassroomId);
+
         // 1. Lấy các buổi học thông qua ClassroomStudents
         var regularSessions = await _db.ClassSessions
             .AsNoTracking()
@@ -65,11 +89,12 @@ public sealed class StudentScheduleController : Controller
                 TutorName = session.Classroom.Tutor.User.FullName,
                 TutorAvatarUrl = session.Classroom.Tutor.User.AvatarUrl,
                 ClassroomType = session.Classroom.Type,
+                Fee = session.Classroom.Fee,
                 ScheduledAtUtc = session.ScheduledAt,
                 Status = session.Status,
                 IsTrial = _db.TrialSchedules.Any(t => t.ClassSessionId == session.Id),
                 VideoRoom = session.VideoRoom,
-                DurationHours = session.Classroom.HoursPerSession > 0 ? session.Classroom.HoursPerSession : 2.0,
+                DurationHours = session.Classroom.HoursPerSession >= 10.0 ? session.Classroom.HoursPerSession / 10.0 : (session.Classroom.HoursPerSession > 0 ? session.Classroom.HoursPerSession : 2.0),
                 HasReviewed = session.Reviews.Any(r => r.StudentId == studentId)
             })
             .ToListAsync(cancellationToken);
@@ -94,6 +119,7 @@ public sealed class StudentScheduleController : Controller
                 TutorName = ts.ConnectionRequest.Tutor.User.FullName,
                 TutorAvatarUrl = ts.ConnectionRequest.Tutor.User.AvatarUrl,
                 ClassroomType = ts.ConnectionRequest.PreferredType,
+                Fee = 0m,
                 ScheduledAtUtc = ts.ScheduledAt,
                 Status = ts.ClassSession != null ? ts.ClassSession.Status : SessionStatus.Scheduled,
                 IsTrial = true,
@@ -111,8 +137,11 @@ public sealed class StudentScheduleController : Controller
                 var sVn = s.ScheduledAtUtc.AddHours(VietnamUtcOffsetHours);
                 var endVn = sVn.AddHours(s.DurationHours);
                 var isCompleted = s.Status == SessionStatus.Done || (s.Status != SessionStatus.Cancelled && endVn < nowVn && s.Status != SessionStatus.InProgress);
-                var canJoin = s.Status == SessionStatus.InProgress ||
-                              (s.Status == SessionStatus.Scheduled && nowVn >= sVn.AddMinutes(-45) && nowVn <= endVn);
+
+                var isPaid = s.Fee <= 0 || s.IsTrial || paidSet.Contains(s.ClassroomId);
+                var pendingPaymentId = !isPaid && pendingMap.TryGetValue(s.ClassroomId, out var pp) ? (int?)pp.PaymentId : null;
+                var canJoin = isPaid && (s.Status == SessionStatus.InProgress ||
+                              (s.Status == SessionStatus.Scheduled && nowVn >= sVn.AddMinutes(-45) && nowVn <= endVn));
 
                 return new StudentScheduleItemDto
                 {
@@ -131,7 +160,9 @@ public sealed class StudentScheduleController : Controller
                     VideoRoom = s.VideoRoom,
                     DurationHours = s.DurationHours,
                     CanJoin = canJoin,
-                    HasReviewed = s.HasReviewed
+                    HasReviewed = s.HasReviewed,
+                    HasPaid = isPaid,
+                    PendingPaymentId = pendingPaymentId
                 };
             })
             .ToList();
@@ -146,6 +177,7 @@ public sealed class StudentScheduleController : Controller
             WeekOffset = offset,
             TodayVn = todayVn,
             Sessions = allItems,
+            PendingPayments = pendingPayments,
             UpcomingCount = upcomingCount,
             CompletedCount = completedCount
         };
