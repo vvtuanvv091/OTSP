@@ -6,6 +6,7 @@ public sealed class TutorTeachingScheduleDto
 {
     public int RequestId { get; init; }
     public string StudentName { get; init; } = string.Empty;
+    public string StudentUserId { get; init; } = string.Empty;
     public string SubjectName { get; init; } = string.Empty;
     public string GradeLevelName { get; init; } = string.Empty;
     public ClassroomType PreferredType { get; init; }
@@ -18,4 +19,11 @@ public sealed class TutorTeachingScheduleDto
     public List<DateTime> ProposedTrialSlotsUtc { get; init; } = new();
     public int? ClassroomId { get; init; }
     public string? ClassroomName { get; init; }
+    public decimal HourlyFee { get; init; } = 150000;
+    public decimal MonthlyFee { get; init; }
+    public bool IsOfficialRequest { get; init; }
+    public bool IsOfficialEnrolled { get; init; }
+    public bool HasPaid { get; init; }
+    public int? PendingPaymentId { get; init; }
+    public List<string> WeeklyScheduleSummaries { get; init; } = new();
 }

@@ -300,6 +300,27 @@
         </div>
     }
 
+    @if (Model.PendingPayments is { Count: > 0 })
+    {
+        @foreach (var alert in Model.PendingPayments)
+        {
+            <div class="alert alert-warning border border-warning-subtle shadow-sm p-3 mb-3 rounded-3 d-flex align-items-center justify-content-between flex-wrap gap-2">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="rounded-circle bg-warning-subtle p-2 text-warning d-flex align-items-center justify-content-center" style="width: 44px; height: 44px;">
+                        <i class="bi bi-wallet2 fs-5"></i>
+                    </div>
+                    <div>
+                        <h6 class="mb-1 fw-bold text-dark">Lớp học chính thức đang chờ thanh toán học phí</h6>
+                        <div class="small text-muted">Lớp <strong>@alert.ClassroomName</strong> (@alert.SubjectName - Gia sư @alert.TutorName) · Học phí: <strong class="text-danger">@alert.Amount.ToString("N0") đ / tháng</strong>. Vui lòng thanh toán để mở khóa lịch học &amp; phòng học trực tuyến!</div>
+                    </div>
+                </div>
+                <a asp-area="Student_Parent" asp-controller="StudentParent_Payment" asp-action="Checkout" asp-route-id="@alert.PaymentId" class="btn btn-danger btn-sm text-nowrap">
+                    <i class="bi bi-qr-code me-1"></i>Thanh toán VietQR ngay
+                </a>
+            </div>
+        }
+    }
+
     <!-- Điều hướng tuần -->
     <div class="card border-0 shadow-sm rounded-3 mb-3">
         <div class="card-body p-3">
@@ -422,19 +443,23 @@
                                                 var isInProgress = session.Status == SessionStatus.InProgress;
                                                 var isCancelled = session.Status == SessionStatus.Cancelled;
 
-                                                var statusBadgeClass = isDone ? "text-bg-success" 
+                                                var isUnpaid = !session.HasPaid;
+                                                var statusBadgeClass = isUnpaid ? "text-bg-warning"
+                                                    : isDone ? "text-bg-success" 
                                                     : isInProgress ? "text-bg-primary" 
                                                     : isCancelled ? "text-bg-danger" 
                                                     : session.IsMakeup ? "text-bg-info text-white" 
                                                     : "text-bg-dark";
 
-                                                var statusBadgeLabel = isDone ? "Đã học" 
+                                                var statusBadgeLabel = isUnpaid ? "Chờ thanh toán"
+                                                    : isDone ? "Đã học" 
                                                     : isInProgress ? "Đang diễn ra" 
                                                     : isCancelled ? "Gia sư báo bận" 
                                                     : session.IsMakeup ? "Buổi học bù" 
                                                     : "Sắp tới";
 
-                                                var cardClass = isDone ? "status-done" 
+                                                var cardClass = isUnpaid ? "status-pending-payment border-warning-subtle bg-warning-subtle"
+                                                    : isDone ? "status-done" 
                                                     : isInProgress ? "status-inprogress" 
                                                     : isCancelled ? "status-cancelled border-danger-subtle bg-danger-subtle" 
                                                     : session.IsTrial ? "status-trial" 
@@ -448,7 +473,14 @@
                                                     <div class="session-tutor text-truncate" title="@session.TutorName">@session.TutorName</div>
                                                     <div class="session-sub text-truncate">@session.SubjectName · @(session.ClassroomType == ClassroomType.OneToOne ? "1-1" : "Nhóm")</div>
 
-                                                    @if (session.CanJoin && session.SessionId > 0 && !isCancelled)
+                                                    @if (isUnpaid && session.PendingPaymentId.HasValue)
+                                                    {
+                                                        <a asp-area="Student_Parent" asp-controller="StudentParent_Payment" asp-action="Checkout" asp-route-id="@session.PendingPaymentId"
+                                                           class="btn btn-warning btn-sm w-100 py-0 mt-1 fw-semibold text-dark" style="font-size: 9px; line-height: 1.5;">
+                                                            <i class="bi bi-wallet2 me-1"></i>Thanh toán
+                                                        </a>
+                                                    }
+                                                    else if (session.CanJoin && session.SessionId > 0 && !isCancelled)
                                                     {
                                                         <form asp-area="" asp-controller="ClassSession" asp-action="Join" method="post" class="mt-1">
                                                             @Html.AntiForgeryToken()

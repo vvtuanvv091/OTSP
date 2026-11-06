@@ -1,0 +1,62 @@
+@model PROJECT_OTSP.Dtos.PaginationVm
+
+@if (Model != null && Model.TotalPages > 1)
+{
+    var visiblePages = Model.GetVisiblePages();
+    <nav aria-label="Phân trang dữ liệu" class="my-4">
+        <ul class="pagination-modern d-flex align-items-center justify-content-center flex-wrap gap-1 p-0 mb-0 list-unstyled">
+            <!-- Nút Trước -->
+            <li>
+                @if (Model.CurrentPage > 1)
+                {
+                    <a href="@Model.GetPageUrl(Model.CurrentPage - 1)" class="page-link-btn" aria-label="Trang trước">
+                        &lsaquo; Trước
+                    </a>
+                }
+                else
+                {
+                    <span class="page-link-btn disabled" aria-disabled="true">&lsaquo; Trước</span>
+                }
+            </li>
+
+            <!-- Các số trang -->
+            @foreach (var p in visiblePages)
+            {
+                if (p.HasValue)
+                {
+                    <li>
+                        @if (p.Value == Model.CurrentPage)
+                        {
+                            <span class="page-link-btn active" aria-current="page">@p.Value</span>
+                        }
+                        else
+                        {
+                            <a href="@Model.GetPageUrl(p.Value)" class="page-link-btn">@p.Value</a>
+                        }
+                    </li>
+                }
+                else
+                {
+                    <li>
+                        <span class="page-ellipsis px-1">...</span>
+                    </li>
+                }
+            }
+
+            <!-- Nút Sau -->
+            <li>
+                @if (Model.CurrentPage < Model.TotalPages)
+                {
+                    <a href="@Model.GetPageUrl(Model.CurrentPage + 1)" class="page-link-btn" aria-label="Trang sau">
+                        Sau &rsaquo;
+                    </a>
+                }
+                else
+                {
+                    <span class="page-link-btn disabled" aria-disabled="true">Sau &rsaquo;</span>
+                }
+            </li>
+        </ul>
+    </nav>
+}
+

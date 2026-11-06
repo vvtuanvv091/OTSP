@@ -145,7 +145,7 @@
             : 'Chưa có đánh giá';
         const format = FORMAT_LABEL[enumName(t.teachingFormat, FORMAT_NAMES)] ?? '';
         const avatar = t.avatarUrl
-            ? `<img src="${esc(t.avatarUrl)}" class="otsp-avatar" width="56" height="56" alt="${esc(t.fullName)}" loading="lazy">`
+            ? `<img src="${esc(t.avatarUrl)}" class="otsp-avatar" width="56" height="56" alt="${esc(t.fullName)}" loading="lazy" decoding="async">`
             : `<div class="otsp-avatar" aria-hidden="true">${esc(t.initials)}</div>`;
         const qualification = t.verifiedQualificationCount > 0
             ? `<span class="otsp-tag otsp-tag-qual"><i class="bi bi-patch-check-fill me-1"></i>${t.verifiedQualificationCount} bằng cấp</span>`

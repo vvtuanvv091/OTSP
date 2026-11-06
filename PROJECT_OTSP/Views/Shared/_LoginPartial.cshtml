@@ -4,309 +4,277 @@
     var isVietnamese = System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == "vi";
     var isSignedIn = User.Identity?.IsAuthenticated == true;
     var fallbackName = User.Identity?.Name ?? "";
+    var roleLabel = User.IsInRole("Admin") ? "Quản trị viên" : (User.IsInRole("Tutor") ? "Gia sư" : "Học viên");
     var summaryUrl = Url.Action("Summary", "Header", new { area = "" }) ?? "/Header/Summary";
     var notificationsUrl = Url.Action("Index", "Notifications", new { area = "" }) ?? "/Notifications";
     var logoutReturnUrl = Url.Action("Index", "Home", new { area = "" });
+    var returnUrl = Context.Request.Path + Context.Request.QueryString;
+    var currentTheme = Context.Request.Cookies["otsp-theme"] == "dark" ? "dark" : "light";
+
+    string profileUrl = "/Home/MyAccount";
+    if (User.IsInRole("Tutor"))
+    {
+        profileUrl = Url.Action("Index", "TutorProfile", new { area = "Tutor" }) ?? "/Tutor/TutorProfile";
+    }
+    else if (User.IsInRole("Student_Parent"))
+    {
+        profileUrl = Url.Action("Index", "Student_Parent_Profile", new { area = "Student_Parent" }) ?? "/Student_Parent/Student_Parent_Profile";
+    }
+    else if (User.IsInRole("Admin"))
+    {
+        profileUrl = "/Admin/TutorApprovals";
+    }
 }
 
 <style>
-/* Notification & Account Tools scoped styles */
+/* ==================== USER PILL TRIGGER ==================== */
 .header-account-tools {
     display: inline-flex;
     align-items: center;
-    gap: 12px;
-}
-.header-notifications {
     position: relative;
 }
-.header-circle-btn,
-.header-notification-trigger {
-    width: 36px !important;
-    height: 36px !important;
-    min-width: 36px !important;
-    min-height: 36px !important;
-    max-width: 36px !important;
-    max-height: 36px !important;
+
+.header-user-pill-btn {
+    background: var(--bs-card-bg, #ffffff) !important;
+    border: 1.5px solid #0f172a !important;
+    border-radius: 9999px !important;
+    padding: 3px 14px 3px 4px !important;
+    color: var(--bs-body-color, #0f172a) !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    position: relative !important;
+    cursor: pointer !important;
+    text-decoration: none !important;
+    transition: all 0.15s ease-in-out !important;
+    max-width: 220px !important;
+    user-select: none !important;
+    line-height: 1 !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+}
+
+[data-bs-theme="dark"] .header-user-pill-btn {
+    background: #1e293b !important;
+    border-color: #64748b !important;
+    color: #f8fafc !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25) !important;
+}
+
+.header-user-pill-btn:hover,
+.header-user-pill-btn[aria-expanded="true"] {
+    border-color: #dc2626 !important;
+    box-shadow: 0 2px 10px rgba(220, 38, 38, 0.18) !important;
+}
+
+.user-avatar-circle {
+    width: 32px !important;
+    height: 32px !important;
+    min-width: 32px !important;
     border-radius: 50% !important;
-    border: 1px solid #e2e8f0 !important;
-    background: #ffffff !important;
+    background: #e0e7ff !important;
+    color: #3730a3 !important;
+    font-weight: 700 !important;
+    font-size: 14px !important;
     display: inline-flex !important;
     align-items: center !important;
     justify-content: center !important;
-    position: relative !important;
-    color: #475569 !important;
-    font-size: 16px !important;
-    cursor: pointer !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    line-height: 1 !important;
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04) !important;
-}
-.header-circle-btn:hover,
-.header-circle-btn[aria-expanded="true"],
-.header-notification-trigger:hover,
-.header-notification-trigger[aria-expanded="true"] {
-    background-color: #fff5f5 !important;
-    border-color: #dc3545 !important;
-    color: #dc3545 !important;
-    box-shadow: 0 2px 8px rgba(220, 53, 69, 0.15) !important;
-    transform: translateY(-1px);
-}
-.header-circle-btn:active,
-.header-notification-trigger:active {
-    transform: translateY(0);
-}
-[data-bs-theme="dark"] .header-circle-btn,
-[data-bs-theme="dark"] .header-notification-trigger {
-    background: #1e293b !important;
-    border-color: #334155 !important;
-    color: #cbd5e1 !important;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2) !important;
-}
-[data-bs-theme="dark"] .header-circle-btn:hover,
-[data-bs-theme="dark"] .header-circle-btn[aria-expanded="true"],
-[data-bs-theme="dark"] .header-notification-trigger:hover,
-[data-bs-theme="dark"] .header-notification-trigger[aria-expanded="true"] {
-    border-color: #ef4444 !important;
-    color: #ef4444 !important;
-    background-color: rgba(239, 68, 68, 0.15) !important;
-}
-.header-mark-read {
-    background: transparent !important;
-    border: none !important;
-    color: #4f46e5 !important;
-    font-size: 13px !important;
-    font-weight: 500 !important;
-    cursor: pointer !important;
-    padding: 0 !important;
-    text-decoration: none !important;
-    transition: opacity 0.15s ease !important;
-}
-.header-mark-read:hover {
-    color: #4338ca !important;
-    opacity: 0.85;
-    text-decoration: underline !important;
-}
-[data-bs-theme="dark"] .header-mark-read {
-    color: #818cf8 !important;
-}
-[data-bs-theme="dark"] .header-mark-read:hover {
-    color: #a5b4fc !important;
-}
-.header-notification-count {
-    position: absolute;
-    top: -4px;
-    right: -4px;
-    background: #dc3545;
-    color: #ffffff;
-    font-size: 11px;
-    font-weight: 700;
-    min-width: 18px;
-    height: 18px;
-    border-radius: 9px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0 4px;
-    border: 2px solid #ffffff;
-    line-height: 1;
-}
-[data-bs-theme="dark"] .header-notification-count {
-    border-color: #1e293b;
-}
-.header-notification-menu {
-    width: min(380px, calc(100vw - 24px)) !important;
-    max-width: 400px;
-    padding: 0 !important;
-    border: 1px solid #e2e8f0 !important;
-    border-radius: 14px !important;
-    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.12) !important;
-    background: #ffffff !important;
+    margin-right: 8px !important;
     overflow: hidden !important;
 }
-[data-bs-theme="dark"] .header-notification-menu {
-    background: #1e293b !important;
-    border-color: #334155 !important;
-    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35) !important;
+
+[data-bs-theme="dark"] .user-avatar-circle {
+    background: #334155 !important;
+    color: #93c5fd !important;
 }
-.header-dropdown-heading {
-    padding: 13px 18px;
-    border-bottom: 1px solid #f1f5f9;
+
+.user-avatar-img {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
+}
+
+.header-user-name-text {
+    font-size: 14px !important;
+    font-weight: 600 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    max-width: 120px !important;
+}
+
+.header-user-chevron-icon {
+    font-size: 12px !important;
+    transition: transform 0.2s ease !important;
+    color: var(--bs-secondary-color, #64748b) !important;
+}
+
+.header-user-pill-btn[aria-expanded="true"] .header-user-chevron-icon {
+    transform: rotate(180deg) !important;
+}
+
+/* ==================== NOTIFICATION BADGE ON PILL ==================== */
+.header-pill-notification-badge {
+    position: absolute !important;
+    top: -5px !important;
+    right: -4px !important;
+    min-width: 20px !important;
+    height: 20px !important;
+    border-radius: 10px !important;
+    font-size: 11px !important;
+    font-weight: 700 !important;
     display: flex;
-    justify-content: space-between;
-    align-items: center;
-    background: #ffffff;
-}
-[data-bs-theme="dark"] .header-dropdown-heading {
-    background: #1e293b;
-    border-bottom-color: #334155;
-}
-.header-dropdown-heading strong {
-    font-size: 15px;
-    font-weight: 700;
-    color: #1e293b;
-}
-[data-bs-theme="dark"] .header-dropdown-heading strong {
-    color: #f8fafc;
-}
-.header-notification-list {
-    max-height: 380px;
-    overflow-y: auto;
-    display: flex;
-    flex-direction: column;
-}
-.header-notification-item {
-    display: flex !important;
-    flex-direction: row !important;
-    align-items: flex-start !important;
-    gap: 12px !important;
-    padding: 13px 18px !important;
-    border-bottom: 1px solid #f1f5f9 !important;
-    text-decoration: none !important;
-    color: inherit !important;
-    background: #ffffff !important;
-    transition: background-color 0.15s ease !important;
-    border-left: 3px solid transparent !important;
-}
-.header-notification-item:last-child {
-    border-bottom: none !important;
-}
-.header-notification-item:hover {
-    background-color: #f8fafc !important;
-}
-.header-notification-item.is-unread {
-    background-color: #f8faff !important;
-    border-left: 3px solid #6366f1 !important;
-}
-.header-notification-item.is-unread:hover {
-    background-color: #eff6ff !important;
-}
-[data-bs-theme="dark"] .header-notification-item {
-    background: #1e293b !important;
-    border-bottom-color: #334155 !important;
-}
-[data-bs-theme="dark"] .header-notification-item:hover {
-    background-color: #27354a !important;
-}
-[data-bs-theme="dark"] .header-notification-item.is-unread {
-    background-color: #1e2238 !important;
-    border-left-color: #818cf8 !important;
-}
-[data-bs-theme="dark"] .header-notification-item.is-unread:hover {
-    background-color: #262c4a !important;
-}
-.header-notif-icon-wrap {
-    width: 36px !important;
-    height: 36px !important;
-    min-width: 36px !important;
-    min-height: 36px !important;
-    border-radius: 50% !important;
-    display: inline-flex !important;
     align-items: center !important;
     justify-content: center !important;
+    padding: 0 5px !important;
+    background-color: #dc2626 !important;
+    color: #ffffff !important;
+    border: 2px solid var(--bs-body-bg, #ffffff) !important;
+    box-shadow: 0 2px 6px rgba(220, 38, 38, 0.45) !important;
+    z-index: 10 !important;
+    line-height: 1 !important;
+    animation: pillBadgePulse 2.2s infinite ease-in-out !important;
+}
+
+.header-pill-notification-badge.d-none {
+    display: none !important;
+}
+
+[data-bs-theme="dark"] .header-pill-notification-badge {
+    border-color: #0f172a !important;
+}
+
+@@keyframes pillBadgePulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.08); }
+}
+
+/* ==================== DROPDOWN MENU CARD ==================== */
+.header-consolidated-menu {
+    min-width: 250px !important;
+    max-width: min(300px, calc(100vw - 20px)) !important;
+    border-radius: 16px !important;
+    border: 1px solid var(--bs-border-color, #e2e8f0) !important;
+    box-shadow: 0 14px 40px rgba(0, 0, 0, 0.12) !important;
+    background-color: var(--bs-card-bg, #ffffff) !important;
+    padding: 6px 0 !important;
+    margin-top: 8px !important;
+    z-index: 1060 !important;
+}
+
+[data-bs-theme="dark"] .header-consolidated-menu {
+    background-color: #1e293b !important;
+    border-color: #334155 !important;
+    box-shadow: 0 16px 45px rgba(0, 0, 0, 0.45) !important;
+}
+
+.header-menu-header-box {
+    padding: 10px 18px 8px 18px !important;
+}
+
+.header-menu-header-name {
     font-size: 15px !important;
-    flex-shrink: 0 !important;
-    margin-top: 2px !important;
-    background: #f1f5f9 !important;
-    color: #94a3b8 !important;
-}
-.header-notif-icon-wrap.is-unread,
-.header-notification-item.is-unread .header-notif-icon-wrap {
-    background: #eef2ff !important;
-    color: #4f46e5 !important;
-}
-[data-bs-theme="dark"] .header-notif-icon-wrap {
-    background: #334155 !important;
-    color: #94a3b8 !important;
-}
-[data-bs-theme="dark"] .header-notif-icon-wrap.is-unread,
-[data-bs-theme="dark"] .header-notification-item.is-unread .header-notif-icon-wrap {
-    background: rgba(99, 102, 241, 0.2) !important;
-    color: #a5b4fc !important;
-}
-.header-notification-copy {
-    display: flex !important;
-    flex-direction: column !important;
-    gap: 3px !important;
-    flex: 1 !important;
-    min-width: 0 !important;
-}
-.header-notif-title {
-    font-size: 13.5px !important;
-    font-weight: 600 !important;
-    color: #1e293b !important;
-    line-height: 1.35 !important;
-    display: block !important;
-    margin-bottom: 2px !important;
-}
-.header-notification-item.is-unread .header-notif-title {
     font-weight: 700 !important;
-    color: #0f172a !important;
+    color: var(--bs-body-color, #0f172a) !important;
+    line-height: 1.3 !important;
 }
-[data-bs-theme="dark"] .header-notif-title {
+
+.header-menu-header-role {
+    font-size: 12.5px !important;
+    color: var(--bs-secondary-color, #64748b) !important;
+    margin-top: 2px !important;
+}
+
+.header-consolidated-menu .dropdown-item {
+    padding: 9px 18px !important;
+    font-size: 14px !important;
+    font-weight: 500 !important;
+    color: var(--bs-body-color, #1e293b) !important;
+    transition: background-color 0.15s ease !important;
+}
+
+[data-bs-theme="dark"] .header-consolidated-menu .dropdown-item {
     color: #e2e8f0 !important;
 }
-[data-bs-theme="dark"] .header-notification-item.is-unread .header-notif-title {
+
+.header-consolidated-menu .dropdown-item:hover {
+    background-color: var(--bs-tertiary-bg, #f1f5f9) !important;
+    color: var(--bs-body-color, #0f172a) !important;
+}
+
+[data-bs-theme="dark"] .header-consolidated-menu .dropdown-item:hover {
+    background-color: #334155 !important;
     color: #ffffff !important;
 }
-.header-notif-body {
-    font-size: 12.5px !important;
-    font-weight: 400 !important;
-    color: #475569 !important;
-    line-height: 1.45 !important;
-    display: block !important;
-    word-break: break-word !important;
+
+.header-consolidated-menu .dropdown-divider {
+    margin: 4px 0 !important;
+    border-top-color: var(--bs-border-color, #f1f5f9) !important;
 }
-[data-bs-theme="dark"] .header-notif-body {
-    color: #94a3b8 !important;
-}
-.header-notif-time {
-    font-size: 11.5px !important;
-    color: #94a3b8 !important;
-    margin-top: 3px !important;
-    display: flex !important;
-    align-items: center !important;
-    gap: 4px !important;
-}
-[data-bs-theme="dark"] .header-notif-time {
-    color: #64748b !important;
-}
-.header-notifications-empty {
-    padding: 36px 16px !important;
-    text-align: center !important;
-    color: #94a3b8 !important;
-    font-size: 14px !important;
-    margin: 0 !important;
-}
-[data-bs-theme="dark"] .header-notifications-empty {
-    color: #64748b !important;
-}
-.header-notifications-all {
-    display: block !important;
-    text-align: center !important;
-    padding: 12px 16px !important;
-    font-size: 13.5px !important;
-    font-weight: 500 !important;
-    color: #4f46e5 !important;
-    text-decoration: none !important;
-    background-color: #ffffff !important;
-    border-top: 1px solid #f1f5f9 !important;
-    transition: all 0.15s ease !important;
-}
-.header-notifications-all:hover {
-    background-color: #f8fafc !important;
-    color: #4338ca !important;
-    text-decoration: none !important;
-}
-[data-bs-theme="dark"] .header-notifications-all {
-    background-color: #1e293b !important;
+
+[data-bs-theme="dark"] .header-consolidated-menu .dropdown-divider {
     border-top-color: #334155 !important;
-    color: #818cf8 !important;
 }
-[data-bs-theme="dark"] .header-notifications-all:hover {
-    background-color: #27354a !important;
-    color: #a5b4fc !important;
+
+.header-menu-item-icon {
+    font-size: 17px !important;
+    width: 22px !important;
+    display: inline-flex !important;
+    justify-content: center !important;
+    color: var(--bs-secondary-color, #64748b) !important;
+    flex-shrink: 0 !important;
+}
+
+/* Switch & Lang Buttons in menu */
+.header-menu-switch {
+    cursor: pointer !important;
+    width: 38px !important;
+    height: 20px !important;
+}
+
+.header-menu-lang-btn {
+    font-size: 11px !important;
+    font-weight: 600 !important;
+    padding: 2px 8px !important;
+    border-radius: 4px !important;
+    min-width: 30px !important;
+    line-height: 1.4 !important;
+}
+
+/* ==================== MOBILE OPTIMIZATION (< 576px) ==================== */
+@@media (max-width: 575.98px) {
+    .header-user-pill-btn {
+        max-width: 160px !important;
+        padding: 2px 10px 2px 3px !important;
+    }
+
+    .user-avatar-circle {
+        width: 28px !important;
+        height: 28px !important;
+        min-width: 28px !important;
+        font-size: 13px !important;
+        margin-right: 6px !important;
+    }
+
+    .header-user-name-text {
+        max-width: 80px !important;
+        font-size: 13px !important;
+    }
+
+    .header-consolidated-menu {
+        position: absolute !important;
+        top: calc(100% + 8px) !important;
+        right: 0 !important;
+        bottom: auto !important;
+        left: auto !important;
+        width: min(290px, calc(100vw - 16px)) !important;
+        max-width: 290px !important;
+        max-height: calc(100vh - 100px) !important;
+        max-height: calc(100dvh - 100px) !important;
+        overflow-y: auto !important;
+        overscroll-behavior: contain;
+        transform: none !important;
+        margin-top: 0 !important;
+        border-radius: 14px !important;
+    }
 }
 </style>
 
@@ -318,86 +286,113 @@
          data-notifications-url="@notificationsUrl"
          data-vi="@(isVietnamese ? "1" : "0")">
 
-        <!-- Notification Bell Dropdown -->
-        <div class="dropdown header-notifications">
-            <button type="button" class="header-circle-btn header-notification-trigger" data-bs-toggle="dropdown" aria-expanded="false"
-                    aria-label="@(isVietnamese ? "Thông báo" : "Notifications")">
-                <i class="bi bi-bell" aria-hidden="true"></i>
-                <span class="header-notification-count d-none" data-role="unread"></span>
-            </button>
+        <!-- Unified User Pill Trigger & Consolidated Dropdown -->
+        <div class="dropdown header-user-dropdown position-relative">
+            <button type="button" class="header-user-pill-btn"
+                    id="headerUserConsolidatedBtn"
+                    data-bs-toggle="dropdown" data-bs-display="static" aria-expanded="false"
+                    aria-label="@fallbackName - Menu tùy chọn">
 
-            <div class="dropdown-menu dropdown-menu-end header-notification-menu shadow">
-                <div class="header-dropdown-heading">
-                    <strong>@(isVietnamese ? "Thông báo" : "Notifications")</strong>
-                    <button type="button" class="header-mark-read" data-role="mark-read">
-                        @(isVietnamese ? "Đánh dấu đã đọc hết" : "Mark all as read")
-                    </button>
-                </div>
-
-                <p class="header-notifications-empty" data-role="empty">
-                    @(isVietnamese ? "Chưa có thông báo nào." : "No notifications yet.")
-                </p>
-                <div class="header-notification-list" data-role="list"></div>
-
-                <a class="header-notifications-all" asp-area="" asp-controller="Notifications" asp-action="Index">
-                    @(isVietnamese ? "Xem tất cả thông báo" : "See all notifications")
-                </a>
-            </div>
-        </div>
-
-        <!-- User Profile Dropdown -->
-        <div class="dropdown header-user-dropdown">
-            <button type="button" class="header-user-trigger" data-bs-toggle="dropdown" aria-expanded="false">
-                <span class="header-user-avatar header-user-avatar-fallback" data-role="avatar-fallback">
-                    <i class="bi bi-person-fill" aria-hidden="true"></i>
+                <!-- Avatar Circle (Image or Initial) -->
+                <span class="user-avatar-circle" data-role="avatar-circle">
+                    <img class="user-avatar-img d-none" data-role="avatar" alt="Avatar" referrerpolicy="no-referrer" />
+                    <span class="user-avatar-initial" data-role="avatar-initial">@(string.IsNullOrWhiteSpace(fallbackName) ? "U" : fallbackName.Substring(0, 1).ToUpper())</span>
                 </span>
-                <img class="header-user-avatar d-none" data-role="avatar" alt="Avatar" referrerpolicy="no-referrer" />
-                <span class="header-user-name" data-role="name">@fallbackName</span>
-                <i class="bi bi-chevron-down header-user-chevron ms-1" aria-hidden="true"></i>
+
+                <!-- User Name -->
+                <span class="header-user-name-text" data-role="name">@fallbackName</span>
+
+                <!-- Chevron Icon -->
+                <i class="bi bi-chevron-down ms-1 header-user-chevron-icon" aria-hidden="true"></i>
+
+                <!-- Live Notification Badge on top of Name/Avatar -->
+                <span class="header-pill-notification-badge d-none" data-role="total-unread-badge">0</span>
             </button>
 
-            <div class="dropdown-menu dropdown-menu-end header-user-menu shadow-lg">
-                <div class="header-user-menu-heading">
-                    <strong data-role="menu-name">@fallbackName</strong>
-                    <small data-role="menu-email" class="text-truncate"></small>
+            <!-- Consolidated Dropdown Menu Card -->
+            <div class="dropdown-menu dropdown-menu-end shadow header-consolidated-menu" aria-labelledby="headerUserConsolidatedBtn">
+                <!-- 1. Header: Full Name & Role -->
+                <div class="header-menu-header-box">
+                    <div class="header-menu-header-name text-truncate" data-role="menu-name">@fallbackName</div>
+                    <div class="header-menu-header-role" data-role="menu-role">@roleLabel</div>
                 </div>
 
-                <a class="dropdown-item" asp-area="" asp-controller="Home" asp-action="MyAccount">
-                    <i class="bi bi-speedometer2" aria-hidden="true"></i>@(isVietnamese ? "Bàn làm việc của tôi" : "My Dashboard")
+                <div class="dropdown-divider"></div>
+
+                <!-- 2. Hồ sơ -->
+                <a class="dropdown-item d-flex align-items-center gap-3" href="@profileUrl">
+                    <i class="bi bi-person header-menu-item-icon" aria-hidden="true"></i>
+                    <span>@(isVietnamese ? "Hồ sơ" : "Profile")</span>
                 </a>
 
-                @if (User.IsInRole("Admin"))
-                {
-                    <a class="dropdown-item" asp-area="Admin" asp-controller="TutorApprovals" asp-action="Index">
-                        <i class="bi bi-person-check" aria-hidden="true"></i>@(isVietnamese ? "Duyệt hồ sơ gia sư" : "Review tutor profiles")
-                    </a>
-                }
-
+                <!-- 3. Thu nhập (Gia sư) / Học phí (Học viên) -->
                 @if (User.IsInRole("Tutor"))
                 {
-                    <a class="dropdown-item" asp-area="Tutor" asp-controller="TutorProfile" asp-action="Index">
-                        <i class="bi bi-person-vcard" aria-hidden="true"></i>@(isVietnamese ? "Hồ sơ gia sư" : "Tutor Profile")
-                    </a>
-                    <a class="dropdown-item" asp-area="Tutor" asp-controller="TutorConnectionRequest" asp-action="Index">
-                        <i class="bi bi-chat-left-text" aria-hidden="true"></i>@(isVietnamese ? "Yêu cầu kết nối" : "Connection Requests")
+                    <a class="dropdown-item d-flex align-items-center gap-3" asp-area="Tutor" asp-controller="TutorSubject" asp-action="Index">
+                        <i class="bi bi-wallet2 header-menu-item-icon" aria-hidden="true"></i>
+                        <span>@(isVietnamese ? "Thu nhập" : "Income")</span>
                     </a>
                 }
                 else if (User.IsInRole("Student_Parent"))
                 {
-                    <a class="dropdown-item" asp-area="Student_Parent" asp-controller="Student_Parent_Profile" asp-action="Index">
-                        <i class="bi bi-person-circle" aria-hidden="true"></i>@(isVietnamese ? "Hồ sơ học viên" : "Student Profile")
+                    <a class="dropdown-item d-flex align-items-center gap-3" asp-area="Student_Parent" asp-controller="StudentParent_Payment" asp-action="Index">
+                        <i class="bi bi-wallet2 header-menu-item-icon" aria-hidden="true"></i>
+                        <span>@(isVietnamese ? "Học phí & Lịch sử" : "Billing & Tuition")</span>
                     </a>
                 }
 
-                <a class="dropdown-item" asp-area="Identity" asp-page="/Account/Manage/Index">
-                    <i class="bi bi-gear" aria-hidden="true"></i>@(isVietnamese ? "Cài đặt tài khoản" : "Account settings")
+                <!-- 4. Tin nhắn (Không hiện badge số theo yêu cầu) -->
+                <a class="dropdown-item d-flex align-items-center justify-content-between" asp-area="" asp-controller="Chat" asp-action="Index">
+                    <div class="d-flex align-items-center gap-3">
+                        <i class="bi bi-chat-dots header-menu-item-icon" aria-hidden="true"></i>
+                        <span>@(isVietnamese ? "Tin nhắn" : "Messages")</span>
+                    </div>
                 </a>
 
                 <div class="dropdown-divider"></div>
 
+                <!-- 5. Thông báo (kèm badge số thông báo chưa đọc, VD: 1) -->
+                <a class="dropdown-item d-flex align-items-center justify-content-between" asp-area="" asp-controller="Notifications" asp-action="Index">
+                    <div class="d-flex align-items-center gap-3">
+                        <i class="bi bi-bell header-menu-item-icon" aria-hidden="true"></i>
+                        <span>@(isVietnamese ? "Thông báo" : "Notifications")</span>
+                    </div>
+                    <span class="badge bg-danger rounded-pill px-2 d-none" data-role="menu-unread-notifications" style="font-size: 11px;">0</span>
+                </a>
+
+                <!-- 6. Giao diện tối (kèm công tắc toggle switch) -->
+                <div class="dropdown-item d-flex align-items-center justify-content-between user-select-none" id="dropdownThemeRow" role="button">
+                    <div class="d-flex align-items-center gap-3">
+                        <i class="bi bi-moon-stars header-menu-item-icon" aria-hidden="true"></i>
+                        <span>@(isVietnamese ? "Giao diện tối" : "Dark theme")</span>
+                    </div>
+                    <div class="form-check form-switch m-0 p-0 d-flex align-items-center">
+                        <input class="form-check-input ms-0 header-menu-switch" type="checkbox" role="switch" id="dropdownThemeSwitch" aria-label="Giao diện tối" @(currentTheme == "dark" ? "checked" : "") />
+                    </div>
+                </div>
+
+                <!-- 7. Ngôn ngữ (kèm nút switch VI | EN) -->
+                <div class="dropdown-item d-flex align-items-center justify-content-between" id="dropdownLangRow">
+                    <div class="d-flex align-items-center gap-3">
+                        <i class="bi bi-translate header-menu-item-icon" aria-hidden="true"></i>
+                        <span>@(isVietnamese ? "Ngôn ngữ" : "Language")</span>
+                    </div>
+                    <form asp-area="" asp-controller="SetLanguage" asp-action="SetPreferences" method="post" class="m-0">
+                        <input type="hidden" name="returnUrl" value="@returnUrl" />
+                        <div class="btn-group btn-group-sm" role="group">
+                            <button type="submit" name="culture" value="vi" class="btn btn-sm header-menu-lang-btn @(isVietnamese ? "btn-danger text-white" : "btn-light text-secondary border")">VI</button>
+                            <button type="submit" name="culture" value="en" class="btn btn-sm header-menu-lang-btn @(!isVietnamese ? "btn-danger text-white" : "btn-light text-secondary border")">EN</button>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="dropdown-divider"></div>
+
+                <!-- 8. Đăng xuất -->
                 <form asp-area="Identity" asp-page="/Account/Logout" asp-route-returnUrl="@logoutReturnUrl" method="post" class="m-0">
-                    <button type="submit" class="dropdown-item header-user-logout">
-                        <i class="bi bi-box-arrow-right" aria-hidden="true"></i>@(isVietnamese ? "Đăng xuất" : "Log out")
+                    <button type="submit" class="dropdown-item d-flex align-items-center gap-3 text-danger fw-semibold">
+                        <i class="bi bi-box-arrow-right header-menu-item-icon text-danger" aria-hidden="true"></i>
+                        <span>@(isVietnamese ? "Đăng xuất" : "Log out")</span>
                     </button>
                 </form>
             </div>
@@ -412,139 +407,149 @@
         const q = sel => box.querySelector(sel);
         const isVi = box.dataset.vi === '1';
 
+        // 1. Tải thông tin người dùng và số lượng thông báo tổng hợp (thông báo + tin nhắn)
         fetch(box.dataset.summaryUrl, {
             credentials: 'same-origin',
             headers: { Accept: 'application/json' }
         })
         .then(res => res.ok ? res.json() : null)
-        .then(data => { if (data) render(data); })
-        .catch(() => { /* Giữ fallback cookie name */ });
+        .then(data => { if (data) renderHeaderState(data); })
+        .catch(() => {});
 
-        function render({ user, unread, items }) {
+        function renderHeaderState(data) {
+            const user = data.user;
             if (user) {
                 if (q('[data-role="name"]')) q('[data-role="name"]').textContent = user.name || '';
                 if (q('[data-role="menu-name"]')) q('[data-role="menu-name"]').textContent = user.name || '';
-                if (q('[data-role="menu-email"]')) q('[data-role="menu-email"]').textContent = user.email || '';
+                if (q('[data-role="menu-role"]') && user.role) q('[data-role="menu-role"]').textContent = user.role;
 
+                // Cập nhật chữ cái đầu avatar fallback (VD: 'N' cho 'Ngọc Linh')
+                const initialEl = q('[data-role="avatar-initial"]');
+                if (initialEl && user.name) {
+                    const cleanName = user.name.trim();
+                    initialEl.textContent = cleanName.charAt(0).toUpperCase();
+                }
+
+                // Cập nhật ảnh avatar nếu có
                 if (user.avatarUrl) {
                     const img = q('[data-role="avatar"]');
-                    const fallback = q('[data-role="avatar-fallback"]');
+                    const initial = q('[data-role="avatar-initial"]');
                     if (img) {
                         img.onerror = () => {
                             img.classList.add('d-none');
-                            if (fallback) fallback.classList.remove('d-none');
+                            if (initial) initial.classList.remove('d-none');
                         };
                         img.src = user.avatarUrl;
                         img.classList.remove('d-none');
+                        if (initial) initial.classList.add('d-none');
                     }
-                    if (fallback) fallback.classList.add('d-none');
                 }
             }
 
-            const badge = q('[data-role="unread"]');
-            if (badge) {
-                if (unread > 0) {
-                    badge.textContent = unread > 99 ? '99+' : String(unread);
-                    badge.classList.remove('d-none');
+            // 1.1 Badge TỔNG HỢP hiển thị trực tiếp trên nút người dùng (Pill trigger)
+            const totalUnread = data.totalUnread || (data.unreadNotifications || 0) + (data.unreadMessages || 0) || data.unread || 0;
+            const pillBadge = q('[data-role="total-unread-badge"]');
+            if (pillBadge) {
+                if (totalUnread > 0) {
+                    pillBadge.textContent = totalUnread > 99 ? '99+' : String(totalUnread);
+                    pillBadge.classList.remove('d-none');
                 } else {
-                    badge.textContent = '';
-                    badge.classList.add('d-none');
+                    pillBadge.textContent = '0';
+                    pillBadge.classList.add('d-none');
                 }
             }
 
-            const emptyEl = q('[data-role="empty"]');
-            const list = q('[data-role="list"]');
-            if (items && items.length > 0) {
-                if (emptyEl) emptyEl.classList.add('d-none');
-                if (list) {
-                    list.innerHTML = '';
-                    list.classList.remove('d-none');
-                    items.forEach(n => list.appendChild(notificationItem(n)));
+            // 1.2 Badge số thông báo chưa đọc trong menu (VD: 3)
+            const notifBadge = q('[data-role="menu-unread-notifications"]');
+            const unreadNotifs = data.unreadNotifications || 0;
+            if (notifBadge) {
+                if (unreadNotifs > 0) {
+                    notifBadge.textContent = unreadNotifs > 99 ? '99+' : String(unreadNotifs);
+                    notifBadge.classList.remove('d-none');
+                } else {
+                    notifBadge.classList.add('d-none');
                 }
-            } else {
-                if (emptyEl) emptyEl.classList.remove('d-none');
-                if (list) {
-                    list.innerHTML = '';
-                    list.classList.add('d-none');
+            }
+
+            // 1.3 Badge số tin nhắn chưa đọc trong menu
+            const msgBadge = q('[data-role="menu-unread-messages"]');
+            const unreadMsgs = data.unreadMessages || 0;
+            if (msgBadge) {
+                if (unreadMsgs > 0) {
+                    msgBadge.textContent = unreadMsgs > 99 ? '99+' : String(unreadMsgs);
+                    msgBadge.classList.remove('d-none');
+                } else {
+                    msgBadge.classList.add('d-none');
                 }
             }
         }
 
-        const markReadBtn = q('[data-role="mark-read"]');
-        if (markReadBtn) {
-            markReadBtn.addEventListener('click', async (e) => {
-                e.preventDefault();
+        // 2. Xử lý Toggle Switch Giao diện tối trực tiếp trong menu (không reload trang)
+        const themeSwitch = document.getElementById('dropdownThemeSwitch');
+        const themeRow = document.getElementById('dropdownThemeRow');
+        if (themeSwitch && themeRow) {
+            const handleThemeToggle = (e) => {
                 e.stopPropagation();
-                try {
-                    const res = await fetch('/Notifications/MarkAllAsRead', {
-                        method: 'POST',
-                        headers: {
-                            'Accept': 'application/json',
-                            'X-Requested-With': 'XMLHttpRequest'
-                        }
-                    });
-                    if (res.ok) {
-                        const badge = q('[data-role="unread"]');
-                        if (badge) {
-                            badge.textContent = '';
-                            badge.classList.add('d-none');
-                        }
-                        box.querySelectorAll('.header-notification-item').forEach(el => {
-                            el.classList.remove('is-unread');
-                            el.classList.add('is-read');
-                            const iconWrap = el.querySelector('.header-notif-icon-wrap');
-                            if (iconWrap) {
-                                iconWrap.classList.remove('is-unread');
-                                iconWrap.classList.add('is-read');
-                            }
-                        });
-                    }
-                } catch (err) {
-                    console.error('Mark all read error:', err);
+                const html = document.documentElement;
+                const currentTheme = html.getAttribute('data-bs-theme') || 'light';
+                const nextTheme = currentTheme === 'dark' ? 'light' : 'dark';
+
+                // 1. Đổi ngay trên DOM
+                html.setAttribute('data-bs-theme', nextTheme);
+                themeSwitch.checked = (nextTheme === 'dark');
+
+                // 2. Lưu Cookie 1 năm
+                document.cookie = 'otsp-theme=' + nextTheme + ';path=/;max-age=31536000;SameSite=Lax';
+
+                // 3. Đồng bộ ngầm với server
+                const formData = new FormData();
+                formData.append('theme', nextTheme);
+                formData.append('returnUrl', window.location.pathname);
+                fetch('/SetLanguage/SetPreferences', { method: 'POST', body: formData }).catch(() => {});
+            };
+
+            themeSwitch.addEventListener('change', handleThemeToggle);
+            themeRow.addEventListener('click', (e) => {
+                if (e.target !== themeSwitch) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    themeSwitch.checked = !themeSwitch.checked;
+                    handleThemeToggle(e);
                 }
             });
         }
 
-        function notificationItem(n) {
-            const a = document.createElement('a');
-            a.className = 'header-notification-item ' + (n.isRead ? 'is-read' : 'is-unread');
-            a.href = n.targetUrl || ('/Notifications/Open?id=' + n.id);
+        // 3. Lắng nghe tin nhắn & thông báo realtime qua SignalR để nhảy số tức thì
+        if (typeof signalR !== 'undefined') {
+            try {
+                const hub = new signalR.HubConnectionBuilder()
+                    .withUrl('/hubs/chat')
+                    .withAutomaticReconnect()
+                    .build();
 
-            // Icon wrap
-            const iconWrap = document.createElement('div');
-            iconWrap.className = 'header-notif-icon-wrap ' + (n.isRead ? 'is-read' : 'is-unread');
-            iconWrap.innerHTML = '<i class="bi bi-bell-fill"></i>';
+                hub.on('ReceiveDirectMessage', () => {
+                    // Tăng số thông báo tổng trên Pill
+                    const pillBadge = q('[data-role="total-unread-badge"]');
+                    if (pillBadge) {
+                        let count = parseInt(pillBadge.textContent || '0', 10);
+                        if (isNaN(count)) count = 0;
+                        count += 1;
+                        pillBadge.textContent = count > 99 ? '99+' : String(count);
+                        pillBadge.classList.remove('d-none');
+                    }
+                    // Tăng số thông báo chưa đọc trong Menu (Thông báo)
+                    const notifBadge = q('[data-role="menu-unread-notifications"]');
+                    if (notifBadge) {
+                        let count = parseInt(notifBadge.textContent || '0', 10);
+                        if (isNaN(count)) count = 0;
+                        count += 1;
+                        notifBadge.textContent = count > 99 ? '99+' : String(count);
+                        notifBadge.classList.remove('d-none');
+                    }
+                });
 
-            // Content copy
-            const copy = document.createElement('div');
-            copy.className = 'header-notification-copy';
-
-            const title = document.createElement('div');
-            title.className = 'header-notif-title';
-            title.textContent = n.title || (isVi ? 'Thông báo mới' : 'Notification');
-
-            const content = document.createElement('div');
-            content.className = 'header-notif-body';
-            content.textContent = n.content || '';
-
-            const time = document.createElement('div');
-            time.className = 'header-notif-time';
-            const dateStr = new Date(n.createdAt).toLocaleString(isVi ? 'vi-VN' : 'en-GB');
-            time.innerHTML = '<i class="bi bi-clock me-1"></i> ' + dateStr;
-
-            copy.append(title, content, time);
-            a.append(iconWrap, copy);
-
-            a.addEventListener('click', () => {
-                if (!n.isRead) {
-                    fetch('/Notifications/MarkAsRead?id=' + n.id, {
-                        method: 'POST',
-                        headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
-                    }).catch(() => {});
-                }
-            });
-
-            return a;
+                hub.start().catch(() => {});
+            } catch (err) {}
         }
     })();
     </script>
@@ -552,10 +557,10 @@
 else
 {
     <a class="header-auth-link" asp-area="Identity" asp-page="/Account/Login">
-        <i class="bi bi-box-arrow-in-right me-1"></i>@(isVietnamese ? "Đăng nhập" : "Log in")
+        <i class="bi bi-box-arrow-in-right me-1 d-none d-sm-inline"></i>@(isVietnamese ? "Đăng nhập" : "Log in")
     </a>
     <a class="header-auth-link header-auth-register" asp-area="Identity" asp-page="/Account/Register">
-        <i class="bi bi-person-plus-fill me-1"></i>@(isVietnamese ? "Đăng ký" : "Register")
+        <i class="bi bi-person-plus-fill me-1 d-none d-sm-inline"></i>@(isVietnamese ? "Đăng ký" : "Register")
     </a>
 }
 </div>

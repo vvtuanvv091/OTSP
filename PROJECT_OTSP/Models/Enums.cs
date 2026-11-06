@@ -1,4 +1,4 @@
-﻿namespace PROJECT_OTSP.Models
+namespace PROJECT_OTSP.Models
 {
     public class Enums /*trang thái*/
     {
@@ -14,6 +14,7 @@
         public enum AlertStatus { New, Reviewed, Dismissed }
         public enum ClassroomType { OneToOne, Group }
         public enum TeachingFormat { Online, Offline, Hybrid }
+        public enum DocumentScope { Classroom, Public }
 
 
     }

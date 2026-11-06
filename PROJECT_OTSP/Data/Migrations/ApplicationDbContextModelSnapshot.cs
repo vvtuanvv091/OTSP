@@ -1324,6 +1324,10 @@ namespace PROJECT_OTSP.Data.Migrations
                     b.Property<int>("GradeLevelId")
                         .HasColumnType("integer");
 
+                    b.Property<decimal>("HourlyFee")
+                        .HasPrecision(18)
+                        .HasColumnType("numeric(18,0)");
+
                     b.Property<int>("SubjectId")
                         .HasColumnType("integer");
 

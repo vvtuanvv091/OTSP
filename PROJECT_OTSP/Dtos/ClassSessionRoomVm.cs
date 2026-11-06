@@ -8,4 +8,6 @@ public sealed class ClassSessionRoomVm
     public DateTime ScheduledAtUtc { get; init; }
     public string RoomName { get; init; } = string.Empty;
     public string DisplayName { get; init; } = string.Empty;
+    public bool IsTutor { get; init; }
+    public int ClassroomId { get; init; }
 }

@@ -4908,7 +4908,7 @@ textarea.form-control-lg {
 
 .alert-success {
   --bs-alert-color: var(--bs-success-text-emphasis);
-  --bs-alert-bg: var(--bs-success-bg-subtle);
+/*  --bs-alert-bg: var(--bs-success-bg-subtle);*/
   --bs-alert-border-color: var(--bs-success-border-subtle);
   --bs-alert-link-color: var(--bs-success-text-emphasis);
 }

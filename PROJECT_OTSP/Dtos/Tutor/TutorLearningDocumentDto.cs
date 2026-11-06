@@ -1,3 +1,6 @@
+using PROJECT_OTSP.Models;
+using static PROJECT_OTSP.Models.Enums;
+
 namespace PROJECT_OTSP.Dtos;
 
 /// <summary>
@@ -11,4 +14,27 @@ public class TutorLearningDocumentDto
     public string SubjectName { get; set; } = string.Empty;
     public string GradeLevelName { get; set; } = string.Empty;
     public DateTime UploadedAt { get; set; }
+    public DocumentScope Scope { get; set; } = DocumentScope.Classroom;
+    public int? ClassroomId { get; set; }
+    public string? ClassroomName { get; set; }
+    public ClassroomType? ClassroomType { get; set; }
+    public VerificationStatus Status { get; set; } = VerificationStatus.Approved;
+    public string FileExtension { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// Dữ liệu lựa chọn lớp học đang dạy của gia sư để liên kết tài liệu.
+/// </summary>
+public class TutorActiveClassroomOptionDto
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public ClassroomType Type { get; set; }
+    public int SubjectId { get; set; }
+    public string SubjectName { get; set; } = string.Empty;
+    public int GradeLevelId { get; set; }
+    public string GradeLevelName { get; set; } = string.Empty;
+    public int CurrentStudents { get; set; }
+    public int MaxStudents { get; set; }
+    public string? ScheduleSummary { get; set; }
 }

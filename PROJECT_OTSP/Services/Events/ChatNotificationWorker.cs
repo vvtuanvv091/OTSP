@@ -45,9 +45,7 @@ public sealed class ChatNotificationWorker : BackgroundService
                 var chatHub = scope.ServiceProvider.GetRequiredService<IHubContext<ChatHub>>();
                 var emailSender = scope.ServiceProvider.GetService<IEmailSender>();
 
-                // 1. TỐI ƯU NEON DB:
-                // KHÔNG ghi row vào bảng Notifications cho từng tin nhắn đơn lẻ!
-                // Số tin nhắn chưa đọc đã được quản lý trực tiếp và hiệu quả trong bảng Messagers.
+                // 1. Thông báo tin nhắn đã được ghi nhận trong bảng Notifications tại ChatService để hiển thị tập trung tại mục Thông báo theo yêu cầu.
 
                 // 2. Bắn tín hiệu Realtime qua SignalR tới người nhận (0 byte Database)
                 // Cập nhật preview cuộc trò chuyện và báo tin nhắn mới nếu người dùng đang online ở trang khác

@@ -134,5 +134,125 @@ public class ChatServiceTests
         savedMessage.Should().NotBeNull();
         savedMessage!.ReceiverId.Should().Be("tutor_user_2");
     }
+
+    [Fact]
+    public async Task EditMessageAsync_WhenValidOwner_ShouldUpdateContentAndReturnDto()
+    {
+        // ARRANGE
+        using var db = TestDbContextFactory.CreateInMemoryDbContext();
+        var message = new Messager
+        {
+            Id = 101,
+            SenderId = "user_sender_1",
+            ReceiverId = "user_receiver_2",
+            Content = "Nội dung ban đầu",
+            SentAt = DateTime.UtcNow
+        };
+        db.Messagers.Add(message);
+        await db.SaveChangesAsync();
+
+        var chatService = new ChatService(db, _memoryCache);
+
+        // ACT
+        var result = await chatService.EditMessageAsync(101, "user_sender_1", "Nội dung sau khi chỉnh sửa");
+
+        // ASSERT
+        result.Should().NotBeNull();
+        result.Content.Should().Be("Nội dung sau khi chỉnh sửa");
+        result.IsEdited.Should().BeTrue();
+
+        var updatedInDb = await db.Messagers.FindAsync(101);
+        updatedInDb.Should().NotBeNull();
+        updatedInDb!.Content.Should().Be("Nội dung sau khi chỉnh sửa");
+    }
+
+    [Fact]
+    public async Task EditMessageAsync_WhenNotOwner_ShouldThrowUnauthorizedAccessException()
+    {
+        // ARRANGE
+        using var db = TestDbContextFactory.CreateInMemoryDbContext();
+        var message = new Messager
+        {
+            Id = 102,
+            SenderId = "user_sender_1",
+            ReceiverId = "user_receiver_2",
+            Content = "Tin nhắn gốc",
+            SentAt = DateTime.UtcNow
+        };
+        db.Messagers.Add(message);
+        await db.SaveChangesAsync();
+
+        var chatService = new ChatService(db, _memoryCache);
+
+        // ACT & ASSERT: user khác cố tình sửa tin nhắn
+        var act = async () => await chatService.EditMessageAsync(102, "intruder_user_999", "Hack nội dung");
+        await act.Should().ThrowAsync<UnauthorizedAccessException>()
+            .WithMessage("*chỉ có thể chỉnh sửa tin nhắn của chính mình*");
+    }
+
+    [Fact]
+    public async Task DeleteMessageAsync_WhenValidOwner_ShouldRemoveMessageFromDbAndReturnResult()
+    {
+        // ARRANGE
+        using var db = TestDbContextFactory.CreateInMemoryDbContext();
+        var msg1 = new Messager
+        {
+            Id = 201,
+            SenderId = "user_sender_1",
+            ReceiverId = "user_receiver_2",
+            Content = "Tin nhắn 1",
+            SentAt = DateTime.UtcNow.AddMinutes(-5)
+        };
+        var msg2 = new Messager
+        {
+            Id = 202,
+            SenderId = "user_sender_1",
+            ReceiverId = "user_receiver_2",
+            Content = "Tin nhắn 2 muốn xóa",
+            SentAt = DateTime.UtcNow
+        };
+        db.Messagers.AddRange(msg1, msg2);
+        await db.SaveChangesAsync();
+
+        var chatService = new ChatService(db, _memoryCache);
+
+        // ACT
+        var result = await chatService.DeleteMessageAsync(202, "user_sender_1");
+
+        // ASSERT
+        result.Should().NotBeNull();
+        result.MessageId.Should().Be(202);
+        result.SenderId.Should().Be("user_sender_1");
+        result.ReceiverId.Should().Be("user_receiver_2");
+        result.LastRemainingMessageContent.Should().Be("Tin nhắn 1");
+
+        // Tin 202 phải không còn trong CSDL
+        var deletedInDb = await db.Messagers.FindAsync(202);
+        deletedInDb.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task DeleteMessageAsync_WhenNotOwner_ShouldThrowUnauthorizedAccessException()
+    {
+        // ARRANGE
+        using var db = TestDbContextFactory.CreateInMemoryDbContext();
+        var msg = new Messager
+        {
+            Id = 203,
+            SenderId = "user_sender_1",
+            ReceiverId = "user_receiver_2",
+            Content = "Tin nhắn quan trọng",
+            SentAt = DateTime.UtcNow
+        };
+        db.Messagers.Add(msg);
+        await db.SaveChangesAsync();
+
+        var chatService = new ChatService(db, _memoryCache);
+
+        // ACT & ASSERT
+        var act = async () => await chatService.DeleteMessageAsync(203, "other_user_333");
+        await act.Should().ThrowAsync<UnauthorizedAccessException>()
+            .WithMessage("*chỉ có thể xóa tin nhắn của chính mình*");
+    }
 }
 

@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.AspNetCore.Http;
+using static PROJECT_OTSP.Models.Enums;
 
 namespace PROJECT_OTSP.Dtos;
 
@@ -14,18 +15,21 @@ public sealed class ClassroomFormVm
     public string Name { get; set; } = string.Empty;
 
     [Range(typeof(decimal), "1", "999999999", ErrorMessage = "Học phí phải lớn hơn 0.")]
-    [Display(Name = "Học phí (VNĐ)")]
+    [Display(Name = "Học phí / học viên / tháng (VNĐ)")]
     public decimal Fee { get; set; }
 
-    [Range(2, 50, ErrorMessage = "Sĩ số tối đa phải từ 2 đến 50 học viên.")]
+    [Range(1, 50, ErrorMessage = "Sĩ số tối đa phải từ 1 đến 50 học viên.")]
     [Display(Name = "Sĩ số tối đa")]
-    public int MaxStudents { get; set; } = 2;
+    public int MaxStudents { get; set; } = 5;
 
-    [Range(1, 7, ErrorMessage = "Số buổi học mỗi tuần phải từ 1 đến 7.")]
+    public ClassroomType Type { get; set; } = ClassroomType.Group;
+    public bool IsOneToOne => Type == ClassroomType.OneToOne;
+
+    [Range(1, 3, ErrorMessage = "Số buổi học mỗi tuần nên từ 1 đến 3 buổi (tối đa 6 tiếng/tuần).")]
     [Display(Name = "Số buổi học / tuần")]
     public int SessionsPerWeek { get; set; } = 2;
 
-    [Range(0.5, 5.0, ErrorMessage = "Thời lượng mỗi buổi phải từ 0.5 đến 5 giờ.")]
+    [Range(1.0, 3.0, ErrorMessage = "Thời lượng mỗi buổi học nên từ 1 đến 3 giờ (chuẩn 2 giờ/buổi).")]
     [Display(Name = "Thời lượng mỗi buổi (giờ)")]
     public double HoursPerSession { get; set; } = 2.0;
 
@@ -68,8 +72,9 @@ public sealed class DateNotInPastAttribute : ValidationAttribute
         if (value is not DateOnly date)
             return ValidationResult.Success;
 
-        var todayInVietnam = DateOnly.FromDateTime(DateTime.UtcNow.AddHours(7));
-        return date < todayInVietnam
+        // Nới lỏng 1 ngày dung sai để tránh lệch múi giờ giữa máy client và Render/Neon (UTC)
+        var minAllowedDate = DateOnly.FromDateTime(DateTime.UtcNow.AddHours(7)).AddDays(-1);
+        return date < minAllowedDate
             ? new ValidationResult(ErrorMessage ?? "Ngày bắt đầu không được ở quá khứ.")
             : ValidationResult.Success;
     }

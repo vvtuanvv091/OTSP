@@ -37,6 +37,19 @@ public sealed class AvailabilitySlotService : IAvailabilitySlotService
         var windowStartUtc = startDateVn.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc).AddHours(-VietnamUtcOffsetHours);
         var windowEndUtc = endDateVn.AddDays(1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc).AddHours(-VietnamUtcOffsetHours);
 
+        // Lấy lịch học cố định hàng tuần của các lớp học chính thức đang hoạt động của gia sư (cả lớp 1-1 và lớp nhóm)
+        var activeClassroomWeeklySchedules = await _db.ClassroomWeeklySchedules
+            .AsNoTracking()
+            .Where(w => w.Classroom.TutorId == tutorId
+                     && w.Classroom.Status == ClassroomStatus.Active)
+            .Select(w => new
+            {
+                w.DayOfWeek,
+                w.StartTime,
+                w.EndTime
+            })
+            .ToListAsync(cancellationToken);
+
         // Lấy các khoảng giờ bận từ các buổi học đã lên lịch
         var busySessions = await _db.ClassSessions
             .AsNoTracking()
@@ -67,8 +80,30 @@ public sealed class AvailabilitySlotService : IAvailabilitySlotService
         var busyIntervals = busySessions
             .Select(s => (Start: s.StartUtc, End: s.StartUtc.AddHours(s.DurationHours)))
             .Concat(busyTrials.Select(t => (Start: t.StartUtc, End: t.StartUtc.AddHours(t.DurationHours))))
-            .OrderBy(i => i.Start)
             .ToList();
+
+        // Thêm các khung giờ bận từ lịch học cố định hàng tuần của các lớp chính thức cho toàn bộ 14 ngày tới
+        if (activeClassroomWeeklySchedules.Count > 0)
+        {
+            for (var d = startDateVn; d <= endDateVn; d = d.AddDays(1))
+            {
+                var daySchedules = activeClassroomWeeklySchedules.Where(w => w.DayOfWeek == d.DayOfWeek);
+                foreach (var w in daySchedules)
+                {
+                    var busyStartUtc = DateTime.SpecifyKind(
+                        d.ToDateTime(w.StartTime).AddHours(-VietnamUtcOffsetHours),
+                        DateTimeKind.Utc);
+
+                    var busyEndUtc = w.EndTime > w.StartTime
+                        ? DateTime.SpecifyKind(d.ToDateTime(w.EndTime).AddHours(-VietnamUtcOffsetHours), DateTimeKind.Utc)
+                        : DateTime.SpecifyKind(d.AddDays(1).ToDateTime(w.EndTime).AddHours(-VietnamUtcOffsetHours), DateTimeKind.Utc);
+
+                    busyIntervals.Add((Start: busyStartUtc, End: busyEndUtc));
+                }
+            }
+        }
+
+        busyIntervals = busyIntervals.OrderBy(i => i.Start).ToList();
 
         // 1. Thuật toán gộp khoảng bận (Interval Merging Algorithm - O(N log N))
         // Gộp các khoảng thời gian bận trùng lặp hoặc gối đầu nhau thành danh sách các khoảng rời rạc duy nhất

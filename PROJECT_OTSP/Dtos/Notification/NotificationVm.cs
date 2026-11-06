@@ -8,6 +8,19 @@ public class NotificationItemDto
     public DateTime CreatedAt { get; set; }
     public bool IsRead { get; set; }
     public string TargetUrl { get; set; } = "/Notifications";
+
+    public string DisplayContent
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(Content)) return string.Empty;
+            var idx = Content.IndexOf("[url:");
+            return idx >= 0 ? Content[..idx].Trim() : Content;
+        }
+    }
+
+    public bool IsMessage => (Title?.Contains("Tin nhắn", StringComparison.OrdinalIgnoreCase) ?? false)
+                          || (Content?.Contains("[url:/Chat", StringComparison.OrdinalIgnoreCase) ?? false);
 }
 
 public class NotificationPageVm

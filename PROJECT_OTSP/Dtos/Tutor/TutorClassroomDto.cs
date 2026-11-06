@@ -15,6 +15,8 @@ public class TutorClassroomDto
     public ClassroomType Type { get; set; }
     public int StudentCount { get; set; }
     public int MaxStudents { get; set; }
+    public int SubjectId { get; set; }
+    public int GradeLevelId { get; set; }
     public string SubjectName { get; set; } = string.Empty;
     public string GradeLevelName { get; set; } = string.Empty;
 

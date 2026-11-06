@@ -1,4 +1,5 @@
-﻿using System.ComponentModel.DataAnnotations;
+using Microsoft.EntityFrameworkCore;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace PROJECT_OTSP.Models
@@ -27,5 +28,8 @@ namespace PROJECT_OTSP.Models
         public int GradeLevelId { get; set; }
         public GradeLevel GradeLevel { get; set; } = null!;
 
+        // Học phí mỗi giờ cho môn học này (VNĐ)
+        [Precision(18, 0)]
+        public decimal HourlyFee { get; set; }
     }
 }

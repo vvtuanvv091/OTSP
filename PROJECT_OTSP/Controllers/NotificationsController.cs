@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using PROJECT_OTSP.Data;
+using PROJECT_OTSP.Dtos;
 using PROJECT_OTSP.Dtos.Notification;
 using PROJECT_OTSP.Helpers;
 
@@ -12,7 +13,7 @@ namespace PROJECT_OTSP.Controllers;
 [Authorize]
 public class NotificationsController : Controller
 {
-    private const int PageSize = 10; // Chỉ hiển thị 10 thông báo đầu tiên theo yêu cầu
+    private const int PageSize = 10; // 10 thông báo mỗi trang theo yêu cầu
 
     private readonly ApplicationDbContext _dbContext;
     private readonly IMemoryCache _cache;
@@ -70,6 +71,16 @@ public class NotificationsController : Controller
             TotalCount = totalCount,
             UnreadCount = unreadCount
         };
+
+        var pagination = new PaginationVm
+        {
+            CurrentPage = page,
+            TotalPages = vm.TotalPages,
+            TotalItems = totalCount,
+            PageSize = PageSize,
+            BaseUrl = Url.Action("Index", "Notifications") ?? ""
+        };
+        ViewBag.Pagination = pagination;
 
         return View(vm);
     }

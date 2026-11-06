@@ -206,3 +206,9 @@ html[data-bs-theme="dark"] .student-sidebar-link.active i { color: #FF9CA2; }
         border-radius: 8px !important;
     }
 }
+
+@media (min-width: 992px) {
+    .student-menu-toggle {
+        display: none !important;
+    }
+}

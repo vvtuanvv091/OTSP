@@ -172,8 +172,8 @@ namespace PROJECT_OTSP.Areas.Identity.Pages.Account
                     ModelState.AddModelError("Input.GuardianResidenceAddress", "Vui lòng nhập nơi ở người giám hộ (tối đa 500 ký tự).");
             }
 
-            if (Input.Role == RoleTutor && Input.HourlyFee is null)
-                ModelState.AddModelError("Input.HourlyFee", "Vui lòng nhập học phí mong muốn.");
+            // Tutor sets hourly fee per subject in TutorSubject
+
 
             if (!ModelState.IsValid)
                 return Page();

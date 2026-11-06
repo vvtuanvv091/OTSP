@@ -171,10 +171,8 @@ namespace PROJECT_OTSP.Services
                 {
                     if (!string.IsNullOrWhiteSpace(pastId) && pastId != currentUserId && !partnerRoleMap.ContainsKey(pastId))
                     {
-                        if (await CanUsersChatAsync(currentUserId, pastId, cancellationToken))
-                        {
-                            partnerRoleMap[pastId] = ("Thành viên OTSP", null);
-                        }
+                        // Hai người đã có lịch sử nhắn tin nên luôn được phép tiếp tục cuộc trò chuyện
+                        partnerRoleMap[pastId] = ("Thành viên OTSP", null);
                     }
                 }
             }
@@ -333,6 +331,35 @@ namespace PROJECT_OTSP.Services
             };
 
             _db.Messagers.Add(message);
+
+            // Tạo hoặc cập nhật thông báo tin nhắn gửi tới người nhận trong bảng Notifications (để hiện trong mục Thông báo)
+            var snippet = message.Content.Length > 80 ? message.Content[..80] + "..." : message.Content;
+            var urlTag = $"[url:/Chat?contactId={senderUserId}]";
+            var notifTitle = $"Tin nhắn mới từ {senderName}";
+
+            var existingNotif = await _db.Notifications
+                .FirstOrDefaultAsync(n => n.UserId == receiverUserId 
+                                          && !n.IsRead 
+                                          && n.Title == notifTitle, cancellationToken);
+
+            if (existingNotif != null)
+            {
+                existingNotif.Content = $"\"{snippet}\" {urlTag}";
+                existingNotif.CreatedAt = DateTime.UtcNow;
+            }
+            else
+            {
+                var notification = new Notification
+                {
+                    UserId = receiverUserId,
+                    Title = notifTitle,
+                    Content = $"\"{snippet}\" {urlTag}",
+                    CreatedAt = DateTime.UtcNow,
+                    IsRead = false
+                };
+                _db.Notifications.Add(notification);
+            }
+
             await _db.SaveChangesAsync(cancellationToken);
 
             // Bắn sự kiện bất đồng bộ vào Channel (Event-Driven) nếu có EventBus
@@ -348,9 +375,10 @@ namespace PROJECT_OTSP.Services
                 ), cancellationToken);
             }
 
-            // Xóa cache hội thoại của 2 bên
+            // Xóa cache hội thoại và cache header summary
             _cache.Remove($"chat_convs_{senderUserId}");
             _cache.Remove($"chat_convs_{receiverUserId}");
+            _cache.Remove($"hdr_summary_{receiverUserId}");
 
             return new ChatMessageDto
             {
@@ -476,6 +504,12 @@ namespace PROJECT_OTSP.Services
                 .Where(m => m.ReceiverId == currentUserId && m.SenderId == contactUserId && !m.IsRead)
                 .ExecuteUpdateAsync(s => s.SetProperty(m => m.IsRead, true), cancellationToken);
 
+            // Đồng thời đánh dấu đã đọc các thông báo tin nhắn từ người này trong bảng Notifications
+            var notifTag = $"[url:/Chat?contactId={contactUserId}]";
+            await _db.Notifications
+                .Where(n => n.UserId == currentUserId && !n.IsRead && n.Content.Contains(notifTag))
+                .ExecuteUpdateAsync(s => s.SetProperty(n => n.IsRead, true), cancellationToken);
+
             if (updated > 0)
             {
                 _cache.Remove($"chat_convs_{currentUserId}");
@@ -533,6 +567,95 @@ namespace PROJECT_OTSP.Services
             CancellationToken cancellationToken = default)
         {
             return await GetAcceptedParticipantsAsync(requestId, currentUserId, cancellationToken) is not null;
+        }
+
+        public async Task<ChatMessageDto> EditMessageAsync(
+            int messageId,
+            string senderUserId,
+            string newContent,
+            CancellationToken cancellationToken = default)
+        {
+            if (string.IsNullOrWhiteSpace(senderUserId))
+                throw new ArgumentException("Người gửi không hợp lệ.", nameof(senderUserId));
+
+            var normalizedContent = newContent?.Trim();
+            if (string.IsNullOrWhiteSpace(normalizedContent) || normalizedContent.Length > MaxMessageLength)
+                throw new ArgumentException($"Nội dung chỉnh sửa phải từ 1 đến {MaxMessageLength} ký tự.", nameof(newContent));
+
+            var message = await _db.Messagers
+                .Include(m => m.Sender)
+                .FirstOrDefaultAsync(m => m.Id == messageId, cancellationToken);
+
+            if (message == null)
+                throw new KeyNotFoundException("Không tìm thấy tin nhắn cần chỉnh sửa.");
+
+            if (message.SenderId != senderUserId)
+                throw new UnauthorizedAccessException("Bạn chỉ có thể chỉnh sửa tin nhắn của chính mình.");
+
+            if (message.Content.StartsWith("[img]") || message.Content.StartsWith("/uploads/chat/"))
+                throw new InvalidOperationException("Không thể chỉnh sửa tin nhắn hình ảnh. Bạn có thể xóa và gửi lại ảnh mới.");
+
+            message.Content = normalizedContent;
+            await _db.SaveChangesAsync(cancellationToken);
+
+            _cache.Remove($"chat_convs_{message.SenderId}");
+            _cache.Remove($"chat_convs_{message.ReceiverId}");
+
+            return new ChatMessageDto
+            {
+                Id = message.Id,
+                SenderId = message.SenderId,
+                SenderName = message.Sender?.FullName ?? message.Sender?.UserName ?? "Tôi",
+                ReceiverId = message.ReceiverId,
+                Content = message.Content,
+                SentAtUtc = message.SentAt,
+                IsOwn = true,
+                IsEdited = true
+            };
+        }
+
+        public async Task<ChatMessageDeleteResult> DeleteMessageAsync(
+            int messageId,
+            string senderUserId,
+            CancellationToken cancellationToken = default)
+        {
+            if (string.IsNullOrWhiteSpace(senderUserId))
+                throw new ArgumentException("Người gửi không hợp lệ.", nameof(senderUserId));
+
+            var message = await _db.Messagers
+                .FirstOrDefaultAsync(m => m.Id == messageId, cancellationToken);
+
+            if (message == null)
+                throw new KeyNotFoundException("Không tìm thấy tin nhắn cần xóa.");
+
+            if (message.SenderId != senderUserId)
+                throw new UnauthorizedAccessException("Bạn chỉ có thể xóa tin nhắn của chính mình.");
+
+            var senderId = message.SenderId;
+            var receiverId = message.ReceiverId;
+
+            _db.Messagers.Remove(message);
+            await _db.SaveChangesAsync(cancellationToken);
+
+            _cache.Remove($"chat_convs_{senderId}");
+            _cache.Remove($"chat_convs_{receiverId}");
+
+            var lastMsg = await _db.Messagers
+                .AsNoTracking()
+                .Where(m => (m.SenderId == senderId && m.ReceiverId == receiverId) ||
+                            (m.SenderId == receiverId && m.ReceiverId == senderId))
+                .OrderByDescending(m => m.SentAt)
+                .Select(m => new { m.Content, m.SentAt })
+                .FirstOrDefaultAsync(cancellationToken);
+
+            return new ChatMessageDeleteResult
+            {
+                MessageId = messageId,
+                SenderId = senderId,
+                ReceiverId = receiverId,
+                LastRemainingMessageContent = lastMsg?.Content,
+                LastRemainingMessageTimeUtc = lastMsg?.SentAt
+            };
         }
 
         private async Task<ConversationParticipants?> GetAcceptedParticipantsAsync(

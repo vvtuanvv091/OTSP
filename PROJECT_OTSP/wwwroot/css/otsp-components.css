@@ -1830,3 +1830,297 @@ body, .header, .card, .btn, .features-item, .course-item, .member, .stats-item, 
 }
 
 
+
+
+/* ==================== 1-ROW COMPACT HEADER & ACTIONS ==================== */
+.header-main-nav {
+    display: flex;
+    flex-direction: column;
+}
+
+.header-actions-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.header-actions-group .btn-getstarted {
+    margin: 0 !important;
+    white-space: nowrap;
+    padding: 8px 22px !important;
+    font-size: 14px !important;
+}
+
+.otsp-brand-tagline {
+    font-size: 11px;
+    font-weight: 400;
+    color: var(--bs-secondary-color, #94a3b8);
+    margin-top: 2px;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+.header-mobile-search-bar {
+    display: block;
+}
+
+.header-mobile-search-bar .btn-getstarted {
+    background: #dc2626 !important;
+    color: #ffffff !important;
+    border-radius: 9999px !important;
+    font-weight: 600 !important;
+    font-size: 15px !important;
+    padding: 11px 20px !important;
+    box-shadow: 0 4px 14px rgba(220, 38, 38, 0.35) !important;
+    border: none !important;
+    text-decoration: none !important;
+    margin: 0 !important;
+    width: 100% !important;
+}
+
+/* ==================== RESPONSIVE HEADER & DRAWER (< 1200px) ==================== */
+@media (max-width: 1199px) {
+    .header-main-nav .logo {
+        order: 1 !important;
+    }
+
+    .header-actions-group {
+        order: 2 !important;
+        margin-left: auto !important;
+        margin-right: 6px !important;
+    }
+
+    .navmenu {
+        order: 3 !important;
+        margin: 0 !important;
+    }
+
+    .mobile-nav-toggle {
+        font-size: 28px !important;
+        cursor: pointer !important;
+        margin: 0 !important;
+        padding: 4px !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        color: var(--bs-body-color, #0f172a) !important;
+    }
+
+    [data-bs-theme="dark"] .mobile-nav-toggle {
+        color: #f8fafc !important;
+    }
+
+    /* Modal Backdrop for mobile menu */
+    .mobile-nav-active .navmenu {
+        position: fixed !important;
+        inset: 0 !important;
+        background: rgba(0, 0, 0, 0.72) !important;
+        backdrop-filter: blur(8px) !important;
+        -webkit-backdrop-filter: blur(8px) !important;
+        z-index: 9998 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        padding: 16px !important;
+    }
+
+    /* Mobile Drawer Card Modal (matching mockup) */
+    .mobile-nav-active .navmenu > ul {
+        display: flex !important;
+        flex-direction: column !important;
+        position: relative !important;
+        inset: auto !important;
+        width: 100% !important;
+        max-width: 440px !important;
+        max-height: calc(100vh - 32px) !important;
+        background: #18181b !important;
+        border: 1px solid rgba(255, 255, 255, 0.12) !important;
+        border-radius: 20px !important;
+        padding: 18px !important;
+        overflow-y: auto !important;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8) !important;
+    }
+
+    [data-bs-theme="light"] .mobile-nav-active .navmenu > ul {
+        background: #ffffff !important;
+        border-color: #e2e8f0 !important;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.2) !important;
+    }
+
+    /* Close icon positioned in top right of mobile drawer */
+    .mobile-nav-active .mobile-nav-toggle {
+        position: fixed !important;
+        top: 28px !important;
+        right: 28px !important;
+        font-size: 28px !important;
+        color: #ffffff !important;
+        z-index: 10000 !important;
+        line-height: 1 !important;
+    }
+
+    .mobile-drawer-header {
+        padding: 0 4px 14px 4px !important;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+        margin-bottom: 8px !important;
+    }
+
+    [data-bs-theme="light"] .mobile-drawer-header {
+        border-bottom-color: #f1f5f9 !important;
+    }
+
+    .mobile-drawer-item > a {
+        padding: 14px 8px !important;
+        font-size: 16px !important;
+        font-weight: 500 !important;
+        color: #f4f4f5 !important;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        text-decoration: none !important;
+    }
+
+    [data-bs-theme="light"] .mobile-drawer-item > a {
+        color: #0f172a !important;
+        border-bottom-color: #f1f5f9 !important;
+    }
+
+    .mobile-drawer-item > a:hover,
+    .mobile-drawer-item > a.active {
+        color: #ef4444 !important;
+    }
+
+    .mobile-drawer-auth {
+        padding-top: 18px !important;
+        margin-top: 6px !important;
+        border-top: none !important;
+        list-style: none !important;
+    }
+
+    .mobile-drawer-btn-login {
+        border: 1.5px solid rgba(255, 255, 255, 0.3) !important;
+        background: transparent !important;
+        color: #ffffff !important;
+        font-weight: 600 !important;
+        border-radius: 9999px !important;
+        padding: 11px 0 !important;
+        display: block !important;
+        text-align: center !important;
+        text-decoration: none !important;
+        font-size: 15px !important;
+        transition: all 0.2s ease !important;
+    }
+
+    [data-bs-theme="light"] .mobile-drawer-btn-login {
+        border-color: #0f172a !important;
+        color: #0f172a !important;
+    }
+
+    .mobile-drawer-btn-register {
+        background: #dc2626 !important;
+        border: none !important;
+        color: #ffffff !important;
+        font-weight: 600 !important;
+        border-radius: 9999px !important;
+        padding: 11px 0 !important;
+        display: block !important;
+        text-align: center !important;
+        text-decoration: none !important;
+        font-size: 15px !important;
+        box-shadow: 0 4px 14px rgba(220, 38, 38, 0.45) !important;
+        transition: all 0.2s ease !important;
+    }
+}
+
+
+/* ==================== HEADER TOP TAGLINE & RIGHT TOOLS ==================== */
+.header-top-tagline {
+    font-size: 13.5px;
+    font-weight: 500;
+    color: var(--bs-secondary-color, #94a3b8);
+    letter-spacing: 0.15px;
+    user-select: none;
+}
+
+[data-bs-theme="dark"] .header-top-tagline {
+    color: #cbd5e1 !important;
+}
+
+[data-bs-theme="light"] .header-top-tagline {
+    color: #475569 !important;
+}
+
+.header-top-right {
+    display: inline-flex;
+    align-items: center;
+}
+
+
+/* ==================== OTSP MODERN PAGINATION BAR ==================== */
+.pagination-modern {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    margin: 1.5rem 0;
+    list-style: none;
+    padding: 0;
+}
+.pagination-modern .page-link-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 38px;
+    height: 38px;
+    padding: 0 12px;
+    font-size: 0.88rem;
+    font-weight: 500;
+    color: #475569;
+    background-color: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    text-decoration: none;
+    transition: all 0.15s ease-in-out;
+}
+.pagination-modern .page-link-btn:hover:not(.disabled) {
+    border-color: #db303a;
+    color: #db303a;
+    background-color: #fff5f5;
+}
+.pagination-modern .page-link-btn.active {
+    background-color: #db303a !important;
+    border-color: #db303a !important;
+    color: #ffffff !important;
+    font-weight: 700;
+}
+.pagination-modern .page-link-btn.disabled {
+    opacity: 0.45;
+    pointer-events: none;
+    cursor: not-allowed;
+    background-color: #f8fafc;
+}
+.pagination-modern .page-ellipsis {
+    padding: 0 6px;
+    color: #94a3b8;
+    font-weight: 600;
+}
+
+[data-bs-theme="dark"] .pagination-modern .page-link-btn {
+    background-color: #1e293b;
+    border-color: #334155;
+    color: #cbd5e1;
+}
+[data-bs-theme="dark"] .pagination-modern .page-link-btn:hover:not(.disabled) {
+    border-color: #db303a;
+    color: #ffffff;
+    background-color: #2d1c24;
+}
+[data-bs-theme="dark"] .pagination-modern .page-link-btn.active {
+    background-color: #db303a !important;
+    border-color: #db303a !important;
+    color: #ffffff !important;
+}
+[data-bs-theme="dark"] .pagination-modern .page-link-btn.disabled {
+    background-color: #0f172a;
+    border-color: #1e293b;
+    opacity: 0.4;
+}

@@ -1,0 +1,469 @@
+@model PROJECT_OTSP.Areas.Tutor.Controllers.TutorIncomeVm
+@{
+    ViewData["Title"] = "Thu nhập của tôi";
+}
+
+<style>
+    .income-stat-card {
+        background: var(--tutor-card-bg, #ffffff);
+        border: 1px solid var(--tutor-border, #e2e8f0);
+        border-radius: 12px;
+        padding: 20px 22px;
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+    }
+
+    [data-bs-theme="dark"] .income-stat-card {
+        background: #162032;
+        border-color: #263347;
+    }
+
+    .income-stat-label {
+        font-size: 13px;
+        color: var(--tutor-text-muted, #64748b);
+        font-weight: 500;
+        margin-bottom: 8px;
+    }
+
+    [data-bs-theme="dark"] .income-stat-label {
+        color: #94a3b8;
+    }
+
+    .income-stat-value {
+        font-size: 26px;
+        font-weight: 700;
+        color: var(--tutor-text-main, #0f172a);
+        line-height: 1.2;
+        margin-bottom: 6px;
+    }
+
+    [data-bs-theme="dark"] .income-stat-value {
+        color: #f8fafc;
+    }
+
+    .income-stat-subtext {
+        font-size: 12px;
+        color: var(--tutor-text-muted, #64748b);
+        margin: 0;
+    }
+
+    [data-bs-theme="dark"] .income-stat-subtext {
+        color: #94a3b8;
+    }
+
+    .income-section-card {
+        background: var(--tutor-card-bg, #ffffff);
+        border: 1px solid var(--tutor-border, #e2e8f0);
+        border-radius: 14px;
+        padding: 24px 26px;
+        margin-bottom: 24px;
+    }
+
+    [data-bs-theme="dark"] .income-section-card {
+        background: #162032;
+        border-color: #263347;
+    }
+
+    /* 1 Thanh tiến độ mượt mà theo đúng phong cách Image 3 */
+    .unified-progress-track {
+        width: 100%;
+        height: 14px;
+        background: #e2e8f0;
+        border-radius: 999px;
+        overflow: hidden;
+        position: relative;
+    }
+
+    [data-bs-theme="dark"] .unified-progress-track {
+        background: #263347;
+    }
+
+    .unified-progress-bar {
+        height: 100%;
+        background: linear-gradient(90deg, #16a34a 0%, #22c55e 100%);
+        border-radius: 999px;
+        transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    [data-bs-theme="dark"] .income-input {
+        background-color: #0f172a;
+        border-color: #334155;
+        color: #f8fafc;
+    }
+
+    [data-bs-theme="dark"] .income-input:focus {
+        background-color: #0f172a;
+        border-color: #3b82f6;
+        color: #ffffff;
+    }
+
+    .tutor-qr-box {
+        background: #ffffff;
+        border-radius: 12px;
+        padding: 16px;
+        text-align: center;
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+    }
+
+    [data-bs-theme="dark"] .tutor-qr-box {
+        background: #0f172a;
+        border-color: #334155;
+    }
+</style>
+
+<div class="tutor-page-container">
+    <!-- Header -->
+    <div class="tutor-page-header d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+        <div>
+            <div class="text-uppercase fw-bold text-muted small mb-1" style="letter-spacing: 0.5px;">TÀI CHÍNH / THU NHẬP</div>
+            <h1 class="tutor-page-title mb-1">Thu nhập của tôi</h1>
+            <p class="tutor-page-subtitle mb-0">Theo dõi buổi dạy và tiền thanh toán thực tế</p>
+        </div>
+        <div>
+            <form method="get" class="d-inline-block">
+                <select name="month" class="form-select form-select-sm fw-semibold income-input px-3 py-2" onchange="this.form.submit()" style="min-width: 150px; border-radius: 8px;">
+                    @foreach (var m in Model.AvailableMonths)
+                    {
+                        if (m == Model.SelectedMonth)
+                        {
+                            <option value="@m" selected="selected">Tháng @m</option>
+                        }
+                        else
+                        {
+                            <option value="@m">Tháng @m</option>
+                        }
+                    }
+                </select>
+            </form>
+        </div>
+    </div>
+
+    <!-- Alerts -->
+    @if (TempData["Success"] is string successMessage)
+    {
+        <div class="alert alert-success alert-dismissible fade show shadow-sm" role="alert">
+            <i class="bi bi-check-circle-fill me-2"></i>@successMessage
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Đóng"></button>
+        </div>
+    }
+
+    @if (TempData["Error"] is string errorMessage)
+    {
+        <div class="alert alert-warning alert-dismissible fade show shadow-sm" role="alert">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>@errorMessage
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Đóng"></button>
+        </div>
+    }
+
+    <!-- ==================== HÀNG 1: 3 THẺ BUỔI DẠY (DỮ LIỆU THỰC TẾ) ==================== -->
+    <div class="row g-3 mb-3">
+        <div class="col-12 col-md-4">
+            <div class="income-stat-card">
+                <div>
+                    <div class="income-stat-label">Tổng số buổi dạy</div>
+                    <div class="income-stat-value">@Model.TotalSessions <span class="fs-6 fw-normal text-muted">buổi</span></div>
+                </div>
+                <p class="income-stat-subtext">Theo lịch các lớp đang mở</p>
+            </div>
+        </div>
+        <div class="col-12 col-md-4">
+            <div class="income-stat-card">
+                <div>
+                    <div class="income-stat-label">Đã hoàn thành</div>
+                    <div class="income-stat-value" style="color: #22c55e;">@Model.CompletedSessions <span class="fs-6 fw-normal" style="color: #22c55e;">buổi</span></div>
+                </div>
+                <p class="income-stat-subtext">Đủ điều kiện tính thu nhập</p>
+            </div>
+        </div>
+        <div class="col-12 col-md-4">
+            <div class="income-stat-card">
+                <div>
+                    <div class="income-stat-label">Chờ xác nhận</div>
+                    <div class="income-stat-value" style="color: #eab308;">@Model.PendingConfirmSessions <span class="fs-6 fw-normal" style="color: #eab308;">buổi</span></div>
+                </div>
+                <p class="income-stat-subtext">Chờ học viên xác nhận</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== HÀNG 2: 3 THẺ GIỜ DẠY & ĐƠN GIÁ ==================== -->
+    <div class="row g-3 mb-3">
+        <div class="col-12 col-md-4">
+            <div class="income-stat-card">
+                <div>
+                    <div class="income-stat-label">Buổi sắp diễn ra</div>
+                    <div class="income-stat-value" style="color: #38bdf8;">@Model.UpcomingSessions <span class="fs-6 fw-normal" style="color: #38bdf8;">buổi</span></div>
+                </div>
+                <p class="income-stat-subtext">Theo lịch dạy sắp tới</p>
+            </div>
+        </div>
+        <div class="col-12 col-md-4">
+            <div class="income-stat-card">
+                <div>
+                    <div class="income-stat-label">Tổng giờ dạy</div>
+                    <div class="income-stat-value">@Model.TotalTeachingHours.ToString("0.#") <span class="fs-6 fw-normal text-muted">giờ</span></div>
+                </div>
+                <p class="income-stat-subtext">Từ các buổi đã hoàn thành</p>
+            </div>
+        </div>
+        <div class="col-12 col-md-4">
+            <div class="income-stat-card">
+                <div>
+                    <div class="income-stat-label">Trung bình / buổi</div>
+                    <div class="income-stat-value">@Model.AverageFeePerSession.ToString("N0") <span class="fs-6 fw-normal text-muted">đ</span></div>
+                </div>
+                <p class="income-stat-subtext">Học phí trước hoa hồng</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== HÀNG 3: 3 THẺ TÀI CHÍNH (HỌC PHÍ - HOA HỒNG 20% - THU NHẬP GIA SƯ 80%) ==================== -->
+    <div class="row g-3 mb-4">
+        <div class="col-12 col-md-4">
+            <div class="income-stat-card">
+                <div>
+                    <div class="income-stat-label">Tổng học phí hoàn thành</div>
+                    <div class="income-stat-value text-dark fw-bold">@Model.TotalTuition.ToString("N0") <span class="fs-6 fw-normal text-muted">đ</span></div>
+                </div>
+                <p class="income-stat-subtext">@Model.CompletedSessions buổi đã dạy xong</p>
+            </div>
+        </div>
+        <div class="col-12 col-md-4">
+            <div class="income-stat-card">
+                <div>
+                    <div class="income-stat-label">Hoa hồng nền tảng (20%)</div>
+                    <div class="income-stat-value" style="color: #eab308;">@Model.PlatformCommission.ToString("N0") <span class="fs-6 fw-normal" style="color: #eab308;">đ</span></div>
+                </div>
+                <p class="income-stat-subtext">Phí dịch vụ vận hành OTSP</p>
+            </div>
+        </div>
+        <div class="col-12 col-md-4">
+            <div class="income-stat-card" style="border-left: 4px solid #22c55e;">
+                <div>
+                    <div class="income-stat-label">Thu nhập gia sư (80%)</div>
+                    <div class="income-stat-value" style="color: #22c55e;">@Model.TutorPayout.ToString("N0") <span class="fs-6 fw-normal" style="color: #22c55e;">đ</span></div>
+                </div>
+                <p class="income-stat-subtext">Chờ Admin quyết toán cuối tháng</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== KHỐI 1 THANH TIẾN ĐỘ DUY NHẤT (THEO IMAGE 3) ==================== -->
+    <div class="income-section-card">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div>
+                <h5 class="fw-bold mb-1">Thống kê tiến độ giảng dạy</h5>
+                <p class="text-muted small mb-0">Tình trạng các buổi học trong tháng</p>
+            </div>
+            <div>
+                <span class="badge rounded-pill px-3 py-1.5 fw-semibold" style="background: #2563eb; color: #ffffff; font-size: 12px;">
+                    Tháng @Model.SelectedMonth.Split('/')[0]
+                </span>
+            </div>
+        </div>
+
+        <!-- 1 THANH TIẾN ĐỘ DUY NHẤT -->
+        <div class="my-3">
+            <div class="d-flex justify-content-between align-items-center small mb-2">
+                <span class="fw-semibold">
+                    Tiến độ hoàn thành: <span class="text-success fw-bold">@Model.CompletedSessions/@Model.TotalSessions buổi (@Model.CompletionPercentage%)</span>
+                </span>
+                <span class="text-muted">Tổng dự kiến: @Model.TotalSessions buổi</span>
+            </div>
+            <div class="unified-progress-track">
+                <div class="unified-progress-bar" style="width: @(Model.CompletionPercentage)%;"></div>
+            </div>
+        </div>
+
+        <div class="d-flex flex-wrap gap-4 pt-2 small">
+            <div class="d-flex align-items-center gap-2">
+                <span style="width: 10px; height: 10px; border-radius: 50%; background-color: #22c55e; display: inline-block;"></span>
+                <span class="fw-medium">Đã hoàn thành: <strong>@Model.CompletedSessions</strong> buổi</span>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                <span style="width: 10px; height: 10px; border-radius: 50%; background-color: #eab308; display: inline-block;"></span>
+                <span class="fw-medium">Chờ xác nhận: <strong>@Model.PendingConfirmSessions</strong> buổi</span>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                <span style="width: 10px; height: 10px; border-radius: 50%; background-color: #38bdf8; display: inline-block;"></span>
+                <span class="fw-medium">Sắp diễn ra: <strong>@Model.UpcomingSessions</strong> buổi</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== KHỐI LỊCH SỬ THANH TOÁN ==================== -->
+    <div class="income-section-card">
+        <div class="mb-3">
+            <h5 class="fw-bold mb-1">Lịch sử thanh toán</h5>
+            <p class="text-muted small mb-0">Quyết toán thu nhập hàng tháng từ Admin</p>
+        </div>
+
+        @if (Model.PayoutHistories.Count == 0)
+        {
+            <div class="p-4 text-center text-muted small">
+                <i class="bi bi-clock-history fs-2 d-block mb-2 text-secondary"></i>
+                <div class="fw-semibold">Chưa có kỳ quyết toán nào</div>
+                <div>Sau khi hoàn thành các buổi dạy trong tháng, Admin sẽ đối soát và giải ngân thu nhập định kỳ tại đây.</div>
+            </div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table tutor-custom-table align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th scope="col" style="width: 18%;">Kỳ</th>
+                            <th scope="col" style="width: 22%;">Học phí</th>
+                            <th scope="col" style="width: 20%;">Hoa hồng (20%)</th>
+                            <th scope="col" style="width: 22%;">Gia sư nhận (80%)</th>
+                            <th scope="col" style="width: 18%; text-align: right;">Trạng thái</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var p in Model.PayoutHistories)
+                        {
+                            <tr>
+                                <td>
+                                    <span class="fw-semibold">@p.Period</span>
+                                </td>
+                                <td>
+                                    <span class="fw-medium">@p.TuitionFee.ToString("N0") đ</span>
+                                </td>
+                                <td>
+                                    <span class="text-warning fw-medium">@p.CommissionFee.ToString("N0") đ</span>
+                                </td>
+                                <td>
+                                    <span class="text-success fw-bold">@p.TutorReceive.ToString("N0") đ</span>
+                                </td>
+                                <td style="text-align: right;">
+                                    @if (p.IsTransferred)
+                                    {
+                                        <span class="badge rounded-pill px-3 py-1.5 fw-semibold" style="background: #14532d; color: #86efac; font-size: 12px;">
+                                            Đã chuyển
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge rounded-pill px-3 py-1.5 fw-semibold" style="background: #854d0e; color: #fef08a; font-size: 12px;">
+                                            Chờ chuyển
+                                        </span>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+
+    <!-- ==================== KHỐI TÀI KHOẢN NHẬN TIỀN & MÃ QR VIETQR ==================== -->
+    <div class="income-section-card">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h5 class="fw-bold mb-1">Tài khoản nhận tiền & Mã QR VietQR</h5>
+                <p class="text-muted small mb-0">Thông tin admin sử dụng để quét mã chuyển tiền cuối tháng</p>
+            </div>
+            <div>
+                @if (Model.BankAccount.IsUpdated)
+                {
+                    <span class="badge rounded-pill px-3 py-1.5 fw-semibold" style="background: #14532d; color: #86efac; font-size: 12px;">
+                        <i class="bi bi-check-circle me-1"></i>Đã cập nhật
+                    </span>
+                }
+            </div>
+        </div>
+
+        <div class="row g-4 align-items-center">
+            <!-- Cột trái: Form thông tin tài khoản -->
+            <div class="col-12 col-lg-7">
+                <form asp-action="SaveBankAccount" method="post">
+                    @Html.AntiForgeryToken()
+                    <div class="row g-3">
+                        <div class="col-12 col-md-6">
+                            <label class="form-label small fw-semibold">Ngân hàng</label>
+                            <select name="BankName" class="form-select income-input">
+                                @{
+                                    var banks = new[] { "MBBank", "Vietcombank", "Techcombank", "ACB", "VPBank", "BIDV", "Agribank", "TPBank", "Sacombank", "OCB" };
+                                    foreach (var b in banks)
+                                    {
+                                        if (b == Model.BankAccount.BankName)
+                                        {
+                                            <option value="@b" selected="selected">@b</option>
+                                        }
+                                        else
+                                        {
+                                            <option value="@b">@b</option>
+                                        }
+                                    }
+                                }
+                            </select>
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label small fw-semibold">Số tài khoản</label>
+                            <input type="text" name="AccountNumber" value="@Model.BankAccount.AccountNumber" class="form-control income-input" placeholder="Ví dụ: 0984391940" required />
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label small fw-semibold">Chủ tài khoản</label>
+                            <input type="text" name="AccountHolder" value="@Model.BankAccount.AccountHolder" class="form-control income-input" placeholder="Tên in hoa không dấu" required />
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label small fw-semibold">CCCD / Định danh</label>
+                            <input type="text" name="CitizenId" value="@Model.BankAccount.CitizenId" class="form-control income-input" placeholder="12 số căn cước công dân" />
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center mt-4 pt-2 border-top">
+                        <span class="text-muted small fst-italic">Mã QR bên phải tự động đồng bộ theo tài khoản</span>
+                        <button type="submit" class="btn btn-primary px-4 fw-semibold" style="background-color: #2563eb; border-color: #2563eb; border-radius: 8px;">
+                            Lưu thông tin & Tạo QR
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Cột phải: HIỂN THỊ MÃ QR VIETQR NHẬN TIỀN -->
+            <div class="col-12 col-lg-5">
+                <div class="tutor-qr-box">
+                    <div class="small fw-bold text-dark mb-2">
+                        <i class="bi bi-qr-code-scan me-1 text-primary"></i>Mã VietQR nhận tiền của bạn
+                    </div>
+                    @if (!string.IsNullOrWhiteSpace(Model.BankAccount.QrImageUrl))
+                    {
+                        <div class="bg-white p-2 rounded-3 border d-inline-block shadow-sm">
+                            <img src="@Model.BankAccount.QrImageUrl" alt="Mã VietQR" class="img-fluid" style="max-width: 200px; height: auto;" />
+                        </div>
+                        <div class="small text-muted mt-2">
+                            <span class="d-block fw-semibold text-dark">@Model.BankAccount.BankName - @Model.BankAccount.AccountNumber</span>
+                            <span>Chủ TK: @Model.BankAccount.AccountHolder</span>
+                        </div>
+                        <div class="text-muted small mt-1" style="font-size: 11px;">
+                            <i class="bi bi-shield-check text-success me-1"></i>Admin quét mã QR này để thanh toán thu nhập hàng tháng
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="p-4 text-muted small">Vui lòng cập nhật STK để tạo mã QR</div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== KHỐI NGUYÊN TẮC TÍNH THU NHẬP ==================== -->
+    <div class="income-section-card" style="border-left: 4px solid #2563eb;">
+        <h6 class="fw-bold mb-2 d-flex align-items-center text-primary">
+            <i class="bi bi-shield-check me-2 fs-5"></i>Nguyên tắc tính thu nhập
+        </h6>
+        <p class="small text-muted mb-0 lh-base">
+            Học viên thanh toán học phí qua mã QR SePay trực tiếp vào tài khoản Admin OTSP để giữ bảo đảm. Chỉ buổi học được xác nhận hoàn thành mới được cộng vào học phí. Nền tảng khấu trừ 20% hoa hồng, gia sư nhận 80% vào kỳ quyết toán cuối tháng. Buổi hủy hoặc chưa xác nhận không được tính vào khoản thực nhận.
+        </p>
+    </div>
+</div>

@@ -515,7 +515,7 @@
                     <div class="d-flex flex-column flex-sm-row gap-3 align-items-sm-center">
                         @if (!string.IsNullOrWhiteSpace(Model.AvatarUrl))
                         {
-                            <img src="@Model.AvatarUrl" alt="@Model.FullName" class="tutor-avatar-xl" onerror="this.onerror=null;this.src='/assets/img/default-avatar.svg';" />
+                            <img src="@Model.AvatarUrl" alt="@Model.FullName" class="tutor-avatar-xl" width="96" height="96" fetchpriority="high" decoding="async" onerror="this.onerror=null;this.src='/assets/img/default-avatar.svg';" />
                         }
                         else
                         {
@@ -675,15 +675,15 @@
                 <div class="pro-card" id="tutorScheduleCard">
                     <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
                         <h2 class="section-title mb-0">
-                            <i class="bi bi-calendar-week text-danger"></i> Khung lịch rảnh &amp; Đặt giờ học thử (1 kèm 1)
+                            <i class="bi bi-calendar-week text-danger"></i> Khung lịch rảnh &amp; Đặt giờ học (1 kèm 1)
                         </h2>
-                        <span class="badge bg-danger-subtle text-danger border border-danger-subtle">
-                            Khối 2 tiếng · Bắt buộc đủ 4 tiếng/tuần
+                        <span class="badge bg-danger-subtle text-danger border border-danger-subtle" id="scheduleCardBadge">
+                            <i class="bi bi-clock-history me-1"></i>Mỗi buổi 2 tiếng · Tối đa 3 buổi/tuần (6 tiếng)
                         </span>
                     </div>
-                    <p class="small text-muted mb-3">
+                    <p class="small text-muted mb-3" id="scheduleCardDesc">
                         Lịch rảnh thực tế trong 14 ngày tới (đã tự động lọc bỏ giờ gia sư bận). 
-                        <strong>Bấm chọn 2 khung giờ (mỗi khung 2 tiếng = đủ 4 tiếng/tuần)</strong> để đề xuất lịch học 1 kèm 1 chia đều trong tuần.
+                        <strong>Học thử: chọn 1 buổi (2 tiếng). Học chính thức: chọn tối đa 3 buổi/tuần (6 tiếng)</strong> để lên lịch cố định và kích hoạt gói học phí tháng.
                     </p>
 
                     @if (Model.AvailableTrialSlots.Count == 0)
@@ -858,7 +858,7 @@
                                         <div>
                                             @if (!string.IsNullOrWhiteSpace(cls.CoverImageUrl))
                                             {
-                                                <img src="@cls.CoverImageUrl" alt="Ảnh bìa lớp @cls.Name" class="w-100 rounded mb-2" style="height:140px;object-fit:cover" loading="lazy" />
+                                                <img src="@cls.CoverImageUrl" alt="Ảnh bìa lớp @cls.Name" class="w-100 rounded mb-2" style="height:140px;object-fit:cover" loading="lazy" decoding="async" width="280" height="140" />
                                             }
                                             <div class="d-flex justify-content-between align-items-start mb-2">
                                                 <span class="badge bg-primary-subtle text-primary border border-primary-subtle">
@@ -907,7 +907,7 @@
                                         <div class="d-flex align-items-center gap-2">
                                             @if (!string.IsNullOrWhiteSpace(rev.StudentAvatarUrl))
                                             {
-                                                <img src="@rev.StudentAvatarUrl" alt="@rev.StudentName" width="32" height="32" class="rounded-circle" onerror="this.onerror=null;this.src='/assets/img/default-avatar.svg';" />
+                                                <img src="@rev.StudentAvatarUrl" alt="@rev.StudentName" width="32" height="32" class="rounded-circle" loading="lazy" decoding="async" onerror="this.onerror=null;this.src='/assets/img/default-avatar.svg';" />
                                             }
                                             else
                                             {
@@ -1016,31 +1016,47 @@
                                 </div>
                             </div>
 
-                            <!-- Khi chọn 1 kèm 1: Chọn slot học từ lịch rảnh thực tế của gia sư (Bắt buộc đủ 4 tiếng: 2 buổi, mỗi buổi 2 tiếng) -->
+                            <!-- Lựa chọn mục đích học (Khi chọn 1 kèm 1) -->
+                            <div class="mb-3" id="purposeSelectBox">
+                                <label class="form-label small fw-semibold">Mục đích kết nối</label>
+                                <div class="d-flex flex-column gap-2">
+                                    <div class="form-check p-2 border rounded-3 bg-light purpose-option">
+                                        <input class="form-check-input ms-1" type="radio" asp-for="Request.IsTrial" id="purposeTrial" value="true" checked />
+                                        <label class="form-check-label small ms-2 cursor-pointer" for="purposeTrial">
+                                            <span class="d-block fw-bold text-dark"><i class="bi bi-mortarboard text-danger me-1"></i>Đăng ký Học thử 1 buổi</span>
+                                            <span class="text-muted" style="font-size:11px;">Trải nghiệm 1 buổi học trực tuyến cùng gia sư để đánh giá mức độ phù hợp</span>
+                                        </label>
+                                    </div>
+                                    <div class="form-check p-2 border rounded-3 bg-light purpose-option">
+                                        <input class="form-check-input ms-1" type="radio" asp-for="Request.IsTrial" id="purposeOfficial" value="false" />
+                                        <label class="form-check-label small ms-2 cursor-pointer" for="purposeOfficial">
+                                            <span class="d-block fw-bold text-dark"><i class="bi bi-lightning-charge text-danger me-1"></i>Vào học chính thức (Gói tối đa 3 buổi = 6 tiếng/tuần)</span>
+                                            <span class="text-muted" style="font-size:11px;">Chọn các khung giờ cố định trong tuần (tối đa 3 buổi = 6 tiếng/tuần) để tạo lớp và tính gói học phí tháng</span>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Khung giờ học đề xuất (1 kèm 1) -->
                             <div class="mb-3" id="trialSlotSection">
                                 <label class="form-label small fw-semibold d-flex justify-content-between align-items-center mb-1">
-                                    <span><i class="bi bi-clock-history text-danger me-1"></i> Khung giờ học đề xuất (1 kèm 1) <span class="text-danger">*</span></span>
-                                    <span class="badge bg-danger-subtle text-danger border border-danger-subtle" id="hoursCountBadge" style="font-size:10px;">0 / 4 tiếng (0/2 buổi)</span>
+                                    <span id="slotSectionTitle"><i class="bi bi-clock-history text-danger me-1"></i> Khung giờ học đề xuất</span>
+                                    <span class="badge bg-secondary-subtle text-secondary border" id="hoursCountBadge" style="font-size:10px;">Chưa chọn buổi học</span>
                                 </label>
-
-                                <!-- Thanh tiến độ chọn giờ -->
-                                <div class="progress mb-2" style="height: 6px;">
-                                    <div id="slotProgressBar" class="progress-bar bg-danger" role="progressbar" style="width: 0%; transition: width .3s ease;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
-                                </div>
 
                                 <div id="noSlotSelectedNotice" class="p-3 border rounded-3 bg-light text-center">
                                     <i class="bi bi-calendar-event text-danger fs-3 d-block mb-1"></i>
-                                    <div class="small fw-semibold text-dark">Chưa chọn đủ lịch học</div>
-                                    <p class="text-muted small mb-0 mt-1" style="font-size: 11px;">
-                                        Bắt buộc chọn <strong>đủ 4 tiếng (2 buổi, mỗi buổi 2 tiếng)</strong> trực tiếp trên <strong>Khung lịch rảnh</strong> bên cạnh để chia đều trong tuần.
+                                    <div class="small fw-semibold text-dark" id="noSlotTitle">Chưa chọn lịch học</div>
+                                    <p class="text-muted small mb-0 mt-1" id="noSlotDesc" style="font-size: 11px;">
+                                        Bấm vào 1 khung giờ xanh trên <strong>Khung lịch rảnh</strong> bên cạnh để đặt lịch học thử, hoặc ghi chú giờ mong muốn vào ô Lời nhắn bên dưới.
                                     </p>
                                 </div>
 
                                 <div id="slotSelectedCard" class="p-3 border rounded-3 d-none">
                                     <div class="d-flex align-items-center justify-content-between mb-2">
-                                        <span class="small fw-bold text-dark" style="font-size: 12px;">Các buổi học đã chọn:</span>
+                                        <span class="small fw-bold text-dark" id="slotCardHeader" style="font-size: 12px;">Buổi học đã chọn:</span>
                                         <button type="button" class="btn btn-sm btn-link text-danger p-0 text-decoration-none" id="clearAllSlotsBtn" style="font-size: 11px;">
-                                            <i class="bi bi-trash3 me-1"></i>Xóa tất cả
+                                            <i class="bi bi-trash3 me-1"></i>Bỏ chọn
                                         </button>
                                     </div>
                                     <div id="selectedSlotsList" class="d-flex flex-column gap-2 mb-2">
@@ -1051,11 +1067,10 @@
                                     </div>
                                 </div>
 
-                                <div class="form-text small text-muted mt-1" style="font-size: 11px;">
-                                    <i class="bi bi-shield-check text-success me-1"></i>Lớp 1 kèm 1 yêu cầu chọn đúng 2 buổi (mỗi buổi 2 tiếng) để đạt đủ 4 tiếng/tuần.
+                                <div class="form-text small text-muted mt-1" id="slotHelpText" style="font-size: 11px;">
+                                    <i class="bi bi-info-circle text-primary me-1"></i>Gia sư sẽ xem và kích hoạt phòng học trực tuyến ngay khi đồng ý.
                                 </div>
                             </div>
-
                             <!-- Khi chọn Lớp nhóm: Chọn lớp nhóm có sẵn kèm thông tin lịch học cố định -->
                             <div class="mb-3 d-none" id="classroomSelectBox">
                                 <label class="form-label small fw-semibold" asp-for="Request.ClassroomId">
@@ -1073,7 +1088,7 @@
                                         <option value="">-- Chọn lớp nhóm mở sẵn --</option>
                                         @foreach (var cls in Model.Classrooms)
                                         {
-                                            <option value="@cls.Id" data-schedule="@cls.ScheduleSummary" data-fee="@cls.Fee.ToString("N0", money)">
+                                            <option value="@cls.Id" data-schedule="@cls.ScheduleSummary" data-fee="@cls.Fee.ToString("N0", money)" data-subject-id="@cls.SubjectId" data-grade-id="@cls.GradeLevelId" data-subject-grade="@($"{cls.SubjectId}_{cls.GradeLevelId}")">
                                                 @cls.Name (@cls.SubjectName - @cls.GradeLevelName) · Còn @cls.AvailableSeats chỗ
                                             </option>
                                         }
@@ -1161,6 +1176,9 @@
             const hiddenGrade = document.getElementById('hiddenGradeLevelId');
             const radioOneToOne = document.getElementById('typeOneToOne');
             const radioGroup = document.getElementById('typeGroup');
+            const purposeSelectBox = document.getElementById('purposeSelectBox');
+            const purposeTrial = document.getElementById('purposeTrial');
+            const purposeOfficial = document.getElementById('purposeOfficial');
             const classroomBox = document.getElementById('classroomSelectBox');
             const trialSlotSection = document.getElementById('trialSlotSection');
             const hiddenTrialSlot = document.getElementById('hiddenProposedTrialSlotUtc');
@@ -1168,13 +1186,16 @@
             const scheduleBadge = document.getElementById('classroomScheduleBadge');
             const scheduleText = document.getElementById('classroomScheduleText');
 
+            const slotSectionTitle = document.getElementById('slotSectionTitle');
             const noSlotNotice = document.getElementById('noSlotSelectedNotice');
+            const noSlotTitle = document.getElementById('noSlotTitle');
+            const noSlotDesc = document.getElementById('noSlotDesc');
             const slotSelectedCard = document.getElementById('slotSelectedCard');
+            const slotCardHeader = document.getElementById('slotCardHeader');
             const clearAllSlotsBtn = document.getElementById('clearAllSlotsBtn');
             const selectedSlotsList = document.getElementById('selectedSlotsList');
             const slotStatusAlert = document.getElementById('slotStatusAlert');
             const hoursCountBadge = document.getElementById('hoursCountBadge');
-            const slotProgressBar = document.getElementById('slotProgressBar');
             const hiddenSlotsContainer = document.getElementById('hiddenSlotsContainer');
             const sendRequestForm = document.getElementById('sendRequestForm');
 
@@ -1193,49 +1214,67 @@
                 syncSubjectGrade();
             }
 
-            if (radioGroup && radioOneToOne && classroomBox) {
-                radioGroup.addEventListener('change', function () {
-                    if (this.checked) classroomBox.classList.remove('d-none');
-                });
-                radioOneToOne.addEventListener('change', function () {
-                    if (this.checked) classroomBox.classList.add('d-none');
             function toggleType() {
-                if (radioGroup && radioGroup.checked) {
+                const isGroup = radioGroup && radioGroup.checked;
+                if (isGroup) {
                     if (classroomBox) classroomBox.classList.remove('d-none');
                     if (trialSlotSection) trialSlotSection.classList.add('d-none');
+                    if (purposeSelectBox) purposeSelectBox.classList.add('d-none');
                 } else {
                     if (classroomBox) classroomBox.classList.add('d-none');
                     if (trialSlotSection) trialSlotSection.classList.remove('d-none');
+                    if (purposeSelectBox) purposeSelectBox.classList.remove('d-none');
                     if (classroomSelect) classroomSelect.value = '';
                     if (scheduleBadge) scheduleBadge.classList.add('d-none');
                 }
+                updateSlotsUi();
             }
 
             if (radioGroup) radioGroup.addEventListener('change', toggleType);
             if (radioOneToOne) radioOneToOne.addEventListener('change', toggleType);
+            if (purposeTrial) purposeTrial.addEventListener('change', updateSlotsUi);
+            if (purposeOfficial) purposeOfficial.addEventListener('change', updateSlotsUi);
 
             const slotBtns = document.querySelectorAll('.trial-slot-picker-btn');
-
-            // Quản lý danh sách các slot đã chọn (Bắt buộc đủ 4 tiếng: 2 buổi, mỗi buổi 2 tiếng)
             let selectedSlots = [];
-            const MAX_SLOTS = 2; // 2 buổi x 2 tiếng = 4 tiếng/tuần
+            const tutorHourlyFee = @((long)Model.HourlyFee);
 
             function updateSlotsUi() {
-                // 1. Cập nhật giao diện trên các nút trong bảng lịch
+                const isTrial = purposeTrial ? purposeTrial.checked : true;
+
+                if (slotSectionTitle) {
+                    slotSectionTitle.innerHTML = isTrial
+                        ? '<i class="bi bi-mortarboard text-danger me-1"></i> Chọn giờ học thử đề xuất (1 buổi)'
+                        : '<i class="bi bi-calendar-week text-danger me-1"></i> Chọn khung giờ học (Tối đa 3 buổi = 6 tiếng/tuần)';
+                }
+
+                if (noSlotTitle && noSlotDesc) {
+                    if (isTrial) {
+                        noSlotTitle.textContent = 'Chưa chọn lịch học thử';
+                        noSlotDesc.innerHTML = 'Bấm chọn <strong>1 khung giờ xanh</strong> trên lịch rảnh bên cạnh để đặt lịch trải nghiệm thử 2 tiếng (miễn phí).';
+                    } else {
+                        noSlotTitle.textContent = 'Chưa chọn lịch học chính thức';
+                        noSlotDesc.innerHTML = 'Bấm chọn <strong>tối đa 3 khung giờ xanh</strong> cố định trong tuần (mỗi buổi 2 tiếng = tối đa 6 tiếng/tuần) để lên lịch cố định và set thanh toán.';
+                    }
+                }
+
                 slotBtns.forEach(btn => {
                     const btnIso = btn.dataset.iso;
                     const slotIndex = selectedSlots.findIndex(s => s.iso === btnIso);
                     const tagEl = btn.querySelector('.duration-tag');
                     if (slotIndex >= 0) {
                         btn.classList.add('is-selected');
-                        if (tagEl) tagEl.innerHTML = `<i class="bi bi-check-circle-fill me-1"></i>Buổi ${slotIndex + 1}`;
+                        if (tagEl) {
+                            tagEl.innerHTML = isTrial
+                                ? '<i class="bi bi-check-circle-fill me-1"></i>Học thử (2h)'
+                                : `<i class="bi bi-check-circle-fill me-1"></i>Buổi ${slotIndex + 1} (2h)`;
+                        }
                     } else {
                         btn.classList.remove('is-selected');
-                        if (tagEl) tagEl.innerHTML = `<i class="bi bi-clock me-1"></i>2 tiếng`;
+                        if (tagEl) tagEl.innerHTML = '<i class="bi bi-clock me-1"></i>2 tiếng';
                     }
                 });
 
-                // 2. Cập nhật các input hidden gửi lên server
                 if (hiddenSlotsContainer) {
                     hiddenSlotsContainer.innerHTML = '';
                     selectedSlots.forEach(s => {
@@ -1250,45 +1289,31 @@
                     hiddenTrialSlot.value = selectedSlots.length > 0 ? selectedSlots[0].iso : '';
                 }
 
-                // 3. Cập nhật tiến độ & huy hiệu
                 const count = selectedSlots.length;
-                const hours = count * 2;
-                const percent = Math.min(100, Math.round((hours / 4) * 100));
-
-                if (hoursCountBadge) {
-                    hoursCountBadge.textContent = `${hours} / 4 tiếng (${count}/2 buổi)`;
-                    if (count >= 2) {
-                        hoursCountBadge.className = 'badge bg-success text-white border border-success';
-                    } else if (count === 1) {
-                        hoursCountBadge.className = 'badge bg-warning-subtle text-warning-emphasis border border-warning-subtle';
-                    } else {
-                        hoursCountBadge.className = 'badge bg-danger-subtle text-danger border border-danger-subtle';
-                    }
-                }
-
-                if (slotProgressBar) {
-                    slotProgressBar.style.width = `${percent}%`;
-                    if (count >= 2) {
-                        slotProgressBar.className = 'progress-bar bg-success';
-                    } else if (count === 1) {
-                        slotProgressBar.className = 'progress-bar bg-warning';
-                    } else {
-                        slotProgressBar.className = 'progress-bar bg-danger';
-                    }
-                }
-
-                // 4. Render danh sách buổi đã chọn trong card
                 if (count === 0) {
                     if (noSlotNotice) noSlotNotice.classList.remove('d-none');
                     if (slotSelectedCard) slotSelectedCard.classList.add('d-none');
+                    if (hoursCountBadge) {
+                        hoursCountBadge.textContent = isTrial ? 'Chưa chọn buổi học' : 'Chưa chọn lịch học';
+                        hoursCountBadge.className = 'badge bg-secondary-subtle text-secondary border';
+                    }
                 } else {
                     if (noSlotNotice) noSlotNotice.classList.add('d-none');
                     if (slotSelectedCard) {
                         slotSelectedCard.classList.remove('d-none');
-                        if (count >= 2) {
-                            slotSelectedCard.className = 'p-3 border border-success rounded-3 bg-success-subtle';
+                        slotSelectedCard.className = 'p-3 border rounded-3 bg-light shadow-sm';
+                    }
+
+                    if (hoursCountBadge) {
+                        if (isTrial) {
+                            hoursCountBadge.textContent = 'Đã chọn 1 buổi học thử (2 tiếng) · Miễn phí';
+                            hoursCountBadge.className = 'badge bg-success text-white border border-success';
                         } else {
-                            slotSelectedCard.className = 'p-3 border border-warning rounded-3 bg-warning-subtle';
+                            const hours = count * 2;
+                            hoursCountBadge.textContent = `Đã chọn: ${count} / 3 buổi (${hours} / 6 tiếng)`;
+                            hoursCountBadge.className = count === 3
+                                ? 'badge bg-success text-white border border-success'
+                                : 'badge bg-warning text-dark border border-warning';
                         }
                     }
 
@@ -1299,7 +1324,7 @@
                                     <span class="badge ${idx === 0 ? 'bg-primary' : 'bg-success'} text-white rounded-circle d-flex align-items-center justify-content-center" style="width:20px;height:20px;font-size:10px;">${idx + 1}</span>
                                     <div>
                                         <div class="fw-bold text-dark" style="font-size:12px;">${s.date}</div>
-                                        <div class="text-secondary small" style="font-size:11px;">${s.time} (Khối 2 tiếng)</div>
+                                        <div class="text-secondary small" style="font-size:11px;">${s.time} (2 tiếng)</div>
                                     </div>
                                 </div>
                                 <button type="button" class="btn btn-sm btn-outline-danger py-0 px-2 btn-remove-single-slot" data-iso="${s.iso}" title="Bỏ chọn buổi này" style="font-size:11px;">
@@ -1319,12 +1344,38 @@
                     }
 
                     if (slotStatusAlert) {
-                        if (count >= 2) {
-                            slotStatusAlert.className = 'small p-2 rounded bg-success text-white d-flex align-items-center gap-2 mt-2';
-                            slotStatusAlert.innerHTML = '<i class="bi bi-check-circle-fill fs-6"></i><span><strong>Đã chọn đủ 4 tiếng (2 buổi/tuần)!</strong> Bạn đã sẵn sàng gửi yêu cầu.</span>';
+                        if (isTrial) {
+                            slotStatusAlert.className = 'small p-2 rounded bg-success-subtle text-success-emphasis border border-success-subtle mt-2'; slotStatusAlert.style.backgroundColor = '#DCFCE7'; slotStatusAlert.style.color = '#14532D'; slotStatusAlert.style.borderColor = '#86EFAC';
+                            slotStatusAlert.innerHTML = '<i class="bi bi-check-circle-fill fs-6 me-1" style="color:#166534;"></i><strong style="color:#14532D;">Đã chọn buổi học thử!</strong> <span style="color:#14532D;">Buổi học thử 2 tiếng hoàn toàn miễn phí. Gia sư sẽ xác nhận lịch học để mở phòng học trực tuyến.</span>';
                         } else {
-                            slotStatusAlert.className = 'small p-2 rounded bg-warning text-dark d-flex align-items-center gap-2 mt-2';
-                            slotStatusAlert.innerHTML = '<i class="bi bi-exclamation-circle-fill fs-6"></i><span><strong>Đã chọn 2/4 tiếng.</strong> Vui lòng bấm chọn thêm 1 buổi (2 tiếng) nữa trên lịch rảnh để đủ 4 tiếng.</span>';
+                            const hoursPerWeek = count * 2;
+                            const monthlyHours = hoursPerWeek * 4;
+                            const monthlyFee = tutorHourlyFee * monthlyHours;
+
+                            slotStatusAlert.className = 'small p-2 rounded bg-white border mt-2';
+                            slotStatusAlert.innerHTML = `
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <span class="text-dark fw-semibold"><i class="bi bi-calendar-check text-primary me-1"></i>Đã chọn ${count}/3 buổi (${hoursPerWeek} tiếng/tuần)</span>
+                                    <span class="badge ${count === 3 ? 'bg-success' : 'bg-warning text-dark'}">${count === 3 ? 'Đủ 6 tiếng/tuần' : 'Chưa đủ 3 buổi'}</span>
+                                </div>
+                                <div class="p-2 rounded bg-light border-top mt-1">
+                                    <div class="d-flex justify-content-between align-items-center mb-1 text-secondary" style="font-size: 11px;">
+                                        <span>Đơn giá gia sư:</span>
+                                        <strong>${tutorHourlyFee.toLocaleString('vi-VN')} đ/giờ</strong>
+                                    </div>
+                                    <div class="d-flex justify-content-between align-items-center mb-1 text-secondary" style="font-size: 11px;">
+                                        <span>Thời lượng gói tháng (4 tuần):</span>
+                                        <strong>${monthlyHours} tiếng</strong>
+                                    </div>
+                                    <div class="d-flex justify-content-between align-items-center border-top pt-1 text-dark" style="font-size: 12px;">
+                                        <span class="fw-bold">Học phí tháng dự kiến:</span>
+                                        <strong class="text-danger fs-6">${monthlyFee.toLocaleString('vi-VN')} đ</strong>
+                                    </div>
+                                </div>
+                                <div class="text-muted mt-2" style="font-size: 10px; line-height: 1.4;">
+                                    <i class="bi bi-shield-check text-success me-1"></i>Học phí được chuyển khoản qua mã QR SePay trực tiếp vào tài khoản Admin OTSP để giữ bảo đảm an toàn. Sàn đối soát và giải ngân thu nhập (sau khi trừ 20% phí sàn) cho gia sư định kỳ.
+                                </div>
+                            `;
                         }
                     }
                 }
@@ -1335,6 +1386,21 @@
                 updateSlotsUi();
             }
 
+            // Xử lý khi chuyển đổi giữa Học thử và Học chính thức
+            if (purposeTrial) {
+                purposeTrial.addEventListener('change', function () {
+                    if (this.checked && selectedSlots.length > 1) {
+                        selectedSlots = selectedSlots.slice(0, 1);
+                    }
+                    updateSlotsUi();
+                });
+            }
+            if (purposeOfficial) {
+                purposeOfficial.addEventListener('change', function () {
+                    updateSlotsUi();
+                });
+            }
+
             slotBtns.forEach(btn => {
                 btn.addEventListener('click', function () {
                     const isoVal = this.dataset.iso;
@@ -1342,28 +1408,36 @@
                     const timeText = this.dataset.time;
                     const displayText = this.dataset.display || `${dateText} ${timeText}`;
 
+                    const isTrial = purposeTrial ? purposeTrial.checked : true;
                     const existingIndex = selectedSlots.findIndex(s => s.iso === isoVal);
+
                     if (existingIndex >= 0) {
-                        // Bấm lại ô đang chọn để hủy chọn
                         selectedSlots.splice(existingIndex, 1);
                         updateSlotsUi();
                         return;
                     }
 
-                    // Nếu đã chọn đủ 2 buổi (4 tiếng) mà cố chọn thêm
-                    if (selectedSlots.length >= MAX_SLOTS) {
-                        alert('Bạn đã chọn đủ 4 tiếng (2 buổi/tuần). Nếu muốn đổi khung giờ, vui lòng bấm nút (X) bỏ chọn bớt 1 buổi trước.');
-                        return;
+                    if (isTrial) {
+                        selectedSlots = [{
+                            iso: isoVal,
+                            date: dateText,
+                            time: timeText,
+                            display: displayText
+                        }];
+                    } else {
+                        // Giới hạn tối đa 3 buổi/tuần (6 tiếng)
+                        if (selectedSlots.length >= 3) {
+                            alert('Gói học chính thức tiêu chuẩn tối đa 3 buổi/tuần (tổng cộng 6 tiếng/tuần).\nBạn đã chọn đủ 3 buổi. Vui lòng bấm bỏ chọn một buổi trước nếu muốn đổi sang khung giờ khác!');
+                            return;
+                        }
+                        selectedSlots.push({
+                            iso: isoVal,
+                            date: dateText,
+                            time: timeText,
+                            display: displayText
+                        });
                     }
 
-                    selectedSlots.push({
-                        iso: isoVal,
-                        date: dateText,
-                        time: timeText,
-                        display: displayText
-                    });
-
-                    // Tự động chuyển radio sang 1 kèm 1 nếu đang ở nhóm
                     if (radioOneToOne && !radioOneToOne.checked) {
                         radioOneToOne.checked = true;
                         toggleType();
@@ -1371,34 +1445,41 @@
 
                     updateSlotsUi();
 
-                    // Cuộn nhẹ tới form nếu trên màn hình nhỏ
                     if (window.innerWidth < 992 && slotSelectedCard) {
                         slotSelectedCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                     }
                 });
             });
-
             if (clearAllSlotsBtn) {
                 clearAllSlotsBtn.addEventListener('click', function () {
                     deselectAllSlots();
                 });
             }
 
-            // Kiểm tra ràng buộc khi gửi form: 1 kèm 1 bắt buộc phải chọn ĐỦ 4 TIẾNG (2 buổi x 2 tiếng)
             if (sendRequestForm) {
                 sendRequestForm.addEventListener('submit', function (e) {
                     if (radioOneToOne && radioOneToOne.checked) {
-                        if (selectedSlots.length < 2) {
-                            e.preventDefault();
-                            const currentHours = selectedSlots.length * 2;
-                            alert(`Lớp 1 kèm 1 bắt buộc phải chọn đủ 4 tiếng (2 buổi học, mỗi buổi 2 tiếng) chia đều trong tuần.\nHiện tại bạn mới chọn ${currentHours}/4 tiếng (${selectedSlots.length}/2 buổi).`);
-                            const schedCard = document.getElementById('tutorScheduleCard');
-                            if (schedCard) {
-                                schedCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                                schedCard.classList.add('border-danger', 'shadow');
-                                setTimeout(() => schedCard.classList.remove('border-danger', 'shadow'), 2500);
+                        const isTrial = purposeTrial ? purposeTrial.checked : true;
+                        const messageInput = document.querySelector('textarea[name="Request.Message"]');
+                        const hasMessage = messageInput && messageInput.value.trim().length > 0;
+
+                        if (isTrial) {
+                            if (selectedSlots.length === 0 && !hasMessage) {
+                                e.preventDefault();
+                                alert('Vui lòng chọn 1 khung giờ học thử từ lịch rảnh bên cạnh, hoặc ghi chú thời gian bạn mong muốn vào ô Lời nhắn.');
+                                return false;
                             }
-                            return false;
+                        } else {
+                            if (selectedSlots.length === 0 && !hasMessage) {
+                                e.preventDefault();
+                                alert('Vui lòng chọn các khung giờ học cố định trong tuần (khuyến nghị đủ 3 buổi = 6 tiếng/tuần) từ lịch rảnh bên cạnh.');
+                                return false;
+                            }
+                            if (selectedSlots.length > 3) {
+                                e.preventDefault();
+                                alert('Bạn chỉ được chọn tối đa 3 buổi/tuần (tổng cộng 6 tiếng/tuần).');
+                                return false;
+                            }
                         }
                     }
                 });
@@ -1408,14 +1489,25 @@
                 classroomSelect.addEventListener('change', function () {
                     const opt = this.options[this.selectedIndex];
                     const sched = opt ? opt.getAttribute('data-schedule') : null;
+                    const fee = opt ? opt.getAttribute('data-fee') : null;
+                    const subGrade = opt ? opt.getAttribute('data-subject-grade') : null;
+
+                    // Tự động đồng bộ môn & cấp học khi học viên chọn lớp nhóm
+                    if (subGrade && select && select.value !== subGrade) {
+                        select.value = subGrade;
+                        syncSubjectGrade();
+                    }
+
                     if (sched) {
-                        scheduleText.textContent = sched;
+                        scheduleText.innerHTML = `<div><i class="bi bi-calendar-event text-danger me-1"></i><strong>Lịch học cố định:</strong> ${sched}</div>${fee ? `<div class="mt-1 text-danger fw-bold"><i class="bi bi-cash-coin me-1"></i>Học phí tháng: ${fee} đ / học viên</div><div class="text-muted mt-1" style="font-size:10px;"><i class="bi bi-shield-check text-success me-1"></i>Học phí được chuyển qua QR SePay về tài khoản Admin OTSP để đảm bảo an toàn sau khi gia sư chấp nhận yêu cầu.</div>` : ''}`;
                         scheduleBadge.classList.remove('d-none');
                     } else {
                         scheduleBadge.classList.add('d-none');
                     }
                 });
             }
+
+            toggleType();
         });
     </script>
 }
