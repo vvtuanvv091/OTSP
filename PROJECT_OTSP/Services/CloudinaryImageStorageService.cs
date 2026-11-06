@@ -5,6 +5,9 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats.Webp;
+using SixLabors.ImageSharp.Processing;
 
 namespace PROJECT_OTSP.Services;
 
@@ -22,6 +25,7 @@ public interface IImageStorageService
 {
     Task<StoredImage> UploadClassroomCoverAsync(IFormFile file, CancellationToken cancellationToken);
     Task<StoredImage> UploadAvatarAsync(IFormFile file, CancellationToken cancellationToken);
+    Task<StoredImage> UploadChatImageAsync(IFormFile file, CancellationToken cancellationToken);
     Task DeleteAsync(string publicId, CancellationToken cancellationToken);
 }
 
@@ -29,7 +33,7 @@ public sealed class CloudinaryImageStorageService : IImageStorageService
 {
     private static readonly HashSet<string> AllowedExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
-        ".jpg", ".jpeg", ".png", ".webp"
+        ".jpg", ".jpeg", ".png", ".webp", ".gif"
     };
 
     private readonly CloudinarySettings _settings;
@@ -95,6 +99,7 @@ public sealed class CloudinaryImageStorageService : IImageStorageService
             var webRoot = _environment.WebRootPath ?? Path.Combine(_environment.ContentRootPath, "wwwroot");
             Directory.CreateDirectory(Path.Combine(webRoot, "uploads", "avatars"));
             Directory.CreateDirectory(Path.Combine(webRoot, "uploads", "classrooms"));
+            Directory.CreateDirectory(Path.Combine(webRoot, "uploads", "chat"));
         }
         catch (Exception ex)
         {
@@ -187,6 +192,48 @@ public sealed class CloudinaryImageStorageService : IImageStorageService
         return await SaveToLocalFolderAsync(file, "classrooms", cancellationToken);
     }
 
+    public async Task<StoredImage> UploadChatImageAsync(IFormFile file, CancellationToken cancellationToken)
+    {
+        ValidateImageFile(file, maxBytes: 10 * 1024 * 1024);
+
+        if (IsCloudinaryConfigured())
+        {
+            try
+            {
+                var cloudinary = CreateClient();
+                await using var stream = file.OpenReadStream();
+                var result = await cloudinary.UploadAsync(new ImageUploadParams
+                {
+                    File = new FileDescription(file.FileName, stream),
+                    Folder = "otsp/chat",
+                    PublicId = Guid.NewGuid().ToString("N"),
+                    Overwrite = false,
+                    UseFilename = false,
+                    UniqueFilename = false
+                }, cancellationToken);
+
+                if (result.Error is null && result.SecureUrl is not null && !string.IsNullOrWhiteSpace(result.PublicId))
+                {
+                    const string uploadPath = "/image/upload/";
+                    var secureUrl = result.SecureUrl.ToString();
+                    var markerIndex = secureUrl.IndexOf(uploadPath, StringComparison.Ordinal);
+                    if (markerIndex >= 0)
+                        secureUrl = secureUrl.Insert(markerIndex + uploadPath.Length, "f_auto,q_auto,c_limit,w_1200,h_1200/");
+
+                    return new StoredImage(secureUrl, result.PublicId);
+                }
+
+                _logger.LogWarning("Cloudinary chat upload returned error: {Error}. Falling back to local storage.", result.Error?.Message);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to upload chat image to Cloudinary. Falling back to local storage.");
+            }
+        }
+
+        return await SaveToLocalFolderAsync(file, "chat", cancellationToken);
+    }
+
     public async Task DeleteAsync(string publicId, CancellationToken cancellationToken)
     {
         if (IsCloudinaryConfigured())
@@ -225,18 +272,85 @@ public sealed class CloudinaryImageStorageService : IImageStorageService
         var targetDir = Path.Combine(webRoot, "uploads", subFolder);
         Directory.CreateDirectory(targetDir);
 
-        var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
-        var fileName = $"{Guid.NewGuid():N}{extension}";
-        var fullPath = Path.Combine(targetDir, fileName);
-
-        await using (var stream = new FileStream(fullPath, FileMode.CreateNew, FileAccess.Write))
+        try
         {
-            await file.CopyToAsync(stream, cancellationToken);
-        }
+            var fileName = $"{Guid.NewGuid():N}.webp";
+            var fullPath = Path.Combine(targetDir, fileName);
 
-        var relativeUrl = $"/uploads/{subFolder}/{fileName}";
-        var relativePublicId = $"{subFolder}/{fileName}";
-        return new StoredImage(relativeUrl, relativePublicId);
+            await using var inStream = file.OpenReadStream();
+            using var image = await Image.LoadAsync(inStream, cancellationToken);
+
+            if (string.Equals(subFolder, "avatars", StringComparison.OrdinalIgnoreCase))
+            {
+                // Thuật toán tối ưu Avatar:
+                // Cắt cúp vuông Crop 400x400 theo trung tâm ảnh với bộ lọc Lanczos3 sắc nét
+                var resizeOptions = new ResizeOptions
+                {
+                    Size = new SixLabors.ImageSharp.Size(400, 400),
+                    Mode = ResizeMode.Crop,
+                    Position = AnchorPositionMode.Center,
+                    Sampler = KnownResamplers.Lanczos3
+                };
+                image.Mutate(ctx => ctx.Resize(resizeOptions));
+            }
+            else if (string.Equals(subFolder, "classrooms", StringComparison.OrdinalIgnoreCase))
+            {
+                // Thuật toán tối ưu Bìa lớp học: Giới hạn tối đa 1200x800, giữ nguyên tỷ lệ
+                if (image.Width > 1200 || image.Height > 800)
+                {
+                    var resizeOptions = new ResizeOptions
+                    {
+                        Size = new SixLabors.ImageSharp.Size(1200, 800),
+                        Mode = ResizeMode.Max,
+                        Sampler = KnownResamplers.Lanczos3
+                    };
+                    image.Mutate(ctx => ctx.Resize(resizeOptions));
+                }
+            }
+            else if (string.Equals(subFolder, "chat", StringComparison.OrdinalIgnoreCase))
+            {
+                // Thuật toán tối ưu ảnh Chat: Giới hạn tối đa 1200x1200, giữ nguyên tỷ lệ
+                if (image.Width > 1200 || image.Height > 1200)
+                {
+                    var resizeOptions = new ResizeOptions
+                    {
+                        Size = new SixLabors.ImageSharp.Size(1200, 1200),
+                        Mode = ResizeMode.Max,
+                        Sampler = KnownResamplers.Lanczos3
+                    };
+                    image.Mutate(ctx => ctx.Resize(resizeOptions));
+                }
+            }
+
+            var webpEncoder = new WebpEncoder
+            {
+                Quality = 82,
+                FileFormat = WebpFileFormatType.Lossy
+            };
+
+            await image.SaveAsync(fullPath, webpEncoder, cancellationToken);
+
+            var relativeUrl = $"/uploads/{subFolder}/{fileName}";
+            var relativePublicId = $"{subFolder}/{fileName}";
+            return new StoredImage(relativeUrl, relativePublicId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Tối ưu ảnh bằng ImageSharp thất bại, chuyển về lưu trữ file gốc.");
+
+            var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
+            var fallbackName = $"{Guid.NewGuid():N}{extension}";
+            var fallbackPath = Path.Combine(targetDir, fallbackName);
+
+            await using (var stream = new FileStream(fallbackPath, FileMode.CreateNew, FileAccess.Write))
+            {
+                await file.CopyToAsync(stream, cancellationToken);
+            }
+
+            var relativeUrl = $"/uploads/{subFolder}/{fallbackName}";
+            var relativePublicId = $"{subFolder}/{fallbackName}";
+            return new StoredImage(relativeUrl, relativePublicId);
+        }
     }
 
     private static void ValidateImageFile(IFormFile file, long maxBytes)

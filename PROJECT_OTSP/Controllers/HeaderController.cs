@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using PROJECT_OTSP.Data;
+using PROJECT_OTSP.Models;
 
 namespace PROJECT_OTSP.Controllers;
 
@@ -30,38 +31,105 @@ public class HeaderController : Controller
     public async Task<IActionResult> Summary(CancellationToken cancellationToken)
     {
         var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (string.IsNullOrWhiteSpace(userId))
-            return Unauthorized();
-
-        // Cache tóm tắt header (thông báo + thông tin người dùng) trong 15 giây
-        var cacheKey = $"hdr_summary_{userId}";
-        if (_cache.TryGetValue(cacheKey, out object? cachedResult) && cachedResult != null)
+        if (string.IsNullOrEmpty(userId))
         {
-            return Json(cachedResult);
+            return Json(new
+            {
+                user = new { name = "", email = "", avatarUrl = (string?)null, role = "" },
+                unread = 0,
+                unreadNotifications = 0,
+                unreadMessages = 0,
+                totalUnread = 0,
+                items = Array.Empty<object>()
+            });
         }
 
-        // Lấy thông tin hiển thị của user (FullName, Email, AvatarUrl) với projection gọn nhẹ, cache 30 giây
-        var userInfo = await _cache.GetOrCreateAsync($"hdr_user_{userId}", async entry =>
+        var cacheKey = $"header_summary_{userId}";
+        if (_cache.TryGetValue(cacheKey, out object? cached) && cached != null)
         {
-            entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(30);
-            return await _db.Users
-                .AsNoTracking()
-                .Where(u => u.Id == userId)
-                .Select(u => new
-                {
-                    name = !string.IsNullOrWhiteSpace(u.FullName) ? u.FullName : u.UserName,
-                    email = u.Email,
-                    avatarUrl = u.AvatarUrl
-                })
-                .FirstOrDefaultAsync(cancellationToken);
-        });
+            return Json(cached);
+        }
+
+        var userInfo = await _db.Users
+            .AsNoTracking()
+            .Where(u => u.Id == userId)
+            .Select(u => new
+            {
+                name = string.IsNullOrWhiteSpace(u.FullName) ? u.UserName : u.FullName,
+                email = u.Email,
+                avatarUrl = u.AvatarUrl
+            })
+            .FirstOrDefaultAsync(cancellationToken);
 
         if (userInfo == null)
-            return Unauthorized();
+        {
+            userInfo = new { name = (string?)(User.Identity?.Name ?? ""), email = (string?)"", avatarUrl = (string?)null };
+        }
 
-        var unread = await _db.Notifications
+        var roleLabel = User.IsInRole("Admin")
+            ? "Quản trị viên"
+            : (User.IsInRole("Tutor") ? "Gia sư" : "Học viên");
+
+        string? tutorVerification = null;
+        if (User.IsInRole("Tutor"))
+        {
+            var tutorProfile = await _db.TutorProfiles
+                .AsNoTracking()
+                .Where(t => t.UserId == userId)
+                .Select(t => (PROJECT_OTSP.Models.Enums.VerificationStatus?)t.VerificationStatus)
+                .FirstOrDefaultAsync(cancellationToken);
+            tutorVerification = tutorProfile?.ToString() ?? "Pending";
+        }
+
+        // Đồng bộ tin nhắn chưa đọc vào bảng Notifications nếu chưa có
+        var unreadMessagesList = await _db.Messagers
+            .AsNoTracking()
+            .Where(m => m.ReceiverId == userId && !m.IsRead)
+            .Include(m => m.Sender)
+            .OrderByDescending(m => m.SentAt)
+            .Take(10)
+            .ToListAsync(cancellationToken);
+
+        if (unreadMessagesList.Count > 0)
+        {
+            var senderGroups = unreadMessagesList.GroupBy(m => m.SenderId);
+            var hasNewNotifs = false;
+            foreach (var group in senderGroups)
+            {
+                var senderId = group.Key;
+                var notifTag = $"[url:/Chat?contactId={senderId}]";
+                var hasNotif = await _db.Notifications
+                    .AnyAsync(n => n.UserId == userId && !n.IsRead && n.Content.Contains(notifTag), cancellationToken);
+
+                if (!hasNotif)
+                {
+                    var lastMsg = group.OrderByDescending(m => m.SentAt).First();
+                    var senderName = lastMsg.Sender?.FullName ?? lastMsg.Sender?.UserName ?? "Thành viên OTSP";
+                    var snippet = lastMsg.Content.Length > 80 ? lastMsg.Content[..80] + "..." : lastMsg.Content;
+                    _db.Notifications.Add(new Notification
+                    {
+                        UserId = userId,
+                        Title = $"Tin nhắn mới từ {senderName}",
+                        Content = $"\"{snippet}\" {notifTag}",
+                        CreatedAt = lastMsg.SentAt,
+                        IsRead = false
+                    });
+                    hasNewNotifs = true;
+                }
+            }
+
+            if (hasNewNotifs)
+            {
+                await _db.SaveChangesAsync(cancellationToken);
+            }
+        }
+
+        var unreadNotifications = await _db.Notifications
             .AsNoTracking()
             .CountAsync(n => n.UserId == userId && !n.IsRead, cancellationToken);
+
+        // Theo yêu cầu người dùng: Số thông báo tập trung tại mục Thông báo và Pill Badge
+        var totalUnread = unreadNotifications;
 
         var items = await _db.Notifications
             .AsNoTracking()
@@ -72,7 +140,7 @@ public class HeaderController : Controller
             {
                 id = n.Id,
                 title = n.Title,
-                content = n.Content,
+                content = n.Content.Contains("[url:") ? n.Content.Substring(0, n.Content.IndexOf("[url:")).Trim() : n.Content,
                 createdAt = n.CreatedAt,
                 isRead = n.IsRead,
                 targetUrl = $"/Notifications/Open?id={n.Id}"
@@ -81,14 +149,23 @@ public class HeaderController : Controller
 
         var result = new
         {
-            user = userInfo,
-            unread,
+            user = new
+            {
+                name = userInfo.name,
+                email = userInfo.email,
+                avatarUrl = userInfo.avatarUrl,
+                role = roleLabel,
+                verificationStatus = tutorVerification
+            },
+            unread = totalUnread,
+            unreadNotifications,
+            unreadMessages = 0,
+            totalUnread,
             items
         };
 
-        _cache.Set(cacheKey, result, TimeSpan.FromSeconds(30));
+        _cache.Set(cacheKey, result, TimeSpan.FromSeconds(15));
 
         return Json(result);
     }
 }
-

@@ -22,6 +22,9 @@ public class SendConnectionRequestDto
     [Display(Name = "Hình thức lớp mong muốn")]
     public ClassroomType PreferredType { get; set; } = ClassroomType.OneToOne;
 
+    [Display(Name = "Đăng ký học thử 1 buổi (true) hoặc Vào học chính thức luôn (false)")]
+    public bool IsTrial { get; set; } = true;
+
     [Display(Name = "Lớp học tham gia")]
     public int? ClassroomId { get; set; }
 

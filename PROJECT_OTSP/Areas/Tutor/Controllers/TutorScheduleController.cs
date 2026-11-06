@@ -1,4 +1,4 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
@@ -109,6 +109,18 @@ public sealed class TutorScheduleController : TutorAreaController
         var monday = currentMonday.AddDays(weekOffset * 7);
         return (monday, monday.AddDays(6), weekOffset);
     }
+
+    private static string ToVnDay(DayOfWeek d) => d switch
+    {
+        DayOfWeek.Monday => "Thứ Hai",
+        DayOfWeek.Tuesday => "Thứ Ba",
+        DayOfWeek.Wednesday => "Thứ Tư",
+        DayOfWeek.Thursday => "Thứ Năm",
+        DayOfWeek.Friday => "Thứ Sáu",
+        DayOfWeek.Saturday => "Thứ Bảy",
+        DayOfWeek.Sunday => "Chủ Nhật",
+        _ => d.ToString()
+    };
 
     private static DateOnly MondayOf(DateOnly date) =>
         date.AddDays(-(((int)date.DayOfWeek + 6) % 7));
@@ -224,19 +236,128 @@ public sealed class TutorScheduleController : TutorAreaController
             .ToList();
     }
 
-    private Task<List<TutorTeachingScheduleDto>> LoadTeachingRequestsAsync(string userId, CancellationToken ct) =>
-        _dbContext.ConnectionRequests
+    private async Task<List<TutorTeachingScheduleDto>> LoadTeachingRequestsAsync(string userId, CancellationToken ct)
+    {
+        // 1. Tự động liên kết và kích hoạt lớp chính thức cho các yêu cầu đã chấp nhận nhưng chưa gán lớp chính
+        var unlinkedOfficial = await _dbContext.ConnectionRequests
+            .Include(r => r.Student).ThenInclude(s => s.User)
+            .Include(r => r.Tutor)
+            .Include(r => r.Subject)
+            .Include(r => r.GradeLevel)
+            .Include(r => r.Classroom!).ThenInclude(c => c.WeeklySchedules)
+            .Include(r => r.TrialSchedules)
+            .Where(r => r.Tutor.UserId == userId
+                     && r.Status == RequestStatus.Accepted
+                     && (r.Classroom == null || (!r.Classroom.WeeklySchedules.Any() && r.Classroom.Fee <= 0))
+                     && ((r.Message != null && r.Message.Contains("Vào học chính thức")) || r.TrialSchedules.Count > 1))
+            .ToListAsync(ct);
+
+        if (unlinkedOfficial.Count > 0)
+        {
+            foreach (var req in unlinkedOfficial)
+            {
+                var sName = req.Student?.User?.FullName ?? "Học viên";
+                var subName = req.Subject?.Name ?? "Môn học";
+                var tSub = await _dbContext.TutorSubjects.AsNoTracking()
+                    .FirstOrDefaultAsync(ts => ts.TutorId == req.TutorId && ts.SubjectId == req.SubjectId && ts.GradeLevelId == req.GradeLevelId, ct);
+                var hFee = (tSub != null && tSub.HourlyFee > 0) ? tSub.HourlyFee : (req.Tutor.HourlyFee > 0 ? req.Tutor.HourlyFee : 150000);
+                var sCount = Math.Clamp(req.TrialSchedules.Count > 0 ? req.TrialSchedules.Count : 3, 1, 3);
+                var mFee = hFee * 2.0m * sCount * 4;
+
+                var offClass = req.Classroom;
+                if (offClass == null)
+                {
+                    offClass = new Classroom
+                    {
+                        Name = $"Lớp 1-1: {subName} - {sName}",
+                        Fee = mFee,
+                        Status = ClassroomStatus.Active,
+                        Type = ClassroomType.OneToOne,
+                        MaxStudents = 1,
+                        SessionsPerWeek = sCount,
+                        HoursPerSession = 2.0,
+                        TutorId = req.TutorId,
+                        SubjectId = req.SubjectId,
+                        GradeLevelId = req.GradeLevelId,
+                        StartDate = DateOnly.FromDateTime(DateTime.UtcNow.AddHours(VietnamUtcOffsetHours))
+                    };
+                    _dbContext.Classrooms.Add(offClass);
+                    req.Classroom = offClass;
+                }
+                else
+                {
+                    offClass.Name = $"Lớp 1-1: {subName} - {sName}";
+                    offClass.Fee = mFee;
+                    offClass.SessionsPerWeek = sCount;
+                    offClass.Status = ClassroomStatus.Active;
+                }
+
+                if (!offClass.WeeklySchedules.Any() && req.TrialSchedules.Count > 0)
+                {
+                    int sIndex = 1;
+                    foreach (var sItem in req.TrialSchedules.OrderBy(ts => ts.ScheduledAt))
+                    {
+                        var vn = sItem.ScheduledAt.AddHours(VietnamUtcOffsetHours);
+                        var start = TimeOnly.FromTimeSpan(vn.TimeOfDay);
+                        var end = start.AddHours(2);
+                        offClass.WeeklySchedules.Add(new ClassroomWeeklySchedule
+                        {
+                            Classroom = offClass,
+                            SessionIndex = sIndex++,
+                            DayOfWeek = vn.DayOfWeek,
+                            StartTime = start,
+                            EndTime = end
+                        });
+                    }
+                }
+
+                var isEnr = await _dbContext.ClassroomStudents.AnyAsync(cs => cs.ClassroomId == offClass.Id && cs.StudentId == req.StudentId, ct);
+                if (!isEnr)
+                {
+                    _dbContext.ClassroomStudents.Add(new ClassroomStudent
+                    {
+                        Classroom = offClass,
+                        StudentId = req.StudentId,
+                        JoinedAt = DateTime.UtcNow
+                    });
+                }
+
+                var hasPay = await _dbContext.Payments.AnyAsync(p => p.ClassroomId == offClass.Id && p.StudentId == req.StudentId, ct);
+                if (!hasPay && mFee > 0)
+                {
+                    _dbContext.Payments.Add(new Payment
+                    {
+                        StudentId = req.StudentId,
+                        Classroom = offClass,
+                        Amount = mFee,
+                        Method = "VietQR",
+                        Status = PaymentStatus.Pending
+                    });
+                }
+
+                foreach (var ts in req.TrialSchedules)
+                {
+                    ts.Status = ScheduleStatus.Confirmed;
+                }
+            }
+            await _dbContext.SaveChangesAsync(ct);
+        }
+
+        // 2. Tải danh sách yêu cầu dạy
+        var rawRequests = await _dbContext.ConnectionRequests
             .AsNoTracking()
             .Where(request => request.Tutor.UserId == userId && request.Status == RequestStatus.Accepted)
             .OrderByDescending(request => request.RespondedAt)
-            .Select(request => new TutorTeachingScheduleDto
+            .Select(request => new
             {
-                RequestId = request.Id,
+                request.Id,
                 StudentName = request.Student.User.FullName,
+                StudentUserId = request.Student.UserId,
                 SubjectName = request.Subject.Name,
                 GradeLevelName = request.GradeLevel.Name,
-                PreferredType = request.PreferredType,
-                CreatedAt = request.CreatedAt,
+                request.PreferredType,
+                request.CreatedAt,
+                request.Message,
                 TrialScheduledAt = request.TrialSchedules
                     .OrderByDescending(schedule => schedule.ScheduledAt)
                     .Select(schedule => (DateTime?)schedule.ScheduledAt)
@@ -253,19 +374,68 @@ public sealed class TutorScheduleController : TutorAreaController
                 ClassSessionStatus = request.TrialSchedules
                     .Where(schedule => schedule.Status == ScheduleStatus.Confirmed)
                     .OrderByDescending(schedule => schedule.ScheduledAt)
-                    .Select(schedule => schedule.ClassSession == null
-                        ? (SessionStatus?)null
-                        : schedule.ClassSession.Status)
+                    .Select(schedule => schedule.ClassSession == null ? (SessionStatus?)null : schedule.ClassSession.Status)
                     .FirstOrDefault(),
-                ProposedTrialSlotUtc = request.ProposedTrialSlotUtc,
+                request.ProposedTrialSlotUtc,
                 ProposedTrialSlotsUtc = request.TrialSchedules
                     .OrderBy(ts => ts.ScheduledAt)
                     .Select(ts => ts.ScheduledAt)
                     .ToList(),
-                ClassroomId = request.ClassroomId,
-                ClassroomName = request.Classroom != null ? request.Classroom.Name : null
+                request.ClassroomId,
+                ClassroomName = request.Classroom != null ? request.Classroom.Name : null,
+                ClassroomFee = request.Classroom != null ? request.Classroom.Fee : 0,
+                HasWeeklySchedules = request.Classroom != null && request.Classroom.WeeklySchedules.Any(),
+                WeeklySchedules = request.Classroom != null
+                    ? request.Classroom.WeeklySchedules.OrderBy(w => w.SessionIndex).Select(w => new { w.SessionIndex, w.DayOfWeek, w.StartTime, w.EndTime }).ToList()
+                    : new(),
+                HourlyFee = request.Tutor.HourlyFee > 0 ? request.Tutor.HourlyFee : 150000,
+                HasPaid = request.Classroom != null && (request.Classroom.Fee <= 0 || request.Classroom.Payments.Any(p => p.Status == PaymentStatus.Success && p.StudentId == request.StudentId)),
+                PendingPaymentId = request.Classroom != null
+                    ? request.Classroom.Payments.Where(p => p.Status == PaymentStatus.Pending && p.StudentId == request.StudentId).Select(p => (int?)p.Id).FirstOrDefault()
+                    : null
             })
             .ToListAsync(ct);
+
+        return rawRequests.Select(r =>
+        {
+            var isOfficial = (r.Message != null && r.Message.Contains("Vào học chính thức"))
+                || r.HasWeeklySchedules
+                || (r.ClassroomFee > 0 && r.ClassroomName != null && !r.ClassroomName.StartsWith("Học thử"))
+                || r.ProposedTrialSlotsUtc.Count > 1;
+
+            var scheduleSummaries = r.WeeklySchedules.Select(w =>
+                $"Buổi {w.SessionIndex}: {ToVnDay(w.DayOfWeek)} ({w.StartTime:HH:mm} - {w.EndTime:HH:mm})"
+            ).ToList();
+
+            var monthlyFee = r.ClassroomFee > 0 ? r.ClassroomFee : (r.HourlyFee * 24);
+
+            return new TutorTeachingScheduleDto
+            {
+                RequestId = r.Id,
+                StudentName = r.StudentName,
+                StudentUserId = r.StudentUserId,
+                SubjectName = r.SubjectName,
+                GradeLevelName = r.GradeLevelName,
+                PreferredType = r.PreferredType,
+                CreatedAt = r.CreatedAt,
+                TrialScheduledAt = r.TrialScheduledAt,
+                TrialStatus = r.TrialStatus,
+                ClassSessionId = r.ClassSessionId,
+                ClassSessionStatus = r.ClassSessionStatus,
+                ProposedTrialSlotUtc = r.ProposedTrialSlotUtc,
+                ProposedTrialSlotsUtc = r.ProposedTrialSlotsUtc,
+                ClassroomId = r.ClassroomId,
+                ClassroomName = r.ClassroomName,
+                HourlyFee = r.HourlyFee,
+                MonthlyFee = monthlyFee,
+                IsOfficialRequest = isOfficial,
+                IsOfficialEnrolled = r.HasWeeklySchedules || (r.ClassroomFee > 0 && r.ClassroomName != null && !r.ClassroomName.StartsWith("Học thử")),
+                HasPaid = r.HasPaid,
+                PendingPaymentId = r.PendingPaymentId,
+                WeeklyScheduleSummaries = scheduleSummaries
+            };
+        }).ToList();
+    }
 
     // ─────────────────── Xác nhận lịch học thử ───────────────────
 
@@ -433,6 +603,8 @@ public sealed class TutorScheduleController : TutorAreaController
     public async Task<IActionResult> PromoteToOfficialClassroom(
         int requestId,
         int? targetClassroomId,
+        List<string>? scheduleDays,
+        List<int>? scheduleStartHours,
         CancellationToken cancellationToken)
     {
         var tutorUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -476,69 +648,169 @@ public sealed class TutorScheduleController : TutorAreaController
         }
         else
         {
-            // Lớp 1-1
+            // Lớp 1-1: Phân tích các buổi học định kỳ do gia sư chọn (tối đa 3 buổi = 6 tiếng/tuần)
+            var validSchedules = new List<(DayOfWeek Day, TimeOnly Start, TimeOnly End)>();
+            if (scheduleDays != null && scheduleStartHours != null)
+            {
+                var count = Math.Min(scheduleDays.Count, scheduleStartHours.Count);
+                for (int i = 0; i < count; i++)
+                {
+                    var rawDay = scheduleDays[i];
+                    var rawHour = scheduleStartHours[i];
+
+                    if (rawHour < 0 || rawHour > 22)
+                        continue; // -1: không chọn slot này
+
+                    if (!Enum.TryParse<DayOfWeek>(rawDay, true, out var dayOfWeek))
+                        continue;
+
+                    var start = new TimeOnly(rawHour, 0);
+                    var end = start.AddHours(2);
+                    validSchedules.Add((dayOfWeek, start, end));
+                }
+            }
+
+            if (validSchedules.Count == 0)
+            {
+                return Fail("Vui lòng chọn ít nhất 1 buổi học cố định trong tuần (tối đa 3 buổi = 6 tiếng/tuần) để xếp lớp chính thức.");
+            }
+
+            if (validSchedules.Count > 3)
+            {
+                validSchedules = validSchedules.Take(3).ToList();
+            }
+
+            if (validSchedules.GroupBy(s => new { s.Day, s.Start }).Any(g => g.Count() > 1))
+            {
+                return Fail("Các buổi học trong tuần không được trùng thứ và khung giờ. Vui lòng chọn các khung giờ khác nhau.");
+            }
+
+            // Lớp 1-1: Lấy học phí chính xác theo môn và cấp học từ TutorSubject
+            var tutorSubject = await _dbContext.TutorSubjects
+                .AsNoTracking()
+                .FirstOrDefaultAsync(ts => ts.TutorId == request.TutorId
+                                        && ts.SubjectId == request.SubjectId
+                                        && ts.GradeLevelId == request.GradeLevelId, cancellationToken);
+            var hourlyFee = (tutorSubject != null && tutorSubject.HourlyFee > 0) ? tutorSubject.HourlyFee : request.Tutor.HourlyFee;
+            if (hourlyFee <= 0) hourlyFee = 150000;
+
+            var sessionsCount = validSchedules.Count;
+            var monthlyFee = hourlyFee * 2.0m * sessionsCount * 4;
+
             if (request.Classroom is not null)
             {
                 officialClassroom = request.Classroom;
                 officialClassroom.Name = $"Lớp 1-1: {request.Subject.Name} - {request.Student.User.FullName}";
                 officialClassroom.Type = ClassroomType.OneToOne;
                 officialClassroom.Status = ClassroomStatus.Active;
+                officialClassroom.SessionsPerWeek = sessionsCount;
+                officialClassroom.HoursPerSession = 2.0;
+                officialClassroom.Fee = monthlyFee;
             }
             else
             {
                 officialClassroom = new Classroom
                 {
                     Name = $"Lớp 1-1: {request.Subject.Name} - {request.Student.User.FullName}",
-                    Fee = request.Tutor.HourlyFee,
+                    Fee = monthlyFee,
                     Status = ClassroomStatus.Active,
                     Type = ClassroomType.OneToOne,
                     MaxStudents = 1,
-                    SessionsPerWeek = 1,
+                    SessionsPerWeek = sessionsCount,
                     HoursPerSession = 2.0,
                     TutorId = request.TutorId,
                     SubjectId = request.SubjectId,
-                    GradeLevelId = request.GradeLevelId
+                    GradeLevelId = request.GradeLevelId,
+                    StartDate = DateOnly.FromDateTime(DateTime.UtcNow.AddHours(VietnamUtcOffsetHours))
                 };
                 _dbContext.Classrooms.Add(officialClassroom);
                 request.Classroom = officialClassroom;
             }
 
-            // Nếu lớp 1-1 chưa có WeeklySchedule, cấu hình từ buổi học thử đã chốt (hoặc proposed slot)
-            if (!officialClassroom.WeeklySchedules.Any())
+            // Xóa lịch tuần cũ (nếu có) và thêm lịch tuần mới
+            var existingWeekly = await _dbContext.ClassroomWeeklySchedules
+                .Where(ws => ws.ClassroomId == officialClassroom.Id)
+                .ToListAsync(cancellationToken);
+            if (existingWeekly.Count > 0)
             {
-                var trialTime = request.TrialSchedules.OrderByDescending(t => t.ScheduledAt).Select(t => (DateTime?)t.ScheduledAt).FirstOrDefault()
-                                ?? request.ProposedTrialSlotUtc;
-                if (trialTime.HasValue)
+                _dbContext.ClassroomWeeklySchedules.RemoveRange(existingWeekly);
+            }
+
+            int sessionIdx = 1;
+            foreach (var sched in validSchedules)
+            {
+                _dbContext.ClassroomWeeklySchedules.Add(new ClassroomWeeklySchedule
                 {
-                    var vnTime = trialTime.Value.AddHours(VietnamUtcOffsetHours);
-                    var start = TimeOnly.FromTimeSpan(vnTime.TimeOfDay);
-                    var end = start.AddHours(2);
-                    officialClassroom.WeeklySchedules.Add(new ClassroomWeeklySchedule
-                    {
-                        SessionIndex = 1,
-                        DayOfWeek = vnTime.DayOfWeek,
-                        StartTime = start,
-                        EndTime = end
-                    });
-                }
+                    Classroom = officialClassroom,
+                    SessionIndex = sessionIdx++,
+                    DayOfWeek = sched.Day,
+                    StartTime = sched.Start,
+                    EndTime = sched.End
+                });
             }
         }
 
         // Đảm bảo học viên đã được liên kết vào lớp
         await EnsureEnrolledAsync(officialClassroom, request.StudentId, cancellationToken);
+        await _dbContext.SaveChangesAsync(cancellationToken);
 
-        // Sinh tự động các ClassSession cho 4 tuần tiếp theo dựa theo ClassroomWeeklySchedule (nếu chưa có)
+        // Sinh tự động các ClassSession cho 4 tuần tiếp theo dựa theo ClassroomWeeklySchedule
         await GenerateUpcomingSessionsAsync(officialClassroom.Id, cancellationToken);
+
+        // Tự động sinh Payment Pending cho lớp học nếu chưa có hoặc cập nhật số tiền
+        var existingPayment = await _dbContext.Payments.FirstOrDefaultAsync(
+            p => p.ClassroomId == officialClassroom.Id && p.StudentId == request.StudentId && (p.Status == PaymentStatus.Pending || p.Status == PaymentStatus.Success),
+            cancellationToken);
+
+        if (existingPayment == null && officialClassroom.Fee > 0)
+        {
+            _dbContext.Payments.Add(new Payment
+            {
+                ClassroomId = officialClassroom.Id,
+                StudentId = request.StudentId,
+                Amount = officialClassroom.Fee,
+                Method = "VietQR",
+                Status = PaymentStatus.Pending
+            });
+        }
+        else if (existingPayment != null && existingPayment.Status == PaymentStatus.Pending)
+        {
+            existingPayment.Amount = officialClassroom.Fee;
+            existingPayment.Method = "VietQR";
+        }
 
         await _dbContext.SaveChangesAsync(cancellationToken);
 
-        // Gửi thông báo SignalR cho học viên
-        await _hubContext.Clients.User(request.Student.UserId).SendAsync(
-            "ConnectionRequestStatusChanged",
-            new { requestId = request.Id, status = "OfficialEnrolled", classroomId = officialClassroom.Id },
-            cancellationToken);
+        // Gửi thông báo SignalR và Notification cho học viên
+        var studentUserId = request.Student?.UserId ?? request.Student?.User?.Id;
+        if (!string.IsNullOrWhiteSpace(studentUserId))
+        {
+            var tutorName = request.Tutor?.User?.FullName ?? "Gia sư";
+            var feeNotice = officialClassroom.Fee > 0
+                ? $" Học phí tháng ({officialClassroom.SessionsPerWeek} buổi = {officialClassroom.SessionsPerWeek * 2} tiếng/tuần): {officialClassroom.Fee:N0} đ. Vui lòng vào Lớp học để thanh toán kích hoạt qua SePay VietQR."
+                : "";
 
-        TempData["Success"] = $"Đã nhận học viên {request.Student.User.FullName} vào {officialClassroom.Name}. Lịch học đã được đồng bộ vào Lịch học của học viên và Lịch dạy của gia sư.";
+            _dbContext.Notifications.Add(new Notification
+            {
+                UserId = studentUserId,
+                Title = "Đã được nhận vào lớp chính thức!",
+                Content = $"Gia sư {tutorName} đã nhận bạn vào {officialClassroom.Name} với lịch học cố định.{feeNotice} [url:/Student_Parent/StudentClassroom]",
+                CreatedAt = DateTime.UtcNow,
+                IsRead = false
+            });
+            await _dbContext.SaveChangesAsync(cancellationToken);
+
+            try
+            {
+                await _hubContext.Clients.User(studentUserId).SendAsync(
+                    "ConnectionRequestStatusChanged",
+                    new { requestId = request.Id, status = "OfficialEnrolled", classroomId = officialClassroom.Id },
+                    cancellationToken);
+            }
+            catch { }
+        }
+
+        TempData["Success"] = $"Đã nhận học viên {request.Student?.User?.FullName ?? "Học viên"} vào {officialClassroom.Name} ({officialClassroom.SessionsPerWeek} buổi/tuần = {officialClassroom.SessionsPerWeek * 2} tiếng/tuần). Học phí {officialClassroom.Fee:N0} đ/tháng đã được cập nhật và tạo lịch học 4 tuần tiếp theo.";
         return RedirectToAction(nameof(Index));
     }
 
@@ -611,6 +883,7 @@ public sealed class TutorScheduleController : TutorAreaController
                 }
             }
         }
+        await _dbContext.SaveChangesAsync(ct);
     }
 
     // ─────────────────── Tự tạo lịch học / Lên lịch dạy bù ───────────────────

@@ -62,7 +62,7 @@ public class HomeController : Controller
         // giúp giảm 7-8 truy vấn DB liên tiếp xuống 0 truy vấn, trang tải ngay tức thì (<2ms).
         var vm = await _cache.GetOrCreateAsync(HomeCacheKey, async entry =>
         {
-            entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(3);
+            entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(15);
 
             var approvedTutors = _db.TutorProfiles.AsNoTracking()
                 .Where(t => t.VerificationStatus == VerificationStatus.Approved

@@ -656,7 +656,18 @@
                                     <h3 class="h5 mb-1">@item.StudentName</h3>
                                     <div class="text-body-secondary">@item.SubjectName · @item.GradeLevelName · @(item.PreferredType == ClassroomType.Group ? "Lớp nhóm" : "1 kèm 1")</div>
                                 </div>
-                                @if (item.TrialStatus == ScheduleStatus.Confirmed && item.TrialScheduledAt.HasValue)
+                                @if (item.IsOfficialRequest || item.IsOfficialEnrolled)
+                                {
+                                    @if (!item.HasPaid)
+                                    {
+                                        <span class="badge text-bg-warning"><i class="bi bi-hourglass-split me-1"></i>Chờ học viên thanh toán</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge text-bg-success"><i class="bi bi-patch-check-fill me-1"></i>Đã thanh toán · Lớp chính thức</span>
+                                    }
+                                }
+                                else if (item.TrialStatus == ScheduleStatus.Confirmed && item.TrialScheduledAt.HasValue)
                                 {
                                     var sessionBadge = item.ClassSessionStatus switch
                                     {
@@ -684,7 +695,115 @@
                                 }
                             </div>
 
-                            @if (item.TrialStatus == ScheduleStatus.Confirmed && item.TrialScheduledAt.HasValue)
+                            @if (item.IsOfficialRequest || item.IsOfficialEnrolled)
+                            {
+                                <div class="mt-3">
+                                    <div class="p-3 border rounded-3 bg-light mb-3">
+                                        <div class="d-flex align-items-center justify-content-between mb-2 pb-2 border-bottom flex-wrap gap-2">
+                                            <div>
+                                                <h6 class="mb-0 fw-bold text-dark">
+                                                    <i class="bi bi-calendar3-range text-danger me-1"></i>Lịch học cố định hàng tuần (Lớp 1-1 chính thức)
+                                                </h6>
+                                                <small class="text-muted">Tiêu chuẩn: <strong>3 buổi/tuần = 6 tiếng/tuần</strong> (mỗi buổi 2 tiếng)</small>
+                                            </div>
+                                            <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2 py-1">
+                                                Học phí: @((item.MonthlyFee > 0 ? item.MonthlyFee : item.HourlyFee * 24).ToString("N0")) đ / tháng
+                                            </span>
+                                        </div>
+
+                                        <div class="row g-2">
+                                            @if (item.WeeklyScheduleSummaries.Count > 0)
+                                            {
+                                                @for (int sIdx = 0; sIdx < item.WeeklyScheduleSummaries.Count; sIdx++)
+                                                {
+                                                    <div class="col-md-4">
+                                                        <div class="card h-100 border-0 shadow-none bg-white p-2 border rounded-2">
+                                                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                                                <span class="badge bg-danger text-white" style="font-size: 10px;">Buổi @(sIdx + 1)</span>
+                                                                <span class="badge bg-secondary-subtle text-secondary" style="font-size: 10px;">2 tiếng</span>
+                                                            </div>
+                                                            <div class="fw-semibold small text-dark">@item.WeeklyScheduleSummaries[sIdx]</div>
+                                                        </div>
+                                                    </div>
+                                                }
+                                            }
+                                            else if (item.ProposedTrialSlotsUtc.Count > 0)
+                                            {
+                                                @for (int sIdx = 0; sIdx < item.ProposedTrialSlotsUtc.Count; sIdx++)
+                                                {
+                                                    var pVn = item.ProposedTrialSlotsUtc[sIdx].AddHours(7);
+                                                    <div class="col-md-4">
+                                                        <div class="card h-100 border-0 shadow-none bg-white p-2 border rounded-2">
+                                                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                                                <span class="badge bg-danger text-white" style="font-size: 10px;">Buổi @(sIdx + 1)</span>
+                                                                <span class="badge bg-secondary-subtle text-secondary" style="font-size: 10px;">2 tiếng</span>
+                                                            </div>
+                                                            <div class="fw-semibold small text-dark">@pVn.ToString("dddd", new System.Globalization.CultureInfo("vi-VN"))</div>
+                                                            <div class="small text-muted">@pVn.ToString("HH:mm") - @pVn.AddHours(2).ToString("HH:mm")</div>
+                                                        </div>
+                                                    </div>
+                                                }
+                                            }
+                                        </div>
+                                    </div>
+
+                                    @if (!item.HasPaid)
+                                    {
+                                        <div class="p-3 rounded border border-warning-subtle d-flex align-items-center justify-content-between flex-wrap gap-2" style="background-color: #FFFBEB !important;">
+                                            <div class="d-flex align-items-center gap-2">
+                                                <i class="bi bi-hourglass-split text-warning fs-4"></i>
+                                                <div>
+                                                    <span class="fw-bold text-dark">Đang chờ học viên thanh toán học phí qua SePay VietQR</span>
+                                                    <div class="small text-muted">
+                                                        Học phí tháng: <strong class="text-danger">@item.MonthlyFee.ToString("N0") đ</strong> (3 buổi = 6 tiếng/tuần · 24 tiếng/tháng). Sau khi học viên thanh toán, hệ thống sẽ tự động kích hoạt phòng học trực tuyến.
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="d-flex gap-2">
+                                                @if (item.ClassroomId.HasValue)
+                                                {
+                                                    <a asp-area="Tutor" asp-controller="TutorClassroom" asp-action="Index" class="btn btn-sm btn-outline-secondary">
+                                                        <i class="bi bi-eye me-1"></i>Xem lớp
+                                                    </a>
+                                                }
+                                                @if (!string.IsNullOrWhiteSpace(item.StudentUserId))
+                                                {
+                                                    <a asp-area="" asp-controller="Chat" asp-action="Index" asp-route-contactId="@item.StudentUserId" class="btn btn-sm btn-outline-danger">
+                                                        <i class="bi bi-chat-dots me-1"></i>Nhắn tin
+                                                    </a>
+                                                }
+                                            </div>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <div class="p-3 rounded border border-success-subtle d-flex align-items-center justify-content-between flex-wrap gap-2" style="background-color: #DCFCE7 !important;">
+                                            <div class="d-flex align-items-center gap-2">
+                                                <i class="bi bi-patch-check-fill text-success fs-4"></i>
+                                                <div>
+                                                    <span class="fw-bold text-success">Đã nhận vào lớp chính thức: @(item.ClassroomName ?? "Lớp 1-1")</span>
+                                                    <div class="small text-muted">Học viên đã hoàn tất thanh toán học phí. Lịch dạy 3 buổi/tuần (6 tiếng/tuần) đã sẵn sàng và đồng bộ vào Lịch dạy của gia sư.</div>
+                                                </div>
+                                            </div>
+                                            <div class="d-flex gap-2">
+                                                @if (item.ClassroomId.HasValue)
+                                                {
+                                                    <a asp-area="Tutor" asp-controller="TutorClassroom" asp-action="Index" class="btn btn-sm btn-outline-success">
+                                                        <i class="bi bi-box-arrow-up-right me-1"></i>Xem lớp học
+                                                    </a>
+                                                }
+                                                @if (!string.IsNullOrWhiteSpace(item.StudentUserId))
+                                                {
+                                                    <a asp-area="" asp-controller="Chat" asp-action="Index" asp-route-contactId="@item.StudentUserId" class="btn btn-sm btn-outline-danger">
+                                                        <i class="bi bi-chat-dots me-1"></i>Nhắn tin
+                                                    </a>
+                                                }
+                                            </div>
+                                        </div>
+                                    }
+                                </div>
+                            }
+                            else if (item.TrialStatus == ScheduleStatus.Confirmed && item.TrialScheduledAt.HasValue)
                             {
                                 var trialVn = item.TrialScheduledAt.Value.AddHours(7);
                                 var trialBlock = BlockService.Containing(trialVn.Hour);
@@ -744,12 +863,30 @@
                                     </div>
                                 }
 
-                                @if (item.ClassSessionStatus == SessionStatus.Done)
+                                @if (item.IsOfficialEnrolled)
+                                {
+                                    <div class="mt-3 p-3 rounded border border-success-subtle d-flex align-items-center justify-content-between flex-wrap gap-2" style="background-color: #DCFCE7 !important;">
+                                        <div class="d-flex align-items-center gap-2">
+                                            <i class="bi bi-patch-check-fill text-success fs-5"></i>
+                                            <div>
+                                                <span class="fw-bold text-success">Đã nhận vào lớp chính thức: @(item.ClassroomName ?? "Lớp 1-1")</span>
+                                                <div class="small text-muted">Lịch học định kỳ hàng tuần đã được kích hoạt và đồng bộ vào Lịch dạy của gia sư &amp; Lịch học của học viên.</div>
+                                            </div>
+                                        </div>
+                                        @if (item.ClassroomId.HasValue)
+                                        {
+                                            <a asp-area="Tutor" asp-controller="TutorClassroom" asp-action="Index" class="btn btn-sm btn-outline-success">
+                                                <i class="bi bi-box-arrow-up-right me-1"></i>Xem lớp học
+                                            </a>
+                                        }
+                                    </div>
+                                }
+                                else if (item.ClassSessionStatus == SessionStatus.Done || (item.TrialScheduledAt.HasValue && item.TrialScheduledAt.Value.AddHours(2) <= DateTime.UtcNow && item.ClassSessionStatus != SessionStatus.Cancelled))
                                 {
                                     <div class="mt-3 p-3 bg-light-subtle rounded border border-success-subtle">
                                         <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
                                             <span class="fw-bold text-success"><i class="bi bi-patch-check-fill me-1" aria-hidden="true"></i>Buổi học thử đã hoàn thành</span>
-                                            <span class="small text-muted">Đánh giá và xếp lớp cho học viên</span>
+                                            <span class="small text-muted">Đánh giá và cấu hình lịch học chính thức (tối đa 3 buổi = 6 tiếng/tuần)</span>
                                         </div>
                                         <div class="d-flex flex-wrap gap-2 align-items-center">
                                             <button type="button" class="btn btn-success btn-sm" data-bs-toggle="collapse" data-bs-target="#promote-box-@item.RequestId">
@@ -771,8 +908,156 @@
                                                 <div class="mb-2">
                                                     @if (item.PreferredType == ClassroomType.OneToOne)
                                                     {
-                                                        <div class="text-secondary small mb-2">
-                                                            Học viên sẽ được nhận vào <strong>Lớp 1-1 chính thức</strong>. Hệ thống sẽ tự động cấu hình lịch định kỳ hàng tuần và tạo trước các buổi học tiếp theo.
+                                                        var trialVn = item.TrialScheduledAt?.AddHours(7);
+                                                        var d1 = trialVn?.DayOfWeek ?? DayOfWeek.Monday;
+                                                        var h1 = trialVn?.Hour ?? 19;
+                                                        if (h1 < 8 || h1 > 19) h1 = 19;
+
+                                                        var d2 = d1 switch
+                                                        {
+                                                            DayOfWeek.Monday => DayOfWeek.Wednesday,
+                                                            DayOfWeek.Tuesday => DayOfWeek.Thursday,
+                                                            DayOfWeek.Wednesday => DayOfWeek.Friday,
+                                                            _ => DayOfWeek.Wednesday
+                                                        };
+                                                        var d3 = d1 switch
+                                                        {
+                                                            DayOfWeek.Monday => DayOfWeek.Friday,
+                                                            DayOfWeek.Tuesday => DayOfWeek.Saturday,
+                                                            DayOfWeek.Wednesday => DayOfWeek.Sunday,
+                                                            _ => DayOfWeek.Friday
+                                                        };
+
+                                                        <div class="p-3 border rounded-3 bg-light mb-3">
+                                                            <div class="d-flex align-items-center justify-content-between mb-2 pb-2 border-bottom flex-wrap gap-2">
+                                                                <div>
+                                                                    <h6 class="mb-0 fw-bold text-dark"><i class="bi bi-calendar3-range text-danger me-1"></i>Xếp lịch học cố định hàng tuần (Lớp 1-1 chính thức)</h6>
+                                                                    <small class="text-muted">Chọn các buổi học định kỳ trong tuần cho học viên. Tiêu chuẩn <strong>3 buổi/tuần = 6 tiếng/tuần</strong> (mỗi buổi 2 tiếng).</small>
+                                                                </div>
+                                                                <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2 py-1">
+                                                                    Đơn giá: @item.HourlyFee.ToString("N0") đ/giờ
+                                                                </span>
+                                                            </div>
+
+                                                            <!-- 3 Cards chọn buổi 1, buổi 2, buổi 3 -->
+                                                            <div class="row g-2 mb-3">
+                                                                <!-- Buổi 1 (Bắt buộc) -->
+                                                                <div class="col-md-4">
+                                                                    <div class="card h-100 border-primary-subtle shadow-none">
+                                                                        <div class="card-header bg-primary-subtle text-primary py-1 px-2 fw-semibold small d-flex justify-content-between align-items-center">
+                                                                            <span><i class="bi bi-1-circle-fill me-1"></i>Buổi 1 (Bắt buộc)</span>
+                                                                            <span class="badge bg-primary text-white" style="font-size: 10px;">2 tiếng</span>
+                                                                        </div>
+                                                                        <div class="card-body p-2">
+                                                                            <label class="form-label small mb-1 fw-semibold">Thứ trong tuần:</label>
+                                                                            <select name="scheduleDays" class="form-select form-select-sm mb-2" required>
+                                                                                <option value="Monday" selected="@(d1 == DayOfWeek.Monday)">Thứ Hai</option>
+                                                                                <option value="Tuesday" selected="@(d1 == DayOfWeek.Tuesday)">Thứ Ba</option>
+                                                                                <option value="Wednesday" selected="@(d1 == DayOfWeek.Wednesday)">Thứ Tư</option>
+                                                                                <option value="Thursday" selected="@(d1 == DayOfWeek.Thursday)">Thứ Năm</option>
+                                                                                <option value="Friday" selected="@(d1 == DayOfWeek.Friday)">Thứ Sáu</option>
+                                                                                <option value="Saturday" selected="@(d1 == DayOfWeek.Saturday)">Thứ Bảy</option>
+                                                                                <option value="Sunday" selected="@(d1 == DayOfWeek.Sunday)">Chủ Nhật</option>
+                                                                            </select>
+
+                                                                            <label class="form-label small mb-1 fw-semibold">Khung giờ học:</label>
+                                                                            <select name="scheduleStartHours" class="form-select form-select-sm promote-hour-select" data-fee="@item.HourlyFee" data-req="@item.RequestId" required>
+                                                                                <option value="8" selected="@(h1 == 8)">08:00 - 10:00 (Sáng)</option>
+                                                                                <option value="10" selected="@(h1 == 10)">10:00 - 12:00 (Sáng)</option>
+                                                                                <option value="13" selected="@(h1 == 13)">13:00 - 15:00 (Chiều)</option>
+                                                                                <option value="15" selected="@(h1 == 15)">15:00 - 17:00 (Chiều)</option>
+                                                                                <option value="17" selected="@(h1 == 17)">17:00 - 19:00 (Tối)</option>
+                                                                                <option value="19" selected="@(h1 == 19 || (h1 != 8 && h1 != 10 && h1 != 13 && h1 != 15 && h1 != 17))">19:00 - 21:00 (Tối)</option>
+                                                                            </select>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+
+                                                                <!-- Buổi 2 -->
+                                                                <div class="col-md-4">
+                                                                    <div class="card h-100 border-info-subtle shadow-none">
+                                                                        <div class="card-header bg-info-subtle text-info-emphasis py-1 px-2 fw-semibold small d-flex justify-content-between align-items-center">
+                                                                            <span><i class="bi bi-2-circle-fill me-1"></i>Buổi 2</span>
+                                                                            <span class="badge bg-info text-white" style="font-size: 10px;">2 tiếng</span>
+                                                                        </div>
+                                                                        <div class="card-body p-2">
+                                                                            <label class="form-label small mb-1 fw-semibold">Thứ trong tuần:</label>
+                                                                            <select name="scheduleDays" class="form-select form-select-sm mb-2">
+                                                                                <option value="Monday" selected="@(d2 == DayOfWeek.Monday)">Thứ Hai</option>
+                                                                                <option value="Tuesday" selected="@(d2 == DayOfWeek.Tuesday)">Thứ Ba</option>
+                                                                                <option value="Wednesday" selected="@(d2 == DayOfWeek.Wednesday)">Thứ Tư</option>
+                                                                                <option value="Thursday" selected="@(d2 == DayOfWeek.Thursday)">Thứ Năm</option>
+                                                                                <option value="Friday" selected="@(d2 == DayOfWeek.Friday)">Thứ Sáu</option>
+                                                                                <option value="Saturday" selected="@(d2 == DayOfWeek.Saturday)">Thứ Bảy</option>
+                                                                                <option value="Sunday" selected="@(d2 == DayOfWeek.Sunday)">Chủ Nhật</option>
+                                                                            </select>
+
+                                                                            <label class="form-label small mb-1 fw-semibold">Khung giờ học:</label>
+                                                                            <select name="scheduleStartHours" class="form-select form-select-sm promote-hour-select" data-fee="@item.HourlyFee" data-req="@item.RequestId">
+                                                                                <option value="-1">-- Không chọn buổi này --</option>
+                                                                                <option value="8">08:00 - 10:00 (Sáng)</option>
+                                                                                <option value="10">10:00 - 12:00 (Sáng)</option>
+                                                                                <option value="13">13:00 - 15:00 (Chiều)</option>
+                                                                                <option value="15">15:00 - 17:00 (Chiều)</option>
+                                                                                <option value="17">17:00 - 19:00 (Tối)</option>
+                                                                                <option value="19" selected>19:00 - 21:00 (Tối)</option>
+                                                                            </select>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+
+                                                                <!-- Buổi 3 -->
+                                                                <div class="col-md-4">
+                                                                    <div class="card h-100 border-success-subtle shadow-none">
+                                                                        <div class="card-header py-1 px-2 fw-semibold small d-flex justify-content-between align-items-center" style="background-color: #DCFCE7 !important; color: #14532D !important; border-bottom: 1px solid #86EFAC !important;">
+                                                                            <span style="color: #14532D !important;"><i class="bi bi-3-circle-fill me-1"></i>Buổi 3 (Đủ 6h/tuần)</span>
+                                                                            <span class="badge text-white" style="background-color: #166534 !important; font-size: 10px;">2 tiếng</span>
+                                                                        </div>
+                                                                        <div class="card-body p-2">
+                                                                            <label class="form-label small mb-1 fw-semibold">Thứ trong tuần:</label>
+                                                                            <select name="scheduleDays" class="form-select form-select-sm mb-2">
+                                                                                <option value="Monday" selected="@(d3 == DayOfWeek.Monday)">Thứ Hai</option>
+                                                                                <option value="Tuesday" selected="@(d3 == DayOfWeek.Tuesday)">Thứ Ba</option>
+                                                                                <option value="Wednesday" selected="@(d3 == DayOfWeek.Wednesday)">Thứ Tư</option>
+                                                                                <option value="Thursday" selected="@(d3 == DayOfWeek.Thursday)">Thứ Năm</option>
+                                                                                <option value="Friday" selected="@(d3 == DayOfWeek.Friday)">Thứ Sáu</option>
+                                                                                <option value="Saturday" selected="@(d3 == DayOfWeek.Saturday)">Thứ Bảy</option>
+                                                                                <option value="Sunday" selected="@(d3 == DayOfWeek.Sunday)">Chủ Nhật</option>
+                                                                            </select>
+
+                                                                            <label class="form-label small mb-1 fw-semibold">Khung giờ học:</label>
+                                                                            <select name="scheduleStartHours" class="form-select form-select-sm promote-hour-select" data-fee="@item.HourlyFee" data-req="@item.RequestId">
+                                                                                <option value="-1">-- Không chọn buổi này --</option>
+                                                                                <option value="8">08:00 - 10:00 (Sáng)</option>
+                                                                                <option value="10">10:00 - 12:00 (Sáng)</option>
+                                                                                <option value="13">13:00 - 15:00 (Chiều)</option>
+                                                                                <option value="15">15:00 - 17:00 (Chiều)</option>
+                                                                                <option value="17">17:00 - 19:00 (Tối)</option>
+                                                                                <option value="19" selected>19:00 - 21:00 (Tối)</option>
+                                                                            </select>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+
+                                                            <!-- Tóm tắt học phí & chính sách SePay 20% hoa hồng -->
+                                                            <div class="alert alert-info py-2 px-3 small mb-0 d-flex flex-column gap-1">
+                                                                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                                                                    <div>
+                                                                        <strong><i class="bi bi-cash-stack me-1"></i>Dự tính học phí tháng (4 tuần):</strong>
+                                                                        <span class="text-danger fw-bold ms-1" id="promote-fee-preview-@item.RequestId">
+                                                                            @((item.HourlyFee * 2 * 3 * 4).ToString("N0")) đ / tháng
+                                                                        </span>
+                                                                        <span class="text-muted ms-1" id="promote-hours-preview-@item.RequestId">(3 buổi = 6 tiếng/tuần · 24 tiếng/tháng)</span>
+                                                                    </div>
+                                                                    <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle">
+                                                                        <i class="bi bi-shield-check me-1"></i>SePay VietQR Admin · Hoa hồng 20%
+                                                                    </span>
+                                                                </div>
+                                                                <div class="text-muted" style="font-size: 11px;">
+                                                                    Hệ thống tự động cấu hình lịch 4 tuần vào Lịch học của học viên &amp; Lịch dạy của gia sư, đồng thời tạo mã thanh toán VietQR gửi học viên. Admin nhận tiền qua SePay và đối soát chi trả 80% cho gia sư theo chu kỳ hàng tháng.
+                                                                </div>
+                                                            </div>
                                                         </div>
                                                     }
                                                     else

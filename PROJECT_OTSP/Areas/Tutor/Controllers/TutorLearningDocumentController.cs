@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using PROJECT_OTSP.Data;
 using PROJECT_OTSP.Dtos;
 using PROJECT_OTSP.Models;
+using static PROJECT_OTSP.Models.Enums;
 
 namespace PROJECT_OTSP.Areas.Tutor.Controllers;
 
@@ -14,7 +15,7 @@ public class TutorLearningDocumentController : TutorAreaController
 {
     private const long MaxFileSize = 20 * 1024 * 1024;
     private const long MaxRequestSize = MaxFileSize + 1024 * 1024;
-    private const int PageSize = 20;
+    private const int PageSize = 8;
     private static readonly HashSet<string> AllowedExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
         ".pdf", ".doc", ".docx", ".ppt", ".pptx", ".xls", ".xlsx"
@@ -44,21 +45,43 @@ public class TutorLearningDocumentController : TutorAreaController
         var totalPages = Math.Max(1, (int)Math.Ceiling(totalItems / (double)PageSize));
         page = Math.Clamp(page, 1, totalPages);
 
-        var documents = await documentsQuery
+        var rawDocuments = await documentsQuery
             .OrderByDescending(document => document.UploadedAt)
             .ThenByDescending(document => document.Id)
             .Skip((page - 1) * PageSize)
             .Take(PageSize)
-            .Select(document => new TutorLearningDocumentDto
+            .Select(document => new
             {
-                Id = document.Id,
-                Title = document.Title,
-                Description = document.Description,
+                document.Id,
+                document.Title,
+                document.Description,
                 SubjectName = document.Subject.Name,
                 GradeLevelName = document.GradeLevel.Name,
-                UploadedAt = document.UploadedAt
+                document.UploadedAt,
+                document.Scope,
+                document.ClassroomId,
+                ClassroomName = document.Classroom != null ? document.Classroom.Name : null,
+                ClassroomType = document.Classroom != null ? (ClassroomType?)document.Classroom.Type : null,
+                document.Status,
+                document.FileUrl
             })
             .ToListAsync(cancellationToken);
+
+        var documents = rawDocuments.Select(document => new TutorLearningDocumentDto
+        {
+            Id = document.Id,
+            Title = document.Title,
+            Description = document.Description,
+            SubjectName = document.SubjectName,
+            GradeLevelName = document.GradeLevelName,
+            UploadedAt = document.UploadedAt,
+            Scope = document.Scope,
+            ClassroomId = document.ClassroomId,
+            ClassroomName = document.ClassroomName,
+            ClassroomType = document.ClassroomType,
+            Status = document.Status,
+            FileExtension = Path.GetExtension(document.FileUrl) ?? string.Empty
+        }).ToList();
 
         var teachingPairs = await _dbContext.TutorSubjects
             .AsNoTracking()
@@ -75,10 +98,61 @@ public class TutorLearningDocumentController : TutorAreaController
             })
             .ToListAsync(cancellationToken);
 
+        // Lấy danh sách các lớp học gia sư đang dạy (cả 1-1 và Lớp nhóm) có trạng thái Active
+        var activeClassroomsRaw = await _dbContext.Classrooms
+            .AsNoTracking()
+            .Where(c => c.Tutor.UserId == userId && c.Status == ClassroomStatus.Active)
+            .OrderBy(c => c.Type)
+            .ThenBy(c => c.Name)
+            .Select(c => new
+            {
+                c.Id,
+                c.Name,
+                c.Type,
+                c.SubjectId,
+                SubjectName = c.Subject.Name,
+                c.GradeLevelId,
+                GradeLevelName = c.GradeLevel.Name,
+                CurrentStudents = c.ClassroomStudents.Count,
+                c.MaxStudents,
+                Schedules = c.WeeklySchedules.Select(w => new { w.DayOfWeek, w.StartTime, w.EndTime }).ToList()
+            })
+            .ToListAsync(cancellationToken);
+
+        var activeClassrooms = activeClassroomsRaw.Select(c =>
+        {
+            var schedSummary = c.Schedules.Any()
+                ? string.Join(", ", c.Schedules.OrderBy(s => s.DayOfWeek).Select(s => $"{FormatDayOfWeek(s.DayOfWeek)} {s.StartTime:hh\\:mm}"))
+                : null;
+
+            return new TutorActiveClassroomOptionDto
+            {
+                Id = c.Id,
+                Name = c.Name,
+                Type = c.Type,
+                SubjectId = c.SubjectId,
+                SubjectName = c.SubjectName,
+                GradeLevelId = c.GradeLevelId,
+                GradeLevelName = c.GradeLevelName,
+                CurrentStudents = c.CurrentStudents,
+                MaxStudents = c.MaxStudents,
+                ScheduleSummary = schedSummary
+            };
+        }).ToList();
+
+        ViewBag.ActiveClassrooms = activeClassrooms;
         ViewBag.TeachingPairs = teachingPairs;
         ViewBag.CurrentPage = page;
         ViewBag.TotalPages = totalPages;
         ViewBag.TotalItems = totalItems;
+        ViewBag.Pagination = new PaginationVm
+        {
+            CurrentPage = page,
+            TotalPages = totalPages,
+            TotalItems = totalItems,
+            PageSize = PageSize,
+            BaseUrl = Url.Action("Index", "TutorLearningDocument", new { area = "Tutor" }) ?? ""
+        };
         return RenderIndex(documents);
     }
 
@@ -89,6 +163,8 @@ public class TutorLearningDocumentController : TutorAreaController
         string? title,
         string? description,
         int tutorSubjectId,
+        DocumentScope scope,
+        int? classroomId,
         IFormFile? file,
         CancellationToken cancellationToken)
     {
@@ -117,7 +193,40 @@ public class TutorLearningDocumentController : TutorAreaController
             return RedirectToAction(nameof(Index));
         }
 
-        // Mã danh mục lấy từ cặp môn–cấp của chính gia sư, không tin SubjectId/GradeLevelId từ form.
+        // Kiểm tra phạm vi chia sẻ
+        int? selectedClassroomId = null;
+        VerificationStatus docStatus = VerificationStatus.Approved;
+
+        if (scope == DocumentScope.Classroom)
+        {
+            if (!classroomId.HasValue || classroomId.Value <= 0)
+            {
+                TempData["Error"] = "Vui lòng chọn lớp học đang dạy cần chia sẻ tài liệu.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            var validClassroom = await _dbContext.Classrooms
+                .AsNoTracking()
+                .FirstOrDefaultAsync(c => c.Id == classroomId.Value && c.Tutor.UserId == userId && c.Status == ClassroomStatus.Active, cancellationToken);
+
+            if (validClassroom is null)
+            {
+                TempData["Error"] = "Lớp học được chọn không hợp lệ hoặc hiện không còn hoạt động.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            selectedClassroomId = validClassroom.Id;
+            // Tài liệu chia sẻ theo lớp sẽ khả dụng ngay cho học viên trong lớp
+            docStatus = VerificationStatus.Approved;
+        }
+        else
+        {
+            // Tài liệu công khai: chờ gia sư duyệt trước khi công bố ra cộng đồng
+            selectedClassroomId = null;
+            docStatus = VerificationStatus.Pending;
+        }
+
+        // Mã danh mục lấy từ cặp môn–cấp của chính gia sư
         var teachingPair = await _dbContext.TutorSubjects
             .AsNoTracking()
             .Where(pair => pair.Id == tutorSubjectId && pair.Tutor.UserId == userId)
@@ -149,7 +258,10 @@ public class TutorLearningDocumentController : TutorAreaController
                 FileUrl = storedName,
                 TutorId = teachingPair.TutorId,
                 SubjectId = teachingPair.SubjectId,
-                GradeLevelId = teachingPair.GradeLevelId
+                GradeLevelId = teachingPair.GradeLevelId,
+                Scope = scope,
+                ClassroomId = selectedClassroomId,
+                Status = docStatus
             });
 
             await _dbContext.SaveChangesAsync(cancellationToken);
@@ -161,7 +273,64 @@ public class TutorLearningDocumentController : TutorAreaController
             throw;
         }
 
-        TempData["Success"] = "Đã tải tài liệu lên.";
+        if (scope == DocumentScope.Public)
+        {
+            TempData["Success"] = "Đã tải tài liệu công khai lên (trạng thái: Chờ duyệt). Bạn có thể bấm nút \"Duyệt ngay\" bên dưới để xuất bản.";
+        }
+        else
+        {
+            TempData["Success"] = "Đã tải tài liệu lên cho lớp học thành công.";
+        }
+        return RedirectToAction(nameof(Index));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Approve(int id, CancellationToken cancellationToken)
+    {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrWhiteSpace(userId))
+            return NotFound();
+
+        var document = await _dbContext.LearningDocuments
+            .FirstOrDefaultAsync(item => item.Id == id && item.Tutor.UserId == userId, cancellationToken);
+
+        if (document is null)
+            return NotFound();
+
+        document.Status = VerificationStatus.Approved;
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        TempData["Success"] = $"Đã duyệt thành công tài liệu \"{document.Title}\".";
+        return RedirectToAction(nameof(Index));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ToggleStatus(int id, CancellationToken cancellationToken)
+    {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrWhiteSpace(userId))
+            return NotFound();
+
+        var document = await _dbContext.LearningDocuments
+            .FirstOrDefaultAsync(item => item.Id == id && item.Tutor.UserId == userId, cancellationToken);
+
+        if (document is null)
+            return NotFound();
+
+        if (document.Status == VerificationStatus.Approved)
+        {
+            document.Status = VerificationStatus.Pending;
+            TempData["Success"] = $"Đã chuyển tài liệu \"{document.Title}\" về trạng thái Chờ duyệt.";
+        }
+        else
+        {
+            document.Status = VerificationStatus.Approved;
+            TempData["Success"] = $"Đã duyệt thành công tài liệu \"{document.Title}\".";
+        }
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
         return RedirectToAction(nameof(Index));
     }
 
@@ -245,4 +414,16 @@ public class TutorLearningDocumentController : TutorAreaController
         var safeName = new string(value.Select(character => invalidCharacters.Contains(character) ? '_' : character).ToArray()).Trim();
         return string.IsNullOrWhiteSpace(safeName) ? "tai-lieu-on-tap" : safeName;
     }
+
+    private static string FormatDayOfWeek(DayOfWeek day) => day switch
+    {
+        DayOfWeek.Monday => "T2",
+        DayOfWeek.Tuesday => "T3",
+        DayOfWeek.Wednesday => "T4",
+        DayOfWeek.Thursday => "T5",
+        DayOfWeek.Friday => "T6",
+        DayOfWeek.Saturday => "T7",
+        DayOfWeek.Sunday => "CN",
+        _ => day.ToString()
+    };
 }

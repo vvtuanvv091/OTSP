@@ -9,4 +9,5 @@ public sealed class ChatMessageDto
     public string Content { get; init; } = string.Empty;
     public DateTime SentAtUtc { get; init; }
     public bool IsOwn { get; init; }
+    public bool IsEdited { get; init; }
 }

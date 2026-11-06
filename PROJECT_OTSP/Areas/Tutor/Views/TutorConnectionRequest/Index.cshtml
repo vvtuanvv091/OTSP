@@ -5,14 +5,55 @@
     ViewData["Title"] = "Yêu cầu kết nối";
     var totalPages = ViewBag.TotalPages != null ? (int)ViewBag.TotalPages : 1;
     var currentPage = ViewBag.CurrentPage != null ? (int)ViewBag.CurrentPage : 1;
-    var selectedStatus = ViewBag.SelectedStatus as RequestStatus?;
+    var selectedStatus = (ViewBag.CurrentStatus ?? ViewBag.SelectedStatus) as RequestStatus?;
+    var totalItems = ViewBag.TotalItems != null ? (int)ViewBag.TotalItems : Model.Count;
 }
 
 <div class="tutor-page-container" id="tutor-requests-page" data-hub-url="@Url.Content("~/hubs/connection-requests")">
     <!-- Header -->
-    <div class="tutor-page-header">
-        <h1 class="tutor-page-title">Yêu cầu kết nối</h1>
-        <p class="tutor-page-subtitle">Học viên gửi yêu cầu kèm khung giờ học thử. Hệ thống đối chiếu với lịch rảnh của bạn.</p>
+    <div class="tutor-page-header d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+        <div>
+            <h1 class="tutor-page-title">Yêu cầu kết nối</h1>
+            <p class="tutor-page-subtitle">Học viên gửi yêu cầu kèm khung giờ học thử. Hệ thống đối chiếu với lịch rảnh của bạn.</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a asp-area="Tutor" asp-controller="TutorSchedule" asp-action="Index" class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center">
+                <i class="bi bi-calendar3 me-1"></i> Lịch dạy
+            </a>
+            <a asp-area="Tutor" asp-controller="TutorStudent" asp-action="Index" class="btn btn-sm btn-outline-danger d-inline-flex align-items-center">
+                <i class="bi bi-people me-1"></i> Học viên của tôi
+            </a>
+        </div>
+    </div>
+
+    <!-- Filter Tabs -->
+    <div class="mb-4">
+        <ul class="nav nav-pills gap-2 bg-light p-1.5 rounded-3 border d-inline-flex flex-wrap">
+            <li class="nav-item">
+                <a class="nav-link py-1.5 px-3 fw-semibold small @(selectedStatus == null ? "active bg-danger text-white shadow-sm" : "text-secondary")"
+                   asp-action="Index" asp-route-status="">
+                    <i class="bi bi-collection me-1"></i> Tất cả
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link py-1.5 px-3 fw-semibold small @(selectedStatus == RequestStatus.Pending ? "active bg-danger text-white shadow-sm" : "text-secondary")"
+                   asp-action="Index" asp-route-status="@RequestStatus.Pending">
+                    <i class="bi bi-hourglass-split me-1"></i> Chờ duyệt
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link py-1.5 px-3 fw-semibold small @(selectedStatus == RequestStatus.Accepted ? "active bg-danger text-white shadow-sm" : "text-secondary")"
+                   asp-action="Index" asp-route-status="@RequestStatus.Accepted">
+                    <i class="bi bi-check-circle me-1"></i> Đã chấp nhận
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link py-1.5 px-3 fw-semibold small @(selectedStatus == RequestStatus.Rejected ? "active bg-danger text-white shadow-sm" : "text-secondary")"
+                   asp-action="Index" asp-route-status="@RequestStatus.Rejected">
+                    <i class="bi bi-x-circle me-1"></i> Đã từ chối
+                </a>
+            </li>
+        </ul>
     </div>
 
     <!-- Alerts -->
@@ -37,42 +78,43 @@
         <div class="tutor-card-table-wrapper p-5 text-center">
             <i class="bi bi-person-x fs-1 text-muted d-block mb-3"></i>
             <h5 class="fw-semibold">Chưa có yêu cầu kết nối nào</h5>
-            <p class="text-secondary small mb-0">Khi có học viên gửi đề xuất học thử, thông tin sẽ hiển thị tại đây.</p>
+            <p class="text-secondary small mb-0">Khi có học viên gửi đề xuất học tập, thông tin sẽ hiển thị tại đây.</p>
         </div>
     }
     else
     {
         <!-- ==================== DESKTOP TABLE VIEW (>= 768px) ==================== -->
         <div class="d-none d-md-block tutor-card-table-wrapper">
-            <table class="tutor-custom-table">
+            <table class="tutor-custom-table align-middle">
                 <thead>
                     <tr>
-                        <th scope="col" style="width: 20%;">Học viên</th>
-                        <th scope="col" style="width: 20%;">Môn / Cấp</th>
-                        <th scope="col" style="width: 28%;">Giờ học thử đề xuất</th>
-                        <th scope="col" style="width: 16%;">Trạng thái</th>
-                        <th scope="col" style="width: 16%;">Thao tác</th>
+                        <th scope="col" style="width: 25%;">Học viên</th>
+                        <th scope="col" style="width: 23%;">Môn & Lớp</th>
+                        <th scope="col" style="width: 22%;">Giờ học đề xuất</th>
+                        <th scope="col" style="width: 14%;">Trạng thái</th>
+                        <th scope="col" style="width: 16%; text-align: right;">Thao tác</th>
                     </tr>
                 </thead>
                 <tbody>
                     @foreach (var request in Model)
                     {
-                        var statusLabel = request.Status switch
-                        {
-                            RequestStatus.Pending => "Chờ duyệt",
-                            RequestStatus.Accepted => "Đã chấp nhận",
-                            RequestStatus.Rejected => "Đã từ chối",
-                            RequestStatus.Cancelled => "Đã hủy",
-                            _ => request.Status.ToString()
-                        };
+                        bool isTrial = (request.Message != null && request.Message.Contains("[Mục đích: Đăng ký học thử 1 buổi]"))
+                            || request.ProposedTrialSlotUtc.HasValue
+                            || request.ProposedTrialSlotsUtc.Count > 0;
 
-                        var badgeClass = request.Status switch
+                        string? studentNote = null;
+                        if (!string.IsNullOrWhiteSpace(request.Message))
                         {
-                            RequestStatus.Pending => "tutor-pill-pending",
-                            RequestStatus.Accepted => "tutor-pill-accepted",
-                            RequestStatus.Rejected => "tutor-pill-rejected",
-                            _ => "tutor-pill-cancelled"
-                        };
+                            var cleanLines = request.Message.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+                                .Select(l => l.Trim())
+                                .Where(l => !l.StartsWith("[Mục đích:", StringComparison.OrdinalIgnoreCase) &&
+                                            !l.StartsWith("[Lịch học đề xuất", StringComparison.OrdinalIgnoreCase));
+                            var joined = string.Join(" ", cleanLines).Trim();
+                            if (!string.IsNullOrWhiteSpace(joined))
+                            {
+                                studentNote = joined;
+                            }
+                        }
 
                         string formattedSlot = "Lịch linh hoạt";
                         if (request.ProposedTrialSlotUtc.HasValue)
@@ -89,7 +131,7 @@
                                 DayOfWeek.Saturday => "Thứ 7",
                                 _ => ""
                             };
-                            formattedSlot = $"{day}, {s:dd/MM} · {s:HH:mm}-{s.AddHours(1):HH:mm}";
+                            formattedSlot = $"{day}, {s:dd/MM} · {s:HH:mm}-{s.AddHours(2):HH:mm}";
                         }
                         else if (request.ProposedTrialSlotsUtc.Count > 0)
                         {
@@ -105,67 +147,158 @@
                                 DayOfWeek.Saturday => "Thứ 7",
                                 _ => ""
                             };
-                            formattedSlot = $"{day}, {s:dd/MM} · {s:HH:mm}-{s.AddHours(1):HH:mm}";
+                            formattedSlot = $"{day}, {s:dd/MM} · {s:HH:mm}-{s.AddHours(2):HH:mm}";
+                            if (request.ProposedTrialSlotsUtc.Count > 1)
+                            {
+                                formattedSlot += $" (+{request.ProposedTrialSlotsUtc.Count - 1} buổi)";
+                            }
                         }
 
                         <tr data-request-row="@request.Id">
                             <td>
-                                <div class="cell-student-name">@request.StudentName</div>
+                                <div class="d-flex align-items-center gap-2.5">
+                                    @if (!string.IsNullOrWhiteSpace(request.StudentAvatarUrl))
+                                    {
+                                        <img src="@request.StudentAvatarUrl" alt="@request.StudentName" class="rounded-circle object-fit-cover shadow-sm" style="width: 38px; height: 38px; flex-shrink: 0;" />
+                                    }
+                                    else
+                                    {
+                                        <div class="student-avatar-circle" style="width: 38px; height: 38px; font-size: 14px; border-radius: 50%; background: #fee2e2; color: #dc2626; display: flex; align-items: center; justify-content: center; font-weight: 700; flex-shrink: 0;">
+                                            @(string.IsNullOrWhiteSpace(request.StudentName) ? "H" : request.StudentName.Trim().Substring(0, 1).ToUpper())
+                                        </div>
+                                    }
+                                    <div class="min-w-0">
+                                        <div class="fw-bold text-dark text-truncate" style="font-size: 14px;" title="@request.StudentName">@request.StudentName</div>
+                                        <div class="small mt-0.5">
+                                            @if (isTrial)
+                                            {
+                                                <span class="text-danger fw-semibold" style="font-size: 11.5px;">
+                                                    <i class="bi bi-lightning-charge-fill me-1"></i>Học thử 1 buổi
+                                                </span>
+                                            }
+                                            else
+                                            {
+                                                <span class="text-primary fw-semibold" style="font-size: 11.5px;">
+                                                    <i class="bi bi-mortarboard-fill me-1"></i>Học chính thức
+                                                </span>
+                                            }
+                                        </div>
+                                        @if (!string.IsNullOrWhiteSpace(studentNote))
+                                        {
+                                            <div class="text-secondary small mt-0.5 text-truncate" style="max-width: 240px;" title="@studentNote">
+                                                <i class="bi bi-chat-left-dots text-muted me-1"></i>"@studentNote"
+                                            </div>
+                                        }
+                                    </div>
+                                </div>
                             </td>
                             <td>
-                                <span>@request.SubjectName</span>
-                                @if (!string.IsNullOrWhiteSpace(request.GradeLevelName))
-                                {
-                                    <span> · @request.GradeLevelName</span>
-                                }
+                                <div class="fw-bold text-dark" style="font-size: 14px;">@request.SubjectName</div>
+                                <div class="small text-secondary mt-0.5">
+                                    @if (!string.IsNullOrWhiteSpace(request.GradeLevelName))
+                                    {
+                                        <span>@request.GradeLevelName</span>
+                                    }
+                                    <span class="mx-1">·</span>
+                                    @if (request.PreferredType == ClassroomType.OneToOne)
+                                    {
+                                        <span>1 kèm 1</span>
+                                    }
+                                    else
+                                    {
+                                        <span>Lớp nhóm@(string.IsNullOrWhiteSpace(request.ClassroomName) ? "" : $": {request.ClassroomName}")</span>
+                                    }
+                                </div>
                             </td>
                             <td>
-                                <div class="slot-time-text">@formattedSlot</div>
+                                <div class="fw-semibold text-dark" style="font-size: 13px;">
+                                    <i class="bi bi-clock text-muted me-1"></i>@formattedSlot
+                                </div>
                                 @if (request.MatchesAvailability)
                                 {
-                                    <div class="slot-match-note">
-                                        <span class="match-check">✓</span> Khớp lịch rảnh
+                                    <div class="small text-success fw-semibold mt-0.5">
+                                        <i class="bi bi-check2-circle me-1"></i>Khớp lịch rảnh
                                     </div>
                                 }
                             </td>
                             <td>
-                                <span class="tutor-pill-badge @badgeClass">@statusLabel</span>
-                            </td>
-                            <td>
                                 @if (request.Status == RequestStatus.Pending)
                                 {
-                                    <div class="tutor-action-group">
+                                    <span class="badge rounded-pill px-2.5 py-1 fw-semibold" style="background: #fef3c7; color: #b45309; border: 1px solid #fcd34d; font-size: 12px;">
+                                        <i class="bi bi-hourglass-split me-1"></i>Chờ duyệt
+                                    </span>
+                                }
+                                else if (request.Status == RequestStatus.Accepted)
+                                {
+                                    <span class="badge rounded-pill px-2.5 py-1 fw-semibold" style="background: #15803d; color: #ffffff; font-size: 12px;">
+                                        <i class="bi bi-check-circle-fill me-1"></i>Đã chấp nhận
+                                    </span>
+                                }
+                                else if (request.Status == RequestStatus.Rejected)
+                                {
+                                    <span class="badge rounded-pill px-2.5 py-1 fw-semibold" style="background: #64748b; color: #ffffff; font-size: 12px;">
+                                        <i class="bi bi-x-circle-fill me-1"></i>Đã từ chối
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span class="badge rounded-pill px-2.5 py-1 fw-semibold" style="background: #dc2626; color: #ffffff; font-size: 12px;">
+                                        <i class="bi bi-slash-circle-fill me-1"></i>Đã hủy
+                                    </span>
+                                }
+                            </td>
+                            <td style="text-align: right;">
+                                @if (request.Status == RequestStatus.Pending)
+                                {
+                                    <div class="d-inline-flex align-items-center gap-1.5">
                                         @if (request.Id < 0)
                                         {
-                                            <button type="button" class="btn-tutor-accept" onclick="alert('Đã chấp nhận yêu cầu của @request.StudentName.'); location.reload();">
-                                                Chấp nhận
+                                            <button type="button" class="btn btn-sm btn-success d-inline-flex align-items-center gap-1 px-2.5 py-1" onclick="alert('Đã chấp nhận yêu cầu của @request.StudentName.'); location.reload();">
+                                                <i class="bi bi-check-lg"></i> Chấp nhận
                                             </button>
-                                            <button type="button" class="btn-tutor-reject" onclick="alert('Đã từ chối yêu cầu.'); location.reload();">
-                                                Từ chối
+                                            <button type="button" class="btn btn-sm btn-outline-danger d-inline-flex align-items-center gap-1 px-2.5 py-1" onclick="alert('Đã từ chối yêu cầu.'); location.reload();">
+                                                <i class="bi bi-x-lg"></i> Từ chối
                                             </button>
                                         }
                                         else
                                         {
                                             <form asp-action="Accept" asp-route-id="@request.Id" method="post" class="d-inline">
-                                                <button type="submit" class="btn-tutor-accept">Chấp nhận</button>
+                                                @Html.AntiForgeryToken()
+                                                <button type="submit" class="btn btn-sm btn-success d-inline-flex align-items-center gap-1 px-2.5 py-1 shadow-sm" style="font-size: 12.5px; font-weight: 500;">
+                                                    <i class="bi bi-check-lg"></i> Chấp nhận
+                                                </button>
                                             </form>
                                             <form asp-action="Reject" asp-route-id="@request.Id" method="post" class="d-inline">
-                                                <button type="submit" class="btn-tutor-reject">Từ chối</button>
+                                                @Html.AntiForgeryToken()
+                                                <button type="submit" class="btn btn-sm btn-outline-danger d-inline-flex align-items-center gap-1 px-2.5 py-1" style="font-size: 12.5px; font-weight: 500;" onclick="return confirm('Bạn có chắc chắn muốn từ chối yêu cầu này không?');">
+                                                    <i class="bi bi-x-lg"></i> Từ chối
+                                                </button>
                                             </form>
                                         }
                                     </div>
                                 }
                                 else if (request.Status == RequestStatus.Accepted)
                                 {
-                                    <span class="tutor-text-action">Đã học thử</span>
+                                    <div class="d-inline-flex align-items-center gap-1.5 justify-content-end">
+                                        <a asp-area="" asp-controller="Chat" asp-action="Conversation" asp-route-requestId="@request.Id" class="btn btn-sm btn-outline-danger d-inline-flex align-items-center gap-1 px-2.5 py-1" style="font-size: 12.5px; font-weight: 500;" title="Nhắn tin với học viên">
+                                            <i class="bi bi-chat-dots-fill"></i> Nhắn tin
+                                        </a>
+                                        <a asp-area="Tutor" asp-controller="TutorSchedule" asp-action="Index" class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1 px-2 py-1" style="font-size: 12.5px;" title="Xem lịch dạy">
+                                            <i class="bi bi-calendar3"></i>
+                                        </a>
+                                    </div>
                                 }
                                 else if (request.Status == RequestStatus.Rejected)
                                 {
-                                    <span class="text-muted small">Đã từ chối</span>
+                                    <span class="text-muted small d-inline-flex align-items-center gap-1">
+                                        <i class="bi bi-dash-circle"></i> Đã từ chối
+                                    </span>
                                 }
                                 else
                                 {
-                                    <span class="text-muted small">Đã hủy</span>
+                                    <span class="text-muted small d-inline-flex align-items-center gap-1">
+                                        <i class="bi bi-info-circle"></i> Học viên đã hủy
+                                    </span>
                                 }
                             </td>
                         </tr>
@@ -178,22 +311,23 @@
         <div class="d-block d-md-none tutor-mobile-list">
             @foreach (var request in Model)
             {
-                var statusLabel = request.Status switch
-                {
-                    RequestStatus.Pending => "Chờ duyệt",
-                    RequestStatus.Accepted => "Đã chấp nhận",
-                    RequestStatus.Rejected => "Đã từ chối",
-                    RequestStatus.Cancelled => "Đã hủy",
-                    _ => request.Status.ToString()
-                };
+                bool isTrial = (request.Message != null && request.Message.Contains("[Mục đích: Đăng ký học thử 1 buổi]"))
+                    || request.ProposedTrialSlotUtc.HasValue
+                    || request.ProposedTrialSlotsUtc.Count > 0;
 
-                var badgeClass = request.Status switch
+                string? studentNote = null;
+                if (!string.IsNullOrWhiteSpace(request.Message))
                 {
-                    RequestStatus.Pending => "tutor-pill-pending",
-                    RequestStatus.Accepted => "tutor-pill-accepted",
-                    RequestStatus.Rejected => "tutor-pill-rejected",
-                    _ => "tutor-pill-cancelled"
-                };
+                    var cleanLines = request.Message.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+                        .Select(l => l.Trim())
+                        .Where(l => !l.StartsWith("[Mục đích:", StringComparison.OrdinalIgnoreCase) &&
+                                    !l.StartsWith("[Lịch học đề xuất", StringComparison.OrdinalIgnoreCase));
+                    var joined = string.Join(" ", cleanLines).Trim();
+                    if (!string.IsNullOrWhiteSpace(joined))
+                    {
+                        studentNote = joined;
+                    }
+                }
 
                 string formattedSlot = "Lịch linh hoạt";
                 if (request.ProposedTrialSlotUtc.HasValue)
@@ -210,7 +344,7 @@
                         DayOfWeek.Saturday => "Thứ 7",
                         _ => ""
                     };
-                    formattedSlot = $"{day}, {s:dd/MM} · {s:HH:mm}-{s.AddHours(1):HH:mm}";
+                    formattedSlot = $"{day}, {s:dd/MM} · {s:HH:mm}-{s.AddHours(2):HH:mm}";
                 }
                 else if (request.ProposedTrialSlotsUtc.Count > 0)
                 {
@@ -226,18 +360,29 @@
                         DayOfWeek.Saturday => "Thứ 7",
                         _ => ""
                     };
-                    formattedSlot = $"{day}, {s:dd/MM} · {s:HH:mm}-{s.AddHours(1):HH:mm}";
+                    formattedSlot = $"{day}, {s:dd/MM} · {s:HH:mm}-{s.AddHours(2):HH:mm}";
+                    if (request.ProposedTrialSlotsUtc.Count > 1)
+                    {
+                        formattedSlot += $" (+{request.ProposedTrialSlotsUtc.Count - 1} buổi)";
+                    }
                 }
 
-                <div class="tutor-mobile-card" data-request-row="@request.Id">
-                    <div class="tutor-m-card-header">
-                        <div class="tutor-m-student-info">
-                            <div class="student-avatar-circle">
-                                @(string.IsNullOrWhiteSpace(request.StudentName) ? "H" : request.StudentName.Trim().Substring(0, 1).ToUpper())
-                            </div>
+                <div class="tutor-mobile-card mb-3 p-3 border rounded-3 bg-white shadow-sm" data-request-row="@request.Id">
+                    <div class="d-flex justify-content-between align-items-start mb-2 pb-2 border-bottom">
+                        <div class="d-flex align-items-center gap-2">
+                            @if (!string.IsNullOrWhiteSpace(request.StudentAvatarUrl))
+                            {
+                                <img src="@request.StudentAvatarUrl" alt="@request.StudentName" class="rounded-circle object-fit-cover shadow-sm" style="width: 36px; height: 36px; flex-shrink: 0;" />
+                            }
+                            else
+                            {
+                                <div class="student-avatar-circle" style="width: 36px; height: 36px; font-size: 13px; border-radius: 50%; background: #fee2e2; color: #dc2626; display: flex; align-items: center; justify-content: center; font-weight: 700; flex-shrink: 0;">
+                                    @(string.IsNullOrWhiteSpace(request.StudentName) ? "H" : request.StudentName.Trim().Substring(0, 1).ToUpper())
+                                </div>
+                            }
                             <div>
-                                <div class="tutor-m-name">@request.StudentName</div>
-                                <div class="tutor-m-subject">
+                                <div class="fw-bold text-dark" style="font-size: 14px;">@request.StudentName</div>
+                                <div class="text-secondary small">
                                     @request.SubjectName
                                     @if (!string.IsNullOrWhiteSpace(request.GradeLevelName))
                                     {
@@ -246,55 +391,98 @@
                                 </div>
                             </div>
                         </div>
-                        <span class="tutor-pill-badge @badgeClass">@statusLabel</span>
+                        <div>
+                            @if (request.Status == RequestStatus.Pending)
+                            {
+                                <span class="badge rounded-pill px-2.5 py-1 fw-semibold" style="background: #fef3c7; color: #b45309; border: 1px solid #fcd34d; font-size: 11px;">Chờ duyệt</span>
+                            }
+                            else if (request.Status == RequestStatus.Accepted)
+                            {
+                                <span class="badge rounded-pill px-2.5 py-1 fw-semibold" style="background: #15803d; color: #ffffff; font-size: 11px;">Đã chấp nhận</span>
+                            }
+                            else if (request.Status == RequestStatus.Rejected)
+                            {
+                                <span class="badge rounded-pill px-2.5 py-1 fw-semibold" style="background: #64748b; color: #ffffff; font-size: 11px;">Đã từ chối</span>
+                            }
+                            else
+                            {
+                                <span class="badge rounded-pill px-2.5 py-1 fw-semibold" style="background: #dc2626; color: #ffffff; font-size: 11px;">Đã hủy</span>
+                            }
+                        </div>
                     </div>
 
-                    <div class="tutor-m-card-body">
-                        <div class="tutor-m-data-row">
-                            <span class="tutor-m-label"><i class="bi bi-clock me-1"></i>Học thử:</span>
-                            <span class="tutor-m-value">@formattedSlot</span>
+                    <div class="mb-3">
+                        <div class="d-flex align-items-center justify-content-between small text-secondary mb-1">
+                            <span><i class="bi bi-tag me-1"></i>Hình thức:</span>
+                            <span class="fw-medium text-dark">
+                                @(request.PreferredType == ClassroomType.OneToOne ? "1 kèm 1" : $"Lớp nhóm {(string.IsNullOrWhiteSpace(request.ClassroomName) ? "" : $"({request.ClassroomName})")}")
+                                · @(isTrial ? "Học thử 1 buổi" : "Học chính thức")
+                            </span>
+                        </div>
+                        <div class="d-flex align-items-center justify-content-between small text-secondary mb-1">
+                            <span><i class="bi bi-clock me-1"></i>Thời gian:</span>
+                            <span class="fw-medium text-dark">@formattedSlot</span>
                         </div>
                         @if (request.MatchesAvailability)
                         {
-                            <div class="slot-match-note justify-content-end">
-                                <span class="match-check">✓</span> Khớp lịch rảnh
+                            <div class="text-end mt-1">
+                                <span class="small text-success fw-semibold">
+                                    <i class="bi bi-check2-circle me-1"></i>Khớp lịch rảnh
+                                </span>
+                            </div>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(studentNote))
+                        {
+                            <div class="bg-light p-2 rounded-2 small text-secondary mt-2 border">
+                                <i class="bi bi-chat-left-dots text-muted me-1"></i>"@studentNote"
                             </div>
                         }
                     </div>
 
-                    <div class="tutor-m-card-footer">
+                    <div class="d-flex gap-2 pt-2 border-top">
                         @if (request.Status == RequestStatus.Pending)
                         {
                             @if (request.Id < 0)
                             {
-                                <button type="button" class="btn-tutor-accept" onclick="alert('Đã chấp nhận yêu cầu của @request.StudentName.'); location.reload();">
-                                    Chấp nhận
+                                <button type="button" class="btn btn-sm btn-success flex-grow-1 py-1.5" onclick="alert('Đã chấp nhận yêu cầu của @request.StudentName.'); location.reload();">
+                                    <i class="bi bi-check-lg me-1"></i>Chấp nhận
                                 </button>
-                                <button type="button" class="btn-tutor-reject" onclick="alert('Đã từ chối yêu cầu.'); location.reload();">
-                                    Từ chối
+                                <button type="button" class="btn btn-sm btn-outline-danger flex-grow-1 py-1.5" onclick="alert('Đã từ chối yêu cầu.'); location.reload();">
+                                    <i class="bi bi-x-lg me-1"></i>Từ chối
                                 </button>
                             }
                             else
                             {
                                 <form asp-action="Accept" asp-route-id="@request.Id" method="post" class="flex-grow-1">
-                                    <button type="submit" class="btn-tutor-accept w-100">Chấp nhận</button>
+                                    @Html.AntiForgeryToken()
+                                    <button type="submit" class="btn btn-sm btn-success w-100 py-1.5 shadow-sm">
+                                        <i class="bi bi-check-lg me-1"></i>Chấp nhận
+                                    </button>
                                 </form>
                                 <form asp-action="Reject" asp-route-id="@request.Id" method="post" class="flex-grow-1">
-                                    <button type="submit" class="btn-tutor-reject w-100">Từ chối</button>
+                                    @Html.AntiForgeryToken()
+                                    <button type="submit" class="btn btn-sm btn-outline-danger w-100 py-1.5" onclick="return confirm('Bạn có chắc chắn muốn từ chối yêu cầu này không?');">
+                                        <i class="bi bi-x-lg me-1"></i>Từ chối
+                                    </button>
                                 </form>
                             }
                         }
                         else if (request.Status == RequestStatus.Accepted)
                         {
-                            <span class="tutor-text-action text-center w-100 py-1">Đã học thử</span>
+                            <a asp-area="" asp-controller="Chat" asp-action="Conversation" asp-route-requestId="@request.Id" class="btn btn-sm btn-outline-danger flex-grow-1 py-1.5 d-flex align-items-center justify-content-center gap-1">
+                                <i class="bi bi-chat-dots-fill"></i> Nhắn tin
+                            </a>
+                            <a asp-area="Tutor" asp-controller="TutorSchedule" asp-action="Index" class="btn btn-sm btn-outline-secondary flex-grow-1 py-1.5 d-flex align-items-center justify-content-center gap-1">
+                                <i class="bi bi-calendar3"></i> Xem lịch dạy
+                            </a>
                         }
                         else if (request.Status == RequestStatus.Rejected)
                         {
-                            <span class="text-muted small text-center w-100 py-1">Đã từ chối</span>
+                            <span class="text-muted small text-center w-100 py-1"><i class="bi bi-dash-circle me-1"></i>Đã từ chối</span>
                         }
                         else
                         {
-                            <span class="text-muted small text-center w-100 py-1">Đã hủy</span>
+                            <span class="text-muted small text-center w-100 py-1"><i class="bi bi-info-circle me-1"></i>Học viên đã hủy</span>
                         }
                     </div>
                 </div>
@@ -303,18 +491,10 @@
     }
 
     <!-- Pagination -->
-    @if (totalPages > 1)
+    @if (ViewBag.Pagination is PROJECT_OTSP.Dtos.PaginationVm pagination)
     {
-        <nav class="mt-4" aria-label="Phân trang yêu cầu kết nối">
-            <ul class="pagination justify-content-center flex-wrap">
-                <li class="page-item @(currentPage <= 1 ? "disabled" : "")">
-                    <a class="page-link" asp-action="Index" asp-route-status="@selectedStatus" asp-route-page="@(currentPage - 1)" aria-label="Trang trước">Trước</a>
-                </li>
-                <li class="page-item disabled"><span class="page-link">@currentPage / @totalPages</span></li>
-                <li class="page-item @(currentPage >= totalPages ? "disabled" : "")">
-                    <a class="page-link" asp-action="Index" asp-route-status="@selectedStatus" asp-route-page="@(currentPage + 1)" aria-label="Trang sau">Sau</a>
-                </li>
-            </ul>
-        </nav>
+        <div class="mt-4">
+            @await Html.PartialAsync("_PaginationBar", pagination)
+        </div>
     }
 </div>

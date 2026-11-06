@@ -45,4 +45,15 @@ public interface IChatService
         string senderUserId,
         string content,
         CancellationToken cancellationToken = default);
+
+    Task<ChatMessageDto> EditMessageAsync(
+        int messageId,
+        string senderUserId,
+        string newContent,
+        CancellationToken cancellationToken = default);
+
+    Task<ChatMessageDeleteResult> DeleteMessageAsync(
+        int messageId,
+        string senderUserId,
+        CancellationToken cancellationToken = default);
 }

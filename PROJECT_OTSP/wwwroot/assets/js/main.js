@@ -63,29 +63,9 @@
   });
 
   /**
-   * Preloader - Dismiss immediately on DOM ready or fallback after 800ms
+   * Preloader - Được quản lý bởi preloader.js (chỉ hiển thị khi trang tải quá 3s)
    */
-  const preloader = document.querySelector('#preloader');
-  if (preloader) {
-    const dismissPreloader = () => {
-      preloader.classList.add('loaded');
-      setTimeout(() => {
-        if (preloader.parentNode) {
-          preloader.remove();
-        }
-      }, 300);
-    };
-
-    if (document.readyState === 'complete' || document.readyState === 'interactive') {
-      dismissPreloader();
-    } else {
-      document.addEventListener('DOMContentLoaded', dismissPreloader);
-      window.addEventListener('load', dismissPreloader);
-    }
-
-    // Fallback: Never block the UI for more than 800ms under any circumstances
-    setTimeout(dismissPreloader, 800);
-  }
+  // Logic điều khiển nằm trong wwwroot/assets/js/preloader.js
 
   /**
    * Scroll top button

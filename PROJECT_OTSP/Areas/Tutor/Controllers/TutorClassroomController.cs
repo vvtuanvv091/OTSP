@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Http;
@@ -38,8 +39,32 @@ public sealed class TutorClassroomController : TutorAreaController
         _imageStorage = imageStorage;
     }
 
+    private static double SanitizeHours(double hours)
+    {
+        if (hours >= 10.0)
+            hours /= 10.0;
+        if (hours <= 0 || hours > 8.0)
+            hours = 2.0;
+        return hours;
+    }
+
+    private void TryParseHoursFromForm(ClassroomFormVm model)
+    {
+        var rawHours = Request.Form["HoursPerSession"].ToString();
+        if (!string.IsNullOrWhiteSpace(rawHours))
+        {
+            rawHours = rawHours.Trim().Replace(',', '.');
+            if (double.TryParse(rawHours, NumberStyles.Any, CultureInfo.InvariantCulture, out var parsed))
+            {
+                model.HoursPerSession = parsed;
+            }
+        }
+        model.HoursPerSession = SanitizeHours(model.HoursPerSession);
+    }
+
+
     [HttpGet]
-    public async Task<IActionResult> Index(ClassroomStatus? status, CancellationToken cancellationToken)
+    public async Task<IActionResult> Index(ClassroomStatus? status, int page = 1, CancellationToken cancellationToken = default)
     {
         var tutorId = await GetApprovedTutorIdAsync(cancellationToken);
         if (tutorId is null)
@@ -50,7 +75,7 @@ public sealed class TutorClassroomController : TutorAreaController
 
         var query = _db.Classrooms
             .AsNoTracking()
-            .Where(classroom => classroom.TutorId == tutorId.Value && classroom.Type == ClassroomType.Group);
+            .Where(classroom => classroom.TutorId == tutorId.Value);
 
         if (status.HasValue)
             query = query.Where(classroom => classroom.Status == status.Value);
@@ -62,6 +87,7 @@ public sealed class TutorClassroomController : TutorAreaController
             {
                 classroom.Id,
                 classroom.Name,
+                classroom.Type,
                 SubjectName = classroom.Subject.Name,
                 GradeLevelName = classroom.GradeLevel.Name,
                 classroom.CoverImageUrl,
@@ -76,24 +102,51 @@ public sealed class TutorClassroomController : TutorAreaController
                     .OrderBy(w => w.SessionIndex)
                     .Select(w => new { w.SessionIndex, w.DayOfWeek, w.StartTime, w.EndTime })
                     .ToList(),
-                CanHardDelete = !classroom.ClassroomStudents.Any()
-                    && !classroom.ConnectionRequests.Any()
-                    && !classroom.ClassSessions.Any()
-                    && !classroom.Payments.Any(),
-                HasSuccessfulPayment = classroom.Payments.Any(payment => payment.Status == PaymentStatus.Success)
+                CanHardDelete = !classroom.Payments.Any(payment => payment.Status == PaymentStatus.Success),
+                HasSuccessfulPayment = classroom.Payments.Any(payment => payment.Status == PaymentStatus.Success),
+                CompletedSessions = classroom.ClassSessions.Count(s => s.Status == SessionStatus.Done),
+                TotalSessions = classroom.ClassSessions.Count > 0 ? classroom.ClassSessions.Count : Math.Max(1, classroom.SessionsPerWeek * 4),
+                DocumentCount = classroom.LearningDocuments.Count
             })
             .ToListAsync(cancellationToken);
 
+        // Auto-heal any legacy records with corrupted HoursPerSession >= 10
+        var corrupted = await _db.Classrooms
+            .Where(c => c.TutorId == tutorId.Value && c.HoursPerSession >= 10.0)
+            .ToListAsync(cancellationToken);
+        if (corrupted.Count > 0)
+        {
+            foreach (var item in corrupted)
+            {
+                item.HoursPerSession = SanitizeHours(item.HoursPerSession);
+            }
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+
         var classrooms = classroomsRaw.Select(c =>
         {
+            var hours = SanitizeHours(c.HoursPerSession);
             var summary = c.WeeklySchedules.Count > 0
-                ? $"{c.SessionsPerWeek} buổi/tuần ({string.Join(", ", c.WeeklySchedules.Select(w => $"{ToShortVnDay(w.DayOfWeek)} {w.StartTime:HH\\:mm}"))} · {c.HoursPerSession}h/buổi)"
-                : $"{c.SessionsPerWeek} buổi/tuần ({c.HoursPerSession}h/buổi)";
+                ? $"{c.SessionsPerWeek} buổi/tuần ({string.Join(", ", c.WeeklySchedules.Select(w => $"{ToShortVnDay(w.DayOfWeek)} {w.StartTime:HH\\:mm}"))} · {hours:0.#}h/buổi)"
+                : $"{c.SessionsPerWeek} buổi/tuần ({hours:0.#}h/buổi)";
+
+            string formattedSchedule;
+            if (c.WeeklySchedules.Count > 0)
+            {
+                var days = string.Join(", ", c.WeeklySchedules.Select(w => ToShortVnDay(w.DayOfWeek)));
+                var firstTime = c.WeeklySchedules[0];
+                formattedSchedule = $"{days} ({firstTime.StartTime:HH\\:mm} - {firstTime.EndTime:HH\\:mm})";
+            }
+            else
+            {
+                formattedSchedule = $"{c.SessionsPerWeek} buổi/tuần";
+            }
 
             return new ClassroomListItemVm
             {
                 Id = c.Id,
                 Name = c.Name,
+                Type = c.Type,
                 SubjectName = c.SubjectName,
                 GradeLevelName = c.GradeLevelName,
                 CoverImageUrl = c.CoverImageUrl,
@@ -103,15 +156,43 @@ public sealed class TutorClassroomController : TutorAreaController
                 Status = c.Status,
                 StartDate = c.StartDate,
                 SessionsPerWeek = c.SessionsPerWeek,
-                HoursPerSession = c.HoursPerSession,
+                HoursPerSession = hours,
                 ScheduleSummary = summary,
                 CanHardDelete = c.CanHardDelete,
-                HasSuccessfulPayment = c.HasSuccessfulPayment
+                HasSuccessfulPayment = c.HasSuccessfulPayment,
+                CompletedSessions = c.CompletedSessions,
+                TotalSessions = c.TotalSessions > 0 ? c.TotalSessions : 12,
+                FormattedSchedule = formattedSchedule,
+                DocumentCount = c.DocumentCount
             };
         }).ToList();
 
+        page = Math.Max(1, page);
+        const int pageSize = 9; // Lưới 3 cột x 3 dòng = 9 thẻ/trang
+        var totalItems = classrooms.Count;
+        var totalPages = Math.Max(1, (int)Math.Ceiling(totalItems / (double)pageSize));
+        page = Math.Clamp(page, 1, totalPages);
+
+        var pagedClassrooms = classrooms.Skip((page - 1) * pageSize).Take(pageSize).ToList();
+
+        var queryParams = new Dictionary<string, string>();
+        if (status.HasValue)
+        {
+            queryParams["status"] = status.Value.ToString();
+        }
+
         ViewBag.SelectedStatus = status;
-        return RenderIndex(classrooms);
+        ViewBag.Pagination = new PaginationVm
+        {
+            CurrentPage = page,
+            TotalPages = totalPages,
+            TotalItems = totalItems,
+            PageSize = pageSize,
+            BaseUrl = Url.Action("Index", "TutorClassroom", new { area = "Tutor" }) ?? "/Tutor/TutorClassroom",
+            QueryParams = queryParams
+        };
+
+        return RenderIndex(pagedClassrooms);
     }
 
     [HttpGet]
@@ -164,6 +245,7 @@ public sealed class TutorClassroomController : TutorAreaController
             ModelState.AddModelError(nameof(model.SubjectGradeKey), "Môn học hoặc cấp học không thuộc danh sách bạn đăng ký giảng dạy.");
         }
 
+        TryParseHoursFromForm(model);
         await ValidateCoverImageInputAsync(model, cancellationToken);
         await ValidateWeeklySchedulesAsync(model, tutorId.Value, null, cancellationToken);
 
@@ -246,6 +328,12 @@ public sealed class TutorClassroomController : TutorAreaController
             return RedirectToAction(nameof(Index));
         }
 
+        if (classroom.HoursPerSession >= 10.0)
+        {
+            classroom.HoursPerSession = SanitizeHours(classroom.HoursPerSession);
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+
         var existingSchedules = await _db.ClassroomWeeklySchedules
             .AsNoTracking()
             .Where(w => w.ClassroomId == classroom.Id)
@@ -265,10 +353,11 @@ public sealed class TutorClassroomController : TutorAreaController
             Name = classroom.Name,
             Description = classroom.Description,
             Fee = classroom.Fee,
-            MaxStudents = classroom.MaxStudents,
+            Type = classroom.Type,
+            MaxStudents = classroom.Type == ClassroomType.OneToOne ? 1 : classroom.MaxStudents,
             StartDate = classroom.StartDate,
             SessionsPerWeek = classroom.SessionsPerWeek > 0 ? classroom.SessionsPerWeek : (existingSchedules.Count > 0 ? existingSchedules.Count : 2),
-            HoursPerSession = classroom.HoursPerSession > 0 ? classroom.HoursPerSession : 2.0,
+            HoursPerSession = SanitizeHours(classroom.HoursPerSession),
             WeeklySchedules = existingSchedules.Count > 0 ? existingSchedules : new List<ClassroomWeeklyScheduleInputDto>
             {
                 new() { SessionIndex = 1, DayOfWeek = DayOfWeek.Monday, StartTime = new TimeOnly(19, 0), EndTime = new TimeOnly(21, 0) },
@@ -305,6 +394,12 @@ public sealed class TutorClassroomController : TutorAreaController
             return RedirectToAction(nameof(Index));
         }
 
+        if (classroom.Type == ClassroomType.OneToOne)
+        {
+            model.Type = ClassroomType.OneToOne;
+            model.MaxStudents = 1;
+        }
+
         var currentXmin = _db.Entry(classroom).Property<uint>("xmin").CurrentValue;
         if (currentXmin != model.RowVersion)
         {
@@ -339,6 +434,7 @@ public sealed class TutorClassroomController : TutorAreaController
         if (subjectGradeChanged && (hasStudents || hasConnectionRequests))
             ModelState.AddModelError(nameof(model.SubjectGradeKey), "Không thể đổi môn/cấp học khi lớp đã có học viên hoặc yêu cầu kết nối.");
 
+        TryParseHoursFromForm(model);
         await ValidateCoverImageInputAsync(model, cancellationToken);
         await ValidateWeeklySchedulesAsync(model, tutorId.Value, classroom.Id, cancellationToken);
 
@@ -357,7 +453,7 @@ public sealed class TutorClassroomController : TutorAreaController
         classroom.Name = model.Name.Trim();
         classroom.Description = model.Description?.Trim();
         classroom.StartDate = model.StartDate;
-        classroom.MaxStudents = model.MaxStudents;
+        classroom.MaxStudents = classroom.Type == ClassroomType.OneToOne ? 1 : model.MaxStudents;
         classroom.SessionsPerWeek = model.SessionsPerWeek;
         classroom.HoursPerSession = model.HoursPerSession;
         classroom.Fee = model.Fee;
@@ -424,7 +520,7 @@ public sealed class TutorClassroomController : TutorAreaController
             await DeleteCoverImageAsync(previousCoverImageUrl, previousCoverImagePublicId);
         }
 
-        TempData["Success"] = "Đã cập nhật lớp nhóm.";
+        TempData["Success"] = "Đã cập nhật lớp.";
         return RedirectToAction(nameof(Index));
     }
 
@@ -445,7 +541,7 @@ public sealed class TutorClassroomController : TutorAreaController
                 _db.ChangeTracker.Clear();
                 await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
                 var classroom = await _db.Classrooms.FirstOrDefaultAsync(item =>
-                    item.Id == id && item.TutorId == tutorId.Value && item.Type == ClassroomType.Group,
+                    item.Id == id && item.TutorId == tutorId.Value,
                     cancellationToken);
 
                 if (classroom is null)
@@ -462,32 +558,62 @@ public sealed class TutorClassroomController : TutorAreaController
                     return;
                 }
 
-                if (classroom.Status == ClassroomStatus.Cancelled)
-                {
-                    result.Cancelled = true;
-                    result.HasSuccessfulPayment = await _db.Payments.AnyAsync(
-                        payment => payment.ClassroomId == classroom.Id && payment.Status == PaymentStatus.Success,
-                        cancellationToken);
-                    await transaction.CommitAsync(cancellationToken);
-                    return;
-                }
-
-                var hasStudents = await _db.ClassroomStudents.AnyAsync(
-                    student => student.ClassroomId == classroom.Id, cancellationToken);
-                var hasRequests = await _db.ConnectionRequests.AnyAsync(
-                    request => request.ClassroomId == classroom.Id, cancellationToken);
-                var hasSessions = await _db.ClassSessions.AnyAsync(
-                    session => session.ClassroomId == classroom.Id, cancellationToken);
-                var hasPayments = await _db.Payments.AnyAsync(
-                    payment => payment.ClassroomId == classroom.Id, cancellationToken);
                 result.HasSuccessfulPayment = await _db.Payments.AnyAsync(
                     payment => payment.ClassroomId == classroom.Id && payment.Status == PaymentStatus.Success,
                     cancellationToken);
 
-                if (!hasStudents && !hasRequests && !hasSessions && !hasPayments)
+                // Nếu không có thanh toán thành công: Cho phép xóa vĩnh viễn (Hard delete)
+                // Áp dụng cho cả lớp chưa hủy hoặc lớp đã ở trạng thái hủy trước đó
+                if (!result.HasSuccessfulPayment)
                 {
                     result.DeletedCoverImageUrl = classroom.CoverImageUrl;
                     result.DeletedCoverImagePublicId = classroom.CoverImagePublicId;
+
+                    // 1. Gỡ liên kết ConnectionRequests
+                    await _db.ConnectionRequests
+                        .Where(request => request.ClassroomId == classroom.Id)
+                        .ExecuteUpdateAsync(update => update.SetProperty(r => r.ClassroomId, (int?)null), cancellationToken);
+
+                    // 2. Lấy danh sách ID ClassSessions
+                    var sessionIds = await _db.ClassSessions
+                        .Where(session => session.ClassroomId == classroom.Id)
+                        .Select(session => session.Id)
+                        .ToListAsync(cancellationToken);
+
+                    if (sessionIds.Count > 0)
+                    {
+                        // 3. Gỡ liên kết TrialSchedules
+                        await _db.TrialSchedules
+                            .Where(ts => ts.ClassSessionId.HasValue && sessionIds.Contains(ts.ClassSessionId.Value))
+                            .ExecuteUpdateAsync(update => update.SetProperty(ts => ts.ClassSessionId, (int?)null), cancellationToken);
+
+                        // 4. Xóa Reviews
+                        await _db.Reviews
+                            .Where(r => sessionIds.Contains(r.ClassSessionId))
+                            .ExecuteDeleteAsync(cancellationToken);
+
+                        // 5. Xóa ClassSessions
+                        await _db.ClassSessions
+                            .Where(s => s.ClassroomId == classroom.Id)
+                            .ExecuteDeleteAsync(cancellationToken);
+                    }
+
+                    // 6. Xóa ClassroomWeeklySchedules
+                    await _db.ClassroomWeeklySchedules
+                        .Where(ws => ws.ClassroomId == classroom.Id)
+                        .ExecuteDeleteAsync(cancellationToken);
+
+                    // 7. Xóa ClassroomStudents
+                    await _db.ClassroomStudents
+                        .Where(cs => cs.ClassroomId == classroom.Id)
+                        .ExecuteDeleteAsync(cancellationToken);
+
+                    // 8. Xóa Payments chưa thành công
+                    await _db.Payments
+                        .Where(p => p.ClassroomId == classroom.Id)
+                        .ExecuteDeleteAsync(cancellationToken);
+
+                    // 9. Xóa Classroom
                     _db.Classrooms.Remove(classroom);
                     await _db.SaveChangesAsync(cancellationToken);
                     result.Deleted = true;
@@ -495,16 +621,35 @@ public sealed class TutorClassroomController : TutorAreaController
                     return;
                 }
 
+                if (classroom.Status == ClassroomStatus.Cancelled)
+                {
+                    result.Cancelled = true;
+                    await transaction.CommitAsync(cancellationToken);
+                    return;
+                }
+
+                // Nếu có giao dịch thành công: Hủy lớp an toàn (Soft Cancel)
                 var nowUtc = DateTime.UtcNow;
                 classroom.Status = ClassroomStatus.Cancelled;
-                await _db.SaveChangesAsync(cancellationToken);
 
+                // Hủy các buổi học sắp tới
+                await _db.ClassSessions
+                    .Where(session => session.ClassroomId == classroom.Id && session.Status == SessionStatus.Scheduled)
+                    .ExecuteUpdateAsync(update => update.SetProperty(session => session.Status, SessionStatus.Cancelled), cancellationToken);
+
+                // Hủy các yêu cầu kết nối đang chờ
                 await _db.ConnectionRequests
                     .Where(request => request.ClassroomId == classroom.Id && request.Status == RequestStatus.Pending)
                     .ExecuteUpdateAsync(update => update
                         .SetProperty(request => request.Status, RequestStatus.Cancelled)
                         .SetProperty(request => request.RespondedAt, nowUtc), cancellationToken);
 
+                // Hủy các thanh toán đang chờ
+                await _db.Payments
+                    .Where(payment => payment.ClassroomId == classroom.Id && payment.Status == PaymentStatus.Pending)
+                    .ExecuteUpdateAsync(update => update.SetProperty(payment => payment.Status, PaymentStatus.Failed), cancellationToken);
+
+                // Gửi thông báo cho học viên
                 var studentUserIds = await _db.ClassroomStudents
                     .AsNoTracking()
                     .Where(student => student.ClassroomId == classroom.Id)
@@ -536,7 +681,7 @@ public sealed class TutorClassroomController : TutorAreaController
         }
         catch (DbUpdateException)
         {
-            TempData["Error"] = "Không thể xóa lớp vì dữ liệu liên quan vừa được thêm. Vui lòng thử hủy lớp thay vì xóa.";
+            TempData["Error"] = "Không thể xóa lớp vì dữ liệu liên quan. Vui lòng thử hủy lớp thay vì xóa.";
             return RedirectToAction(nameof(Index));
         }
 
@@ -547,11 +692,11 @@ public sealed class TutorClassroomController : TutorAreaController
         if (result.Completed)
             TempData["Error"] = "Không thể hủy lớp đã hoàn thành.";
         else if (result.Deleted)
-            TempData["Success"] = "Đã xóa lớp nhóm vì chưa có dữ liệu liên quan.";
+            TempData["Success"] = "Đã xóa hoàn toàn lớp học khỏi hệ thống.";
         else if (result.Cancelled && result.HasSuccessfulPayment)
             TempData["Warning"] = "Đã hủy lớp. Lớp có giao dịch thanh toán thành công; hệ thống không tự hoàn tiền, vui lòng xử lý hoàn tiền thủ công.";
         else if (result.Cancelled)
-            TempData["Success"] = "Đã hủy lớp nhóm và thông báo cho học viên.";
+            TempData["Success"] = "Đã hủy lớp học và thông báo cho học viên.";
 
         return RedirectToAction(nameof(Index));
     }
@@ -579,8 +724,7 @@ public sealed class TutorClassroomController : TutorAreaController
             .Include(classroom => classroom.GradeLevel)
             .FirstOrDefaultAsync(classroom =>
                 classroom.Id == classroomId
-                && classroom.TutorId == tutorId
-                && classroom.Type == ClassroomType.Group,
+                && classroom.TutorId == tutorId,
                 cancellationToken);
     }
 

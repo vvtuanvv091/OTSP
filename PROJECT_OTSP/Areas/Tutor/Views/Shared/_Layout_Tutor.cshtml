@@ -1,5 +1,13 @@
+@using Microsoft.EntityFrameworkCore
+@inject PROJECT_OTSP.Data.ApplicationDbContext _dbLayoutContext
 @{
     Layout = "_Layout";
+
+    var currentUserId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+    var tutorProfileLayout = !string.IsNullOrEmpty(currentUserId)
+        ? _dbLayoutContext.TutorProfiles.AsNoTracking().Where(t => t.UserId == currentUserId).Select(t => new { t.VerificationStatus }).FirstOrDefault()
+        : null;
+    var currentTutorStatus = tutorProfileLayout?.VerificationStatus ?? PROJECT_OTSP.Models.Enums.VerificationStatus.Pending;
 
     var controllerName = ViewContext.RouteData.Values["controller"]?.ToString();
     var areaName = ViewContext.RouteData.Values["area"]?.ToString();
@@ -11,6 +19,7 @@
 
 <link href="~/css/student-sidebar.css" rel="stylesheet" asp-append-version="true" />
 <link href="~/css/tutor-sidebar.css" rel="stylesheet" asp-append-version="true" />
+<link href="~/css/tutor-ui-refresh.css" rel="stylesheet" asp-append-version="true" />
 
 <div id="tutor-realtime-config" class="d-none"
      data-hub-url="@Url.Content("~/hubs/connection-requests")"
@@ -24,14 +33,27 @@
             <span class="student-sidebar-avatar" data-role="avatar-icon"><i class="bi bi-person-fill" aria-hidden="true"></i></span>
             <div class="student-sidebar-user-info">
                 <strong data-role="name">@initialName</strong>
-                <small>Gia sư · Đã xác minh</small>
+                <span data-role="status-badge">
+                    @if (currentTutorStatus == PROJECT_OTSP.Models.Enums.VerificationStatus.Approved)
+                    {
+                        <small class="text-success fw-semibold"><i class="bi bi-patch-check-fill me-1"></i>Gia sư · Đã xác minh</small>
+                    }
+                    else if (currentTutorStatus == PROJECT_OTSP.Models.Enums.VerificationStatus.Rejected)
+                    {
+                        <small class="text-danger fw-semibold"><i class="bi bi-x-octagon-fill me-1"></i>Gia sư · Bị từ chối</small>
+                    }
+                    else
+                    {
+                        <small class="text-warning fw-semibold" style="color: #d97706;"><i class="bi bi-hourglass-split me-1"></i>Gia sư · Chờ xác nhận</small>
+                    }
+                </span>
             </div>
         </div>
 
         <nav class="student-sidebar-nav">
             <span class="student-sidebar-heading">TỔNG QUAN</span>
-            <a asp-area="Tutor" asp-controller="TutorProfile" asp-action="Index"
-               class="student-sidebar-link @(inTutorArea && controllerName == "TutorProfile" ? "active" : "")">
+            <a asp-area="Tutor" asp-controller="TutorDashboard" asp-action="Index"
+               class="student-sidebar-link @(inTutorArea && controllerName == "TutorDashboard" ? "active" : "")">
                 <i class="bi bi-grid" aria-hidden="true"></i><span>Tổng quan</span>
             </a>
 
@@ -56,6 +78,10 @@
                class="student-sidebar-link @(inTutorArea && controllerName == "TutorStudent" ? "active" : "")">
                 <i class="bi bi-people" aria-hidden="true"></i><span>Học viên của tôi</span>
             </a>
+            <a asp-area="Tutor" asp-controller="TutorSubject" asp-action="Index"
+               class="student-sidebar-link @(inTutorArea && controllerName == "TutorSubject" ? "active" : "")">
+                <i class="bi bi-book" aria-hidden="true"></i><span>Môn học</span>
+            </a>
             <a asp-area="Tutor" asp-controller="TutorLearningDocument" asp-action="Index"
                class="student-sidebar-link @(inTutorArea && controllerName == "TutorLearningDocument" ? "active" : "")">
                 <i class="bi bi-folder2-open" aria-hidden="true"></i><span>Tài liệu</span>
@@ -76,7 +102,10 @@
             </a>
 
             <span class="student-sidebar-heading">TÀI CHÍNH</span>
-            <span class="student-sidebar-link is-disabled" aria-disabled="true"><i class="bi bi-credit-card" aria-hidden="true"></i><span>Thu nhập</span></span>
+            <a asp-area="Tutor" asp-controller="TutorIncome" asp-action="Index"
+               class="student-sidebar-link @(inTutorArea && controllerName == "TutorIncome" ? "active" : "")">
+                <i class="bi bi-credit-card" aria-hidden="true"></i><span>Thu nhập</span>
+            </a>
 
             <span class="student-sidebar-heading">TÀI KHOẢN</span>
             <a asp-area="Tutor" asp-controller="TutorProfile" asp-action="Index"
@@ -109,6 +138,16 @@
                     if (!user) return;
                     const nameEl = box.querySelector('[data-role="name"]');
                     if (nameEl) nameEl.textContent = user.name || '';
+                    const statusBadge = box.querySelector('[data-role="status-badge"]');
+                    if (statusBadge && user.verificationStatus) {
+                        if (user.verificationStatus === 'Approved') {
+                            statusBadge.innerHTML = '<small class="text-success fw-semibold"><i class="bi bi-patch-check-fill me-1"></i>Gia sư · Đã xác minh</small>';
+                        } else if (user.verificationStatus === 'Rejected') {
+                            statusBadge.innerHTML = '<small class="text-danger fw-semibold"><i class="bi bi-x-octagon-fill me-1"></i>Gia sư · Bị từ chối</small>';
+                        } else {
+                            statusBadge.innerHTML = '<small class="text-warning fw-semibold" style="color: #d97706;"><i class="bi bi-hourglass-split me-1"></i>Gia sư · Chờ xác nhận</small>';
+                        }
+                    }
                     if (user.avatarUrl) {
                         const img = box.querySelector('[data-role="avatar-img"]');
                         const icon = box.querySelector('[data-role="avatar-icon"]');

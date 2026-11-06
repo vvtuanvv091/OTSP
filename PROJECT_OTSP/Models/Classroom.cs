@@ -64,6 +64,9 @@ namespace PROJECT_OTSP.Models
         // Các yêu cầu kết nối xin vào lớp này (1-N, dùng cho lớp nhóm)
         public ICollection<ConnectionRequest> ConnectionRequests { get; set; } = new List<ConnectionRequest>();
 
+        // Tài liệu ôn tập / học tập của lớp (1-N)
+        public ICollection<LearningDocument> LearningDocuments { get; set; } = new List<LearningDocument>();
+
         // Môn học của lớp (ví dụ: Toán)
         [ForeignKey("Subject")]
         public int SubjectId { get; set; }

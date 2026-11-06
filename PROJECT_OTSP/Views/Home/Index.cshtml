@@ -16,12 +16,21 @@
         "#b2904f", "#b20969", "#ff5828", "#DB303A"
     };
 }
-
+<style>
+    #tutorsCardsGrid .member > img {
+    width: 100%;
+    height: 240px;
+    object-fit: cover;
+    object-position: center 20%;
+    display: block;
+    max-width: none;
+}
+</style>
 <div class="main otsp-home">
 
     <!-- ==================== 1. HERO SECTION (MENTOR STYLE) ==================== -->
     <section id="hero" class="hero section dark-background otsp-hero">
-        <img src="@Url.Content("~/assets/img/hero-bg.jpg")" alt="Học tập cùng gia sư OTSP" data-aos="fade-in">
+        <img src="@Url.Content("~/assets/img/hero-bg.jpg")" alt="Học tập cùng gia sư OTSP" data-aos="fade-in" fetchpriority="high" decoding="async">
         <div class="container">
             <div class="otsp-hero-content" data-aos="fade-up" data-aos-duration="800">
                 @* <span class="otsp-badge-glow">
@@ -60,7 +69,7 @@
         <div class="container">
             <div class="row gy-4 align-items-center">
                 <div class="col-lg-6 order-1 order-lg-2" data-aos="fade-up" data-aos-delay="100">
-                    <img src="@Url.Content("~/assets/img/about.jpg")" class="img-fluid rounded-4 shadow" alt="Về OTSP">
+                    <img src="@Url.Content("~/assets/img/about.jpg")" class="img-fluid rounded-4 shadow" alt="Về OTSP" loading="lazy" decoding="async" width="600" height="400">
                 </div>
                 <div class="col-lg-6 order-2 order-lg-1 content" data-aos="fade-up" data-aos-delay="200">
                     <h3>@(isVietnamese ? "Nền tảng kết nối gia sư uy tín & chuẩn hóa hàng đầu" : "Leading Tutoring & Mentorship Platform")</h3>

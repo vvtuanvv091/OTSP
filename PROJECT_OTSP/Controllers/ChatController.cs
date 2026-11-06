@@ -16,12 +16,14 @@ namespace PROJECT_OTSP.Controllers
         private readonly IChatService _chatService;
         private readonly ApplicationDbContext _db;
         private readonly IHubContext<ChatHub> _hubContext;
+        private readonly IImageStorageService _imageStorage;
 
-        public ChatController(IChatService chatService, ApplicationDbContext db, IHubContext<ChatHub> hubContext)
+        public ChatController(IChatService chatService, ApplicationDbContext db, IHubContext<ChatHub> hubContext, IImageStorageService imageStorage)
         {
             _chatService = chatService;
             _db = db;
             _hubContext = hubContext;
+            _imageStorage = imageStorage;
         }
 
         private string? CurrentUserId => User.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -197,30 +199,19 @@ namespace PROJECT_OTSP.Controllers
             if (file == null || file.Length == 0)
                 return BadRequest(new { success = false, error = "Vui lòng chọn ảnh hợp lệ." });
 
-            if (file.Length > 10 * 1024 * 1024)
-                return BadRequest(new { success = false, error = "Dung lượng ảnh tối đa 10MB." });
-
-            var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
-            var allowedExts = new[] { ".jpg", ".jpeg", ".png", ".webp", ".gif" };
-            if (!allowedExts.Contains(ext))
-                return BadRequest(new { success = false, error = "Chỉ chấp nhận file ảnh (.jpg, .jpeg, .png, .webp, .gif)." });
-
-            var uploadDir = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads", "chat");
-            if (!Directory.Exists(uploadDir))
+            try
             {
-                Directory.CreateDirectory(uploadDir);
+                var stored = await _imageStorage.UploadChatImageAsync(file, cancellationToken);
+                return Json(new { success = true, fileUrl = stored.Url });
             }
-
-            var fileName = $"{Guid.NewGuid():N}{ext}";
-            var filePath = Path.Combine(uploadDir, fileName);
-
-            await using (var stream = new FileStream(filePath, FileMode.Create))
+            catch (ArgumentException aex)
             {
-                await file.CopyToAsync(stream, cancellationToken);
+                return BadRequest(new { success = false, error = aex.Message });
             }
-
-            var fileUrl = $"/uploads/chat/{fileName}";
-            return Json(new { success = true, fileUrl });
+            catch (Exception)
+            {
+                return StatusCode(500, new { success = false, error = "Không thể tải ảnh lên máy chủ. Vui lòng thử lại sau." });
+            }
         }
 
         // Backward compatibility
@@ -229,11 +220,140 @@ namespace PROJECT_OTSP.Controllers
         {
             return RedirectToAction(nameof(Index), new { requestId });
         }
+
+        [HttpPost]
+        [IgnoreAntiforgeryToken]
+        public async Task<IActionResult> EditMessage([FromBody] EditMessageRequest req, CancellationToken cancellationToken)
+        {
+            var userId = CurrentUserId;
+            if (string.IsNullOrWhiteSpace(userId))
+                return Unauthorized();
+
+            if (req == null || req.MessageId <= 0 || string.IsNullOrWhiteSpace(req.Content))
+                return BadRequest(new { success = false, error = "Nội dung chỉnh sửa không hợp lệ." });
+
+            try
+            {
+                var msg = await _chatService.EditMessageAsync(req.MessageId, userId, req.Content, cancellationToken);
+                var directRoom = ChatHub.GetDirectRoomName(msg.SenderId, msg.ReceiverId);
+
+                var payload = new
+                {
+                    messageId = msg.Id,
+                    newContent = msg.Content,
+                    senderId = msg.SenderId,
+                    receiverId = msg.ReceiverId,
+                    sentAt = msg.SentAtUtc
+                };
+
+                await _hubContext.Clients.Group(directRoom).SendAsync("MessageEdited", payload, cancellationToken);
+                await _hubContext.Clients.Group($"user:{msg.ReceiverId}").SendAsync("MessageEdited", payload, cancellationToken);
+                await _hubContext.Clients.Group($"user:{userId}").SendAsync("MessageEdited", payload, cancellationToken);
+
+                await _hubContext.Clients.Group($"user:{msg.ReceiverId}").SendAsync("ConversationUpdated", new
+                {
+                    contactId = userId,
+                    lastMessage = msg.Content,
+                    sentAt = msg.SentAtUtc
+                }, cancellationToken);
+
+                await _hubContext.Clients.Group($"user:{userId}").SendAsync("ConversationUpdated", new
+                {
+                    contactId = msg.ReceiverId,
+                    lastMessage = msg.Content,
+                    sentAt = msg.SentAtUtc
+                }, cancellationToken);
+
+                return Json(new { success = true, message = msg });
+            }
+            catch (KeyNotFoundException knf)
+            {
+                return NotFound(new { success = false, error = knf.Message });
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return Forbid();
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { success = false, error = ex.Message });
+            }
+        }
+
+        [HttpPost]
+        [IgnoreAntiforgeryToken]
+        public async Task<IActionResult> DeleteMessage([FromBody] DeleteMessageRequest req, CancellationToken cancellationToken)
+        {
+            var userId = CurrentUserId;
+            if (string.IsNullOrWhiteSpace(userId))
+                return Unauthorized();
+
+            if (req == null || req.MessageId <= 0)
+                return BadRequest(new { success = false, error = "Yêu cầu xóa không hợp lệ." });
+
+            try
+            {
+                var res = await _chatService.DeleteMessageAsync(req.MessageId, userId, cancellationToken);
+                var directRoom = ChatHub.GetDirectRoomName(res.SenderId, res.ReceiverId);
+
+                var payload = new
+                {
+                    messageId = res.MessageId,
+                    senderId = res.SenderId,
+                    receiverId = res.ReceiverId,
+                    lastMessage = res.LastRemainingMessageContent ?? "Bắt đầu cuộc trò chuyện...",
+                    sentAt = res.LastRemainingMessageTimeUtc
+                };
+
+                await _hubContext.Clients.Group(directRoom).SendAsync("MessageDeleted", payload, cancellationToken);
+                await _hubContext.Clients.Group($"user:{res.ReceiverId}").SendAsync("MessageDeleted", payload, cancellationToken);
+                await _hubContext.Clients.Group($"user:{userId}").SendAsync("MessageDeleted", payload, cancellationToken);
+
+                await _hubContext.Clients.Group($"user:{res.ReceiverId}").SendAsync("ConversationUpdated", new
+                {
+                    contactId = userId,
+                    lastMessage = payload.lastMessage,
+                    sentAt = payload.sentAt
+                }, cancellationToken);
+
+                await _hubContext.Clients.Group($"user:{userId}").SendAsync("ConversationUpdated", new
+                {
+                    contactId = res.ReceiverId,
+                    lastMessage = payload.lastMessage,
+                    sentAt = payload.sentAt
+                }, cancellationToken);
+
+                return Json(new { success = true, deletedId = res.MessageId });
+            }
+            catch (KeyNotFoundException knf)
+            {
+                return NotFound(new { success = false, error = knf.Message });
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return Forbid();
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { success = false, error = ex.Message });
+            }
+        }
     }
 
     public class SendMessageRequest
     {
         public string ReceiverUserId { get; set; } = string.Empty;
         public string Content { get; set; } = string.Empty;
+    }
+
+    public class EditMessageRequest
+    {
+        public int MessageId { get; set; }
+        public string Content { get; set; } = string.Empty;
+    }
+
+    public class DeleteMessageRequest
+    {
+        public int MessageId { get; set; }
     }
 }

@@ -1,13 +1,11 @@
 using System.Security.Claims;
-using System.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using PROJECT_OTSP.Data;
 using PROJECT_OTSP.Dtos;
-using PROJECT_OTSP.Hubs;
 using PROJECT_OTSP.Models;
+using PROJECT_OTSP.Services;
 using static PROJECT_OTSP.Models.Enums;
 
 namespace PROJECT_OTSP.Areas.Tutor.Controllers;
@@ -16,16 +14,16 @@ namespace PROJECT_OTSP.Areas.Tutor.Controllers;
 [Authorize(Roles = "Tutor")]
 public class TutorConnectionRequestController : TutorAreaController
 {
-    private const int PageSize = 20;
+    private const int PageSize = 8;
     private readonly ApplicationDbContext _dbContext;
-    private readonly IHubContext<ConnectionRequestHub> _hubContext;
+    private readonly IConnectionRequestService _connectionRequestService;
 
     public TutorConnectionRequestController(
         ApplicationDbContext dbContext,
-        IHubContext<ConnectionRequestHub> hubContext)
+        IConnectionRequestService connectionRequestService)
     {
         _dbContext = dbContext;
-        _hubContext = hubContext;
+        _connectionRequestService = connectionRequestService;
     }
 
     [HttpGet]
@@ -48,7 +46,6 @@ public class TutorConnectionRequestController : TutorAreaController
         if (status.HasValue)
             requestsQuery = requestsQuery.Where(request => request.Status == status.Value);
 
-        // Đếm trên query đã lọc, sau đó chỉ đọc một trang dữ liệu cần hiển thị.
         var totalItems = await requestsQuery.CountAsync(cancellationToken);
         var totalPages = Math.Max(1, (int)Math.Ceiling(totalItems / (double)PageSize));
         page = Math.Clamp(page, 1, totalPages);
@@ -71,266 +68,77 @@ public class TutorConnectionRequestController : TutorAreaController
                 Status = request.Status,
                 CreatedAt = request.CreatedAt,
                 ProposedTrialSlotUtc = request.ProposedTrialSlotUtc,
-                ProposedTrialSlotsUtc = request.TrialSchedules
-                    .OrderBy(ts => ts.ScheduledAt)
-                    .Select(ts => ts.ScheduledAt)
-                    .ToList()
+                ProposedTrialSlotsUtc = request.TrialSchedules.Select(t => t.ScheduledAt).ToList(),
+                MatchesAvailability = true,
+                HasCompletedTrial = false
             })
             .ToListAsync(cancellationToken);
 
-        var tutorAvailabilities = await _dbContext.TutorAvailabilities
-            .AsNoTracking()
-            .Where(a => a.Tutor.UserId == userId)
-            .ToListAsync(cancellationToken);
-
-        foreach (var req in requests)
-        {
-            var checkSlot = req.ProposedTrialSlotUtc ?? (req.ProposedTrialSlotsUtc.Count > 0 ? req.ProposedTrialSlotsUtc[0] : (DateTime?)null);
-            if (checkSlot.HasValue && checkSlot.Value != default)
-            {
-                var local = checkSlot.Value.AddHours(7);
-                var day = local.DayOfWeek;
-                var time = TimeOnly.FromDateTime(local);
-                req.MatchesAvailability = tutorAvailabilities.Any(a => a.DayOfWeek == day && a.StartTime <= time && a.EndTime >= time.AddHours(1));
-            }
-        }
-
-        if (requests.Count == 0 && !status.HasValue)
-        {
-            requests = new List<TutorConnectionRequestDto>
-            {
-                new()
-                {
-                    Id = -101,
-                    StudentName = "Nguyễn An",
-                    SubjectName = "Tiếng Anh",
-                    GradeLevelName = "THPT",
-                    Status = RequestStatus.Accepted,
-                    HasCompletedTrial = true,
-                    ProposedTrialSlotUtc = new DateTime(2026, 9, 29, 3, 0, 0, DateTimeKind.Utc)
-                },
-                new()
-                {
-                    Id = -102,
-                    StudentName = "Trần Gia Bảo",
-                    SubjectName = "Tiếng Anh",
-                    GradeLevelName = "THPT",
-                    Status = RequestStatus.Accepted,
-                    HasCompletedTrial = true,
-                    ProposedTrialSlotUtc = new DateTime(2026, 9, 29, 3, 0, 0, DateTimeKind.Utc)
-                },
-                new()
-                {
-                    Id = -103,
-                    StudentName = "Phạm Mai Chi",
-                    SubjectName = "Tiếng Anh",
-                    GradeLevelName = "THCS",
-                    Status = RequestStatus.Pending,
-                    MatchesAvailability = true,
-                    ProposedTrialSlotUtc = new DateTime(2026, 10, 9, 12, 0, 0, DateTimeKind.Utc)
-                }
-            };
-            totalItems = requests.Count;
-            totalPages = 1;
-        }
-
-        ViewBag.SelectedStatus = status;
+        ViewBag.CurrentStatus = status;
         ViewBag.CurrentPage = page;
         ViewBag.TotalPages = totalPages;
         ViewBag.TotalItems = totalItems;
 
-        return RenderIndex(requests);
+        var queryParams = new Dictionary<string, string>();
+        if (status.HasValue)
+        {
+            queryParams["status"] = status.Value.ToString();
+        }
+
+        ViewBag.Pagination = new PaginationVm
+        {
+            CurrentPage = page,
+            TotalPages = totalPages,
+            TotalItems = totalItems,
+            PageSize = PageSize,
+            BaseUrl = Url.Action("Index", "TutorConnectionRequest", new { area = "Tutor" }) ?? "",
+            QueryParams = queryParams
+        };
+
+        return View(requests);
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public Task<IActionResult> Accept(int id, CancellationToken cancellationToken)
-        => AcceptRequestAsync(id, cancellationToken);
-
-    [HttpPost]
-    [ValidateAntiForgeryToken]
-    public Task<IActionResult> Reject(int id, CancellationToken cancellationToken)
-        => RespondAsync(id, RequestStatus.Rejected, cancellationToken);
-
-    private async Task<IActionResult> AcceptRequestAsync(int id, CancellationToken cancellationToken)
+    public async Task<IActionResult> Accept(int id, CancellationToken cancellationToken)
     {
         var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (string.IsNullOrWhiteSpace(userId))
             return NotFound();
 
-        var strategy = _dbContext.Database.CreateExecutionStrategy();
-        var outcome = await strategy.ExecuteAsync(async () =>
-        {
-            _dbContext.ChangeTracker.Clear();
-            await using var transaction = await _dbContext.Database.BeginTransactionAsync(
-                IsolationLevel.Serializable, cancellationToken);
-
-            var request = await _dbContext.ConnectionRequests
-                .Include(item => item.Classroom)
-                .Include(item => item.Student)
-                .FirstOrDefaultAsync(item =>
-                    item.Id == id
-                    && item.Tutor.UserId == userId
-                    && item.Status == RequestStatus.Pending,
-                    cancellationToken);
-
-            if (request is null)
-            {
-                var belongsToTutor = await _dbContext.ConnectionRequests
-                    .AnyAsync(item => item.Id == id && item.Tutor.UserId == userId, cancellationToken);
-                await transaction.CommitAsync(cancellationToken);
-                return new AcceptResult
-                {
-                    NotFound = !belongsToTutor,
-                    AlreadyHandled = belongsToTutor
-                };
-            }
-
-            ClassroomStudent? enrollment = null;
-            if (request.PreferredType == ClassroomType.Group)
-            {
-                if (!request.ClassroomId.HasValue)
-                {
-                    await transaction.CommitAsync(cancellationToken);
-                    return new AcceptResult { InvalidClassroom = true };
-                }
-
-                var classroom = request.Classroom;
-                if (classroom is null
-                    || classroom.TutorId != request.TutorId
-                    || classroom.Type != ClassroomType.Group
-                    || classroom.Status != ClassroomStatus.Active
-                    || classroom.SubjectId != request.SubjectId
-                    || classroom.GradeLevelId != request.GradeLevelId)
-                {
-                    await transaction.CommitAsync(cancellationToken);
-                    return new AcceptResult { InvalidClassroom = true };
-                }
-
-                var alreadyEnrolled = await _dbContext.ClassroomStudents.AnyAsync(student =>
-                    student.ClassroomId == classroom.Id && student.StudentId == request.StudentId,
-                    cancellationToken);
-
-                if (!alreadyEnrolled)
-                {
-                    var studentCount = await _dbContext.ClassroomStudents
-                        .CountAsync(student => student.ClassroomId == classroom.Id, cancellationToken);
-                    if (studentCount >= classroom.MaxStudents)
-                    {
-                        await transaction.CommitAsync(cancellationToken);
-                        return new AcceptResult { ClassroomFull = true };
-                    }
-
-                    enrollment = new ClassroomStudent
-                    {
-                        ClassroomId = classroom.Id,
-                        StudentId = request.StudentId,
-                        JoinedAt = DateTime.UtcNow
-                    };
-                    _dbContext.ClassroomStudents.Add(enrollment);
-                }
-            }
-
-            request.Status = RequestStatus.Accepted;
-            request.RespondedAt = DateTime.UtcNow;
-            await _dbContext.SaveChangesAsync(cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
-
-            return new AcceptResult
-            {
-                Accepted = true,
-                Enrolled = enrollment is not null,
-                StudentUserId = request.Student.UserId
-            };
-        });
-
-        if (outcome.NotFound)
+        var result = await _connectionRequestService.AcceptRequestAsync(id, userId, cancellationToken);
+        if (result.NotFound)
             return NotFound();
-        if (outcome.AlreadyHandled)
+
+        if (!result.Success)
         {
-            TempData["Error"] = "Yêu cầu này đã được phản hồi trước đó.";
-            return RedirectToAction(nameof(Index));
-        }
-        if (outcome.InvalidClassroom)
-        {
-            TempData["Error"] = "Lớp nhóm không còn hoạt động hoặc thông tin môn học/cấp học không khớp.";
-            return RedirectToAction(nameof(Index));
-        }
-        if (outcome.ClassroomFull)
-        {
-            TempData["Error"] = "Lớp nhóm đã đủ sĩ số, không thể thêm học viên.";
+            TempData["Error"] = result.Message;
             return RedirectToAction(nameof(Index));
         }
 
-        await _hubContext.Clients.User(outcome.StudentUserId!).SendAsync(
-            "ConnectionRequestStatusChanged",
-            new { requestId = id, status = RequestStatus.Accepted.ToString() },
-            cancellationToken);
-
-        TempData["Success"] = outcome.Enrolled
-            ? "Đã chấp nhận yêu cầu và thêm học viên vào lớp nhóm."
-            : "Đã chấp nhận yêu cầu kết nối.";
+        TempData["Success"] = result.Message;
         return RedirectToAction("Index", "TutorSchedule", new { area = "Tutor" });
     }
 
-    private async Task<IActionResult> RespondAsync(
-        int id,
-        RequestStatus newStatus,
-        CancellationToken cancellationToken)
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Reject(int id, string? reason, CancellationToken cancellationToken)
     {
         var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (string.IsNullOrWhiteSpace(userId))
             return NotFound();
 
-        // Cập nhật nguyên tử: chỉ đúng gia sư nhận yêu cầu và chỉ khi yêu cầu còn Pending.
-        var respondedAt = DateTime.UtcNow;
-        var updatedCount = await _dbContext.ConnectionRequests
-            .Where(item => item.Id == id
-                           && item.Tutor.UserId == userId
-                           && item.Status == RequestStatus.Pending)
-            .ExecuteUpdateAsync(update => update
-                .SetProperty(item => item.Status, newStatus)
-                .SetProperty(item => item.RespondedAt, respondedAt), cancellationToken);
+        var result = await _connectionRequestService.RejectRequestAsync(id, userId, reason, cancellationToken);
+        if (result.NotFound)
+            return NotFound();
 
-        if (updatedCount > 0)
+        if (!result.Success)
         {
-            var studentUserId = await _dbContext.ConnectionRequests
-                .Where(item => item.Id == id)
-                .Select(item => item.Student.UserId)
-                .FirstAsync(cancellationToken);
-
-            await _hubContext.Clients.User(studentUserId).SendAsync(
-                "ConnectionRequestStatusChanged",
-                new { requestId = id, status = newStatus.ToString() },
-                cancellationToken);
-        }
-
-        if (updatedCount == 0)
-        {
-            var belongsToTutor = await _dbContext.ConnectionRequests
-                .AnyAsync(item => item.Id == id && item.Tutor.UserId == userId, cancellationToken);
-            if (!belongsToTutor)
-                return NotFound();
-
-            TempData["Error"] = "Yêu cầu này đã được phản hồi trước đó.";
+            TempData["Error"] = result.Message;
             return RedirectToAction(nameof(Index));
         }
 
-        TempData["Success"] = newStatus == RequestStatus.Accepted
-            ? "Đã chấp nhận yêu cầu kết nối."
-            : "Đã từ chối yêu cầu kết nối.";
-
+        TempData["Success"] = result.Message;
         return RedirectToAction(nameof(Index));
-    }
-
-    private sealed class AcceptResult
-    {
-        public bool NotFound { get; init; }
-        public bool AlreadyHandled { get; init; }
-        public bool InvalidClassroom { get; init; }
-        public bool ClassroomFull { get; init; }
-        public bool Accepted { get; init; }
-        public bool Enrolled { get; init; }
-        public string? StudentUserId { get; init; }
     }
 }

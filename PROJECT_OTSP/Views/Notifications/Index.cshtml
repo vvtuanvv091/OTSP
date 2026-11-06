@@ -52,10 +52,17 @@
             @foreach (var notification in Model.Items)
             {
                 <a href="@Url.Action("Open", "Notifications", new { id = notification.Id })"
-                   class="notification-card-link @(notification.IsRead ? "is-read" : "is-unread")"
-                   title="@(isVietnamese ? "Nhấn để mở chi tiết" : "Click to view details")">
+                   class="notification-card-link @(notification.IsRead ? "is-read" : "is-unread") @(notification.IsMessage ? "is-message-card" : "")"
+                   title="@(isVietnamese ? "Nhấn để xem chi tiết và chuyển đến trang" : "Click to view details and navigate")">
                     <div class="notification-card-icon-wrap @(notification.IsRead ? "icon-muted" : "icon-brand")">
-                        <i class="bi @(notification.IsRead ? "bi-bell" : "bi-bell-fill")" aria-hidden="true"></i>
+                        @if (notification.IsMessage)
+                        {
+                            <i class="bi @(notification.IsRead ? "bi-chat-dots" : "bi-chat-dots-fill text-danger")" aria-hidden="true"></i>
+                        }
+                        else
+                        {
+                            <i class="bi @(notification.IsRead ? "bi-bell" : "bi-bell-fill")" aria-hidden="true"></i>
+                        }
                     </div>
 
                     <div class="notification-card-body flex-grow-1 min-w-0">
@@ -76,7 +83,16 @@
                             </div>
                         </div>
 
-                        <p class="notification-card-text text-secondary mb-0">@notification.Content</p>
+                        <p class="notification-card-text text-secondary mb-1">@notification.DisplayContent</p>
+
+                        @if (notification.IsMessage)
+                        {
+                            <div class="mt-1">
+                                <span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill px-2.5 py-0.5" style="font-size: 11px;">
+                                    <i class="bi bi-chat-text me-1"></i>@(isVietnamese ? "Bấm vào để chuyển đến cuộc trò chuyện" : "Click to open chat")
+                                </span>
+                            </div>
+                        }
                     </div>
 
                     <div class="notification-arrow ms-2 text-secondary">
@@ -86,28 +102,10 @@
             }
         </div>
 
-        <!-- Khung tải thêm 10 thông báo tiếp theo (AJAX Load More - Chống nghẽn tải trang) -->
-        <div class="notifications-load-more-wrap text-center mt-4 p-3 border-top" id="loadMoreWrap">
-            <p class="text-secondary small mb-2" id="loadMoreSummary">
-                @(isVietnamese
-                    ? $"Đang hiển thị {Model.Items.Count} / {Model.TotalCount} thông báo"
-                    : $"Showing {Model.Items.Count} of {Model.TotalCount} notifications")
-            </p>
-            @if (Model.HasMore)
-            {
-                <button type="button" class="btn btn-outline-danger btn-sm px-4 py-2 rounded-3 shadow-none" id="btnLoadMore" data-next-page="2">
-                    <span class="spinner-border spinner-border-sm d-none me-2" id="loadMoreSpinner" role="status"></span>
-                    <i class="bi bi-arrow-down-circle me-1" id="loadMoreIcon"></i>
-                    <span id="loadMoreText">@(isVietnamese ? "Tải thêm 10 thông báo cũ hơn" : "Load 10 more notifications")</span>
-                </button>
-            }
-            else
-            {
-                <span class="badge bg-light text-secondary border px-3 py-1.5">
-                    @(isVietnamese ? "Đã hiển thị tất cả thông báo" : "All notifications loaded")
-                </span>
-            }
-        </div>
+        @if (ViewBag.Pagination is PROJECT_OTSP.Dtos.PaginationVm pagination)
+        {
+            @await Html.PartialAsync("_PaginationBar", pagination)
+        }
     }
 </div>
 
@@ -262,102 +260,5 @@
     .notification-card-text {
         font-size: 0.82rem;
     }
-
-    #btnLoadMore {
-        width: 100%;
-        padding: 10px 16px !important;
-    }
 }
 </style>
-
-<script>
-(() => {
-    const btnLoadMore = document.getElementById("btnLoadMore");
-    const listContainer = document.getElementById("notificationsList");
-    const summaryEl = document.getElementById("loadMoreSummary");
-    const spinner = document.getElementById("loadMoreSpinner");
-    const icon = document.getElementById("loadMoreIcon");
-    const isVi = "@isVietnamese" === "True";
-
-    if (!btnLoadMore || !listContainer) return;
-
-    btnLoadMore.addEventListener("click", async () => {
-        const nextPage = parseInt(btnLoadMore.dataset.nextPage || "2", 10);
-
-        // Hiển thị loading
-        btnLoadMore.disabled = true;
-        if (spinner) spinner.classList.remove("d-none");
-        if (icon) icon.classList.add("d-none");
-
-        try {
-            const res = await fetch(`/Notifications/LoadMore?page=${nextPage}`, {
-                headers: { "Accept": "application/json" }
-            });
-            if (!res.ok) throw new Error();
-            const data = await res.json();
-
-            if (data.success && data.items && data.items.length > 0) {
-                data.items.forEach(item => {
-                    const a = document.createElement("a");
-                    a.href = `/Notifications/Open?id=${item.id}`;
-                    a.className = `notification-card-link ${item.isRead ? "is-read" : "is-unread"}`;
-                    a.title = isVi ? "Nhấn để mở chi tiết" : "Click to view details";
-
-                    const dateFormatted = new Date(item.createdAt).toLocaleString(isVi ? "vi-VN" : "en-GB", {
-                        day: "2-digit", month: "2-digit", year: "numeric",
-                        hour: "2-digit", minute: "2-digit"
-                    });
-
-                    a.innerHTML = `
-                        <div class="notification-card-icon-wrap ${item.isRead ? "icon-muted" : "icon-brand"}">
-                            <i class="bi ${item.isRead ? "bi-bell" : "bi-bell-fill"}" aria-hidden="true"></i>
-                        </div>
-                        <div class="notification-card-body flex-grow-1 min-w-0">
-                            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-1">
-                                <h2 class="h6 ${item.isRead ? "fw-semibold" : "fw-bold"} mb-0 text-body text-truncate">
-                                    ${item.title || ""}
-                                </h2>
-                                <div class="d-flex align-items-center gap-2">
-                                    ${!item.isRead ? `<span class="badge rounded-pill bg-danger-subtle text-danger px-2 py-0.5" style="font-size: 11px;">${isVi ? "Mới" : "New"}</span>` : ""}
-                                    <time class="text-secondary small text-nowrap">
-                                        <i class="bi bi-clock me-1"></i>${dateFormatted}
-                                    </time>
-                                </div>
-                            </div>
-                            <p class="notification-card-text text-secondary mb-0">${item.content || ""}</p>
-                        </div>
-                        <div class="notification-arrow ms-2 text-secondary">
-                            <i class="bi bi-chevron-right" aria-hidden="true"></i>
-                        </div>
-                    `;
-
-                    listContainer.appendChild(a);
-                });
-
-                // Cập nhật tóm tắt
-                if (summaryEl) {
-                    summaryEl.textContent = isVi
-                        ? `Đang hiển thị ${data.loadedCount} / ${data.totalCount} thông báo`
-                        : `Showing ${data.loadedCount} of ${data.totalCount} notifications`;
-                }
-
-                // Cập nhật trạng thái trang tiếp theo
-                btnLoadMore.dataset.nextPage = String(nextPage + 1);
-
-                if (!data.hasMore) {
-                    btnLoadMore.parentElement.innerHTML = `
-                        <p class="text-secondary small mb-2">${isVi ? `Đang hiển thị ${data.totalCount} / ${data.totalCount} thông báo` : `Showing ${data.totalCount} of ${data.totalCount} notifications`}</p>
-                        <span class="badge bg-light text-secondary border px-3 py-1.5">${isVi ? "Đã hiển thị tất cả thông báo" : "All notifications loaded"}</span>
-                    `;
-                }
-            }
-        } catch (e) {
-            console.error("Lỗi khi tải thêm thông báo:", e);
-        } finally {
-            btnLoadMore.disabled = false;
-            if (spinner) spinner.classList.add("d-none");
-            if (icon) icon.classList.remove("d-none");
-        }
-    });
-})();
-</script>
