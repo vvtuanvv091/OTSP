@@ -135,7 +135,8 @@
                         <li class="mobile-drawer-item dropdown"><a href="#"><span>@(isVietnamese ? "Môn Học" : "Subjects")</span> <i class="bi bi-chevron-down toggle-dropdown"></i></a>
                             <ul>
                               <li><a href="/#features">Danh Sách Môn Học</a></li>
-                              <li><a asp-area="" asp-controller="LearningDocument" asp-action="Index">Tài Liệu Ôn Tập</a></li>
+                              <li><a asp-controller="Search" asp-action="Index">Lớp Học Đang Mở</a></li>
+                              <li><a asp-area="" asp-controller="LearningDocument" asp-action="Index">Tài Liệu Công Khai</a></li>
                             </ul>
                         </li>
                         <li class="mobile-drawer-item"><a href="/#footer">@(isVietnamese ? "Trung Tâm" : "English Center")</a></li>

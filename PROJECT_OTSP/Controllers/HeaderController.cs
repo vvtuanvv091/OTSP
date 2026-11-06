@@ -70,6 +70,17 @@ public class HeaderController : Controller
             ? "Quản trị viên"
             : (User.IsInRole("Tutor") ? "Gia sư" : "Học viên");
 
+        string? tutorVerification = null;
+        if (User.IsInRole("Tutor"))
+        {
+            var tutorProfile = await _db.TutorProfiles
+                .AsNoTracking()
+                .Where(t => t.UserId == userId)
+                .Select(t => (PROJECT_OTSP.Models.Enums.VerificationStatus?)t.VerificationStatus)
+                .FirstOrDefaultAsync(cancellationToken);
+            tutorVerification = tutorProfile?.ToString() ?? "Pending";
+        }
+
         // Đồng bộ tin nhắn chưa đọc vào bảng Notifications nếu chưa có
         var unreadMessagesList = await _db.Messagers
             .AsNoTracking()
@@ -143,7 +154,8 @@ public class HeaderController : Controller
                 name = userInfo.name,
                 email = userInfo.email,
                 avatarUrl = userInfo.avatarUrl,
-                role = roleLabel
+                role = roleLabel,
+                verificationStatus = tutorVerification
             },
             unread = totalUnread,
             unreadNotifications,
