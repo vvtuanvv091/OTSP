@@ -4,18 +4,27 @@ import tutorApi from '../../api/tutorApi';
 
 export default function TutorDashboardPage() {
   const [stats, setStats] = useState(null);
+  const [recentReviews, setRecentReviews] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   useEffect(() => {
     let active = true;
-    tutorApi.getDashboard()
-      .then((res) => {
-        if (active) setStats(res.data);
-      })
-      .catch((err) => {
-        console.error('Error fetching tutor stats', err);
-        if (active) setError('Không tải được thông tin bảng điều khiển.');
+    Promise.allSettled([
+      tutorApi.getDashboard(),
+      tutorApi.getReviews({ page: 1, pageSize: 3 })
+    ])
+      .then(([dashRes, revRes]) => {
+        if (!active) return;
+        if (dashRes.status === 'fulfilled') {
+          setStats(dashRes.value.data);
+        } else {
+          console.error('Error fetching tutor stats', dashRes.reason);
+          setError('Không tải được thông tin bảng điều khiển.');
+        }
+        if (revRes.status === 'fulfilled') {
+          setRecentReviews(revRes.value.data?.reviews || []);
+        }
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -122,10 +131,10 @@ export default function TutorDashboardPage() {
         </div>
       </section>
 
-      {/* Thẻ thống kê tổng quan */}
+      {/* Thẻ thống kê tổng quan với màu đậm chuẩn */}
       <div className="row g-3 mb-4">
         <div className="col-6 col-md-3">
-          <div className="tutor-kpi-card h-100">
+          <div className="tutor-kpi-card h-100 rounded-3 shadow-sm">
             <div className="d-flex align-items-center justify-content-between">
               <div>
                 <small className="tutor-kpi-title">BUỔI HÔM NAY</small>
@@ -135,14 +144,14 @@ export default function TutorDashboardPage() {
                 <i className="bi bi-easel"></i>
               </div>
             </div>
-            <Link to="/tutor/schedule" className="text-danger small fw-semibold text-decoration-none mt-3 d-inline-block">
+            <Link to="/tutor/schedule" className="small fw-bold text-decoration-none mt-3 d-inline-block" style={{ color: '#DC2626' }}>
               Xem lịch dạy <i className="bi bi-arrow-right"></i>
             </Link>
           </div>
         </div>
 
         <div className="col-6 col-md-3">
-          <div className="tutor-kpi-card h-100">
+          <div className="tutor-kpi-card h-100 rounded-3 shadow-sm">
             <div className="d-flex align-items-center justify-content-between">
               <div>
                 <small className="tutor-kpi-title">LỚP ĐANG DẠY</small>
@@ -152,14 +161,14 @@ export default function TutorDashboardPage() {
                 <i className="bi bi-person-plus"></i>
               </div>
             </div>
-            <Link to="/tutor/classrooms" className="text-danger small fw-semibold text-decoration-none mt-3 d-inline-block">
+            <Link to="/tutor/classrooms" className="small fw-bold text-decoration-none mt-3 d-inline-block" style={{ color: '#0284C7' }}>
               Xem lớp học <i className="bi bi-arrow-right"></i>
             </Link>
           </div>
         </div>
 
         <div className="col-6 col-md-3">
-          <div className="tutor-kpi-card h-100">
+          <div className="tutor-kpi-card h-100 rounded-3 shadow-sm">
             <div className="d-flex align-items-center justify-content-between">
               <div>
                 <small className="tutor-kpi-title">YÊU CẦU CHỜ</small>
@@ -169,35 +178,36 @@ export default function TutorDashboardPage() {
                 <i className="bi bi-people"></i>
               </div>
             </div>
-            <Link to="/tutor/connection-requests" className="text-danger small fw-semibold text-decoration-none mt-3 d-inline-block">
+            <Link to="/tutor/connection-requests" className="small fw-bold text-decoration-none mt-3 d-inline-block" style={{ color: '#4F46E5' }}>
               Xử lý yêu cầu <i className="bi bi-arrow-right"></i>
             </Link>
           </div>
         </div>
 
         <div className="col-6 col-md-3">
-          <div className="tutor-kpi-card h-100">
+          <div className="tutor-kpi-card h-100 rounded-3 shadow-sm">
             <div className="d-flex align-items-center justify-content-between">
               <div>
                 <small className="tutor-kpi-title">ĐÁNH GIÁ</small>
-                <h3 className="tutor-kpi-value mt-1 mb-0">
-                  ★ {stats?.averageRating > 0 ? Number(stats.averageRating).toFixed(1) : '--'}
+                <h3 className="tutor-kpi-value mt-1 mb-0" style={{ color: '#B45309' }}>
+                  <span style={{ color: '#D97706', fontSize: '1.9rem', marginRight: 4 }}>★</span>
+                  {stats?.averageRating > 0 ? Number(stats.averageRating).toFixed(1) : '--'}
                 </h3>
               </div>
               <div className="tutor-kpi-icon is-rating" aria-hidden="true">
-                <i className="bi bi-star"></i>
+                <i className="bi bi-star-fill"></i>
               </div>
             </div>
-            <span className="text-success small fw-semibold mt-3 d-inline-block">
-              <i className="bi bi-star-fill me-1"></i>Đánh giá từ học viên
-            </span>
+            <Link to="/tutor/reviews" className="small fw-bold mt-3 d-inline-block text-decoration-none" style={{ color: '#D97706' }}>
+              <i className="bi bi-star-fill me-1" style={{ color: '#D97706' }}></i>Xem nhận xét học viên &rarr;
+            </Link>
           </div>
         </div>
       </div>
 
-      {/* Buổi học sắp tới & Lối tắt nhanh */}
+      {/* Buổi học sắp tới & Nhận xét thu gọn */}
       <div className="row g-4">
-        <div className="col-lg-8">
+        <div className="col-lg-7">
           <div className="tutor-dash-card p-4 h-100">
             <div className="d-flex justify-content-between align-items-center mb-3">
               <h5 className="fw-bold mb-0">
@@ -250,9 +260,9 @@ export default function TutorDashboardPage() {
           </div>
         </div>
 
-        <div className="col-lg-4">
+        <div className="col-lg-5 d-flex flex-column gap-4">
           {stats?.profileCompletion && (
-            <section className="tutor-profile-progress h-100" aria-labelledby="tutor-profile-progress-title">
+            <section className="tutor-profile-progress" aria-labelledby="tutor-profile-progress-title">
               <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
                 <h2 id="tutor-profile-progress-title" className="h5 mb-0">
                   Hoàn thiện hồ sơ <span className="text-secondary fw-normal">· {stats.profileCompletion.percentage}%</span>
@@ -276,6 +286,96 @@ export default function TutorDashboardPage() {
               </ul>
             </section>
           )}
+
+          {/* Khối Nhận xét & Đánh giá thu gọn */}
+          <div className="tutor-dash-card p-4 rounded-3 shadow-sm bg-white border">
+            <div className="d-flex justify-content-between align-items-center mb-3">
+              <h5 className="fw-bold mb-0">
+                <i className="bi bi-star-fill me-2" style={{ color: '#D97706' }}></i>
+                Nhận xét &amp; Đánh giá
+              </h5>
+              <Link
+                to="/tutor/reviews"
+                className="btn btn-sm btn-outline-warning text-dark fw-bold rounded-pill px-3 py-1 shadow-sm"
+                style={{ borderColor: '#D97706', fontSize: '0.78rem' }}
+              >
+                Xem tất cả &rarr;
+              </Link>
+            </div>
+
+            {/* Hộp điểm trung bình và sao vàng đậm */}
+            <div className="p-3 rounded-3 mb-3 d-flex align-items-center justify-content-between" style={{ backgroundColor: '#FFFBEB', border: '1px solid #FDE68A' }}>
+              <div>
+                <div className="small fw-bold text-secondary text-uppercase" style={{ fontSize: '0.72rem', letterSpacing: '0.5px' }}>
+                  ĐIỂM TRUNG BÌNH
+                </div>
+                <div className="d-flex align-items-baseline gap-1.5 mt-0.5">
+                  <span className="fw-bolder fs-2" style={{ color: '#B45309', lineHeight: 1 }}>
+                    {stats?.averageRating > 0 ? Number(stats.averageRating).toFixed(1) : '--'}
+                  </span>
+                  <span className="text-secondary small fw-medium">/ 5.0</span>
+                </div>
+              </div>
+              <div className="text-end">
+                <div className="d-flex gap-1 justify-content-end mb-1">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <i
+                      key={star}
+                      className="bi bi-star-fill"
+                      style={{
+                        color: star <= Math.round(stats?.averageRating || 5) ? '#D97706' : '#CBD5E1',
+                        fontSize: '1.15rem'
+                      }}
+                    ></i>
+                  ))}
+                </div>
+                <div className="small fw-semibold" style={{ color: '#B45309', fontSize: '0.78rem' }}>
+                  {recentReviews.length > 0 ? `${recentReviews.length} nhận xét mới nhất` : 'Đánh giá học viên'}
+                </div>
+              </div>
+            </div>
+
+            {/* Danh sách nhận xét gần nhất */}
+            {recentReviews.length > 0 ? (
+              <div className="d-flex flex-column gap-2.5">
+                {recentReviews.slice(0, 3).map((rev) => (
+                  <div key={rev.id} className="p-2.5 rounded-3 border bg-light-subtle">
+                    <div className="d-flex justify-content-between align-items-center mb-1">
+                      <div className="d-flex align-items-center gap-2">
+                        <div
+                          className="rounded-circle d-flex align-items-center justify-content-center fw-bold text-white shadow-sm flex-shrink-0"
+                          style={{ width: 26, height: 26, backgroundColor: '#0284C7', fontSize: '0.75rem' }}
+                        >
+                          {!rev.studentName ? 'H' : rev.studentName.trim().charAt(0).toUpperCase()}
+                        </div>
+                        <span className="fw-bold small text-dark">{rev.studentName}</span>
+                      </div>
+                      <div className="d-flex gap-0.5">
+                        {[1, 2, 3, 4, 5].map((s) => (
+                          <i
+                            key={s}
+                            className="bi bi-star-fill"
+                            style={{
+                              color: s <= (rev.score || 5) ? '#D97706' : '#E2E8F0',
+                              fontSize: '0.75rem'
+                            }}
+                          ></i>
+                        ))}
+                      </div>
+                    </div>
+                    <p className="small text-secondary mb-0 text-truncate ps-1 fst-italic" title={rev.comment}>
+                      "{rev.comment || 'Học viên hài lòng với buổi học.'}"
+                    </p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-3 text-secondary small">
+                <i className="bi bi-chat-heart fs-3 text-muted mb-1 d-block"></i>
+                Chưa có nhận xét nào từ học viên.
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

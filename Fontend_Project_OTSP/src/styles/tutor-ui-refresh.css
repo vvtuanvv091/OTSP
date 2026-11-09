@@ -94,10 +94,10 @@
   border-radius: 18px;
   font-size: 1.8rem;
 }
-.tutor-kpi-icon.is-schedule { color: #c92536; background: #fff0f1; }
-.tutor-kpi-icon.is-classroom { color: #b66b00; background: #fff4e5; }
-.tutor-kpi-icon.is-requests { color: #315ca8; background: #edf3ff; }
-.tutor-kpi-icon.is-rating { color: #17643c; background: #e9f7ef; }
+.tutor-kpi-icon.is-schedule { color: #ffffff; background: #dc2626; box-shadow: 0 4px 14px rgba(220, 38, 38, .32); }
+.tutor-kpi-icon.is-classroom { color: #ffffff; background: #0284c7; box-shadow: 0 4px 14px rgba(2, 132, 199, .32); }
+.tutor-kpi-icon.is-requests { color: #ffffff; background: #4f46e5; box-shadow: 0 4px 14px rgba(79, 70, 229, .32); }
+.tutor-kpi-icon.is-rating { color: #ffffff; background: #d97706; box-shadow: 0 4px 14px rgba(217, 119, 6, .35); }
 .tutor-kpi-title { color: var(--tutor-muted); font-size: .72rem; font-weight: 700; letter-spacing: .075em; text-transform: uppercase; }
 .tutor-kpi-value { margin-top: 12px; color: var(--tutor-ink); font-size: 2rem; font-weight: 700; line-height: 1.2; }
 .tutor-card-table-wrapper { overflow: hidden; border: 1px solid var(--tutor-line); border-radius: 16px; background: var(--tutor-surface); }

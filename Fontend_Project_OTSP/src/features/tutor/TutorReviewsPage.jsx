@@ -51,7 +51,7 @@ export default function TutorReviewsPage() {
           letter-spacing: -1.5px;
         }
         .star-gold i {
-          color: #F59E0B !important;
+          color: #D97706 !important;
           font-size: 1.15rem;
         }
         .star-gold i.star-muted {

@@ -213,13 +213,16 @@ export default function TutorClassroomsPage() {
                 const statusBadge = c.status === 'Active' ? 'bg-success-subtle text-success border border-success-subtle' : c.status === 'Completed' ? 'bg-secondary-subtle text-secondary border border-secondary-subtle' : 'bg-danger-subtle text-danger border border-danger-subtle';
                 const progressPct = c.totalSessions > 0 ? Math.round((c.completedSessions / c.totalSessions) * 100) : 0;
 
+                const groupDisplayName = c.name?.trim() || (isGroup ? `Nhóm ${c.subjectName}` : `Lớp 1-1 ${c.subjectName}`);
+
                 return (
                   <div key={c.id} className="col">
                     <div className="card tutor-classroom-card h-100 rounded-3 p-3 p-sm-3.5 d-flex flex-column justify-content-between">
                       <div>
-                        <div className="d-flex align-items-start gap-2.5">
+                        {/* Header: Ảnh/Icon đại diện + Tên lớp */}
+                        <div className="d-flex align-items-center gap-2.5 mb-2">
                           {c.coverImageUrl ? (
-                            <div className="position-relative flex-shrink-0" style={{ width: 60, height: 60 }}>
+                            <div className="position-relative flex-shrink-0" style={{ width: 44, height: 44 }}>
                               <img
                                 src={resolveAssetUrl(c.coverImageUrl)}
                                 alt={c.name}
@@ -228,49 +231,90 @@ export default function TutorClassroomsPage() {
                               />
                             </div>
                           ) : (
-                            <div className="tutor-fee-badge p-2 rounded-3 text-center d-flex flex-column justify-content-center flex-shrink-0">
-                              <span className="text-secondary small" style={{ fontSize: '0.72rem', lineHeight: 1.2 }}>Học phí</span>
-                              <span className="fw-bold text-danger mt-0.5" style={{ fontSize: '0.9rem', lineHeight: 1.2 }}>
-                                {formatPrice(c.fee)} đ
-                              </span>
+                            <div
+                              className="rounded-3 d-flex align-items-center justify-content-center flex-shrink-0 shadow-sm text-white"
+                              style={{
+                                width: 44,
+                                height: 44,
+                                backgroundColor: isGroup ? '#4F46E5' : '#0284C7',
+                                fontSize: '1.25rem'
+                              }}
+                            >
+                              <i className={`bi ${isGroup ? 'bi-people-fill' : 'bi-mortarboard-fill'}`}></i>
                             </div>
                           )}
 
-                          <div className="flex-grow-1 min-w-0 ms-2">
-                            {(() => {
-                              const groupDisplayName = c.name?.trim() || (isGroup ? `Nhóm ${c.subjectName}` : `Lớp 1-1 ${c.subjectName}`);
-                              return (
-                                <div className="mb-1.5">
-                                  <div className="fw-bold text-dark text-break mb-1" style={{ fontSize: '0.95rem', lineHeight: 1.3 }}>
-                                    <i className="bi bi-collection-play-fill text-danger me-1"></i>
-                                    {groupDisplayName}
-                                  </div>
-                                  <div className="d-flex align-items-center gap-1.5 flex-wrap">
-                                    <span className="badge bg-danger-subtle text-danger fw-bold" style={{ fontSize: '0.8rem' }}>
-                                      {formatPrice(c.fee)} đ
-                                    </span>
-                                    <span className="badge bg-secondary-subtle text-secondary" style={{ fontSize: '0.72rem' }}>
-                                      {c.subjectName} · {c.gradeLevelName}
-                                    </span>
-                                    <span className={`badge ${!isGroup ? 'bg-info-subtle text-info-emphasis border border-info-subtle' : 'bg-primary-subtle text-primary-emphasis border border-primary-subtle'}`} style={{ fontSize: '0.72rem' }}>
-                                      {!isGroup ? 'Lớp 1-1' : 'Lớp nhóm'}
-                                    </span>
-                                    <span className={`badge ${statusBadge}`} style={{ fontSize: '0.72rem' }}>
-                                      {statusLabel}
-                                    </span>
-                                  </div>
-                                </div>
-                              );
-                            })()}
-
-                            <div className="small text-secondary mb-1" title={c.formattedSchedule || c.scheduleSummary}>
-                              <i className="bi bi-calendar3 me-1 text-danger"></i>Lịch học: <b>{c.formattedSchedule || c.scheduleSummary || 'Chưa xếp'}</b>
-                            </div>
-
-                            <div className="small text-secondary mb-1">
-                              <i className="bi bi-people me-1 text-muted"></i>Sĩ số: <b>{c.studentCount}{isGroup ? `/${c.maxStudents}` : ''} học viên</b>
+                          <div className="flex-grow-1 min-w-0">
+                            <div className="fw-bold text-dark text-break" style={{ fontSize: '0.98rem', lineHeight: 1.3 }}>
+                              {groupDisplayName}
                             </div>
                           </div>
+                        </div>
+
+                        {/* 4 Badges chia 2 hàng, mỗi hàng 2 cái (2 trên, 2 dưới), màu đậm chuẩn */}
+                        <div className="d-flex flex-column gap-1.5 my-2.5">
+                          {/* Hàng 1: Học phí (Đỏ đậm #DC2626) + Môn/Cấp học (Xanh biển đậm #0284C7) */}
+                          <div className="d-flex align-items-center gap-2">
+                            <span
+                              className="badge text-white px-2.5 py-1.5 shadow-sm fw-bold"
+                              style={{
+                                backgroundColor: '#DC2626',
+                                fontSize: '0.82rem',
+                                borderRadius: '6px',
+                                letterSpacing: '0.2px'
+                              }}
+                            >
+                              <i className="bi bi-tag-fill me-1 opacity-75"></i>
+                              {formatPrice(c.fee)} đ
+                            </span>
+                            <span
+                              className="badge text-white px-2.5 py-1.5 shadow-sm fw-semibold text-truncate"
+                              style={{
+                                backgroundColor: '#0284C7',
+                                fontSize: '0.8rem',
+                                borderRadius: '6px',
+                                maxWidth: '190px'
+                              }}
+                              title={`${c.subjectName} · ${c.gradeLevelName}`}
+                            >
+                              <i className="bi bi-book-half me-1 opacity-75"></i>
+                              {c.subjectName} · {c.gradeLevelName}
+                            </span>
+                          </div>
+
+                          {/* Hàng 2: Loại lớp (Tím chàm #4F46E5 / #0891B2) + Trạng thái (Xanh lá đậm #15803D) */}
+                          <div className="d-flex align-items-center gap-2">
+                            <span
+                              className="badge text-white px-2.5 py-1.5 shadow-sm fw-semibold"
+                              style={{
+                                backgroundColor: isGroup ? '#4F46E5' : '#0891B2',
+                                fontSize: '0.78rem',
+                                borderRadius: '6px'
+                              }}
+                            >
+                              <i className={`bi ${isGroup ? 'bi-people-fill' : 'bi-person-fill'} me-1 opacity-75`}></i>
+                              {!isGroup ? 'Lớp 1-1' : 'Lớp nhóm'}
+                            </span>
+                            <span
+                              className="badge text-white px-2.5 py-1.5 shadow-sm fw-semibold"
+                              style={{
+                                backgroundColor: c.status === 'Active' ? '#15803D' : c.status === 'Completed' ? '#475569' : '#B91C1C',
+                                fontSize: '0.78rem',
+                                borderRadius: '6px'
+                              }}
+                            >
+                              <i className={`bi ${c.status === 'Active' ? 'bi-check-circle-fill' : 'bi-dash-circle-fill'} me-1 opacity-75`}></i>
+                              {statusLabel}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="small text-secondary mb-1" title={c.formattedSchedule || c.scheduleSummary}>
+                          <i className="bi bi-calendar3 me-1 text-danger"></i>Lịch học: <b>{c.formattedSchedule || c.scheduleSummary || 'Chưa xếp'}</b>
+                        </div>
+
+                        <div className="small text-secondary mb-1">
+                          <i className="bi bi-people me-1 text-muted"></i>Sĩ số: <b>{c.studentCount}{isGroup ? `/${c.maxStudents}` : ''} học viên</b>
                         </div>
 
                         {/* Progress */}
