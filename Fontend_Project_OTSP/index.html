@@ -1,13 +1,47 @@
-<!doctype html>
-<html lang="en">
+<!DOCTYPE html>
+<html lang="vi" data-bs-theme="light">
   <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>fontend-project-otsp</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
+    <title>OTSP - Nền tảng kết nối Gia sư và Học viên Trực tuyến</title>
+
+    <!-- Prevent Dark/Light theme flicker -->
+    <script>
+      (function () {
+        var savedTheme = localStorage.getItem('otsp-theme');
+        if (savedTheme === 'dark' || savedTheme === 'light') {
+          document.documentElement.setAttribute('data-bs-theme', savedTheme);
+        }
+      })();
+    </script>
+
+    <!-- Favicons -->
+    <link href="/assets/img/favicon.png" rel="icon" />
+    <link href="/assets/img/apple-touch-icon.png" rel="apple-touch-icon" />
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com" rel="preconnect" />
+    <link href="https://fonts.gstatic.com" rel="preconnect" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&family=Poppins:wght@500;600;700&family=Raleway:wght@600;700&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- Preload icon font to prevent layout shift -->
+    <link rel="preload" as="font" type="font/woff2" href="/assets/vendor/bootstrap-icons/fonts/bootstrap-icons.woff2" crossorigin />
+
+    <!-- Vendor CSS Files -->
+    <link href="/assets/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="/assets/vendor/bootstrap-icons/bootstrap-icons.min.css" rel="stylesheet" />
+
+    <!-- Theme & Custom CSS Files -->
+    <link href="/assets/css/main.css" rel="stylesheet" />
   </head>
-  <body>
+  <body class="index-page">
     <div id="root"></div>
+
+    <!-- Vendor JS Files -->
+    <script src="/assets/vendor/bootstrap/js/bootstrap.bundle.min.js" defer></script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

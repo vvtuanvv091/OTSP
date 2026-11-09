@@ -1,0 +1,25 @@
+using static Backend_Project_OTSP.Models.Enums;
+
+namespace Backend_Project_OTSP.Dtos.Tutor;
+
+/// <summary>
+/// Dữ liệu hiển thị danh sách học viên trong trang "Học viên của tôi" dành cho gia sư.
+/// </summary>
+public class TutorStudentItemVm
+{
+    public int StudentId { get; set; }
+    public string StudentUserId { get; set; } = string.Empty;
+    public string StudentName { get; set; } = string.Empty;
+    public string? StudentAvatarUrl { get; set; }
+    public int? ClassroomId { get; set; }
+    public string ClassroomName { get; set; } = string.Empty;
+    public ClassroomType? ClassroomType { get; set; }
+    public string SubjectName { get; set; } = string.Empty;
+    public string Progress { get; set; } = string.Empty;
+    public string NextSessionFormatted { get; set; } = string.Empty;
+    public int? NextSessionId { get; set; }
+    public bool CanJoinNextSession { get; set; }
+    public string? VideoRoom { get; set; }
+    public int? RequestId { get; set; }
+    public bool IsTrial { get; set; }
+}
