@@ -1,0 +1,20 @@
+﻿.header-top > .container-fluid {
+    gap: 10px;
+}
+
+.header-auth-links {
+    display: inline-flex;
+    align-items: center;
+}
+
+.header-top .header-language,
+.header-top .header-theme-form {
+    display: inline-flex;
+    align-items: center;
+    margin: 0;
+}
+.tutor-dashboard-main.is-loading {
+    opacity: .55;
+    pointer-events: none;
+    transition: opacity .15s ease;
+}

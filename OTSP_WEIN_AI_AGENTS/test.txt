@@ -1,0 +1,18 @@
+test database
+(.venv) PS C:\Users\GIGABYTE\Downloads\OTSP_WEIN_AI_AGENTS> python -c "from llm.client import ask_gemini; print(ask_gemini('Bạn là trợ lý AI thông minh.', 'Chào bạn, hãy giới thiệu 1 câu ngắn gọn!'))"
+Chào bạn, tôi là trợ lý AI sẵn sàng hỗ trợ bạn bất cứ lúc nào!
+(.venv) PS C:\Users\GIGABYTE\Downloads\OTSP_WEIN_AI_AGENTS> python -c "from llm.client import ask_gemini_json; print(ask_gemini_json('Hãy trích xuất thông tin thành JSON có keys: subject, grade', 'Tôi muốn tìm gia sư Toán lớp 9'))"
+{'subject': 'Toán', 'grade': '9'}
+(.venv) PS C:\Users\GIGABYTE\Downloads\OTSP_WEIN_AI_AGENTS> python -c "from llm.client import ask_gemini_json; print(ask_gemini_json('Hãy trích xuất thông tin thành JSON có keys: subject, grade', 'Tôi muốn tìm gia sư tieur học'))" 
+{'subject': None, 'grade': 'tiểu học'}
+test action agents
+(.venv) PS C:\Users\GIGABYTE\Downloads\OTSP_WEIN_AI_AGENTS> python -c "from agent.luong import run_agent_workflow; res = run_agent_workflow('Cho tôi xem qua trang 2 danh sách gia sư'); print('Ý định:', res.intent); print('Lệnh UI:', res.uiAction)"
+
+
+
+
+test action phân trạng mức 1
+(.venv) PS C:\Users\GIGABYTE\Downloads\OTSP_WEIN_AI_AGENTS> python -c "from agent.luong import run_agent_workflow; res = run_agent_workflow('Cho tôi xem qua trang 2 danh sách gia sư'); print('Ý định:', res.intent); print('Lệnh UI:', res.uiAction)"
+Ý định: PAGINATION
+Lệnh UI: type='NAVIGATE' target='/search?tab=tutors&page=2' actionType='PAGINATION' label='Nhảy sang Trang 2' autoExecute=True
+(.venv) PS C:\Users\GIGABYTE\Downloads\OTSP_WEIN_AI_AGENTS> 

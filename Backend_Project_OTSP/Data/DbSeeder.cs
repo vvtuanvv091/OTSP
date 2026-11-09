@@ -99,7 +99,7 @@ namespace Backend_Project_OTSP.Data
                         Email = adm.Email,
                         EmailConfirmed = true,
                         FullName = adm.FullName,
-                        AvatarURL = adminAvatar
+                        AvatarUrl = adminAvatar
                     };
                     var kq = await userManager.CreateAsync(admin, adm.Password);
                     if (kq.Succeeded)
@@ -117,9 +117,9 @@ namespace Backend_Project_OTSP.Data
                 }
                 else
                 {
-                    if (string.IsNullOrWhiteSpace(admin.AvatarURL))
+                    if (string.IsNullOrWhiteSpace(admin.AvatarUrl))
                     {
-                        admin.AvatarURL = adminAvatar;
+                        admin.AvatarUrl = adminAvatar;
                         await userManager.UpdateAsync(admin);
                     }
 

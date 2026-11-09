@@ -4,6 +4,15 @@
 *.user
 *.suo
 
+# Environment & Secrets (Bảo mật)
+.env
+.env.*
+!.env.example
+*.env
+*.pfx
+*.pem
+*.key
+
 # .NET Build artifacts
 **/bin/
 **/obj/
@@ -13,6 +22,10 @@
 **/node_modules/
 **/dist/
 npm-debug.log*
+
+# Uploads & Data
+**/uploads/
+**/App_Data/
 
 # Vector DB
 **/chroma_db/

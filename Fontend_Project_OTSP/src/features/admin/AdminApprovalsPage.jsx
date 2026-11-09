@@ -1,0 +1,498 @@
+import { useEffect, useState } from 'react';
+import adminApi from '../../api/adminApi';
+import { resolveAssetUrl } from '../../api/config';
+import { AdminFeedback, AdminLoadingRows, AdminPageHeader, AdminPagination, AdminStats } from './AdminPageShared';
+
+const PAGE_SIZE = 10;
+
+export default function AdminApprovalsPage() {
+  const [data, setData] = useState(null);
+  const [search, setSearch] = useState('');
+  const [querySearch, setQuerySearch] = useState('');
+  const [subjectId, setSubjectId] = useState('all');
+  const [teachingFormat, setTeachingFormat] = useState('all');
+  const [page, setPage] = useState(1);
+  const [reload, setReload] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('tutors'); // 'tutors' | 'qualifications'
+  const [qualPage, setQualPage] = useState(1);
+  const [qualData, setQualData] = useState(null);
+  const [loadingQual, setLoadingQual] = useState(false);
+  const [busyTutorId, setBusyTutorId] = useState(null);
+  const [busyQualificationId, setBusyQualificationId] = useState(null);
+  const [aiVerifyingId, setAiVerifyingId] = useState(null);
+  const [aiResults, setAiResults] = useState({});
+  const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setQuerySearch(search.trim()), 250);
+    return () => window.clearTimeout(timer);
+  }, [search]);
+
+  useEffect(() => {
+    let active = true;
+    async function loadApprovals() {
+      setLoading(true);
+      setError('');
+      const params = { search: querySearch, page, pageSize: PAGE_SIZE };
+      if (subjectId !== 'all') params.subjectId = subjectId;
+      if (teachingFormat !== 'all') params.teachingFormat = teachingFormat;
+
+      try {
+        const response = await adminApi.getTutorApprovalDashboard(params);
+        if (active) setData(response.data);
+      } catch (requestError) {
+        if (active) setError(requestError.response?.data?.message || 'Không tải được danh sách hồ sơ chờ duyệt.');
+      } finally {
+        if (active) setLoading(false);
+      }
+    }
+    loadApprovals();
+    return () => { active = false; };
+  }, [querySearch, subjectId, teachingFormat, page, reload]);
+
+  useEffect(() => {
+    if (activeTab !== 'qualifications') return;
+    let active = true;
+    async function loadPagedQualifications() {
+      setLoadingQual(true);
+      try {
+        const res = await adminApi.getPendingQualifications({ page: qualPage, pageSize: PAGE_SIZE });
+        if (active) {
+          if (res.data?.items) {
+            setQualData(res.data);
+          } else {
+            setQualData({ items: res.data || [], total: (res.data || []).length, totalPages: 1 });
+          }
+        }
+      } catch (err) {
+        if (active) setError(err.response?.data?.message || 'Không tải được danh sách chứng chỉ.');
+      } finally {
+        if (active) setLoadingQual(false);
+      }
+    }
+    loadPagedQualifications();
+    return () => { active = false; };
+  }, [activeTab, qualPage, reload]);
+
+  const updateFilter = (setter, value) => { setter(value); setPage(1); };
+
+  const processTutor = async (tutor, approve) => {
+    const reason = approve ? null : window.prompt('Nhập lý do từ chối hồ sơ gia sư:');
+    if (!approve && reason === null) return;
+    if (!approve && !reason.trim()) {
+      setError('Vui lòng nhập lý do từ chối.');
+      return;
+    }
+
+    setBusyTutorId(tutor.tutorId);
+    setError('');
+    setMessage('');
+    try {
+      if (approve) await adminApi.approveTutor(tutor.tutorId);
+      else await adminApi.rejectTutor(tutor.tutorId, reason.trim());
+      setMessage(approve ? `Đã duyệt hồ sơ ${tutor.fullName}.` : `Đã từ chối hồ sơ ${tutor.fullName}.`);
+      setReload((value) => value + 1);
+    } catch (requestError) {
+      setError(requestError.response?.data?.message || 'Không thể cập nhật hồ sơ gia sư.');
+    } finally {
+      setBusyTutorId(null);
+    }
+  };
+
+  const reviewQualification = async (qualification, approve) => {
+    const reason = approve ? null : window.prompt(`Nhập lý do từ chối “${qualification.title}”:`);
+    if (!approve && reason === null) return;
+    if (!approve && !reason.trim()) {
+      setError('Vui lòng nhập lý do từ chối chứng chỉ.');
+      return;
+    }
+
+    setBusyQualificationId(qualification.id);
+    setError('');
+    setMessage('');
+    try {
+      if (approve) await adminApi.approveQualification(qualification.id);
+      else await adminApi.rejectQualification(qualification.id, reason.trim());
+      setMessage(approve ? 'Đã duyệt bằng cấp/chứng chỉ.' : 'Đã từ chối bằng cấp/chứng chỉ.');
+      setReload((value) => value + 1);
+    } catch (requestError) {
+      setError(requestError.response?.data?.message || 'Không thể cập nhật trạng thái bằng cấp/chứng chỉ.');
+    } finally {
+      setBusyQualificationId(null);
+    }
+  };
+
+  const openQualification = async (qualification) => {
+    if (qualification?.fileUrl && /^https?:\/\//i.test(qualification.fileUrl)) {
+      window.open(qualification.fileUrl, '_blank', 'noopener,noreferrer');
+      return;
+    }
+    if (qualification?.fileUrl && qualification.fileUrl.startsWith('/uploads/')) {
+      window.open(resolveAssetUrl(qualification.fileUrl), '_blank', 'noopener,noreferrer');
+      return;
+    }
+    const preview = window.open('', '_blank');
+    if (!preview) {
+      setError('Trình duyệt đang chặn cửa sổ xem tài liệu. Hãy cho phép mở cửa sổ bật lên rồi thử lại.');
+      return;
+    }
+    preview.document.title = qualification.title || 'Tài liệu gia sư';
+    preview.document.body.innerHTML = '<p style="font:14px sans-serif;padding:20px">Đang tải tài liệu…</p>';
+    try {
+      const response = await adminApi.getQualificationFile(qualification.id);
+      const fileUrl = URL.createObjectURL(response.data);
+      preview.location.href = fileUrl;
+      window.setTimeout(() => URL.revokeObjectURL(fileUrl), 60_000);
+    } catch (requestError) {
+      preview.close();
+      setError(requestError.response?.data?.message || 'Không mở được tệp bằng cấp/chứng chỉ.');
+    }
+  };
+
+  const handleAiVerify = async (qualification) => {
+    setAiVerifyingId(qualification.id);
+    setError('');
+    setMessage('');
+    try {
+      const res = await adminApi.aiVerifyQualification(qualification.id);
+      setAiResults((prev) => ({ ...prev, [qualification.id]: res.data }));
+      setMessage(`AI đã quét xong thông tin bằng cấp: ${qualification.title}`);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Không thể quét bằng cấp bằng AI. Vui lòng kiểm tra lại.');
+    } finally {
+      setAiVerifyingId(null);
+    }
+  };
+
+  const tutors = data?.tutors?.items || [];
+  const stats = data?.stats || {};
+  const pendingQualifications = (data?.pendingQualifications && Array.isArray(data.pendingQualifications))
+    ? data.pendingQualifications
+    : tutors.flatMap((tutor) =>
+        (tutor.qualifications || []).map((q) => ({
+          ...q,
+          tutorId: tutor.tutorId,
+          tutorName: tutor.fullName,
+          tutorEmail: tutor.email,
+          tutorPhone: tutor.phoneNumber,
+        }))
+      ).filter((q) => q.status === 'Pending');
+
+  const totalQualPages = Math.ceil(pendingQualifications.length / PAGE_SIZE) || 1;
+  const pagedQualifications = pendingQualifications.slice((qualPage - 1) * PAGE_SIZE, qualPage * PAGE_SIZE);
+
+  return (
+    <div className="admin-page is-approval">
+      <AdminPageHeader title="Duyệt hồ sơ & Bằng cấp gia sư" description="Xem xét hồ sơ đăng ký và chứng chỉ chuyên môn trước khi gia sư được xuất hiện trên nền tảng." />
+      <AdminFeedback error={error} message={message} onDismiss={() => { setError(''); setMessage(''); }} />
+
+      <AdminStats items={[
+        { label: 'Hồ sơ chờ duyệt', value: stats.pending, note: 'Gia sư cần xét duyệt' },
+        { label: 'Chứng chỉ chờ duyệt', value: stats.pendingQualifications ?? pendingQualifications.length, note: 'Bằng cấp cần kiểm định' },
+        { label: 'Dạy trực tuyến', value: stats.online, note: 'Hồ sơ chờ duyệt · Online' },
+        { label: 'Dạy trực tiếp', value: stats.offline, note: `Hồ sơ chờ duyệt${stats.hybrid ? ` · Kết hợp ${stats.hybrid}` : ''}` },
+      ]} />
+
+      {/* Tab chuyển đổi: Hồ sơ gia sư vs Chứng chỉ cần xét duyệt */}
+      <div style={{ display: 'flex', gap: '10px', margin: '20px 0 16px', borderBottom: '2px solid #e2e8f0', paddingBottom: '10px' }}>
+        <button
+          type="button"
+          style={{
+            background: activeTab === 'tutors' ? '#DB303A' : '#ffffff',
+            color: activeTab === 'tutors' ? '#ffffff' : '#475569',
+            border: activeTab === 'tutors' ? 'none' : '1px solid #cbd5e1',
+            borderRadius: '8px',
+            padding: '9px 18px',
+            fontWeight: '600',
+            fontSize: '0.9rem',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            boxShadow: activeTab === 'tutors' ? '0 2px 6px rgba(219, 48, 58, 0.25)' : 'none',
+          }}
+          onClick={() => {
+            setActiveTab('tutors');
+            setPage(1);
+          }}
+        >
+          <i className="bi bi-person-check"></i>
+          <span>Hồ sơ gia sư cần duyệt ({data?.tutors?.total ?? tutors.length})</span>
+        </button>
+
+        <button
+          type="button"
+          style={{
+            background: activeTab === 'qualifications' ? '#DB303A' : '#ffffff',
+            color: activeTab === 'qualifications' ? '#ffffff' : '#475569',
+            border: activeTab === 'qualifications' ? 'none' : '1px solid #cbd5e1',
+            borderRadius: '8px',
+            padding: '9px 18px',
+            fontWeight: '600',
+            fontSize: '0.9rem',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            boxShadow: activeTab === 'qualifications' ? '0 2px 6px rgba(219, 48, 58, 0.25)' : 'none',
+          }}
+          onClick={() => {
+            setActiveTab('qualifications');
+            setQualPage(1);
+          }}
+        >
+          <i className="bi bi-award"></i>
+          <span>Chứng chỉ &amp; Bằng cấp cần xét duyệt ({pendingQualifications.length})</span>
+        </button>
+      </div>
+
+      {activeTab === 'tutors' && (
+        <>
+          <div className="admin-toolbar">
+            <label className="admin-search"><i className="bi bi-search" aria-hidden="true" /><input value={search} onChange={(event) => updateFilter(setSearch, event.target.value)} placeholder="Tìm tên, email hoặc môn học…" /></label>
+            <label className="admin-select"><select value={subjectId} onChange={(event) => updateFilter(setSubjectId, event.target.value)} aria-label="Lọc theo môn học"><option value="all">Tất cả môn học</option>{(data?.subjectOptions || []).map((subject) => <option key={subject.id} value={subject.id}>{subject.name}</option>)}</select></label>
+            <label className="admin-select"><select value={teachingFormat} onChange={(event) => updateFilter(setTeachingFormat, event.target.value)} aria-label="Lọc theo hình thức"><option value="all">Tất cả hình thức</option><option value="Online">Online</option><option value="Offline">Offline</option><option value="Hybrid">Kết hợp</option></select></label>
+          </div>
+
+          <section className="admin-panel">
+        <div className="admin-panel-heading">Hồ sơ cần xét duyệt <span className="admin-count">{data?.tutors?.total ?? 0}</span></div>
+        <div className="admin-table-scroll">
+          <table className="admin-table">
+            <thead><tr><th>Gia sư</th><th>Môn học / Cấp học</th><th>Bằng cấp / Chứng chỉ</th><th>Liên hệ</th><th>Học phí</th><th>Hình thức</th><th>Thao tác</th></tr></thead>
+            <tbody>
+              <AdminLoadingRows columns={7} loading={loading} hasItems={tutors.length > 0} emptyText="Hiện không có hồ sơ chờ duyệt phù hợp." />
+              {!loading && tutors.map((tutor) => (
+                <tr key={tutor.tutorId}>
+                  <td><span className="admin-table-primary">{tutor.fullName}</span><span className="admin-table-secondary">{tutor.introduction || 'Chưa có giới thiệu'}</span></td>
+                  <td><div className="admin-subjects">{tutor.subjects?.length ? tutor.subjects.map((subject, index) => <span className="admin-subject-tag" key={`${subject.subjectName}-${subject.gradeName}-${index}`}>{subject.subjectName} · {subject.gradeName}</span>) : <span className="admin-table-secondary">Chưa cập nhật</span>}</div></td>
+                  <td>
+                    {tutor.qualifications?.length ? (
+                      <details open className="admin-qualification-details">
+                        <summary style={{ cursor: 'pointer', fontWeight: '600' }}>Kiểm tra tài liệu ({tutor.qualifications.length})</summary>
+                        <div className="admin-qualification-list">
+                          {tutor.qualifications.map((qualification) => (
+                            <div className="admin-qualification-item" key={qualification.id}>
+                              <div>
+                                <span className="admin-table-primary">{qualification.title}</span>
+                                <span className={`admin-status ${qualification.status === 'Approved' ? 'is-active' : qualification.status === 'Rejected' ? 'is-locked' : ''}`}>
+                                  {qualification.status === 'Approved' ? 'Đã duyệt' : qualification.status === 'Rejected' ? 'Từ chối' : 'Chờ duyệt'}
+                                </span>
+                              </div>
+                              <div className="admin-actions-inline">
+                                <button className="admin-action" type="button" onClick={() => openQualification(qualification)}>Xem file</button>
+                                <button
+                                  className="admin-action"
+                                  type="button"
+                                  style={{ background: '#f0fdf4', color: '#166534', borderColor: '#bbf7d0', fontWeight: 'bold' }}
+                                  disabled={aiVerifyingId === qualification.id}
+                                  onClick={() => handleAiVerify(qualification)}
+                                >
+                                  {aiVerifyingId === qualification.id ? '🤖 Đang quét…' : '🤖 AI Quét'}
+                                </button>
+                                {qualification.status === 'Pending' && <>
+                                  <button className="admin-action is-approve" type="button" disabled={busyQualificationId === qualification.id} onClick={() => reviewQualification(qualification, true)}>{busyQualificationId === qualification.id ? 'Đang lưu…' : 'Duyệt'}</button>
+                                  <button className="admin-action" type="button" disabled={busyQualificationId === qualification.id} onClick={() => reviewQualification(qualification, false)}>Từ chối</button>
+                                </>}
+                              </div>
+                              {aiResults[qualification.id] && (
+                                <div style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '8px 10px', marginTop: '6px', fontSize: '0.82rem', width: '100%', boxSizing: 'border-box' }}>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                                    <strong style={{ color: '#0f172a' }}>🤖 Kết quả AI OCR & Đối chiếu:</strong>
+                                    <span style={{
+                                      fontWeight: 'bold',
+                                      padding: '2px 6px',
+                                      borderRadius: '4px',
+                                      fontSize: '0.74rem',
+                                      background: aiResults[qualification.id].recommendation === 'APPROVED_RECOMMENDED' ? '#dcfce7' : '#fee2e2',
+                                      color: aiResults[qualification.id].recommendation === 'APPROVED_RECOMMENDED' ? '#166534' : '#991b1b',
+                                    }}>
+                                      {aiResults[qualification.id].recommendation === 'APPROVED_RECOMMENDED' ? '✅ Đề xuất DUYỆT' : '⚠️ Cần kiểm tra kỹ'}
+                                    </span>
+                                  </div>
+                                  <div><strong>Tên trên bằng:</strong> {aiResults[qualification.id].tutorName || 'N/A'} {aiResults[qualification.id].isNameMatched ? '✅ (Khớp hồ sơ)' : '⚠️ (Chưa trùng khớp)'}</div>
+                                  <div><strong>Trường / Tổ chức:</strong> {aiResults[qualification.id].issuingOrganization || 'N/A'} ({aiResults[qualification.id].certificateType})</div>
+                                  <div><strong>Xếp loại / Điểm:</strong> {aiResults[qualification.id].scoreOrClassification || 'N/A'} | <strong>Chuẩn OTSP:</strong> {aiResults[qualification.id].qualificationStandardMet ? 'Đạt' : 'Chưa đạt'}</div>
+                                  {aiResults[qualification.id].summaryNotes && <div style={{ color: '#334155', marginTop: '4px', fontStyle: 'italic', background: '#ffffff', padding: '4px 6px', borderRadius: '4px' }}>💬 {aiResults[qualification.id].summaryNotes}</div>}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </details>
+                    ) : <span className="admin-table-secondary">Chưa có tài liệu</span>}
+                  </td>
+                  <td><span className="admin-table-primary">{tutor.email || 'Chưa có email'}</span><span className="admin-table-secondary">{tutor.phoneNumber || 'Chưa có số điện thoại'}</span></td>
+                  <td>{Number(tutor.hourlyFee || 0).toLocaleString('vi-VN')} đ/giờ</td>
+                  <td className="admin-format">{tutor.teachingFormat === 'Hybrid' ? 'Kết hợp' : tutor.teachingFormat}</td>
+                  <td><div className="admin-actions-inline">
+                    <button className="admin-action is-approve" type="button" disabled={busyTutorId === tutor.tutorId} onClick={() => processTutor(tutor, true)}>{busyTutorId === tutor.tutorId ? 'Đang lưu…' : 'Duyệt'}</button>
+                    <button className="admin-action" type="button" disabled={busyTutorId === tutor.tutorId} onClick={() => processTutor(tutor, false)}>Từ chối</button>
+                  </div></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <AdminPagination page={data?.tutors?.page || page} totalPages={data?.tutors?.totalPages} total={data?.tutors?.total || 0} pageSize={PAGE_SIZE} onChange={setPage} />
+      </section>
+      </>
+      )}
+
+      {activeTab === 'qualifications' && (
+        <section className="admin-panel">
+          <div className="admin-panel-heading">
+            Danh sách chứng chỉ &amp; bằng cấp cần xét duyệt <span className="admin-count">{qualData ? qualData.total : pendingQualifications.length}</span>
+            <span className="admin-table-secondary" style={{ fontSize: '0.82rem', marginLeft: '12px', fontWeight: 'normal' }}>
+              (Admin tự check thủ công qua file gốc hoặc bấm nút AI OCR quét tự động)
+            </span>
+          </div>
+          <div className="admin-table-scroll">
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th>Gia sư</th>
+                  <th>Tên chứng chỉ / Bằng cấp</th>
+                  <th>Trạng thái</th>
+                  <th>Kiểm tra thủ công</th>
+                  <th>AI OCR Quét tự động</th>
+                  <th>Quyết định duyệt</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loadingQual ? (
+                  <tr>
+                    <td colSpan={6} style={{ textAlign: 'center', padding: '36px', color: '#64748b' }}>
+                      Đang tải danh sách bằng cấp/chứng chỉ…
+                    </td>
+                  </tr>
+                ) : (qualData ? qualData.items : pagedQualifications).length === 0 ? (
+                  <tr>
+                    <td colSpan={6} style={{ textAlign: 'center', padding: '36px', color: '#64748b' }}>
+                      Hiện không có chứng chỉ nào đang chờ xét duyệt.
+                    </td>
+                  </tr>
+                ) : (
+                  (qualData ? qualData.items : pagedQualifications).map((qualification) => (
+                    <tr key={qualification.id}>
+                      <td>
+                        <span className="admin-table-primary">{qualification.tutorName}</span>
+                        <span className="admin-table-secondary">{qualification.tutorEmail}</span>
+                        {qualification.tutorPhone && <span className="admin-table-secondary">{qualification.tutorPhone}</span>}
+                      </td>
+                      <td>
+                        <span className="admin-table-primary" style={{ fontWeight: '600' }}>{qualification.title}</span>
+                        <span className="admin-table-secondary">Mã số: #{qualification.id}</span>
+                      </td>
+                      <td>
+                        <span className="admin-status is-pending">Chờ duyệt</span>
+                      </td>
+                      <td>
+                        <button
+                          className="admin-action"
+                          type="button"
+                          style={{ whiteSpace: 'nowrap' }}
+                          onClick={() => openQualification(qualification)}
+                        >
+                          <i className="bi bi-file-earmark-text me-1"></i> Xem file gốc
+                        </button>
+                      </td>
+                      <td style={{ minWidth: '260px' }}>
+                        <button
+                          className="admin-action"
+                          type="button"
+                          style={{
+                            background: '#f0fdf4',
+                            color: '#166534',
+                            borderColor: '#86efac',
+                            fontWeight: 'bold',
+                            whiteSpace: 'nowrap',
+                          }}
+                          disabled={aiVerifyingId === qualification.id}
+                          onClick={() => handleAiVerify(qualification)}
+                        >
+                          {aiVerifyingId === qualification.id ? '🤖 Đang quét OCR…' : '🤖 AI OCR Quét'}
+                        </button>
+
+                        {/* Thẻ hiển thị kết quả AI OCR trực tiếp */}
+                        {aiResults[qualification.id] && (
+                          <div style={{
+                            background: '#f8fafc',
+                            border: '1px solid #cbd5e1',
+                            borderRadius: '8px',
+                            padding: '10px',
+                            marginTop: '8px',
+                            fontSize: '0.82rem',
+                          }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                              <strong style={{ color: '#0f172a' }}>Kết quả AI OCR:</strong>
+                              <span style={{
+                                fontWeight: 'bold',
+                                padding: '2px 8px',
+                                borderRadius: '4px',
+                                fontSize: '0.74rem',
+                                background: aiResults[qualification.id].recommendation === 'APPROVED_RECOMMENDED' ? '#dcfce7' : '#fee2e2',
+                                color: aiResults[qualification.id].recommendation === 'APPROVED_RECOMMENDED' ? '#166534' : '#991b1b',
+                              }}>
+                                {aiResults[qualification.id].recommendation === 'APPROVED_RECOMMENDED' ? '✅ Đề xuất DUYỆT' : '⚠️ Cần xem kỹ'}
+                              </span>
+                            </div>
+                            <div><strong>Tên trên bằng:</strong> {aiResults[qualification.id].tutorName || 'N/A'} {aiResults[qualification.id].isNameMatched ? '✅ (Khớp hồ sơ)' : '⚠️ (Lệch tên)'}</div>
+                            <div><strong>Nơi cấp:</strong> {aiResults[qualification.id].issuingOrganization || 'N/A'} ({aiResults[qualification.id].certificateType})</div>
+                            <div><strong>Điểm / GPA:</strong> {aiResults[qualification.id].scoreOrClassification || 'N/A'} | <strong>Chuẩn OTSP:</strong> {aiResults[qualification.id].qualificationStandardMet ? 'Đạt' : 'Chưa đạt'}</div>
+                            {aiResults[qualification.id].summaryNotes && (
+                              <div style={{ color: '#334155', marginTop: '6px', fontStyle: 'italic', background: '#ffffff', padding: '6px', borderRadius: '4px', border: '1px solid #f1f5f9' }}>
+                                💬 {aiResults[qualification.id].summaryNotes}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </td>
+                      <td>
+                        <div className="admin-actions-inline">
+                          <button
+                            className="admin-action is-approve"
+                            type="button"
+                            disabled={busyQualificationId === qualification.id}
+                            onClick={() => reviewQualification(qualification, true)}
+                          >
+                            {busyQualificationId === qualification.id ? 'Đang lưu…' : 'Duyệt'}
+                          </button>
+                          <button
+                            className="admin-action"
+                            type="button"
+                            disabled={busyQualificationId === qualification.id}
+                            onClick={() => reviewQualification(qualification, false)}
+                          >
+                            Từ chối
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+          <AdminPagination
+            page={qualData?.page || qualPage}
+            totalPages={qualData?.totalPages || totalQualPages}
+            total={qualData ? qualData.total : pendingQualifications.length}
+            pageSize={PAGE_SIZE}
+            onChange={setQualPage}
+          />
+        </section>
+      )}
+
+      <aside className="admin-note is-warning"><i className="bi bi-shield-check" aria-hidden="true" /><div><strong>Cần kiểm tra trước khi duyệt</strong>Đối chiếu thông tin cá nhân, bằng cấp/CCCD và thông tin giảng dạy. Hồ sơ trong danh sách chưa được xem là đã xác minh.</div></aside>
+
+      <section className="admin-guide">
+        <h2>Hướng dẫn xét duyệt</h2>
+        <div className="admin-guide-step"><b>Bước 1</b>Kiểm tra thông tin cá nhân</div>
+        <div className="admin-guide-step"><b>Bước 2</b>Đối chiếu giấy tờ và bằng cấp</div>
+        <div className="admin-guide-step"><b>Bước 3</b>Xem môn học, cấp học và học phí</div>
+      </section>
+    </div>
+  );
+}
