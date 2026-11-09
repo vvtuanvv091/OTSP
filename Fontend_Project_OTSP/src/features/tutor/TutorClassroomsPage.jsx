@@ -69,6 +69,23 @@ export default function TutorClassroomsPage() {
 
   const formatPrice = (val) => new Intl.NumberFormat('vi-VN').format(val || 0);
 
+  const getSubjectIcon = (subjectName) => {
+    const s = (subjectName || '').toLowerCase();
+    if (s.includes('công nghệ') || s.includes('tin học') || s.includes('cntt') || s.includes('lập trình') || s.includes('computer')) {
+      return 'bi-cpu';
+    }
+    if (s.includes('toán')) return 'bi-calculator';
+    if (s.includes('anh') || s.includes('tiếng anh') || s.includes('pháp') || s.includes('trung') || s.includes('nhật') || s.includes('hàn') || s.includes('ngoại ngữ')) {
+      return 'bi-translate';
+    }
+    if (s.includes('văn') || s.includes('tiếng việt')) return 'bi-journal-text';
+    if (s.includes('lý') || s.includes('vật lý')) return 'bi-lightning-charge';
+    if (s.includes('hóa')) return 'bi-radioactive';
+    if (s.includes('sinh')) return 'bi-flower1';
+    if (s.includes('sử') || s.includes('địa')) return 'bi-globe-americas';
+    return 'bi-mortarboard-fill';
+  };
+
   return (
     <>
       <style>{`
@@ -76,17 +93,30 @@ export default function TutorClassroomsPage() {
           transition: all 0.2s ease;
           border: 1px solid #E2E8F0;
           background: #FFFFFF;
+          border-radius: 16px;
         }
         .tutor-classroom-card:hover {
           border-color: #CBD5E1;
-          box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+          box-shadow: 0 4px 16px rgba(0, 0, 0, 0.07);
           transform: translateY(-1px);
         }
-        .tutor-fee-badge {
-          background-color: #FAFAFA;
-          border: 1px solid #F1F5F9;
-          min-width: 76px;
-          height: 60px;
+        .tutor-info-box {
+          background-color: #F8FAFC;
+          border: 1px solid #E2E8F0;
+          border-radius: 12px;
+          transition: all 0.15s ease;
+        }
+        .tutor-action-btn {
+          border: 1px solid #CBD5E1;
+          background: #FFFFFF;
+          color: #334155;
+          font-weight: 500;
+          transition: all 0.15s ease;
+        }
+        .tutor-action-btn:hover {
+          background-color: #F1F5F9;
+          border-color: #94A3B8;
+          color: #0F172A;
         }
         .progress-bar-custom {
           background-color: #DB303A;
@@ -106,6 +136,31 @@ export default function TutorClassroomsPage() {
           background-color: #DB303A !important;
           border-color: #DB303A !important;
           color: #ffffff !important;
+        }
+        [data-bs-theme="dark"] .tutor-classroom-card {
+          background: #181926;
+          border-color: #2D305D;
+          color: #F1F5F9;
+        }
+        [data-bs-theme="dark"] .tutor-info-box {
+          background-color: #1B1C38;
+          border-color: #2D305D;
+        }
+        [data-bs-theme="dark"] .tutor-info-box .text-dark {
+          color: #F1F5F9 !important;
+        }
+        [data-bs-theme="dark"] .tutor-info-box .text-secondary {
+          color: #94A3B8 !important;
+        }
+        [data-bs-theme="dark"] .tutor-action-btn {
+          background: #1B1C38;
+          border-color: #2D305D;
+          color: #E2E8F0;
+        }
+        [data-bs-theme="dark"] .tutor-action-btn:hover {
+          background: #25284D;
+          border-color: #4A4E85;
+          color: #FFFFFF;
         }
       `}</style>
 
@@ -214,15 +269,19 @@ export default function TutorClassroomsPage() {
                 const progressPct = c.totalSessions > 0 ? Math.round((c.completedSessions / c.totalSessions) * 100) : 0;
 
                 const groupDisplayName = c.name?.trim() || (isGroup ? `Nhóm ${c.subjectName}` : `Lớp 1-1 ${c.subjectName}`);
+                const cleanSchedule = (c.formattedSchedule || c.scheduleSummary || 'Chưa xếp')
+                  .replace(/\s*\(\s*/g, ' · ')
+                  .replace(/\s*\)\s*$/g, '')
+                  .trim();
 
                 return (
                   <div key={c.id} className="col">
-                    <div className="card tutor-classroom-card h-100 rounded-3 p-3 p-sm-3.5 d-flex flex-column justify-content-between">
+                    <div className="card tutor-classroom-card h-100 p-3 p-sm-3.5 d-flex flex-column justify-content-between">
                       <div>
-                        {/* Header: Ảnh/Icon đại diện + Tên lớp */}
-                        <div className="d-flex align-items-center gap-2.5 mb-2">
+                        {/* 1. Header: Ảnh/Icon đại diện + Tên lớp & Badges */}
+                        <div className="d-flex align-items-start gap-3 mb-2">
                           {c.coverImageUrl ? (
-                            <div className="position-relative flex-shrink-0" style={{ width: 44, height: 44 }}>
+                            <div className="position-relative flex-shrink-0" style={{ width: 50, height: 50 }}>
                               <img
                                 src={resolveAssetUrl(c.coverImageUrl)}
                                 alt={c.name}
@@ -232,96 +291,128 @@ export default function TutorClassroomsPage() {
                             </div>
                           ) : (
                             <div
-                              className="rounded-3 d-flex align-items-center justify-content-center flex-shrink-0 shadow-sm text-white"
+                              className="rounded-3 d-flex align-items-center justify-content-center flex-shrink-0 shadow-sm"
                               style={{
-                                width: 44,
-                                height: 44,
-                                backgroundColor: isGroup ? '#4F46E5' : '#0284C7',
-                                fontSize: '1.25rem'
+                                width: 50,
+                                height: 50,
+                                backgroundColor: '#0c2340',
+                                color: '#38bdf8',
+                                fontSize: '1.5rem',
+                                borderRadius: '12px'
                               }}
                             >
-                              <i className={`bi ${isGroup ? 'bi-people-fill' : 'bi-mortarboard-fill'}`}></i>
+                              <i className={`bi ${getSubjectIcon(c.subjectName)}`}></i>
                             </div>
                           )}
 
                           <div className="flex-grow-1 min-w-0">
-                            <div className="fw-bold text-dark text-break" style={{ fontSize: '0.98rem', lineHeight: 1.3 }}>
+                            <div className="fw-bold text-dark text-break fs-5 mb-1.5" style={{ lineHeight: 1.3 }}>
                               {groupDisplayName}
+                            </div>
+
+                            {/* Badges container: màu đậm đổ vào chuẩn layout hình 1 */}
+                            <div className="d-flex align-items-center gap-1.5 flex-wrap">
+                              {/* Học phí (Đỏ đậm) */}
+                              <span
+                                className="badge text-white shadow-sm fw-bold d-inline-flex align-items-center gap-1"
+                                style={{
+                                  backgroundColor: '#DC2626',
+                                  fontSize: '0.78rem',
+                                  borderRadius: '8px',
+                                  padding: '5px 10px'
+                                }}
+                              >
+                                <i className="bi bi-tag-fill opacity-90"></i>
+                                {formatPrice(c.fee)} đ
+                              </span>
+
+                              {/* Môn & Cấp học (Xanh nước biển đậm) */}
+                              <span
+                                className="badge text-white shadow-sm fw-semibold d-inline-flex align-items-center gap-1 text-truncate"
+                                style={{
+                                  backgroundColor: '#0284C7',
+                                  fontSize: '0.78rem',
+                                  borderRadius: '8px',
+                                  padding: '5px 10px',
+                                  maxWidth: '210px'
+                                }}
+                                title={`${c.subjectName} · ${c.gradeLevelName}`}
+                              >
+                                <i className="bi bi-book opacity-90"></i>
+                                {c.subjectName} - {c.gradeLevelName}
+                              </span>
+
+                              {/* Loại lớp (Tím chàm đậm) */}
+                              <span
+                                className="badge text-white shadow-sm fw-semibold d-inline-flex align-items-center gap-1"
+                                style={{
+                                  backgroundColor: isGroup ? '#4F46E5' : '#0891B2',
+                                  fontSize: '0.78rem',
+                                  borderRadius: '8px',
+                                  padding: '5px 10px'
+                                }}
+                              >
+                                <i className={`bi ${isGroup ? 'bi-people-fill' : 'bi-person-fill'} opacity-90`}></i>
+                                {!isGroup ? 'Lớp 1-1' : 'Lớp nhóm'}
+                              </span>
+
+                              {/* Trạng thái (Xanh lá cây đậm) */}
+                              <span
+                                className="badge text-white shadow-sm fw-semibold d-inline-flex align-items-center gap-1"
+                                style={{
+                                  backgroundColor: c.status === 'Active' ? '#15803D' : c.status === 'Completed' ? '#475569' : '#B91C1C',
+                                  fontSize: '0.78rem',
+                                  borderRadius: '8px',
+                                  padding: '5px 10px'
+                                }}
+                              >
+                                <i className={`bi ${c.status === 'Active' ? 'bi-check-circle-fill' : 'bi-dash-circle-fill'} opacity-90`}></i>
+                                {statusLabel}
+                              </span>
                             </div>
                           </div>
                         </div>
 
-                        {/* 4 Badges chia 2 hàng, mỗi hàng 2 cái (2 trên, 2 dưới), màu đậm chuẩn */}
-                        <div className="d-flex flex-column gap-1.5 my-2.5">
-                          {/* Hàng 1: Học phí (Đỏ đậm #DC2626) + Môn/Cấp học (Xanh biển đậm #0284C7) */}
-                          <div className="d-flex align-items-center gap-2">
-                            <span
-                              className="badge text-white px-2.5 py-1.5 shadow-sm fw-bold"
-                              style={{
-                                backgroundColor: '#DC2626',
-                                fontSize: '0.82rem',
-                                borderRadius: '6px',
-                                letterSpacing: '0.2px'
-                              }}
-                            >
-                              <i className="bi bi-tag-fill me-1 opacity-75"></i>
-                              {formatPrice(c.fee)} đ
-                            </span>
-                            <span
-                              className="badge text-white px-2.5 py-1.5 shadow-sm fw-semibold text-truncate"
-                              style={{
-                                backgroundColor: '#0284C7',
-                                fontSize: '0.8rem',
-                                borderRadius: '6px',
-                                maxWidth: '190px'
-                              }}
-                              title={`${c.subjectName} · ${c.gradeLevelName}`}
-                            >
-                              <i className="bi bi-book-half me-1 opacity-75"></i>
-                              {c.subjectName} · {c.gradeLevelName}
-                            </span>
+                        {/* 2. Hai ô thông tin độc lập (Lịch học & Sĩ số) - Chuẩn layout hình 1 */}
+                        <div className="row g-2 my-2.5">
+                          <div className="col-12 col-sm-6">
+                            <div className="tutor-info-box p-2.5 d-flex align-items-center gap-2.5 h-100">
+                              <div className="text-secondary flex-shrink-0" style={{ fontSize: '1.4rem' }}>
+                                <i className="bi bi-calendar3-event"></i>
+                              </div>
+                              <div className="min-w-0 flex-grow-1">
+                                <div className="text-secondary small fw-medium" style={{ fontSize: '0.72rem', lineHeight: 1.2 }}>
+                                  Lịch học
+                                </div>
+                                <div className="fw-bold text-dark text-truncate mt-0.5" style={{ fontSize: '0.85rem' }} title={cleanSchedule}>
+                                  {cleanSchedule}
+                                </div>
+                              </div>
+                            </div>
                           </div>
 
-                          {/* Hàng 2: Loại lớp (Tím chàm #4F46E5 / #0891B2) + Trạng thái (Xanh lá đậm #15803D) */}
-                          <div className="d-flex align-items-center gap-2">
-                            <span
-                              className="badge text-white px-2.5 py-1.5 shadow-sm fw-semibold"
-                              style={{
-                                backgroundColor: isGroup ? '#4F46E5' : '#0891B2',
-                                fontSize: '0.78rem',
-                                borderRadius: '6px'
-                              }}
-                            >
-                              <i className={`bi ${isGroup ? 'bi-people-fill' : 'bi-person-fill'} me-1 opacity-75`}></i>
-                              {!isGroup ? 'Lớp 1-1' : 'Lớp nhóm'}
-                            </span>
-                            <span
-                              className="badge text-white px-2.5 py-1.5 shadow-sm fw-semibold"
-                              style={{
-                                backgroundColor: c.status === 'Active' ? '#15803D' : c.status === 'Completed' ? '#475569' : '#B91C1C',
-                                fontSize: '0.78rem',
-                                borderRadius: '6px'
-                              }}
-                            >
-                              <i className={`bi ${c.status === 'Active' ? 'bi-check-circle-fill' : 'bi-dash-circle-fill'} me-1 opacity-75`}></i>
-                              {statusLabel}
-                            </span>
+                          <div className="col-12 col-sm-6">
+                            <div className="tutor-info-box p-2.5 d-flex align-items-center gap-2.5 h-100">
+                              <div className="text-secondary flex-shrink-0" style={{ fontSize: '1.4rem' }}>
+                                <i className="bi bi-people"></i>
+                              </div>
+                              <div className="min-w-0 flex-grow-1">
+                                <div className="text-secondary small fw-medium" style={{ fontSize: '0.72rem', lineHeight: 1.2 }}>
+                                  Sĩ số
+                                </div>
+                                <div className="fw-bold text-dark text-truncate mt-0.5" style={{ fontSize: '0.85rem' }}>
+                                  {c.studentCount}{isGroup ? `/${c.maxStudents}` : ''} học viên
+                                </div>
+                              </div>
+                            </div>
                           </div>
                         </div>
 
-                        <div className="small text-secondary mb-1" title={c.formattedSchedule || c.scheduleSummary}>
-                          <i className="bi bi-calendar3 me-1 text-danger"></i>Lịch học: <b>{c.formattedSchedule || c.scheduleSummary || 'Chưa xếp'}</b>
-                        </div>
-
-                        <div className="small text-secondary mb-1">
-                          <i className="bi bi-people me-1 text-muted"></i>Sĩ số: <b>{c.studentCount}{isGroup ? `/${c.maxStudents}` : ''} học viên</b>
-                        </div>
-
-                        {/* Progress */}
-                        <div className="mt-3 pt-2.5 border-top">
+                        {/* 3. Tiến độ giảng dạy */}
+                        <div className="mt-3 pt-1">
                           <div className="d-flex justify-content-between align-items-center small mb-1.5">
-                            <span className="text-secondary" style={{ fontSize: '0.8rem' }}>Tiến độ giảng dạy</span>
-                            <span className="fw-bold text-dark" style={{ fontSize: '0.825rem' }}>
+                            <span className="text-secondary fw-medium" style={{ fontSize: '0.82rem' }}>Tiến độ giảng dạy</span>
+                            <span className="fw-bold text-dark" style={{ fontSize: '0.85rem' }}>
                               {c.completedSessions || 0}/{c.totalSessions || 0} buổi
                             </span>
                           </div>
@@ -338,22 +429,22 @@ export default function TutorClassroomsPage() {
                         </div>
                       </div>
 
-                      {/* Footer Actions */}
+                      {/* 4. Footer Actions (Chuẩn layout hình 1) */}
                       <div className="d-flex align-items-center justify-content-between gap-2 mt-3 pt-3 border-top">
                         <Link
                           to={`/tutor/documents?classroomId=${c.id}`}
-                          className="btn btn-sm btn-outline-secondary px-2.5 px-sm-3 py-1.5 d-inline-flex align-items-center gap-1 rounded-2 text-nowrap flex-shrink-0"
+                          className="btn btn-sm tutor-action-btn px-3 py-1.5 d-inline-flex align-items-center gap-1.5 rounded-2 text-nowrap flex-shrink-0"
                           style={{ fontSize: '0.825rem' }}
                           title="Xem tài liệu lớp học"
                         >
                           <i className="bi bi-folder2-open"></i><span>Tài liệu lớp</span>
                         </Link>
 
-                        <div className="d-flex align-items-center gap-1">
+                        <div className="d-flex align-items-center gap-1.5">
                           {c.status === 'Active' && (
                             <Link
                               to={`/tutor/classrooms/edit/${c.id}`}
-                              className="btn btn-sm btn-outline-danger px-2.5 px-sm-3 py-1.5 rounded-2 text-nowrap"
+                              className="btn btn-sm tutor-action-btn px-3 py-1.5 rounded-2 text-nowrap"
                               style={{ fontSize: '0.825rem' }}
                             >
                               Sửa lớp
@@ -362,16 +453,16 @@ export default function TutorClassroomsPage() {
 
                           <Link
                             to="/tutor/schedule"
-                            className="btn btn-sm btn-danger px-2.5 px-sm-3 py-1.5 rounded-2 text-nowrap"
+                            className="btn btn-sm tutor-action-btn px-3 py-1.5 rounded-2 text-nowrap d-inline-flex align-items-center gap-1.5"
                             style={{ fontSize: '0.825rem' }}
                           >
-                            Lịch dạy
+                            <i className="bi bi-calendar3"></i><span>Lịch dạy</span>
                           </Link>
 
                           {/* Dropdown menu */}
                           <div className="dropdown">
                             <button
-                              className="btn btn-sm btn-light border px-2 py-1.5 rounded-2 text-secondary d-flex align-items-center justify-content-center"
+                              className="btn btn-sm tutor-action-btn px-2 py-1.5 rounded-2 d-flex align-items-center justify-content-center"
                               type="button"
                               data-bs-toggle="dropdown"
                               style={{ height: 32, width: 32 }}
