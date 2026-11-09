@@ -366,6 +366,65 @@ export default function StudentSchedulePage() {
           background: #f8fafc;
         }
 
+        /* Dark mode overrides for high contrast and beautiful UI */
+        [data-bs-theme="dark"] .schedule-card {
+          background: #1B1C38 !important;
+          border-color: #2D305D !important;
+        }
+
+        [data-bs-theme="dark"] .schedule-table th {
+          color: #E2E8F0 !important;
+        }
+
+        [data-bs-theme="dark"] .schedule-time-label {
+          color: #94A3B8 !important;
+        }
+
+        [data-bs-theme="dark"] .availability-slot.is-empty {
+          background: #14152D !important;
+          border-color: #2D305D !important;
+        }
+
+        [data-bs-theme="dark"] .schedule-session-card {
+          background: #202244 !important;
+          border-color: #2D305D !important;
+          color: #F8FAFC !important;
+        }
+
+        [data-bs-theme="dark"] .schedule-session-card .session-student {
+          color: #FFFFFF !important;
+        }
+
+        [data-bs-theme="dark"] .schedule-session-card .session-subject {
+          color: #94A3B8 !important;
+        }
+
+        [data-bs-theme="dark"] .schedule-session-card.status-inprogress {
+          background: #1e293b !important;
+          border-left-color: #38bdf8 !important;
+        }
+
+        [data-bs-theme="dark"] .schedule-session-card.status-done {
+          background: #14532d33 !important;
+          border-left-color: #4ade80 !important;
+        }
+
+        [data-bs-theme="dark"] .schedule-session-card.status-scheduled {
+          background: #7f1d1d33 !important;
+          border-left-color: #f87171 !important;
+        }
+
+        [data-bs-theme="dark"] .schedule-session-card.status-cancelled {
+          background: #334155 !important;
+          border-left-color: #94a3b8 !important;
+        }
+
+        [data-bs-theme="dark"] .schedule-session-card .badge.bg-light {
+          background-color: #14152D !important;
+          color: #94A3B8 !important;
+          border-color: #2D305D !important;
+        }
+
         .schedule-session-card .session-time {
           font-size: 10px;
           font-weight: 700;
@@ -408,14 +467,24 @@ export default function StudentSchedulePage() {
           background: var(--bs-body-bg, #ffffff);
         }
 
-        .legend-swatch.is-free {
-          border-color: var(--availability-accent-border, #FCA5A5);
-          background: var(--availability-accent-soft, #FDE8E8);
+        .legend-swatch.legend-inprogress {
+          border-color: #0284c7;
+          background: #0284c7;
         }
 
-        .legend-swatch.is-busy {
-          border-color: var(--availability-busy-border, #1F2937);
-          background: var(--availability-busy-bg, #374151);
+        .legend-swatch.legend-scheduled {
+          border-color: #dc2626;
+          background: #dc2626;
+        }
+
+        .legend-swatch.legend-done {
+          border-color: #166534;
+          background: #166534;
+        }
+
+        .legend-swatch.legend-cancelled {
+          border-color: #64748b;
+          background: #64748b;
         }
 
         /* Mobile day picker */
@@ -598,13 +667,16 @@ export default function StudentSchedulePage() {
           <div className="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
             <div className="availability-legend">
               <span className="legend-item">
-                <span className="legend-swatch is-free" aria-hidden="true"></span>Rảnh - có thể nhận lớp
+                <span className="legend-swatch legend-inprogress" aria-hidden="true"></span>Đang diễn ra
               </span>
               <span className="legend-item">
-                <span className="legend-swatch is-busy" aria-hidden="true"></span>Đã có lớp / Buổi học
+                <span className="legend-swatch legend-scheduled" aria-hidden="true"></span>Sắp tới
               </span>
               <span className="legend-item">
-                <span className="legend-swatch" aria-hidden="true"></span>Không dạy
+                <span className="legend-swatch legend-done" aria-hidden="true"></span>Đã học
+              </span>
+              <span className="legend-item">
+                <span className="legend-swatch legend-cancelled" aria-hidden="true"></span>Đã hủy
               </span>
             </div>
             <div className="small text-secondary">
@@ -680,7 +752,7 @@ export default function StudentSchedulePage() {
                       {weekDates.map((dayDate, i) => {
                         const dayOfWeek = i; // 0 = Monday, ..., 6 = Sunday
                         const daySessions = sessions.filter(
-                          (s) => s.dayOfWeek === dayOfWeek && s.startHour === row.start
+                          (s) => s.dayOfWeek === dayOfWeek && s.startHour >= row.start && s.startHour < row.end
                         );
 
                         return (

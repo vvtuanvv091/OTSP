@@ -851,20 +851,16 @@ export default function TutorSchedulePage() {
                                           </span>
 
                                           {Number(session.sessionId) > 0 && !isDone && !isCancelled && (
-                                            session.canJoin ? (
-                                              <Link
-                                                to={`/room/${session.sessionId}`}
-                                                className={`btn btn-sm py-0 px-1.5 fw-semibold ${isInProgress ? 'btn-danger animate-pulse' : 'btn-outline-danger'}`}
-                                                style={{ fontSize: 10 }}
-                                                onClick={(e) => e.stopPropagation()}
-                                              >
-                                                <i className="bi bi-camera-video me-1" aria-hidden="true" />Vào lớp
-                                              </Link>
-                                            ) : (
-                                              <span className="badge bg-light text-muted border py-0 px-1" style={{ fontSize: 9 }}>
-                                                Chưa mở
-                                              </span>
-                                            )
+                                            <Link
+                                              to={`/room/${session.sessionId}`}
+                                              className={`btn btn-sm py-0 px-1.5 fw-semibold ${isInProgress ? 'btn-danger animate-pulse' : 'btn-outline-danger'}`}
+                                              style={{ fontSize: 10 }}
+                                              onClick={(e) => e.stopPropagation()}
+                                              title={isInProgress ? 'Đang diễn ra - Bấm để vào lớp' : 'Bấm để mở lớp học'}
+                                            >
+                                              <i className="bi bi-camera-video me-1" aria-hidden="true" />
+                                              {isInProgress ? 'Vào lớp' : 'Mở lớp'}
+                                            </Link>
                                           )}
                                         </div>
                                       </div>
@@ -963,15 +959,14 @@ export default function TutorSchedulePage() {
                         <td className="text-end">
                           <div className="d-inline-flex gap-1">
                             {Number(s.sessionId) > 0 && !isDone && !isCancelled && (
-                              s.canJoin ? (
-                                <Link to={`/room/${s.sessionId}`} className="btn btn-sm btn-danger px-2.5">
-                                  <i className="bi bi-camera-video me-1" aria-hidden="true" />Vào lớp
-                                </Link>
-                              ) : (
-                                <button type="button" className="btn btn-sm btn-outline-secondary px-2" disabled title="Chưa đến giờ mở phòng">
-                                  Chưa mở
-                                </button>
-                              )
+                              <Link
+                                to={`/room/${s.sessionId}`}
+                                className={`btn btn-sm px-2.5 ${isInProgress ? 'btn-danger animate-pulse' : 'btn-outline-danger'}`}
+                                title={isInProgress ? 'Đang diễn ra - Bấm để vào lớp' : 'Bấm để mở lớp sớm'}
+                              >
+                                <i className="bi bi-camera-video me-1" aria-hidden="true" />
+                                {isInProgress ? 'Vào lớp' : 'Mở lớp'}
+                              </Link>
                             )}
                             <button
                               type="button"
@@ -1167,23 +1162,14 @@ export default function TutorSchedulePage() {
                       Đóng
                     </button>
                     {Number(selectedSession.sessionId) > 0 && !['Done', 'Cancelled'].includes(selectedSession.normalizedStatus) && (
-                      selectedSession.canJoin ? (
-                        <Link
-                          to={`/room/${selectedSession.sessionId}`}
-                          className="btn btn-danger btn-sm px-3 fw-semibold"
-                          style={{ backgroundColor: '#DB303A', borderColor: '#DB303A' }}
-                        >
-                          <i className="bi bi-camera-video me-1" aria-hidden="true" />Vào phòng học
-                        </Link>
-                      ) : (
-                        <button
-                          type="button"
-                          className="btn btn-outline-secondary btn-sm px-3 fw-semibold"
-                          disabled
-                        >
-                          Phòng chưa mở
-                        </button>
-                      )
+                      <Link
+                        to={`/room/${selectedSession.sessionId}`}
+                        className="btn btn-danger btn-sm px-3 fw-semibold"
+                        style={{ backgroundColor: '#DB303A', borderColor: '#DB303A' }}
+                      >
+                        <i className="bi bi-camera-video me-1" aria-hidden="true" />
+                        {selectedSession.normalizedStatus === 'InProgress' ? 'Vào phòng học' : 'Mở lớp sớm / Vào phòng'}
+                      </Link>
                     )}
                   </div>
                 </div>

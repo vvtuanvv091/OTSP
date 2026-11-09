@@ -206,7 +206,7 @@ export default function TutorClassroomsPage() {
           </div>
         ) : (
           <>
-            <div className="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-3 mb-4">
+            <div className={`row g-3 mb-4 ${classrooms.length === 1 ? 'row-cols-1 row-cols-lg-2' : 'row-cols-1 row-cols-md-2 row-cols-xl-3'}`}>
               {classrooms.map((c) => {
                 const isGroup = c.type === 'Group' || c.type === 1;
                 const statusLabel = c.status === 'Active' ? 'Đang mở' : c.status === 'Completed' ? 'Đã hoàn thành' : 'Đã hủy';
@@ -238,39 +238,37 @@ export default function TutorClassroomsPage() {
 
                           <div className="flex-grow-1 min-w-0 ms-2">
                             {(() => {
-                              const groupDisplayName = c.name?.trim() || (isGroup ? `Nhóm ${c.subjectName} (${c.formattedSchedule || c.scheduleSummary || 'Khác ca'})` : `Lớp 1-1 ${c.subjectName}`);
+                              const groupDisplayName = c.name?.trim() || (isGroup ? `Nhóm ${c.subjectName}` : `Lớp 1-1 ${c.subjectName}`);
                               return (
-                                <div className="d-flex align-items-start justify-content-between gap-1 mb-1">
-                                  <div className="fw-bold text-dark text-truncate" style={{ fontSize: '0.95rem' }} title={`${groupDisplayName} (${c.subjectName} · ${c.gradeLevelName})`}>
+                                <div className="mb-1.5">
+                                  <div className="fw-bold text-dark text-break mb-1" style={{ fontSize: '0.95rem', lineHeight: 1.3 }}>
                                     <i className="bi bi-collection-play-fill text-danger me-1"></i>
-                                    <span className="text-dark fw-bold">{groupDisplayName}</span>
-                                    <span className="text-secondary fw-normal ms-1" style={{ fontSize: '0.82rem' }}>
-                                      ({c.subjectName} · {c.gradeLevelName})
-                                    </span>
+                                    {groupDisplayName}
                                   </div>
-                                  {c.coverImageUrl && (
-                                    <span className="badge bg-danger-subtle text-danger fw-bold text-nowrap px-2 py-0.5" style={{ fontSize: '0.8rem' }}>
+                                  <div className="d-flex align-items-center gap-1.5 flex-wrap">
+                                    <span className="badge bg-danger-subtle text-danger fw-bold" style={{ fontSize: '0.8rem' }}>
                                       {formatPrice(c.fee)} đ
                                     </span>
-                                  )}
+                                    <span className="badge bg-secondary-subtle text-secondary" style={{ fontSize: '0.72rem' }}>
+                                      {c.subjectName} · {c.gradeLevelName}
+                                    </span>
+                                    <span className={`badge ${!isGroup ? 'bg-info-subtle text-info-emphasis border border-info-subtle' : 'bg-primary-subtle text-primary-emphasis border border-primary-subtle'}`} style={{ fontSize: '0.72rem' }}>
+                                      {!isGroup ? 'Lớp 1-1' : 'Lớp nhóm'}
+                                    </span>
+                                    <span className={`badge ${statusBadge}`} style={{ fontSize: '0.72rem' }}>
+                                      {statusLabel}
+                                    </span>
+                                  </div>
                                 </div>
                               );
                             })()}
 
-                            <div className="small text-secondary text-truncate mb-1" title={c.formattedSchedule || c.scheduleSummary}>
-                              <i className="bi bi-calendar3 me-1 text-muted"></i>Lịch học: <b>{c.formattedSchedule || c.scheduleSummary || 'Chưa xếp'}</b>
+                            <div className="small text-secondary mb-1" title={c.formattedSchedule || c.scheduleSummary}>
+                              <i className="bi bi-calendar3 me-1 text-danger"></i>Lịch học: <b>{c.formattedSchedule || c.scheduleSummary || 'Chưa xếp'}</b>
                             </div>
 
-                            <div className="d-flex align-items-center gap-1 flex-wrap">
-                              <span className="small text-secondary text-nowrap me-1">
-                                <i className="bi bi-people me-1 text-muted"></i>Sĩ số: <b>{c.studentCount}{isGroup ? `/${c.maxStudents}` : ''} hv</b>
-                              </span>
-                              <span className={`badge ${!isGroup ? 'bg-info-subtle text-info-emphasis border border-info-subtle' : 'bg-primary-subtle text-primary-emphasis border border-primary-subtle'}`} style={{ fontSize: '0.68rem', padding: '2px 6px' }}>
-                                {!isGroup ? 'Lớp 1-1' : 'Lớp nhóm'}
-                              </span>
-                              <span className={`badge ${statusBadge}`} style={{ fontSize: '0.68rem', padding: '2px 6px' }}>
-                                {statusLabel}
-                              </span>
+                            <div className="small text-secondary mb-1">
+                              <i className="bi bi-people me-1 text-muted"></i>Sĩ số: <b>{c.studentCount}{isGroup ? `/${c.maxStudents}` : ''} học viên</b>
                             </div>
                           </div>
                         </div>

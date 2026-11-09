@@ -425,6 +425,7 @@ public class TutorScheduleApiController : ControllerBase
             {
                 var canJoin = row.Status != SessionStatus.Cancelled && row.Status != SessionStatus.Done
                     && (row.Status == SessionStatus.InProgress
+                        || row.Status == SessionStatus.Scheduled
                         || (nowUtc >= row.ScheduledAtUtc.AddMinutes(-ClassSessionService.EarlyJoinMinutes)
                             && nowUtc <= row.ScheduledAtUtc.AddHours(ClassSessionService.MaxSessionOpenHours)));
 

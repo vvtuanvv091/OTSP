@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import commonApi from '../../api/commonApi';
 import { repairMojibake } from '../../utils/repairMojibake';
+import OtspPagination from '../../components/common/OtspPagination';
 
 export default function LearningDocumentPage() {
   const [documents, setDocuments] = useState([]);
@@ -10,15 +11,20 @@ export default function LearningDocumentPage() {
   const [search, setSearch] = useState('');
   const [subjectId, setSubjectId] = useState('');
   const [gradeLevelId, setGradeLevelId] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  const fetchDocuments = useCallback(async (keywordVal, subjectVal, gradeVal) => {
+  const fetchDocuments = useCallback(async (keywordVal, subjectVal, gradeVal, pageVal = 1) => {
     setLoading(true);
     setError('');
-    const params = {};
-    if (keywordVal) params.keyword = keywordVal;
+    const params = { page: pageVal };
+    if (keywordVal) {
+      params.search = keywordVal;
+      params.keyword = keywordVal;
+    }
     if (subjectVal) params.subjectId = subjectVal;
     if (gradeVal) params.gradeLevelId = gradeVal;
 
@@ -26,6 +32,7 @@ export default function LearningDocumentPage() {
       const res = await commonApi.getPublicDocuments(params);
       setDocuments(res.data?.items || []);
       setTotalItems(res.data?.totalItems || res.data?.items?.length || 0);
+      setTotalPages(res.data?.totalPages || 1);
       if (res.data?.subjects) setSubjects(res.data.subjects);
       if (res.data?.gradeLevels) setGradeLevels(res.data.gradeLevels);
     } catch (err) {
@@ -57,7 +64,14 @@ export default function LearningDocumentPage() {
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();
-    fetchDocuments(search.trim(), subjectId, gradeLevelId);
+    setCurrentPage(1);
+    fetchDocuments(search.trim(), subjectId, gradeLevelId, 1);
+  };
+
+  const handlePageChange = (page) => {
+    setCurrentPage(page);
+    fetchDocuments(search.trim(), subjectId, gradeLevelId, page);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const getFileIconClass = (fileName = '') => {
@@ -218,6 +232,18 @@ export default function LearningDocumentPage() {
           <div className="text-center py-5 text-secondary">
             <i className="bi bi-folder2-open fs-1 text-muted mb-2 d-block"></i>
             <p className="mb-0">Chưa có tài liệu nào phù hợp với bộ lọc.</p>
+          </div>
+        )}
+
+        {/* Phân trang tài liệu */}
+        {!loading && documents.length > 0 && totalPages > 1 && (
+          <div className="mt-4 pt-3 border-top">
+            <OtspPagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={handlePageChange}
+              totalItems={totalItems}
+            />
           </div>
         )}
       </div>

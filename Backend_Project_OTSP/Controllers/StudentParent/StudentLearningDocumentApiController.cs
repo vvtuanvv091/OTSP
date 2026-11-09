@@ -60,12 +60,15 @@ public class StudentLearningDocumentApiController : ControllerBase
 
         if (myClassroomIds.Count == 0)
         {
-            query = query.Where(d => d.Scope == DocumentScope.Public);
+            // Học viên chưa tham gia lớp nào thì không có tài liệu lớp học
+            query = query.Where(d => false);
         }
         else
         {
-            query = query.Where(d => d.Scope == DocumentScope.Public ||
-                                     (d.Scope == DocumentScope.Classroom && d.ClassroomId.HasValue && myClassroomIds.Contains(d.ClassroomId.Value)));
+            // Chỉ hiển thị tài liệu thuộc các lớp học mà học viên đang theo học
+            query = query.Where(d => d.Scope == DocumentScope.Classroom &&
+                                     d.ClassroomId.HasValue &&
+                                     myClassroomIds.Contains(d.ClassroomId.Value));
 
             if (classroomId.HasValue && classroomId.Value > 0)
             {
