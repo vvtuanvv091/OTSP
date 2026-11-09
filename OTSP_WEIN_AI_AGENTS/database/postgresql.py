@@ -73,7 +73,7 @@ def fetch_all_classrooms_from_db() -> list[dict]:
             cur.execute("""
                 SELECT 
                     c."Id" AS classroom_id,
-                    c."Name" AS class_name,
+                    c."NameClass" AS class_name,
                     c."Fee" AS fee,
                     s."Name" AS subject_name,
                     gl."Name" AS grade_name,
@@ -90,7 +90,7 @@ def fetch_all_classrooms_from_db() -> list[dict]:
             return [
                 {
                     "classroomId": r["classroom_id"],
-                    "name": r["class_name"],
+                    "NameClass": r["class_name"],
                     "fee": int(r["fee"] or 0),
                     "subject": r["subject_name"] or "Tổng hợp",
                     "grade": r["grade_name"] or "Phổ thông",
