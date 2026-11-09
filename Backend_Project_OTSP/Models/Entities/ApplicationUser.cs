@@ -18,8 +18,9 @@ namespace Backend_Project_OTSP.Models
         [MaxLength(300)]
         public string? ResidenceAddress { get; set; }
 
-        public DateOnly? DataofBirth { get; set; }
-        public string? AvatarURL { get; set; }
+        public DateOnly? DateOfBirth { get; set; }
+        public string? AvatarUrl { get; set; }
+        
         // Trang thai tai khoan: Active hoac Locked
         public AccountStatus Status { get; set; } = AccountStatus.Active;
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
