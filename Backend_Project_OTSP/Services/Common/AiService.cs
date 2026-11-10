@@ -385,80 +385,146 @@ public class AiService : IAiService
             if (string.IsNullOrWhiteSpace(model)) model = _config["GEMINI_MODEL"];
             if (string.IsNullOrWhiteSpace(model)) model = "gemini-3.5-flash-lite";
 
-            // Làm giàu ngữ cảnh bằng dữ liệu thực tế từ PostgreSQL
+            // Làm giàu ngữ cảnh bằng dữ liệu thực tế từ PostgreSQL (Toàn diện, thông minh & bảo mật tuyệt đối)
             var lowerMsg = (request.Message ?? "").ToLower();
             var liveContextBuilder = new StringBuilder();
 
-            if (lowerMsg.Contains("gia sư") || lowerMsg.Contains("thầy") || lowerMsg.Contains("cô") || lowerMsg.Contains("toán") || lowerMsg.Contains("anh") || lowerMsg.Contains("văn") || lowerMsg.Contains("lý") || lowerMsg.Contains("hóa") || lowerMsg.Contains("tin") || lowerMsg.Contains("công nghệ"))
+            try
             {
-                try
-                {
-                    var tutors = await _db.TutorProfiles
-                        .AsNoTracking()
-                        .Include(t => t.User)
-                        .Include(t => t.TutorSubjects).ThenInclude(ts => ts.Subject)
-                        .Where(t => t.VerificationStatus == VerificationStatus.Approved)
-                        .Take(4)
-                        .Select(t => new
-                        {
-                            Name = t.User.FullName,
-                            HourlyRate = t.HourlyFee,
-                            Subjects = string.Join(", ", t.TutorSubjects.Select(ts => ts.Subject.Name))
-                        })
-                        .ToListAsync(ct);
+                // 1. Thống kê tổng quan hệ thống để AI hiểu đúng quy mô thực tế của OTSP
+                var totalTutors = await _db.TutorProfiles.CountAsync(t => t.VerificationStatus == VerificationStatus.Approved, ct);
+                var totalClasses = await _db.Classrooms.CountAsync(c => c.Status == ClassroomStatus.Active, ct);
 
-                    if (tutors.Any())
+                liveContextBuilder.AppendLine("\n[Dữ liệu hệ thống OTSP thời gian thực]:");
+                liveContextBuilder.AppendLine($"- Tổng số gia sư chính thức đã kiểm duyệt trên nền tảng: {totalTutors} gia sư.");
+                liveContextBuilder.AppendLine($"- Tổng số lớp học nhóm đang mở đăng ký: {totalClasses} lớp.");
+
+                // 2. Tải toàn bộ danh sách gia sư đã duyệt (CHỈ LẤY CÁC TRƯỜNG CÔNG KHAI - BẢO MẬT TUYỆT ĐỐI)
+                // Lưu ý: Tuyệt đối không lấy Password, CCCD, Email, Phone, BankAccount để đảm bảo an toàn.
+                var rawTutors = await _db.TutorProfiles
+                    .AsNoTracking()
+                    .Include(t => t.User)
+                    .Include(t => t.TutorSubjects).ThenInclude(ts => ts.Subject)
+                    .Where(t => t.VerificationStatus == VerificationStatus.Approved)
+                    .Select(t => new
                     {
-                        liveContextBuilder.AppendLine("\n[Dữ liệu gia sư thực tế trên OTSP hiện tại]:");
-                        foreach (var t in tutors)
-                        {
-                            liveContextBuilder.AppendLine($"- Gia sư: {t.Name}, Môn dạy: {t.Subjects}, Học phí: {t.HourlyRate:N0} đ/giờ");
-                        }
+                        t.Id,
+                        Name = t.User.FullName ?? "",
+                        HourlyRate = t.HourlyFee,
+                        Rating = t.AverageRating,
+                        Format = t.TeachingFormat == TeachingFormat.Online ? "Online" :
+                                 t.TeachingFormat == TeachingFormat.Offline ? "Trực tiếp" : "Online & Trực tiếp",
+                        SubjectNames = t.TutorSubjects.Select(ts => ts.Subject.Name).ToList()
+                    })
+                    .ToListAsync(ct);
+
+                var allApprovedTutors = rawTutors.Select(t => new
+                {
+                    t.Id,
+                    t.Name,
+                    t.HourlyRate,
+                    t.Rating,
+                    t.Format,
+                    Subjects = string.Join(", ", t.SubjectNames.Distinct())
+                }).ToList();
+
+                // Tìm gia sư khớp với câu hỏi người dùng (theo tên, môn học, từ khóa)
+                var matchedTutors = allApprovedTutors.Where(t =>
+                {
+                    var nameLower = (t.Name ?? "").ToLower();
+                    if (!string.IsNullOrEmpty(nameLower))
+                    {
+                        if (lowerMsg.Contains(nameLower)) return true;
+                        var parts = nameLower.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                        if (parts.Any(p => p.Length >= 2 && lowerMsg.Contains(p))) return true;
+                    }
+
+                    var subLower = (t.Subjects ?? "").ToLower();
+                    if (!string.IsNullOrEmpty(subLower))
+                    {
+                        var subs = subLower.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries);
+                        if (subs.Any(s => lowerMsg.Contains(s.Trim()))) return true;
+                    }
+
+                    return false;
+                }).ToList();
+
+                // Nếu không khớp tên/môn cụ thể, nhưng người dùng hỏi về gia sư nói chung thì lấy top gia sư tiêu biểu
+                if (!matchedTutors.Any() && (lowerMsg.Contains("gia sư") || lowerMsg.Contains("thầy") || lowerMsg.Contains("cô") || lowerMsg.Contains("học") || lowerMsg.Contains("dạy")))
+                {
+                    matchedTutors = allApprovedTutors.OrderByDescending(t => t.Rating).ThenBy(t => t.HourlyRate).Take(5).ToList();
+                }
+
+                if (matchedTutors.Any())
+                {
+                    liveContextBuilder.AppendLine("\n[Danh sách Gia sư thực tế liên quan]:");
+                    foreach (var t in matchedTutors.Take(8))
+                    {
+                        var subjectsText = string.IsNullOrWhiteSpace(t.Subjects) ? "Đang cập nhật" : t.Subjects;
+                        liveContextBuilder.AppendLine($"- Gia sư: {t.Name} | Môn dạy: {subjectsText} | Học phí: {t.HourlyRate:N0} đ/giờ | Đánh giá: {t.Rating:F1}★ | Hình thức: {t.Format}");
                     }
                 }
-                catch { }
-            }
 
-            if (lowerMsg.Contains("lớp") || lowerMsg.Contains("nhóm") || lowerMsg.Contains("tuyển sinh"))
-            {
-                try
-                {
-                    var classes = await _db.Classrooms
-                        .AsNoTracking()
-                        .Include(c => c.Subject)
-                        .Include(c => c.Tutor).ThenInclude(t => t.User)
-                        .Where(c => c.Status == ClassroomStatus.Active)
-                        .Take(4)
-                        .Select(c => new
-                        {
-                            c.NameClass,
-                            Subject = c.Subject.Name,
-                            Tutor = c.Tutor.User.FullName,
-                            c.Fee,
-                            StudentCount = c.ClassroomStudents.Count,
-                            c.MaxStudents
-                        })
-                        .ToListAsync(ct);
-
-                    if (classes.Any())
+                // 3. Tải danh sách lớp học nhóm (CHỈ LẤY CÁC TRƯỜNG CÔNG KHAI)
+                var allClasses = await _db.Classrooms
+                    .AsNoTracking()
+                    .Include(c => c.Subject)
+                    .Include(c => c.Tutor).ThenInclude(t => t.User)
+                    .Where(c => c.Status == ClassroomStatus.Active)
+                    .Select(c => new
                     {
-                        liveContextBuilder.AppendLine("\n[Dữ liệu lớp học nhóm đang mở trên OTSP]:");
-                        foreach (var c in classes)
-                        {
-                            liveContextBuilder.AppendLine($"- Lớp: {c.NameClass}, Môn: {c.Subject}, Gia sư: {c.Tutor}, Học phí: {c.Fee:N0} đ, Sĩ số: {c.StudentCount}/{c.MaxStudents}");
-                        }
+                        c.Id,
+                        c.NameClass,
+                        Subject = c.Subject.Name,
+                        Tutor = c.Tutor.User.FullName,
+                        c.Fee,
+                        StudentCount = c.ClassroomStudents.Count,
+                        c.MaxStudents
+                    })
+                    .ToListAsync(ct);
+
+                var matchedClasses = allClasses.Where(c =>
+                {
+                    var cName = (c.NameClass ?? "").ToLower();
+                    var cSub = (c.Subject ?? "").ToLower();
+                    var cTutor = (c.Tutor ?? "").ToLower();
+                    return lowerMsg.Contains(cName) ||
+                           lowerMsg.Contains(cSub) ||
+                           lowerMsg.Contains(cTutor) ||
+                           cName.Split(' ', StringSplitOptions.RemoveEmptyEntries).Any(w => w.Length >= 3 && lowerMsg.Contains(w));
+                }).ToList();
+
+                if (!matchedClasses.Any() && (lowerMsg.Contains("lớp") || lowerMsg.Contains("nhóm") || lowerMsg.Contains("khoá") || lowerMsg.Contains("tuyển sinh")))
+                {
+                    matchedClasses = allClasses.Take(5).ToList();
+                }
+
+                if (matchedClasses.Any())
+                {
+                    liveContextBuilder.AppendLine("\n[Dữ liệu lớp học nhóm thực tế trên OTSP]:");
+                    foreach (var c in matchedClasses.Take(6))
+                    {
+                        liveContextBuilder.AppendLine($"- Lớp: {c.NameClass} | Môn: {c.Subject} | Gia sư phụ trách: {c.Tutor} | Học phí: {c.Fee:N0} đ | Sĩ số: {c.StudentCount}/{c.MaxStudents}");
                     }
                 }
-                catch { }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning("Không thể nạp dữ liệu DB vào AI Context: {Msg}", ex.Message);
             }
 
-            var systemPrompt = $@"Bạn là WEIN - Trợ lý AI thông minh của nền tảng kết nối gia sư và lớp học trực tuyến OTSP (Online Tutor Student Platform).
+            var systemPrompt = $@"Bạn là WEIN - Trợ lý AI thông minh và thân thiện của nền tảng kết nối gia sư và lớp học trực tuyến OTSP (Online Tutor Student Platform).
 Phong cách: Thân thiện, tận tình, xưng 'mình' hoặc 'WEIN', gọi người dùng là 'bạn'. Có thể dùng emoji nhẹ nhàng, văn phong sư phạm chuẩn mực.
 Nhiệm vụ:
 - Giải đáp thắc mắc về tìm gia sư, đăng ký lớp học, học phí, lịch học trực tuyến, chính sách học thử và thanh toán VietQR trên OTSP.
 - Trả lời bài tập toán, lý, hóa, văn, anh, công nghệ hoặc các thắc mắc học tập rõ ràng, mạch lạc theo từng bước.
-- Nếu có danh sách gia sư hoặc lớp học thực tế bên dưới, hãy ưu tiên giới thiệu thông tin chính xác từ danh sách đó.
-- KHÔNG tự động chuyển trang web của người dùng. Chỉ gợi ý liên kết dạng Markdown [Tên nút](/duong-dan) hoặc nút hành động khi cần.
+- NGUYÊN TẮC VỀ DỮ LIỆU THỰC TẾ:
+  + Căn cứ vào dữ liệu hệ thống được cung cấp bên dưới để trả lời chính xác.
+  + OTSP có nhiều gia sư và lớp học trên toàn quốc. Tuyệt đối KHÔNG khẳng định hệ thống chỉ có vài gia sư nếu chỉ nhìn thấy một phần danh sách gợi ý.
+  + Khi người dùng hỏi đích danh một gia sư (ví dụ: Phạm Anh Hào, Tống Ngọc...), nếu có trong danh sách nạp bên dưới thì giới thiệu rõ môn dạy, học phí và điểm đánh giá của gia sư đó.
+  + Nếu người dùng hỏi một gia sư hoàn toàn không có trong hệ thống, hãy trả lời lịch sự rằng chưa tìm thấy hồ sơ đó và gợi ý tìm theo môn học hoặc liên hệ hỗ trợ.
+- BẢO MẬT: Tuyệt đối KHÔNG tiết lộ thông tin nhạy cảm của người dùng (mật khẩu, CCCD, số điện thoại cá nhân, số tài khoản ngân hàng chi tiết, lịch sử giao dịch cá nhân).
+- ĐIỀU HƯỚNG: KHÔNG tự động chuyển trang web của người dùng. Chỉ gợi ý liên kết dạng Markdown [Tên nút](/duong-dan) hoặc nút hành động khi cần.
 {liveContextBuilder}";
 
             var contents = new List<object>();

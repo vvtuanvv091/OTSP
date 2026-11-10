@@ -7,6 +7,7 @@ from agent.tool import (
     search_news_tool,
     search_documents_tool
 )
+from database.memory import get_tutors_from_ram, get_classrooms_from_ram
 from llm.client import ask_gemini_chat, ask_gemini_json
 
 logger = logging.getLogger("wein-agent.luong")
@@ -23,16 +24,19 @@ def _make_response(
 ) -> AgentResponse:
     """
     Hàm tiện ích chuẩn hóa phản hồi AgentResponse:
+    - Tuyệt đối tắt auto_execute theo yêu cầu người dùng
     - Đồng bộ cả uiAction (dành cho Frontend React)
     - Đồng bộ cả 2 trường root: autoExecute, actionType (khớp 100% với Backend .NET AiDtos.cs)
     """
+    auto_execute = False  # Đảm bảo không bao giờ tự động chuyển trang
+
     if target:
         ui_action = UIAction(
             type="NAVIGATE",
             target=target,
             actionType=action_type,
             label=label or "Chuyển trang",
-            autoExecute=auto_execute
+            autoExecute=False
         )
     else:
         ui_action = UIAction(type="NONE", autoExecute=False)
@@ -43,7 +47,7 @@ def _make_response(
         uiAction=ui_action,
         suggestedPrompts=suggested_prompts or [],
         recommendedTutorIds=recommended_tutor_ids or [],
-        autoExecute=auto_execute if target else False,
+        autoExecute=False,
         actionType=action_type if target else ""
     )
 
@@ -335,7 +339,29 @@ def run_agent_workflow(
     # =========================================================================
     # 9. CHAT TỰ DO / GIẢI TOÁN / HỎI ĐÁP ĐA LƯỢT VỚI GEMINI
     # =========================================================================
-    # 👉 Nếu không thuộc các lệnh điều hướng web, giữ trọn vẹn trí nhớ hội thoại để trả lời
+    # 👉 Nạp dữ liệu thực tế từ Neon DB qua RAM Cache để AI luôn nắm toàn bộ gia sư & lớp học
+    all_ram_tutors = get_tutors_from_ram(limit=60)
+    all_ram_classes = get_classrooms_from_ram(limit=20)
+
+    # Tìm kiếm gia sư khớp với tin nhắn người dùng (theo tên hoặc môn học)
+    matched_tutors = []
+    for t in all_ram_tutors:
+        name_lower = (t.get("fullName") or "").lower()
+        if name_lower and (name_lower in msg_low or any(p in msg_low for p in name_lower.split() if len(p) >= 2)):
+            matched_tutors.append(t)
+        elif any(s.strip().lower() in msg_low for s in (t.get("subjects") or "").split(",")):
+            matched_tutors.append(t)
+
+    context_db = f"\n[Dữ liệu thực tế hệ thống OTSP]:\n- Tổng số gia sư đã kiểm duyệt: {len(all_ram_tutors)} gia sư.\n- Tổng số lớp học đang mở: {len(all_ram_classes)} lớp.\n"
+    if matched_tutors:
+        context_db += "[Gia sư thực tế phù hợp]:\n" + "\n".join([
+            f"- Gia sư: {t['fullName']} | Môn dạy: {t['subjects']} | Học phí: {t['hourlyFee']:,} đ/giờ | Đánh giá: {t['rating']}★"
+            for t in matched_tutors[:6]
+        ])
+    else:
+        sample_names = ", ".join([f"{t['fullName']} ({t['subjects']})" for t in all_ram_tutors[:5]])
+        context_db += f"- Một số gia sư tiêu biểu: {sample_names} (Hệ thống có nhiều gia sư khác, người dùng có thể tìm theo tên hoặc môn bất kỳ)."
+
     role_desc = "học viên" if user_role == "Student" else ("gia sư" if user_role == "Tutor" else "khách")
     system_prompt = (
         f"Bạn là WEIN - Trợ lý AI thông minh và thân thiện của nền tảng dạy kèm trực tuyến OTSP.\n"
@@ -346,7 +372,11 @@ def run_agent_workflow(
         "dùng cú pháp LaTeX $công thức$ để hiển thị công thức toán học đẹp mắt.\n"
         "3. Nếu người dùng hỏi quy định học thử: OTSP cam kết buổi học thử đầu tiên giúp học viên đánh giá sự phù hợp trước khi thanh toán chính thức.\n"
         "4. Nếu chỉ chào hỏi hoặc hỏi kiến thức thông thường: Trả lời tự nhiên, KHÔNG tự ý ép người dùng chuyển trang.\n"
-        "5. Giữ định dạng Markdown rõ ràng, dễ nhìn trên thiết bị di động và máy tính."
+        "5. Giữ định dạng Markdown rõ ràng, dễ nhìn trên thiết bị di động và máy tính.\n"
+        f"6. Dữ liệu thực tế của hệ thống:\n{context_db}\n"
+        "Tuyệt đối KHÔNG khẳng định hệ thống chỉ có một vài người nếu bạn chỉ nhìn thấy một phần danh sách tìm kiếm. "
+        "Nếu người dùng hỏi gia sư có trong danh sách trên (ví dụ: Phạm Anh Hào, Tống Ngọc...), hãy giới thiệu thông tin chính xác về môn dạy và học phí.\n"
+        "7. BẢO MẬT: Tuyệt đối không bao giờ tiết lộ thông tin nhạy cảm của người dùng (mật khẩu, CCCD, số điện thoại riêng, số tài khoản ngân hàng chi tiết, lịch sử giao dịch cá nhân)."
     )
 
     answer = ask_gemini_chat(
