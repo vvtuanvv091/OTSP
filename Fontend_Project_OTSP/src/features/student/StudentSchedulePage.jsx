@@ -203,19 +203,34 @@ export default function StudentSchedulePage() {
         .schedule-table-wrap {
           overflow-x: auto;
           width: 100%;
+          border: 1px solid var(--availability-border, #E5E7EB);
+          border-radius: 8px;
+          background: var(--bs-body-bg, #ffffff);
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
         }
 
         .schedule-table {
           width: 100%;
-          min-width: 760px;
+          min-width: 860px;
           table-layout: fixed;
-          border-collapse: separate;
-          border-spacing: 3px 4px;
+          border-collapse: collapse;
           font-size: 12px;
         }
 
+        .schedule-table thead th {
+          position: sticky;
+          top: 0;
+          z-index: 5;
+          background: var(--bs-tertiary-bg, #f8fafc);
+        }
+
+        .schedule-table th,
+        .schedule-table td {
+          border: 1px solid var(--availability-border, #E5E7EB);
+        }
+
         .schedule-table th {
-          padding: 5px 3px;
+          padding: 8px 6px;
           color: var(--bs-body-color, #1e293b);
           font-weight: 500;
           text-align: center;
@@ -223,20 +238,27 @@ export default function StudentSchedulePage() {
         }
 
         .schedule-table th.period-column {
-          width: 44px;
+          width: 52px;
         }
 
         .schedule-table th.time-column {
-          width: 104px;
+          width: 110px;
           font-size: 11px;
           font-weight: 600;
           color: #475569;
         }
 
         .schedule-table td {
-          padding: 0 1px;
+          padding: 4px;
           text-align: center;
-          vertical-align: middle;
+          vertical-align: top;
+          min-height: 56px;
+          background: var(--bs-body-bg, #ffffff);
+          transition: background-color .15s ease;
+        }
+
+        .schedule-table td:hover {
+          background: rgba(0, 0, 0, 0.015);
         }
 
         .schedule-period-label {
@@ -246,6 +268,7 @@ export default function StudentSchedulePage() {
           letter-spacing: .5px;
           text-align: center;
           vertical-align: middle;
+          background: rgba(219, 48, 58, 0.04);
         }
 
         .schedule-time-label {
@@ -255,22 +278,22 @@ export default function StudentSchedulePage() {
           font-weight: 500;
           text-align: center;
           vertical-align: middle;
+          background: rgba(0, 0, 0, 0.02);
         }
 
         .schedule-table th.day-column {
-          background: transparent;
-          border-radius: 4px;
-          padding: 6px 4px;
+          background: var(--bs-tertiary-bg, #f8fafc);
+          padding: 8px 4px;
         }
 
         .schedule-table th.day-column.is-today {
           background: var(--availability-accent-soft, #FDE8E8);
           color: var(--availability-accent-text, #B7212B);
-          border: 1px solid var(--availability-accent-border, #FCA5A5);
+          border-bottom: 2px solid #DB303A;
         }
 
         .day-title {
-          font-size: 12px;
+          font-size: 12.5px;
           font-weight: 700;
           line-height: 1.2;
           color: var(--bs-body-color, #0f172a);
@@ -295,19 +318,19 @@ export default function StudentSchedulePage() {
           position: relative;
           display: flex;
           width: 100%;
-          min-height: 44px;
+          min-height: 48px;
+          height: 100%;
           align-items: center;
           justify-content: center;
-          border: 1px solid var(--availability-border, #E5E7EB);
-          border-radius: 4px;
-          background: var(--bs-body-bg, #ffffff);
+          border-radius: 6px;
+          background: transparent;
           font-size: 11px;
           line-height: 1;
           transition: all .15s ease-in-out;
         }
 
         .availability-slot.is-free {
-          border-color: var(--availability-accent-border, #FCA5A5);
+          border: 1px solid var(--availability-accent-border, #FCA5A5);
           background: var(--availability-accent-soft, #FDE8E8);
           color: var(--availability-accent-text, #B7212B);
           font-weight: 600;
@@ -321,10 +344,9 @@ export default function StudentSchedulePage() {
         }
 
         .availability-slot.is-empty {
-          background: var(--bs-body-bg, #ffffff);
-          border: 1px solid var(--availability-border, #E5E7EB);
-          border-radius: 4px;
-          min-height: 44px;
+          background: transparent;
+          min-height: 48px;
+          height: 100%;
           width: 100%;
         }
 
@@ -332,8 +354,8 @@ export default function StudentSchedulePage() {
         .schedule-session-card {
           border: 1px solid var(--availability-border, #E5E7EB);
           border-left: 3px solid #DB303A;
-          border-radius: 4px;
-          padding: 5px 6px;
+          border-radius: 6px;
+          padding: 6px 7px;
           background: var(--bs-body-bg, #ffffff);
           text-align: left;
           cursor: pointer;

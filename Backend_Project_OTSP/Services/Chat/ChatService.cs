@@ -258,6 +258,63 @@ namespace Backend_Project_OTSP.Services.Chat
                 });
             }
 
+            // 10. Bổ sung các nhóm lớp học (Group Classroom Channels) mà user đang tham gia
+            try
+            {
+                var myClassrooms = await _db.Classrooms
+                    .AsNoTracking()
+                    .Where(c => c.Status == ClassroomStatus.Active && (
+                        c.Tutor.UserId == currentUserId ||
+                        c.ClassroomStudents.Any(cs => cs.Student.UserId == currentUserId)
+                    ))
+                    .Select(c => new
+                    {
+                        c.Id,
+                        c.NameClass,
+                        c.CoverImageUrl,
+                        c.Type,
+                        MemberCount = c.ClassroomStudents.Count() + 1
+                    })
+                    .ToListAsync(cancellationToken);
+
+                if (myClassrooms.Count > 0)
+                {
+                    var classIds = myClassrooms.Select(c => c.Id).ToList();
+                    var recentClassMessages = await _db.Messagers
+                        .AsNoTracking()
+                        .Where(m => m.ClassroomId.HasValue && classIds.Contains(m.ClassroomId.Value))
+                        .OrderByDescending(m => m.SentAt)
+                        .GroupBy(m => m.ClassroomId!.Value)
+                        .Select(g => new
+                        {
+                            ClassroomId = g.Key,
+                            LastMessage = g.First()
+                        })
+                        .ToDictionaryAsync(x => x.ClassroomId, x => x.LastMessage, cancellationToken);
+
+                    foreach (var cls in myClassrooms)
+                    {
+                        recentClassMessages.TryGetValue(cls.Id, out var lastMsg);
+                        conversations.Add(new ChatConversationItemDto
+                        {
+                            ContactUserId = $"class_{cls.Id}",
+                            ContactName = cls.NameClass,
+                            ContactAvatarUrl = cls.CoverImageUrl,
+                            RoleLabel = cls.Type == ClassroomType.Group ? $"Lớp nhóm ({cls.MemberCount} TV)" : "Lớp học 1-1",
+                            LastMessageContent = lastMsg != null ? (!string.IsNullOrWhiteSpace(lastMsg.Content) ? lastMsg.Content : "Kênh chat chung của lớp học") : "Kênh chat chung của lớp học",
+                            LastMessageTimeUtc = lastMsg?.SentAt,
+                            UnreadCount = 0,
+                            IsOnline = true,
+                            RequestId = null,
+                            ClassroomId = cls.Id,
+                            IsGroupClass = true,
+                            MemberCount = cls.MemberCount
+                        });
+                    }
+                }
+            }
+            catch { }
+
             // Sắp xếp: có tin chưa đọc -> tin mới nhất -> chưa chat -> theo tên
             var sorted = conversations
                 .OrderByDescending(c => c.UnreadCount > 0)
@@ -278,6 +335,50 @@ namespace Backend_Project_OTSP.Services.Chat
         {
             if (string.IsNullOrWhiteSpace(contactUserId))
                 return [];
+
+            // Hỗ trợ truy vấn tin nhắn trong kênh Chat Nhóm Lớp Học (Group Classroom)
+            if (contactUserId.StartsWith("class_") && int.TryParse(contactUserId[6..], out var classroomId))
+            {
+                var rawClassMessages = await _db.Messagers
+                    .AsNoTracking()
+                    .Where(m => m.ClassroomId == classroomId)
+                    .OrderByDescending(m => m.SentAt)
+                    .ThenByDescending(m => m.Id)
+                    .Take(limit)
+                    .Select(m => new
+                    {
+                        m.Id,
+                        m.SenderId,
+                        SenderName = m.Sender.FullName ?? m.Sender.UserName ?? "Thành viên lớp",
+                        SenderAvatar = m.Sender.AvatarUrl,
+                        Content = m.IsDeleted ? DeletedMessageText : m.Content,
+                        m.SentAt,
+                        m.IsDeleted,
+                        m.EditedAt,
+                        m.ClassroomId
+                    })
+                    .ToListAsync(cancellationToken);
+
+                var classMessages = rawClassMessages.Select(m => new ChatMessageDto
+                {
+                    Id = m.Id,
+                    SenderId = m.SenderId,
+                    SenderName = m.SenderName,
+                    SenderAvatarUrl = m.SenderAvatar,
+                    ReceiverId = contactUserId,
+                    Content = m.Content,
+                    SentAtUtc = m.SentAt,
+                    IsOwn = m.SenderId == currentUserId,
+                    IsDeleted = m.IsDeleted,
+                    IsEdited = m.EditedAt.HasValue,
+                    EditedAtUtc = m.EditedAt,
+                    CanEdit = CanEditMessage(m.IsDeleted, m.SentAt, m.SenderId, currentUserId, m.Content),
+                    ClassroomId = m.ClassroomId
+                }).ToList();
+
+                classMessages.Reverse();
+                return classMessages;
+            }
 
             var rawMessages = await _db.Messagers
                 .AsNoTracking()
@@ -331,6 +432,68 @@ namespace Backend_Project_OTSP.Services.Chat
             var normalizedContent = content?.Trim();
             if (string.IsNullOrWhiteSpace(normalizedContent) || normalizedContent.Length > MaxMessageLength)
                 throw new ArgumentException($"Tin nhắn phải có từ 1 đến {MaxMessageLength} ký tự.", nameof(content));
+
+            // Gửi tin nhắn vào Kênh Chat Nhóm Lớp Học
+            if (receiverUserId.StartsWith("class_") && int.TryParse(receiverUserId[6..], out var classroomId))
+            {
+                var classroom = await _db.Classrooms
+                    .Include(c => c.Tutor)
+                    .Include(c => c.ClassroomStudents).ThenInclude(cs => cs.Student)
+                    .FirstOrDefaultAsync(c => c.Id == classroomId, cancellationToken);
+
+                if (classroom == null)
+                    throw new ArgumentException("Lớp học không tồn tại.");
+
+                var isTutor = classroom.Tutor.UserId == senderUserId;
+                var isStudent = classroom.ClassroomStudents.Any(cs => cs.Student.UserId == senderUserId);
+                if (!isTutor && !isStudent)
+                {
+                    var isAdmin = await (from ur in _db.UserRoles
+                                         join r in _db.Roles on ur.RoleId equals r.Id
+                                         where ur.UserId == senderUserId && (r.NormalizedName == "ADMIN" || r.Name == "Admin")
+                                         select ur.UserId).AnyAsync(cancellationToken);
+                    if (!isAdmin)
+                        throw new InvalidOperationException("Bạn không phải thành viên của lớp học này để gửi tin nhắn nhóm.");
+                }
+
+                var sender = await _db.Users
+                    .AsNoTracking()
+                    .Where(u => u.Id == senderUserId)
+                    .Select(u => new { u.FullName, u.UserName, u.AvatarUrl })
+                    .FirstOrDefaultAsync(cancellationToken);
+
+                var sName = sender?.FullName ?? sender?.UserName ?? "Thành viên lớp";
+                var sAvatar = sender?.AvatarUrl;
+                var sRole = isTutor ? "Gia sư" : "Học viên";
+
+                var classMsg = new Messager
+                {
+                    SenderId = senderUserId,
+                    ReceiverId = classroom.Tutor.UserId, // Đảm bảo FK hợp lệ
+                    ClassroomId = classroomId,
+                    Content = normalizedContent,
+                    SentAt = DateTime.UtcNow,
+                    IsRead = false
+                };
+
+                _db.Messagers.Add(classMsg);
+                await _db.SaveChangesAsync(cancellationToken);
+
+                return new ChatMessageDto
+                {
+                    Id = classMsg.Id,
+                    SenderId = senderUserId,
+                    SenderName = sName,
+                    SenderAvatarUrl = sAvatar,
+                    SenderRole = sRole,
+                    ReceiverId = receiverUserId,
+                    Content = classMsg.Content,
+                    SentAtUtc = classMsg.SentAt,
+                    IsOwn = true,
+                    CanEdit = true,
+                    ClassroomId = classroomId
+                };
+            }
 
             // Kiểm tra phân quyền: Chặn ở tầng nghiệp vụ Server
             if (!await CanUsersChatAsync(senderUserId, receiverUserId, cancellationToken))

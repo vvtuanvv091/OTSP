@@ -14,4 +14,7 @@ public sealed class ChatMessageDto
     public bool IsDeleted { get; init; }
     public bool CanEdit { get; init; }
     public string? LastMessageContent { get; init; }
+    public int? ClassroomId { get; init; }
+    public string? SenderAvatarUrl { get; init; }
+    public string? SenderRole { get; init; }
 }

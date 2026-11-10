@@ -50,6 +50,15 @@ public sealed class ChatHub : Hub
         await Groups.AddToGroupAsync(Context.ConnectionId, room);
     }
 
+    public async Task JoinClassroomRoom(int classroomId)
+    {
+        var userId = Context.User?.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrWhiteSpace(userId) || classroomId <= 0)
+            return;
+
+        await Groups.AddToGroupAsync(Context.ConnectionId, $"classroom:{classroomId}");
+    }
+
     public async Task SendMessageToUser(string receiverUserId, string content)
     {
         var userId = Context.User?.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -58,6 +67,14 @@ public sealed class ChatHub : Hub
 
         if (string.IsNullOrWhiteSpace(receiverUserId) || userId == receiverUserId)
             throw new HubException("Người nhận tin nhắn không hợp lệ.");
+
+        if (receiverUserId.StartsWith("class_") && int.TryParse(receiverUserId[6..], out var cId))
+        {
+            var classMsg = await _chatService.SendMessageToUserAsync(userId, receiverUserId, content, Context.ConnectionAborted);
+            await Clients.Group($"classroom:{cId}").SendAsync("ReceiveDirectMessage", classMsg, Context.ConnectionAborted);
+            await Clients.Group($"classroom:{cId}").SendAsync("ReceiveMessage", classMsg, Context.ConnectionAborted);
+            return;
+        }
 
         if (!await _chatService.CanUsersChatAsync(userId, receiverUserId, Context.ConnectionAborted))
             throw new HubException("Bạn không có quyền gửi tin nhắn cho người dùng này theo quy định OTSP.");

@@ -14,6 +14,12 @@ namespace Backend_Project_OTSP.Models
         public DateTime? EditedAt { get; set; }
         public DateTime SentAt { get; set; } = DateTime.UtcNow;
         public bool IsRead { get; set; } = false;
+
+        // Khóa ngoại tới lớp học (dùng khi chat nhóm lớp học)
+        [ForeignKey("Classroom")]
+        public int? ClassroomId { get; set; }
+        public Classroom? Classroom { get; set; }
+
         [Required]
         [ForeignKey("Sender")]
         public string SenderId { get; set; } = "";

@@ -95,16 +95,15 @@ export default function StudentLayout({ children }) {
               </div>
             </div>
 
-            {/* Nút thu gọn / đóng thanh bên */}
+            {/* Nút đóng thanh bên - CHỈ hiển thị trên mobile khi mở drawer, ẩn hoàn toàn trên Laptop/Desktop */}
             <button
               type="button"
-              className="student-sidebar-close-btn"
+              className="student-sidebar-close-btn d-lg-none"
               onClick={() => setSidebarOpen(false)}
-              title="Thu gọn menu điều hướng"
-              aria-label="Thu gọn menu điều hướng"
+              title="Đóng menu điều hướng"
+              aria-label="Đóng menu điều hướng"
             >
-              <i className="bi bi-chevron-left d-none d-lg-inline"></i>
-              <i className="bi bi-x-lg d-lg-none"></i>
+              <i className="bi bi-x-lg"></i>
             </button>
           </div>
 

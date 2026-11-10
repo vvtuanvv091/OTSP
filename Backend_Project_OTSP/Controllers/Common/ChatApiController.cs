@@ -90,7 +90,15 @@ public class ChatApiController : ControllerBase
 
         try
         {
-            await _hubContext.Clients.User(contactUserId).SendAsync("ReceiveMessage", message, cancellationToken);
+            if (contactUserId.StartsWith("class_") && int.TryParse(contactUserId[6..], out var cId))
+            {
+                await _hubContext.Clients.Group($"classroom:{cId}").SendAsync("ReceiveMessage", message, cancellationToken);
+                await _hubContext.Clients.Group($"classroom:{cId}").SendAsync("ReceiveClassroomMessage", message, cancellationToken);
+            }
+            else
+            {
+                await _hubContext.Clients.User(contactUserId).SendAsync("ReceiveMessage", message, cancellationToken);
+            }
         }
         catch { }
 

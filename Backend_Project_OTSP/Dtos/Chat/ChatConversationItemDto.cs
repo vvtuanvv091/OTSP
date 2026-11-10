@@ -11,5 +11,8 @@ public sealed class ChatConversationItemDto
     public int UnreadCount { get; init; }
     public bool IsOnline { get; init; }
     public int? RequestId { get; init; }
+    public int? ClassroomId { get; init; }
+    public bool IsGroupClass { get; init; }
+    public int MemberCount { get; init; }
 }
 

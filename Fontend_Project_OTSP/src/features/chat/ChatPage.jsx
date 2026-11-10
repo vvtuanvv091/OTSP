@@ -5,10 +5,56 @@ import { HubConnectionBuilder, LogLevel } from '@microsoft/signalr';
 import { useAuth } from '../../context/AuthContext';
 import chatApi from '../../api/chatApi';
 
+// Hàm helper hợp nhất và chuẩn hóa tin nhắn chống trùng lặp / race condition khi 2 người gửi cùng lúc
+function upsertChatMessage(prevList, incoming, currentUserId) {
+  if (!incoming) return prevList;
+
+  // 1. Kiểm tra nếu tin nhắn đã tồn tại theo ID thực
+  const existingByIdIndex = prevList.findIndex((m) => m.id === incoming.id);
+  if (existingByIdIndex !== -1) {
+    const updated = [...prevList];
+    updated[existingByIdIndex] = {
+      ...updated[existingByIdIndex],
+      ...incoming,
+      isMine: incoming.senderId === currentUserId || incoming.isOwn
+    };
+    return updated;
+  }
+
+  // 2. Nếu là tin nhắn từ chính user gửi, kiểm tra xem có tin nhắn tạm (optimistic tempId) tương ứng không
+  if (incoming.senderId === currentUserId || incoming.isOwn) {
+    const tempIndex = prevList.findIndex((m) =>
+      typeof m.id === 'number' &&
+      m.id > 1000000000000 &&
+      m.content === incoming.content
+    );
+    if (tempIndex !== -1) {
+      const updated = [...prevList];
+      updated[tempIndex] = {
+        ...incoming,
+        isMine: true
+      };
+      return updated;
+    }
+  }
+
+  // 3. Nếu chưa có, thêm mới và sắp xếp theo sentAtUtc đảm bảo thứ tự thời gian không bị đảo lộn
+  const isMine = incoming.senderId === currentUserId || incoming.isOwn;
+  const nextList = [...prevList, { ...incoming, isMine }];
+  return nextList.sort((a, b) => {
+    const timeA = new Date(a.sentAtUtc || a.sentAt || 0).getTime();
+    const timeB = new Date(b.sentAtUtc || b.sentAt || 0).getTime();
+    return timeA - timeB;
+  });
+}
+
 export default function ChatPage() {
   const { user } = useAuth();
   const [searchParams] = useSearchParams();
   const contactIdParam = searchParams.get('contactId') || searchParams.get('recipientId');
+  const inquiryParam = searchParams.get('inquiry');
+  const classTitleParam = searchParams.get('classTitle');
+  const classroomIdParam = searchParams.get('classroomId');
 
   const [conversations, setConversations] = useState([]);
   const [selectedContact, setSelectedContact] = useState(null);
@@ -17,6 +63,7 @@ export default function ChatPage() {
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [inputText, setInputText] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [chatFilter, setChatFilter] = useState('all'); // 'all' | 'direct' | 'group'
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [isMobileChatActive, setIsMobileChatActive] = useState(false);
   const [hubConnected, setHubConnected] = useState(false);
@@ -31,6 +78,14 @@ export default function ChatPage() {
   useEffect(() => {
     selectedContactRef.current = selectedContact;
   }, [selectedContact]);
+
+  // Tự động điền lời nhắn tư vấn khi mở từ modal "Chi tiết lớp học"
+  useEffect(() => {
+    if (inquiryParam && classTitleParam && !inputText) {
+      const decodedTitle = decodeURIComponent(classTitleParam);
+      setInputText(`[Tư vấn lớp: ${decodedTitle}] Em chào thầy/cô, em muốn hỏi thêm thông tin về lịch học và giáo trình của lớp này trước khi đăng ký ạ.`);
+    }
+  }, [inquiryParam, classTitleParam]);
 
   const scrollToBottom = () => {
     if (messagesBoxRef.current) {
@@ -52,7 +107,10 @@ export default function ChatPage() {
           // Nếu có tham số người liên hệ trên URL, tìm và chọn hoặc tạo liên hệ tạm
           if (contactIdParam) {
             const found = list.find(
-              (c) => c.contactUserId === contactIdParam || String(c.requestId) === String(contactIdParam)
+              (c) => c.contactUserId === contactIdParam ||
+                     String(c.requestId) === String(contactIdParam) ||
+                     (c.classroomId && String(c.classroomId) === String(contactIdParam)) ||
+                     (classroomIdParam && String(c.classroomId) === String(classroomIdParam))
             );
             if (found) {
               setSelectedContact(found);
@@ -60,13 +118,14 @@ export default function ChatPage() {
               // Tạo liên hệ tạm thời để người dùng có thể gửi tin nhắn ngay
               const tempContact = {
                 contactUserId: contactIdParam,
-                contactName: 'Thành viên OTSP',
-                roleLabel: '',
+                contactName: classTitleParam ? `Lớp ${decodeURIComponent(classTitleParam)}` : 'Thành viên OTSP',
+                roleLabel: classTitleParam ? 'Tư vấn lớp học' : '',
                 contactAvatarUrl: null,
                 lastMessageContent: 'Bắt đầu cuộc trò chuyện...',
                 unreadCount: 0,
                 isOnline: false,
-                requestId: null
+                requestId: null,
+                classroomId: classroomIdParam ? Number(classroomIdParam) : null
               };
               setConversations((prev) => [tempContact, ...prev]);
               setSelectedContact(tempContact);
@@ -84,7 +143,7 @@ export default function ChatPage() {
 
     loadConversations();
     return () => { isMounted = false; };
-  }, [contactIdParam]);
+  }, [contactIdParam, classroomIdParam, classTitleParam]);
 
   // 2. Tải lịch sử tin nhắn khi chọn một cuộc trò chuyện
   useEffect(() => {
@@ -119,6 +178,13 @@ export default function ChatPage() {
     return () => { isMounted = false; };
   }, [selectedContact?.contactUserId, user?.id]);
 
+  // Khi chọn kênh nhóm lớp học, gia nhập SignalR group của lớp đó
+  useEffect(() => {
+    if (selectedContact?.classroomId && hubConnectionRef.current?.state === 'Connected') {
+      hubConnectionRef.current.invoke('JoinClassroomRoom', selectedContact.classroomId).catch(() => {});
+    }
+  }, [selectedContact?.classroomId, hubConnected]);
+
   // 3. Kết nối Hub chat thời gian thực qua SignalR
   useEffect(() => {
     let isMounted = true;
@@ -135,27 +201,30 @@ export default function ChatPage() {
 
     hubConnectionRef.current = connection;
 
-    connection.on('ReceiveMessage', (newMsg) => {
+    const handleIncomingMessage = (newMsg) => {
+      if (!newMsg) return;
       const activeContact = selectedContactRef.current;
       const isCurrentConversation =
         activeContact &&
-        (newMsg.senderId === activeContact.contactUserId || newMsg.receiverId === activeContact.contactUserId);
+        (newMsg.senderId === activeContact.contactUserId ||
+         newMsg.receiverId === activeContact.contactUserId ||
+         (activeContact.classroomId && newMsg.classroomId === activeContact.classroomId) ||
+         (activeContact.contactUserId?.startsWith('class_') && newMsg.receiverId === activeContact.contactUserId));
 
       if (isCurrentConversation) {
-        setMessages((prev) => [
-          ...prev,
-          {
-            ...newMsg,
-            isMine: newMsg.senderId === user?.id || newMsg.isOwn
-          }
-        ]);
+        setMessages((prev) => upsertChatMessage(prev, newMsg, user?.id));
         setTimeout(scrollToBottom, 60);
       }
 
       // Cập nhật nội dung xem trước và thời gian trong danh sách cuộc trò chuyện
       setConversations((prev) =>
         prev.map((c) => {
-          if (c.contactUserId === newMsg.senderId || c.contactUserId === newMsg.receiverId) {
+          const isMatch =
+            c.contactUserId === newMsg.senderId ||
+            c.contactUserId === newMsg.receiverId ||
+            (c.classroomId && newMsg.classroomId === c.classroomId);
+
+          if (isMatch) {
             return {
               ...c,
               lastMessageContent: newMsg.content,
@@ -169,20 +238,11 @@ export default function ChatPage() {
           return c;
         })
       );
-    });
+    };
 
-    connection.on('ReceiveDirectMessage', (newMsg) => {
-      const activeContact = selectedContactRef.current;
-      const isCurrentConversation =
-        activeContact &&
-        (newMsg.senderId === activeContact.contactUserId || newMsg.receiverId === activeContact.contactUserId);
-      if (!isCurrentConversation) return;
-
-      setMessages((prev) => prev.some((message) => message.id === newMsg.id)
-        ? prev
-        : [...prev, { ...newMsg, isMine: newMsg.senderId === user?.id || newMsg.isOwn }]);
-      setTimeout(scrollToBottom, 60);
-    });
+    connection.on('ReceiveMessage', handleIncomingMessage);
+    connection.on('ReceiveDirectMessage', handleIncomingMessage);
+    connection.on('ReceiveClassroomMessage', handleIncomingMessage);
 
     connection.on('MessageEdited', (event) => {
       setMessages((prev) => prev.map((message) => message.id === event.messageId
@@ -215,7 +275,12 @@ export default function ChatPage() {
     connection
       .start()
       .then(() => {
-        if (isMounted) setHubConnected(true);
+        if (isMounted) {
+          setHubConnected(true);
+          if (selectedContactRef.current?.classroomId) {
+            connection.invoke('JoinClassroomRoom', selectedContactRef.current.classroomId).catch(() => {});
+          }
+        }
       })
       .catch((err) => {
         console.warn('SignalR chat connection warning:', err);
@@ -242,6 +307,7 @@ export default function ChatPage() {
       senderId: user?.id || 'me',
       senderName: user?.fullName || 'Tôi',
       receiverId: selectedContact.contactUserId,
+      classroomId: selectedContact.classroomId || null,
       content,
       sentAtUtc: new Date().toISOString(),
       isMine: true
@@ -257,18 +323,27 @@ export default function ChatPage() {
       });
 
       if (res.data) {
-        setMessages((prev) =>
-          prev.map((m) => (m.id === tempId ? { ...res.data, isMine: true } : m))
-        );
+        setMessages((prev) => {
+          const alreadyHasReal = prev.some((m) => m.id === res.data.id);
+          if (alreadyHasReal) {
+            return prev.filter((m) => m.id !== tempId);
+          }
+          return prev
+            .map((m) => (m.id === tempId ? { ...res.data, isMine: true } : m))
+            .sort((a, b) => new Date(a.sentAtUtc || 0) - new Date(b.sentAtUtc || 0));
+        });
       }
 
       // Cập nhật xem trước ngay trên giao diện danh sách chat
       setConversations((prev) =>
-        prev.map((c) =>
-          c.contactUserId === selectedContact.contactUserId
+        prev.map((c) => {
+          const isMatch =
+            c.contactUserId === selectedContact.contactUserId ||
+            (selectedContact.classroomId && c.classroomId === selectedContact.classroomId);
+          return isMatch
             ? { ...c, lastMessageContent: content, lastMessageTimeUtc: new Date().toISOString() }
-            : c
-        )
+            : c;
+        })
       );
     } catch (err) {
       console.error('Lỗi gửi tin nhắn:', err);
@@ -312,6 +387,7 @@ export default function ChatPage() {
       senderId: user?.id || 'me',
       senderName: user?.fullName || 'Tôi',
       receiverId: selectedContact.contactUserId,
+      classroomId: selectedContact.classroomId || null,
       content: imageMsg,
       sentAtUtc: new Date().toISOString(),
       isMine: true
@@ -327,17 +403,26 @@ export default function ChatPage() {
       });
 
       if (res.data) {
-        setMessages((prev) =>
-          prev.map((m) => (m.id === tempId ? { ...res.data, isMine: true } : m))
-        );
+        setMessages((prev) => {
+          const alreadyHasReal = prev.some((m) => m.id === res.data.id);
+          if (alreadyHasReal) {
+            return prev.filter((m) => m.id !== tempId);
+          }
+          return prev
+            .map((m) => (m.id === tempId ? { ...res.data, isMine: true } : m))
+            .sort((a, b) => new Date(a.sentAtUtc || 0) - new Date(b.sentAtUtc || 0));
+        });
       }
 
       setConversations((prev) =>
-        prev.map((c) =>
-          c.contactUserId === selectedContact.contactUserId
+        prev.map((c) => {
+          const isMatch =
+            c.contactUserId === selectedContact.contactUserId ||
+            (selectedContact.classroomId && c.classroomId === selectedContact.classroomId);
+          return isMatch
             ? { ...c, lastMessageContent: '📷 [Hình ảnh]', lastMessageTimeUtc: new Date().toISOString() }
-            : c
-        )
+            : c;
+        })
       );
     } catch (err) {
       console.error('Lỗi gửi ảnh:', err);
@@ -405,9 +490,13 @@ export default function ChatPage() {
     }
   };
 
-  const filteredConversations = conversations.filter((c) =>
-    (c.contactName || c.fullName || '').toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredConversations = conversations.filter((c) => {
+    const matchesSearch = (c.contactName || c.fullName || '').toLowerCase().includes(searchQuery.toLowerCase());
+    if (!matchesSearch) return false;
+    if (chatFilter === 'direct') return !c.isGroupClass && !c.contactUserId?.startsWith('class_');
+    if (chatFilter === 'group') return c.isGroupClass || c.contactUserId?.startsWith('class_');
+    return true;
+  });
 
   return (
     <div className={`chat-workspace-page ${isMobileChatActive ? 'is-chatting-mobile' : ''}`} id="chatWorkspace">
@@ -540,9 +629,11 @@ export default function ChatPage() {
         }
         .chat-message-row {
           display: flex;
-          align-items: center;
+          align-items: flex-end;
           width: 100%;
           position: relative;
+          margin-bottom: 6px;
+          clear: both;
         }
         .chat-message-row.is-mine {
           justify-content: flex-end;
@@ -789,6 +880,34 @@ export default function ChatPage() {
             className={`col-12 col-md-5 col-lg-4 chat-sidebar-column border-end ${isMobileChatActive ? 'd-none d-md-flex' : 'd-flex'}`}
             aria-label="Danh sách cuộc trò chuyện"
           >
+            {/* Bộ lọc phân loại: Tất cả / Trực tiếp / Nhóm lớp */}
+            <div className="px-3 pt-2.5 pb-2 d-flex gap-1.5 border-bottom bg-light-subtle">
+              <button
+                type="button"
+                className={`btn btn-sm rounded-pill px-2.5 py-0.5 fw-semibold ${chatFilter === 'all' ? 'btn-danger text-white' : 'btn-outline-secondary'}`}
+                style={chatFilter === 'all' ? { backgroundColor: '#DB303A', borderColor: '#DB303A', fontSize: '11px' } : { fontSize: '11px' }}
+                onClick={() => setChatFilter('all')}
+              >
+                Tất cả
+              </button>
+              <button
+                type="button"
+                className={`btn btn-sm rounded-pill px-2.5 py-0.5 fw-semibold ${chatFilter === 'direct' ? 'btn-danger text-white' : 'btn-outline-secondary'}`}
+                style={chatFilter === 'direct' ? { backgroundColor: '#DB303A', borderColor: '#DB303A', fontSize: '11px' } : { fontSize: '11px' }}
+                onClick={() => setChatFilter('direct')}
+              >
+                <i className="bi bi-person me-1"></i>Cá nhân
+              </button>
+              <button
+                type="button"
+                className={`btn btn-sm rounded-pill px-2.5 py-0.5 fw-semibold ${chatFilter === 'group' ? 'btn-danger text-white' : 'btn-outline-secondary'}`}
+                style={chatFilter === 'group' ? { backgroundColor: '#DB303A', borderColor: '#DB303A', fontSize: '11px' } : { fontSize: '11px' }}
+                onClick={() => setChatFilter('group')}
+              >
+                <i className="bi bi-people-fill me-1"></i>Nhóm lớp
+              </button>
+            </div>
+
             {/* Ô tìm kiếm cuộc trò chuyện */}
             <div className="chat-search-wrap p-3 border-bottom">
               <div className="chat-search-input-group">
@@ -853,15 +972,28 @@ export default function ChatPage() {
                         ) : null}
                         <div
                           className="chat-avatar-fallback"
-                          style={{ display: avatar ? 'none' : 'flex' }}
+                          style={{
+                            display: avatar ? 'none' : 'flex',
+                            backgroundColor: conv.isGroupClass || conv.contactUserId?.startsWith('class_') ? 'rgba(219, 48, 58, 0.12)' : undefined,
+                            color: conv.isGroupClass || conv.contactUserId?.startsWith('class_') ? '#DB303A' : undefined
+                          }}
                         >
-                          {contactName.charAt(0).toUpperCase()}
+                          {conv.isGroupClass || conv.contactUserId?.startsWith('class_') ? (
+                            <i className="bi bi-people-fill" style={{ fontSize: '15px' }}></i>
+                          ) : (
+                            contactName.charAt(0).toUpperCase()
+                          )}
                         </div>
                       </div>
 
                       <div className="chat-conv-info flex-grow-1 min-w-0">
                         <div className="d-flex align-items-center justify-content-between mb-1">
-                          <span className="chat-conv-name text-truncate">{contactName}</span>
+                          <span className="chat-conv-name text-truncate">
+                            {(conv.isGroupClass || conv.contactUserId?.startsWith('class_')) && (
+                              <i className="bi bi-people-fill text-danger me-1"></i>
+                            )}
+                            {contactName}
+                          </span>
                           {role && (
                             <span
                               className="badge bg-secondary-subtle text-secondary border small px-2 py-0.5 ms-1"
@@ -919,15 +1051,26 @@ export default function ChatPage() {
                       ) : null}
                       <div
                         className="chat-avatar-fallback"
-                        style={{ display: (selectedContact.contactAvatarUrl || selectedContact.avatarUrl) ? 'none' : 'flex' }}
+                        style={{
+                          display: (selectedContact.contactAvatarUrl || selectedContact.avatarUrl) ? 'none' : 'flex',
+                          backgroundColor: selectedContact.isGroupClass || selectedContact.contactUserId?.startsWith('class_') ? 'rgba(219, 48, 58, 0.12)' : undefined,
+                          color: selectedContact.isGroupClass || selectedContact.contactUserId?.startsWith('class_') ? '#DB303A' : undefined
+                        }}
                       >
-                        {(selectedContact.contactName || selectedContact.fullName || 'U').charAt(0).toUpperCase()}
+                        {selectedContact.isGroupClass || selectedContact.contactUserId?.startsWith('class_') ? (
+                          <i className="bi bi-people-fill" style={{ fontSize: '16px' }}></i>
+                        ) : (
+                          (selectedContact.contactName || selectedContact.fullName || 'U').charAt(0).toUpperCase()
+                        )}
                       </div>
                     </div>
 
                     <div className="min-w-0">
                       <div className="d-flex align-items-center gap-1 gap-md-2 flex-wrap">
                         <h2 className="h6 fw-bold mb-0 text-body text-truncate">
+                          {(selectedContact.isGroupClass || selectedContact.contactUserId?.startsWith('class_')) && (
+                            <i className="bi bi-people-fill text-danger me-1"></i>
+                          )}
                           {selectedContact.contactName || selectedContact.fullName}
                         </h2>
                         {selectedContact.roleLabel && (
@@ -939,7 +1082,11 @@ export default function ChatPage() {
                           </span>
                         )}
                       </div>
-                      {selectedContact.isOnline ? (
+                      {selectedContact.isGroupClass || selectedContact.contactUserId?.startsWith('class_') ? (
+                        <span className="chat-status-indicator small text-secondary">
+                          <span className="chat-online-dot text-danger" aria-hidden="true">●</span> Kênh chat chung của lớp học ({selectedContact.memberCount || 2} thành viên)
+                        </span>
+                      ) : selectedContact.isOnline ? (
                         <span className="chat-status-indicator small text-success">
                           <span className="chat-online-dot text-success" aria-hidden="true">●</span> Đang hoạt động
                         </span>
@@ -957,7 +1104,11 @@ export default function ChatPage() {
                         Yêu cầu #{selectedContact.requestId}
                       </span>
                     )}
-                    {selectedContact.isOnline ? (
+                    {selectedContact.isGroupClass || selectedContact.contactUserId?.startsWith('class_') ? (
+                      <span className="badge rounded-pill bg-danger-subtle text-danger border border-danger-subtle px-2 py-1" style={{ fontSize: 11 }}>
+                        Nhóm lớp học
+                      </span>
+                    ) : selectedContact.isOnline ? (
                       <span className="badge rounded-pill bg-success-subtle text-success border border-success-subtle px-2 py-1" style={{ fontSize: 11 }}>
                         Trực tuyến
                       </span>
@@ -966,6 +1117,19 @@ export default function ChatPage() {
                         Ngoại tuyến
                       </span>
                     )}
+                  </div>
+                </div>
+
+                {/* Banner cảnh báo an toàn OTSP & chống giao dịch ngoài để bảo vệ 20% hoa hồng và quyền lợi học viên */}
+                <div
+                  className="chat-security-banner px-3 py-1.5 border-bottom d-flex align-items-center justify-content-between"
+                  style={{ backgroundColor: '#fffbeb', borderColor: '#fef3c7' }}
+                >
+                  <div className="d-flex align-items-center gap-2" style={{ color: '#92400e', fontSize: '11.5px' }}>
+                    <i className="bi bi-shield-fill-check text-success fs-6"></i>
+                    <span>
+                      <strong>Quy chuẩn an toàn OTSP:</strong> Vui lòng <u>không</u> chia sẻ SĐT cá nhân, Zalo, STK ngân hàng hay giao dịch ngoài hệ thống để đảm bảo bảo hiểm học tập và hoàn tiền 100%.
+                    </span>
                   </div>
                 </div>
 
@@ -1002,78 +1166,114 @@ export default function ChatPage() {
                           : msg.content
                         : null;
 
+                      const isGroup = selectedContact?.isGroupClass || selectedContact?.contactUserId?.startsWith('class_') || Boolean(msg.classroomId);
+
                       return (
                         <div
                           key={msg.id}
                           className={`chat-message-row ${msg.isMine ? 'is-mine' : 'is-theirs'}`}
                         >
-                          {msg.isMine && !msg.isDeleted && editingMessageId !== msg.id && (
-                            <div className="chat-message-actions">
-                              {!isImg && (
-                                <button
-                                  type="button"
-                                  className="btn-msg-action btn-edit-msg"
-                                  title="Chỉnh sửa tin nhắn"
-                                  aria-label="Sửa"
-                                  onClick={() => {
-                                    setEditingMessageId(msg.id);
-                                    setEditText(msg.content);
-                                  }}
-                                >
-                                  <i className="bi bi-pencil"></i>
-                                </button>
-                              )}
-                              <button
-                                type="button"
-                                className="btn-msg-action btn-delete-msg"
-                                title="Xóa / Thu hồi tin nhắn"
-                                aria-label="Xóa"
-                                onClick={() => handleDeleteMessage(msg)}
-                              >
-                                <i className="bi bi-trash"></i>
-                              </button>
-                            </div>
-                          )}
-
-                          <div className={`chat-bubble ${isImg ? 'chat-bubble-image' : ''} ${msg.isDeleted ? 'is-deleted' : ''}`}>
-                              {editingMessageId === msg.id ? (
-                                <div className="chat-edit-form">
-                                  <textarea
-                                    value={editText}
-                                    maxLength={2000}
-                                    autoFocus
-                                    onChange={(event) => setEditText(event.target.value)}
-                                    onKeyDown={(event) => handleEditKeyDown(event, msg)}
-                                    aria-label="Chỉnh sửa tin nhắn"
-                                  />
-                                  <div className="d-flex justify-content-end gap-2 mt-2">
-                                    <button type="button" className="btn btn-sm btn-light" onClick={() => {
-                                      setEditingMessageId(null);
-                                      setEditText('');
-                                    }}>Hủy</button>
-                                    <button type="button" className="btn btn-sm btn-light fw-bold" onClick={() => handleSaveEdit(msg)}>Lưu</button>
-                                  </div>
-                                </div>
-                              ) : msg.isDeleted ? (
-                                <div className="chat-deleted-message">Tin nhắn đã được thu hồi</div>
-                              ) : isImg && imgSrc ? (
-                                <a href={resolveAssetUrl(imgSrc)} target="_blank" rel="noopener noreferrer">
+                          <div
+                            className="d-flex flex-column"
+                            style={{
+                              maxWidth: '75%',
+                              alignItems: msg.isMine ? 'flex-end' : 'flex-start'
+                            }}
+                          >
+                            {!msg.isMine && isGroup && (
+                              <div className="d-flex align-items-center gap-1.5 mb-1 px-1">
+                                {msg.senderAvatarUrl ? (
                                   <img
-                                    src={resolveAssetUrl(imgSrc)}
-                                    alt="Hình ảnh"
-                                    className="chat-message-img"
-                                    onError={(e) => {
-                                      e.target.src = '/assets/img/default-avatar.svg';
-                                    }}
+                                    src={resolveAssetUrl(msg.senderAvatarUrl)}
+                                    alt=""
+                                    style={{ width: 18, height: 18, borderRadius: '50%', objectFit: 'cover' }}
                                   />
-                                </a>
-                              ) : (
-                                <>
-                                  <div className="chat-bubble-text">{msg.content}</div>
-                                  {msg.isEdited && <small className="chat-edited-label">(đã chỉnh sửa)</small>}
-                                </>
+                                ) : (
+                                  <span className="badge rounded-circle bg-secondary text-white p-0 d-inline-flex align-items-center justify-content-center" style={{ width: 18, height: 18, fontSize: 10 }}>
+                                    {(msg.senderName || 'U').charAt(0).toUpperCase()}
+                                  </span>
+                                )}
+                                <span className="fw-bold text-dark small" style={{ fontSize: '11px' }}>
+                                  {msg.senderName || 'Thành viên lớp'}
+                                </span>
+                                {msg.senderRole && (
+                                  <span className="badge bg-danger-subtle text-danger" style={{ fontSize: '9px' }}>
+                                    {msg.senderRole}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+
+                            <div className="d-flex align-items-end gap-1 w-100" style={{ justifyContent: msg.isMine ? 'flex-end' : 'flex-start' }}>
+                              {msg.isMine && !msg.isDeleted && editingMessageId !== msg.id && (
+                                <div className="chat-message-actions">
+                                  {!isImg && (
+                                    <button
+                                      type="button"
+                                      className="btn-msg-action btn-edit-msg"
+                                      title="Chỉnh sửa tin nhắn"
+                                      aria-label="Sửa"
+                                      onClick={() => {
+                                        setEditingMessageId(msg.id);
+                                        setEditText(msg.content);
+                                      }}
+                                    >
+                                      <i className="bi bi-pencil"></i>
+                                    </button>
+                                  )}
+                                  <button
+                                    type="button"
+                                    className="btn-msg-action btn-delete-msg"
+                                    title="Xóa / Thu hồi tin nhắn"
+                                    aria-label="Xóa"
+                                    onClick={() => handleDeleteMessage(msg)}
+                                  >
+                                    <i className="bi bi-trash"></i>
+                                  </button>
+                                </div>
                               )}
+
+                              <div className={`chat-bubble ${isImg ? 'chat-bubble-image' : ''} ${msg.isDeleted ? 'is-deleted' : ''}`}>
+                                {editingMessageId === msg.id ? (
+                                  <div className="chat-edit-form">
+                                    <textarea
+                                      value={editText}
+                                      maxLength={2000}
+                                      autoFocus
+                                      onChange={(event) => setEditText(event.target.value)}
+                                      onKeyDown={(event) => handleEditKeyDown(event, msg)}
+                                      aria-label="Chỉnh sửa tin nhắn"
+                                    />
+                                    <div className="d-flex justify-content-end gap-2 mt-2">
+                                      <button type="button" className="btn btn-sm btn-light" onClick={() => {
+                                        setEditingMessageId(null);
+                                        setEditText('');
+                                      }}>Hủy</button>
+                                      <button type="button" className="btn btn-sm btn-light fw-bold" onClick={() => handleSaveEdit(msg)}>Lưu</button>
+                                    </div>
+                                  </div>
+                                ) : msg.isDeleted ? (
+                                  <div className="chat-deleted-message">Tin nhắn đã được thu hồi</div>
+                                ) : isImg && imgSrc ? (
+                                  <a href={resolveAssetUrl(imgSrc)} target="_blank" rel="noopener noreferrer">
+                                    <img
+                                      src={resolveAssetUrl(imgSrc)}
+                                      alt="Hình ảnh"
+                                      className="chat-message-img"
+                                      onError={(e) => {
+                                        e.target.src = '/assets/img/default-avatar.svg';
+                                      }}
+                                    />
+                                  </a>
+                                ) : (
+                                  <>
+                                    <div className="chat-bubble-text">{msg.content}</div>
+                                    {msg.isEdited && <small className="chat-edited-label">(đã chỉnh sửa)</small>}
+                                  </>
+                                )}
+                              </div>
                             </div>
+                          </div>
                         </div>
                       );
                     })

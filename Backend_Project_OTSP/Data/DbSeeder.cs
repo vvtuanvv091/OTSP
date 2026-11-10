@@ -27,6 +27,19 @@ namespace Backend_Project_OTSP.Data
             RoleManager<ApplicationRole> roleManager,
             ILogger logger)
         {
+            // 0. Auto-migrate schema cho Neon Postgres nếu thiếu cột ClassroomId trong Messagers
+            try
+            {
+                await db.Database.ExecuteSqlRawAsync(@"
+                    ALTER TABLE ""Messagers"" ADD COLUMN IF NOT EXISTS ""ClassroomId"" integer NULL;
+                    CREATE INDEX IF NOT EXISTS ""IX_Messagers_ClassroomId"" ON ""Messagers"" (""ClassroomId"");
+                ");
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "[DbSeeder] Auto-migration Messagers.ClassroomId notice: {Message}", ex.Message);
+            }
+
             //1 lấy danh sách role
             var roleNames = new[] { "Admin", "Tutor", "Student_Parent" };
             var existingRoleNames = await roleManager.Roles
