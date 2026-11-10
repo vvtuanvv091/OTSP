@@ -7,7 +7,7 @@ import ChangePasswordPanel from '../auth/ChangePasswordPanel';
 import compressImageFile from '../../utils/imageCompressor';
 
 export default function AdminProfilePage() {
-  const { updateUser } = useAuth();
+  const { user, updateUser } = useAuth();
   const fileInputRef = useRef(null);
   const [profile, setProfile] = useState({ fullName: '', email: '', phoneNumber: '', avatarUrl: '' });
   const [loading, setLoading] = useState(true);
@@ -20,7 +20,16 @@ export default function AdminProfilePage() {
     let active = true;
     adminApi.getProfile()
       .then((response) => {
-        if (active) setProfile((current) => ({ ...current, ...(response.data || {}) }));
+        if (active && response.data) {
+          const d = response.data.profile || response.data || {};
+          setProfile((current) => ({ ...current, ...d }));
+          if (d.avatarUrl && d.avatarUrl !== user?.avatarUrl) {
+            updateUser({ avatarUrl: d.avatarUrl });
+          }
+          if (d.fullName && d.fullName !== user?.fullName) {
+            updateUser({ fullName: d.fullName });
+          }
+        }
       })
       .catch((requestError) => {
         if (active) setError(requestError?.response?.data?.message || 'Không tải được hồ sơ quản trị viên.');

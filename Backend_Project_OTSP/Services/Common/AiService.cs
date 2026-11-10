@@ -399,17 +399,18 @@ public class AiService : IAiService
                 liveContextBuilder.AppendLine($"- Tổng số gia sư chính thức đã kiểm duyệt trên nền tảng: {totalTutors} gia sư.");
                 liveContextBuilder.AppendLine($"- Tổng số lớp học nhóm đang mở đăng ký: {totalClasses} lớp.");
 
-                // 2. Tải toàn bộ danh sách gia sư đã duyệt (CHỈ LẤY CÁC TRƯỜNG CÔNG KHAI - BẢO MẬT TUYỆT ĐỐI)
+                // 2. Tải toàn bộ danh sách gia sư trên hệ thống (CHỈ LẤY CÁC TRƯỜNG CÔNG KHAI - BẢO MẬT TUYỆT ĐỐI)
                 // Lưu ý: Tuyệt đối không lấy Password, CCCD, Email, Phone, BankAccount để đảm bảo an toàn.
                 var rawTutors = await _db.TutorProfiles
                     .AsNoTracking()
                     .Include(t => t.User)
                     .Include(t => t.TutorSubjects).ThenInclude(ts => ts.Subject)
-                    .Where(t => t.VerificationStatus == VerificationStatus.Approved)
+                    .Where(t => t.User.Status == AccountStatus.Active)
                     .Select(t => new
                     {
                         t.Id,
                         Name = t.User.FullName ?? "",
+                        Status = t.VerificationStatus,
                         HourlyRate = t.HourlyFee,
                         Rating = t.AverageRating,
                         Format = t.TeachingFormat == TeachingFormat.Online ? "Online" :
@@ -418,10 +419,11 @@ public class AiService : IAiService
                     })
                     .ToListAsync(ct);
 
-                var allApprovedTutors = rawTutors.Select(t => new
+                var allTutors = rawTutors.Select(t => new
                 {
                     t.Id,
                     t.Name,
+                    t.Status,
                     t.HourlyRate,
                     t.Rating,
                     t.Format,
@@ -431,7 +433,7 @@ public class AiService : IAiService
                 var unaccentMsg = RemoveDiacritics(lowerMsg);
 
                 // Tìm gia sư khớp với câu hỏi người dùng (theo tên, môn học, từ khóa - hỗ trợ cả có dấu & không dấu)
-                var matchedTutors = allApprovedTutors.Where(t =>
+                var matchedTutors = allTutors.Where(t =>
                 {
                     var nameLower = (t.Name ?? "").ToLower();
                     var nameUnaccent = RemoveDiacritics(nameLower);
@@ -455,19 +457,20 @@ public class AiService : IAiService
                     return false;
                 }).ToList();
 
-                // Nếu không khớp tên/môn cụ thể, nhưng người dùng hỏi về gia sư nói chung thì lấy top gia sư tiêu biểu
+                // Nếu không khớp tên/môn cụ thể, nhưng người dùng hỏi về gia sư nói chung thì lấy top gia sư tiêu biểu đã duyệt
                 if (!matchedTutors.Any() && (lowerMsg.Contains("gia sư") || lowerMsg.Contains("thầy") || lowerMsg.Contains("cô") || lowerMsg.Contains("học") || lowerMsg.Contains("dạy")))
                 {
-                    matchedTutors = allApprovedTutors.OrderByDescending(t => t.Rating).ThenBy(t => t.HourlyRate).Take(5).ToList();
+                    matchedTutors = allTutors.Where(t => t.Status == VerificationStatus.Approved).OrderByDescending(t => t.Rating).ThenBy(t => t.HourlyRate).Take(5).ToList();
                 }
 
                 if (matchedTutors.Any())
                 {
-                    liveContextBuilder.AppendLine("\n[Danh sách Gia sư thực tế liên quan]:");
+                    liveContextBuilder.AppendLine("\n[Danh sách Gia sư thực tế liên quan trong hệ thống]:");
                     foreach (var t in matchedTutors.Take(8))
                     {
                         var subjectsText = string.IsNullOrWhiteSpace(t.Subjects) ? "Đang cập nhật" : t.Subjects;
-                        liveContextBuilder.AppendLine($"- Gia sư: {t.Name} | Môn dạy: {subjectsText} | Học phí: {t.HourlyRate:N0} đ/giờ | Đánh giá: {t.Rating:F1}★ | Hình thức: {t.Format}");
+                        var statusText = t.Status == VerificationStatus.Approved ? "Đã duyệt chính thức" : "Hồ sơ đang chờ duyệt";
+                        liveContextBuilder.AppendLine($"- Gia sư: {t.Name} | Trạng thái: {statusText} | Môn dạy: {subjectsText} | Học phí: {t.HourlyRate:N0} đ/giờ | Đánh giá: {t.Rating:F1}★ | Hình thức: {t.Format}");
                     }
                 }
 

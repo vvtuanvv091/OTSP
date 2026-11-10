@@ -145,6 +145,11 @@ export const AuthProvider = ({ children }) => {
       if (sessionStorage.getItem('user')) {
         sessionStorage.setItem('user', JSON.stringify(nextUser));
       }
+      try {
+        window.dispatchEvent(new CustomEvent('otsp:user-updated', { detail: nextUser }));
+      } catch {
+        // Safe fallback
+      }
       return nextUser;
     });
   }, []);

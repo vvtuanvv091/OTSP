@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
 import tutorApi from '../../api/tutorApi';
 import { resolveAssetUrl } from '../../api/config';
+import { useAuth } from '../../context/AuthContext';
 import CollapsibleProfileSection from '../../components/common/CollapsibleProfileSection';
 import ChangePasswordPanel from '../auth/ChangePasswordPanel';
 import compressImageFile from '../../utils/imageCompressor';
 
 export default function TutorProfilePage() {
+  const { user, updateUser } = useAuth();
   const [profile, setProfile] = useState(null);
   const [tutorSubjects, setTutorSubjects] = useState([]);
   const [qualifications, setQualifications] = useState([]);
@@ -54,6 +56,14 @@ export default function TutorProfilePage() {
           setAllGradeLevels(grades);
           if (subs.length > 0) setSelectedSubjectId((prev) => prev || subs[0].id);
           if (grades.length > 0) setSelectedGradeLevelId((prev) => prev || grades[0].id);
+
+          // Tự động đồng bộ ảnh đại diện và họ tên với AuthContext (Header, Sidebar)
+          if (p.avatarUrl && p.avatarUrl !== user?.avatarUrl) {
+            updateUser({ avatarUrl: p.avatarUrl });
+          }
+          if (p.fullName && p.fullName !== user?.fullName) {
+            updateUser({ fullName: p.fullName });
+          }
         }
       } catch {
         if (active) setError('Không tải được thông tin hồ sơ gia sư.');
@@ -81,6 +91,9 @@ export default function TutorProfilePage() {
         introduction,
         hourlyFee: profile?.hourlyFee,
       });
+      if (displayName) {
+        updateUser({ fullName: displayName });
+      }
       setMessage('Cập nhật hồ sơ thành công!');
     } catch (err) {
       setError(err.response?.data?.message || 'Có lỗi xảy ra khi cập nhật hồ sơ.');
@@ -103,6 +116,7 @@ export default function TutorProfilePage() {
       const res = await tutorApi.uploadAvatar(optimizedFile);
       if (res.data?.avatarUrl) {
         setProfile((prev) => ({ ...prev, avatarUrl: res.data.avatarUrl }));
+        updateUser({ avatarUrl: res.data.avatarUrl });
       }
       setMessage(res.data?.message || 'Cập nhật ảnh đại diện thành công!');
     } catch (err) {

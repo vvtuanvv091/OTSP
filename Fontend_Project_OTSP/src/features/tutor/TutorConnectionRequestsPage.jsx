@@ -199,11 +199,11 @@ export default function TutorConnectionRequestsPage() {
             <table className="table table-hover align-middle mb-0">
               <thead className="table-light">
                 <tr>
-                  <th scope="col" style={{ width: '25%' }}>Học viên</th>
-                  <th scope="col" style={{ width: '23%' }}>Môn &amp; Lớp</th>
-                  <th scope="col" style={{ width: '22%' }}>Giờ học đề xuất</th>
+                  <th scope="col" style={{ width: '22%' }}>Học viên</th>
+                  <th scope="col" style={{ width: '22%' }}>Môn &amp; Lớp</th>
+                  <th scope="col" style={{ width: '20%' }}>Giờ học đề xuất</th>
                   <th scope="col" style={{ width: '14%' }}>Trạng thái</th>
-                  <th scope="col" style={{ width: '16%', textAlign: 'right' }}>Thao tác</th>
+                  <th scope="col" style={{ minWidth: 210, width: '22%', textAlign: 'right', whiteSpace: 'nowrap' }}>Thao tác</th>
                 </tr>
               </thead>
               <tbody>
@@ -327,13 +327,13 @@ export default function TutorConnectionRequestsPage() {
                         )}
                       </td>
 
-                      <td style={{ textAlign: 'right' }}>
+                      <td style={{ textAlign: 'right', whiteSpace: 'nowrap', minWidth: 210 }}>
                         {isPending ? (
-                          <div className="d-inline-flex align-items-center gap-1.5">
+                          <div className="d-inline-flex align-items-center justify-content-end gap-2" style={{ flexWrap: 'nowrap' }}>
                             <button
                               type="button"
-                              className="btn btn-sm btn-success d-inline-flex align-items-center gap-1 px-2.5 py-1 shadow-sm"
-                              style={{ fontSize: '12.5px', fontWeight: 500 }}
+                              className="btn btn-sm btn-success d-inline-flex align-items-center gap-1 px-2.5 py-1 shadow-sm text-nowrap"
+                              style={{ fontSize: '12.5px', fontWeight: 500, whiteSpace: 'nowrap', flexShrink: 0 }}
                               disabled={actionLoading === request.id}
                               onClick={() => handleAccept(request.id, request.studentName)}
                             >
@@ -341,8 +341,8 @@ export default function TutorConnectionRequestsPage() {
                             </button>
                             <button
                               type="button"
-                              className="btn btn-sm btn-outline-danger d-inline-flex align-items-center gap-1 px-2.5 py-1"
-                              style={{ fontSize: '12.5px', fontWeight: 500 }}
+                              className="btn btn-sm btn-outline-danger d-inline-flex align-items-center gap-1 px-2.5 py-1 text-nowrap"
+                              style={{ fontSize: '12.5px', fontWeight: 500, whiteSpace: 'nowrap', flexShrink: 0 }}
                               disabled={actionLoading === request.id}
                               onClick={() => handleReject(request.id)}
                             >
@@ -350,12 +350,12 @@ export default function TutorConnectionRequestsPage() {
                             </button>
                           </div>
                         ) : isAccepted ? (
-                          <div className="d-inline-flex align-items-center gap-1.5 justify-content-end">
+                          <div className="d-inline-flex align-items-center gap-1.5 justify-content-end" style={{ flexWrap: 'nowrap' }}>
                             {request.studentUserId && (
                               <Link
                                 to={`/tutor/chat?contactId=${request.studentUserId}`}
-                                className="btn btn-sm btn-outline-danger d-inline-flex align-items-center gap-1 px-2.5 py-1"
-                                style={{ fontSize: '12.5px', fontWeight: 500 }}
+                                className="btn btn-sm btn-outline-danger d-inline-flex align-items-center gap-1 px-2.5 py-1 text-nowrap"
+                                style={{ fontSize: '12.5px', fontWeight: 500, whiteSpace: 'nowrap', flexShrink: 0 }}
                                 title="Nhắn tin với học viên"
                               >
                                 <i className="bi bi-chat-dots-fill"></i> Nhắn tin
@@ -363,8 +363,8 @@ export default function TutorConnectionRequestsPage() {
                             )}
                             <Link
                               to="/tutor/schedule"
-                              className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1 px-2 py-1"
-                              style={{ fontSize: '12.5px' }}
+                              className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1 px-2 py-1 text-nowrap"
+                              style={{ fontSize: '12.5px', whiteSpace: 'nowrap', flexShrink: 0 }}
                               title="Xem lịch dạy"
                             >
                               <i className="bi bi-calendar3"></i>

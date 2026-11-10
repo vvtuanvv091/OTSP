@@ -12,3 +12,4 @@ public sealed class CustomUserIdProvider : IUserIdProvider
             ?? connection.User?.FindFirstValue(ClaimTypes.Name);
     }
 }
+

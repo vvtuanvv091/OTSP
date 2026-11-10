@@ -122,11 +122,13 @@ public sealed class OpenGroupClassroomService : IOpenGroupClassroomService
 
     private IQueryable<Backend_Project_OTSP.Models.Classroom> OpenClassroomQuery(int tutorId)
     {
+        var todayVn = DateOnly.FromDateTime(DateTime.UtcNow.AddHours(7));
         return _db.Classrooms
             .AsNoTracking()
             .Where(classroom => classroom.TutorId == tutorId
                 && classroom.Type == ClassroomType.Group
                 && classroom.Status == ClassroomStatus.Active
-                && classroom.ClassroomStudents.Count < classroom.MaxStudents);
+                && classroom.ClassroomStudents.Count < classroom.MaxStudents
+                && (!classroom.StartDate.HasValue || classroom.StartDate.Value > todayVn));
     }
 }

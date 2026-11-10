@@ -127,6 +127,7 @@ public class ConnectionRequestService : IConnectionRequestService
             }
         }
 
+        var todayVn = DateOnly.FromDateTime(DateTime.UtcNow.AddHours(7));
         var groupClassrooms = await _db.Classrooms.AsNoTracking()
             .Where(c => c.TutorId == tutorId
                      && c.Type == ClassroomType.Group
@@ -149,14 +150,17 @@ public class ConnectionRequestService : IConnectionRequestService
                     cr.StudentId == student.Id && cr.Status == RequestStatus.Pending),
                 CanJoin = !c.ClassroomStudents.Any(cs => cs.StudentId == student.Id)
                     && !c.ConnectionRequests.Any(cr => cr.StudentId == student.Id && cr.Status == RequestStatus.Pending)
-                    && c.ClassroomStudents.Count < c.MaxStudents,
+                    && c.ClassroomStudents.Count < c.MaxStudents
+                    && (!c.StartDate.HasValue || c.StartDate.Value > todayVn),
                 Reason = c.ClassroomStudents.Any(cs => cs.StudentId == student.Id)
                     ? "Bạn đã tham gia lớp này."
                     : c.ConnectionRequests.Any(cr => cr.StudentId == student.Id && cr.Status == RequestStatus.Pending)
                         ? "Yêu cầu tham gia lớp này đang chờ gia sư xác nhận."
                         : c.ClassroomStudents.Count >= c.MaxStudents
                             ? "Lớp đã hết chỗ."
-                            : null
+                            : (c.StartDate.HasValue && c.StartDate.Value <= todayVn)
+                                ? "Lớp học đã khai giảng và đóng tuyển sinh đợt này."
+                                : null
             })
             .ToListAsync(cancellationToken);
 
@@ -206,6 +210,17 @@ public class ConnectionRequestService : IConnectionRequestService
             if (groupClassroom == null)
             {
                 return new ConnectionRequestOperationResult { Success = false, Message = "Lớp nhóm đã chọn không tồn tại hoặc không thuộc gia sư này." };
+            }
+
+            // [Phương án 1]: Nếu lớp nhóm đã qua ngày khai giảng (StartDate <= Today), đóng tuyển sinh
+            var todayVnDate = DateOnly.FromDateTime(DateTime.UtcNow.AddHours(7));
+            if (groupClassroom.StartDate.HasValue && groupClassroom.StartDate.Value <= todayVnDate)
+            {
+                return new ConnectionRequestOperationResult
+                {
+                    Success = false,
+                    Message = $"Lớp học nhóm này đã bắt đầu từ ngày {groupClassroom.StartDate.Value:dd/MM/yyyy} và đã đóng tuyển sinh đợt hiện tại. Vui lòng liên hệ gia sư để đăng ký đợt kế tiếp."
+                };
             }
 
             // Kiểm tra xem học viên đã là thành viên đang học trong lớp nhóm này chưa

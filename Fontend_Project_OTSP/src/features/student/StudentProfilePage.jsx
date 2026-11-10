@@ -8,7 +8,7 @@ import ChangePasswordPanel from '../auth/ChangePasswordPanel';
 import compressImageFile from '../../utils/imageCompressor';
 
 export default function StudentProfilePage() {
-  const { user } = useAuth();
+  const { user, updateUser } = useAuth();
   const location = useLocation();
 
   const [loading, setLoading] = useState(true);
@@ -67,6 +67,14 @@ export default function StudentProfilePage() {
           if (Array.isArray(res.data.guardians)) {
             setGuardians(res.data.guardians);
           }
+
+          // Đồng bộ với AuthContext cho Header và Sidebar
+          if (prof.avatarUrl && prof.avatarUrl !== user?.avatarUrl) {
+            updateUser({ avatarUrl: prof.avatarUrl });
+          }
+          if (prof.fullName && prof.fullName !== user?.fullName) {
+            updateUser({ fullName: prof.fullName });
+          }
         }
       } catch (err) {
         console.warn('Error fetching profile from API:', err);
@@ -108,6 +116,9 @@ export default function StudentProfilePage() {
         area: profile.area,
         freeSchedule: profile.freeSchedule
       });
+      if (profile.fullName) {
+        updateUser({ fullName: profile.fullName });
+      }
       setMessage({ type: 'success', text: 'Cập nhật hồ sơ cá nhân thành công!' });
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err) {
@@ -135,6 +146,7 @@ export default function StudentProfilePage() {
       const newUrl = res.data?.avatarUrl || res.data?.url;
       if (newUrl) {
         setProfile((prev) => ({ ...prev, avatarUrl: newUrl }));
+        updateUser({ avatarUrl: newUrl });
       }
       setMessage({ type: 'success', text: 'Cập nhật ảnh đại diện thành công!' });
     } catch {

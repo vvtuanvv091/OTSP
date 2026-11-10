@@ -179,8 +179,8 @@ export default function ClassDetailModal({ classId, initialData = null, onClose,
                     {c.type === 'Group' || c.type === 1 || !c.type ? 'Lớp nhóm tuyển sinh' : 'Lớp kèm 1-1'}
                   </span>
                   {isStarted && (
-                    <span className="badge rounded-pill px-3 py-1.5 fw-semibold" style={{ backgroundColor: '#fff7ed', color: '#b45309', border: '1px solid #fed7aa' }}>
-                      <i className="bi bi-clock-history me-1"></i>Đã khai giảng ({c.startDate}) · Đang tuyển sinh bổ sung
+                    <span className="badge rounded-pill px-3 py-1.5 fw-semibold" style={{ backgroundColor: '#fee2e2', color: '#b91c1c', border: '1px solid #fca5a5' }}>
+                      <i className="bi bi-lock-fill me-1"></i>Đã khai giảng ({c.startDate}) · Đóng tuyển sinh đợt này
                     </span>
                   )}
                   {isEnrolled && (
@@ -248,8 +248,8 @@ export default function ClassDetailModal({ classId, initialData = null, onClose,
                         {c.startDate ? c.startDate : 'Nhận học viên ngay'}
                       </strong>
                       {isStarted && (
-                        <span className="badge rounded-pill mt-1" style={{ backgroundColor: '#fff7ed', color: '#b45309', fontSize: '0.68rem', border: '1px solid #fed7aa' }}>
-                          Đang học dở dang
+                        <span className="badge rounded-pill mt-1" style={{ backgroundColor: '#fee2e2', color: '#b91c1c', fontSize: '0.68rem', border: '1px solid #fca5a5' }}>
+                          Đã khai giảng
                         </span>
                       )}
                     </div>
@@ -329,21 +329,6 @@ export default function ClassDetailModal({ classId, initialData = null, onClose,
                   </div>
                 </div>
 
-                {/* Lưu ý quyền lợi tuyển sinh bổ sung khi lớp đã qua ngày khai giảng */}
-                {isStarted && !isEnrolled && (
-                  <div className="p-3 rounded-3 mb-4" style={{ backgroundColor: '#fffbeb', border: '1px solid #fef08a', color: '#78350f' }}>
-                    <div className="d-flex align-items-center gap-2 fw-semibold mb-1">
-                      <i className="bi bi-info-circle-fill fs-5" style={{ color: '#b45309' }}></i>
-                      <span>Lưu ý khi đăng ký lớp học đã qua ngày khai giảng ({c.startDate}):</span>
-                    </div>
-                    <ul className="mb-0 ps-3 small" style={{ lineHeight: 1.65 }}>
-                      <li><strong>Tiến độ học tập:</strong> Lịch học của bạn sẽ bắt đầu tính từ buổi học kế tiếp sau khi được gia sư phê duyệt.</li>
-                      <li><strong>Quyền lợi bù kiến thức:</strong> Bạn được tự động mở toàn quyền truy cập tài liệu ôn tập, slide và video ghi hình (Recording) của các buổi trước đó trong kho tài liệu lớp.</li>
-                      <li><strong>Hỗ trợ kèm cặp:</strong> Gia sư phụ trách sẽ chủ động nhắn tin hỗ trợ tóm tắt kiến thức để bạn nhanh chóng hòa nhập cùng cả lớp.</li>
-                    </ul>
-                  </div>
-                )}
-
                 {/* Vùng thao tác đăng ký lớp học */}
                 <div className="border-top pt-3">
                   {isEnrolled ? (
@@ -360,6 +345,25 @@ export default function ClassDetailModal({ classId, initialData = null, onClose,
                     <div className="p-3 bg-secondary-subtle text-secondary border rounded-3 text-center fw-semibold">
                       <i className="bi bi-people-fill me-2 fs-5"></i>
                       Lớp học này hiện đã đủ sĩ số học viên (sĩ số tối đa: {c.maxStudents}).
+                    </div>
+                  ) : isStarted ? (
+                    <div className="p-4 bg-light border border-danger-subtle rounded-3 text-center">
+                      <div className="mx-auto mb-2 d-inline-flex align-items-center justify-content-center" style={{ width: 44, height: 44, borderRadius: '50%', backgroundColor: 'rgba(219, 48, 58, 0.1)', color: '#DB303A' }}>
+                        <i className="bi bi-calendar-x fs-4"></i>
+                      </div>
+                      <h6 className="fw-bold text-dark mb-1">Lớp học đã bắt đầu từ ngày {c.startDate} và đã chốt danh sách</h6>
+                      <p className="text-secondary small mb-3">
+                        Để đảm bảo tất cả học viên trong nhóm cùng học chung tiến độ từ đầu, lớp này hiện đã đóng nhận học viên mới.
+                      </p>
+                      {tutorContactId && (
+                        <Link
+                          to={`/chat?contactId=${tutorContactId}&inquiry=1&classTitle=${encodeURIComponent(c.nameClass || c.title || '')}`}
+                          className="btn btn-outline-danger rounded-pill px-4 py-2 btn-sm fw-semibold"
+                          onClick={onClose}
+                        >
+                          <i className="bi bi-chat-dots-fill me-1.5"></i>Nhắn tin gia sư để đăng ký đợt học kế tiếp
+                        </Link>
+                      )}
                     </div>
                   ) : !user ? (
                     <div className="p-3 bg-light border rounded-3 text-center">
