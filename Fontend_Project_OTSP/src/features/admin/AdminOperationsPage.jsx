@@ -51,6 +51,9 @@ export default function AdminOperationsPage() {
   const [message, setMessage] = useState('');
   const [newsForm, setNewsForm] = useState({ id: null, title: '', category: '', content: '' });
   const [accountForm, setAccountForm] = useState({ fullName: '', email: '', role: 'Student_Parent' });
+  const [selectedPayout, setSelectedPayout] = useState(null);
+  const [payoutLoading, setPayoutLoading] = useState(false);
+  const [payoutNote, setPayoutNote] = useState('');
 
   if (prevMode !== mode) {
     setPrevMode(mode);
@@ -179,6 +182,27 @@ export default function AdminOperationsPage() {
     try { await adminOperationsApi.updateAlert(alert.id, nextStatus); setMessage('Đã cập nhật cảnh báo.'); const result = await adminOperationsApi.getAlerts({ search: query, page, pageSize: PAGE_SIZE, ...(status !== 'all' ? { status } : {}) }); setData(result.data); }
     catch (requestError) { setError(errorText(requestError, 'Không thể cập nhật cảnh báo.')); }
     finally { setBusyId(null); }
+  };
+
+  const handleConfirmPayout = async () => {
+    if (!selectedPayout) return;
+    setPayoutLoading(true);
+    clearFeedback();
+    try {
+      const res = await adminOperationsApi.settlePayout({
+        tutorId: selectedPayout.tutorId,
+        period,
+        note: payoutNote.trim() || 'Admin đã thanh toán thu nhập qua mã VietQR'
+      });
+      setMessage(res.data?.message || `Đã ghi nhận thanh toán thành công và gửi thông báo cho gia sư ${selectedPayout.tutorName}!`);
+      setSelectedPayout(null);
+      const result = await adminOperationsApi.getReconciliation(period);
+      setData(result.data);
+    } catch (requestError) {
+      setError(errorText(requestError, 'Không thể xử lý quyết toán cho gia sư.'));
+    } finally {
+      setPayoutLoading(false);
+    }
   };
 
   const pageData = useMemo(() => {
@@ -369,10 +393,90 @@ export default function AdminOperationsPage() {
       </>}
 
       {mode === 'reconciliation' && <>
-        <div className="admin-reconciliation-toolbar"><label>Kỳ đối soát<input type="month" value={period} onChange={(event) => setPeriod(event.target.value)} /></label><button type="button" className="admin-action" onClick={() => downloadCsv(`doi-soat-${period}.csv`, [['Gia sư', 'Số giao dịch', 'Tổng học phí', 'Phí nền tảng', 'Thực nhận'], ...(data?.items || []).map((x) => [x.tutorName, x.transactionCount, x.totalRevenue, x.platformFee, x.tutorNet])])}><i className="bi bi-download" /> Xuất đối soát</button></div>
-        <AdminStats items={[{ label: 'Tổng học phí thành công', value: money(data?.totals?.totalRevenue) }, { label: `Phí nền tảng (${Number(data?.platformFeeRate || 0) * 100}%)`, value: money(data?.totals?.platformFee) }, { label: 'Gia sư thực nhận', value: money(data?.totals?.tutorNet) }]} />
-        <section className="admin-panel"><div className="admin-panel-heading">Đối soát theo gia sư <span className="admin-count">{data?.items?.length || 0}</span></div><div className="admin-table-scroll"><table className="admin-table"><thead><tr><th>Gia sư</th><th>Số giao dịch</th><th>Tổng học phí</th><th>Phí nền tảng</th><th>Thực nhận</th></tr></thead><tbody>{loading ? renderRows(5, false, '') : !data?.items?.length ? <tr><td className="admin-table-state" colSpan="5">Kỳ này chưa có giao dịch thành công.</td></tr> : data.items.map((item) => <tr key={item.tutorId}><td>{item.tutorName}</td><td>{item.transactionCount}</td><td>{money(item.totalRevenue)}</td><td>{money(item.platformFee)}</td><td><strong>{money(item.tutorNet)}</strong></td></tr>)}</tbody></table></div></section>
-        <aside className="admin-note"><i className="bi bi-info-circle" /><div><strong>Phạm vi dữ liệu</strong>Số liệu tính từ giao dịch Success trong tháng được chọn; phí nền tảng theo tỷ lệ 20%. Đây là báo cáo đối chiếu, không tự chuyển tiền.</div></aside>
+        <div className="admin-reconciliation-toolbar">
+          <label>Kỳ đối soát<input type="month" value={period} onChange={(event) => setPeriod(event.target.value)} /></label>
+          <button type="button" className="admin-action" onClick={() => downloadCsv(`doi-soat-${period}.csv`, [['Gia sư', 'Số giao dịch', 'Tổng học phí', 'Phí nền tảng', 'Thực nhận', 'Trạng thái'], ...(data?.items || []).map((x) => [x.tutorName, x.transactionCount, x.totalRevenue, x.platformFee, x.tutorNet, x.isSettled ? 'Đã quyết toán' : 'Chờ giải ngân'])])}>
+            <i className="bi bi-download" /> Xuất đối soát
+          </button>
+        </div>
+        <AdminStats items={[
+          { label: 'Tổng học phí thành công', value: money(data?.totals?.totalRevenue) },
+          { label: `Phí nền tảng (${Number(data?.platformFeeRate || 0) * 100}%)`, value: money(data?.totals?.platformFee) },
+          { label: 'Gia sư thực nhận (80%)', value: money(data?.totals?.tutorNet) }
+        ]} />
+        <section className="admin-panel">
+          <div className="admin-panel-heading">
+            Đối soát &amp; Chi trả thu nhập gia sư <span className="admin-count">{data?.items?.length || 0}</span>
+          </div>
+          <div className="admin-table-scroll">
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th>Gia sư</th>
+                  <th>Số giao dịch</th>
+                  <th>Tổng học phí</th>
+                  <th>Phí sàn (20%)</th>
+                  <th>Thực nhận</th>
+                  <th>Trạng thái</th>
+                  <th>Thao tác chi trả</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? renderRows(7, false, '') : !data?.items?.length ? (
+                  <tr><td className="admin-table-state" colSpan="7">Kỳ này chưa có giao dịch thành công.</td></tr>
+                ) : data.items.map((item) => (
+                  <tr key={item.tutorId}>
+                    <td>
+                      <strong>{item.tutorName}</strong>
+                      {item.bankAccount?.bankName && (
+                        <span className="admin-table-secondary">
+                          {item.bankAccount.bankName} - {item.bankAccount.accountNumber} ({item.bankAccount.accountHolder})
+                        </span>
+                      )}
+                    </td>
+                    <td>{item.transactionCount}</td>
+                    <td>{money(item.totalRevenue)}</td>
+                    <td>{money(item.platformFee)}</td>
+                    <td><strong style={{ color: '#16834c' }}>{money(item.tutorNet)}</strong></td>
+                    <td>
+                      <span className={`admin-status ${item.isSettled ? 'is-active' : 'is-pending'}`}>
+                        <i className={`bi ${item.isSettled ? 'bi-check-circle-fill' : 'bi-hourglass-split'} me-1`} />
+                        {item.isSettled ? 'Đã quyết toán' : 'Chờ giải ngân'}
+                      </span>
+                    </td>
+                    <td>
+                      {item.isSettled ? (
+                        <button
+                          type="button"
+                          className="admin-action"
+                          onClick={() => { setSelectedPayout(item); setPayoutNote(''); }}
+                        >
+                          <i className="bi bi-eye me-1" />Xem QR &amp; Chi tiết
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          className="admin-action is-approve"
+                          style={{ background: '#db303a', borderColor: '#db303a', color: '#fff', fontWeight: 600 }}
+                          onClick={() => { setSelectedPayout(item); setPayoutNote(''); }}
+                        >
+                          <i className="bi bi-qr-code-scan me-1" />Chi trả VietQR
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+        <aside className="admin-note">
+          <i className="bi bi-info-circle" />
+          <div>
+            <strong>Quy trình chuyển tiền &amp; quyết toán:</strong>
+            Admin bấm <em>"Chi trả VietQR"</em> để quét mã QR ngân hàng của gia sư (đã tích hợp chính xác số tiền thực nhận). Sau khi chuyển khoản qua Internet Banking, bấm <em>"Xác nhận đã chuyển tiền"</em> để hệ thống tự động ghi nhận quyết toán thành công và gửi thông báo trực tiếp đến tài khoản gia sư.
+          </div>
+        </aside>
       </>}
 
       {mode === 'accounts' && <>
@@ -395,6 +499,119 @@ export default function AdminOperationsPage() {
         <section className="admin-panel"><div className="admin-panel-heading">Hoạt động 14 ngày gần đây</div><div className="admin-ai-chart">{(data?.recentActivity || []).map((item) => <div className="admin-ai-bar" key={item.date}><span title={`${item.count} lượt` } style={{ height: `${Math.max(6, Math.min(100, item.count * 8))}%` }} /><small>{date(item.date)}</small><b>{item.count}</b></div>)}{!loading && !data?.recentActivity?.length && <p>Chưa có lượt sử dụng trong 14 ngày gần đây.</p>}</div></section>
         <aside className="admin-note"><i className="bi bi-shield-lock" /><div><strong>Bảo vệ dữ liệu học viên</strong>Trang chỉ tổng hợp số lượt và không hiển thị nội dung câu hỏi hoặc câu trả lời.</div></aside>
       </>}
+
+      {selectedPayout && (
+        <div className="modal show d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1050 }}>
+          <div className="modal-dialog modal-dialog-centered" style={{ maxWidth: 520 }}>
+            <div className="modal-content border-0 shadow-lg rounded-4">
+              <div className="modal-header border-0 pb-0">
+                <div>
+                  <h5 className="modal-title fw-bold text-dark">
+                    <i className="bi bi-cash-stack text-danger me-2"></i>
+                    {selectedPayout.isSettled ? 'Chi tiết quyết toán thu nhập' : 'Chi trả thu nhập qua VietQR'}
+                  </h5>
+                  <p className="text-muted small mb-0">Kỳ đối soát: <strong>{period}</strong></p>
+                </div>
+                <button type="button" className="btn-close" onClick={() => setSelectedPayout(null)} aria-label="Đóng"></button>
+              </div>
+
+              <div className="modal-body py-3">
+                <div className="p-3 rounded-3 mb-3" style={{ background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+                  <div className="d-flex justify-content-between align-items-center mb-2">
+                    <span className="text-secondary small">Gia sư thụ hưởng:</span>
+                    <strong className="text-dark">{selectedPayout.tutorName}</strong>
+                  </div>
+                  <div className="d-flex justify-content-between align-items-center mb-2">
+                    <span className="text-secondary small">Số tiền thực nhận (80%):</span>
+                    <span className="fs-5 fw-bold text-success">{money(selectedPayout.tutorNet)}</span>
+                  </div>
+                  <div className="d-flex justify-content-between align-items-center mb-2">
+                    <span className="text-secondary small">Ngân hàng:</span>
+                    <strong className="text-dark">{selectedPayout.bankAccount?.bankName || 'Chưa cung cấp'}</strong>
+                  </div>
+                  <div className="d-flex justify-content-between align-items-center mb-2">
+                    <span className="text-secondary small">Số tài khoản:</span>
+                    <strong className="text-primary font-monospace">{selectedPayout.bankAccount?.accountNumber || 'Chưa cung cấp'}</strong>
+                  </div>
+                  <div className="d-flex justify-content-between align-items-center">
+                    <span className="text-secondary small">Chủ tài khoản:</span>
+                    <strong className="text-dark text-uppercase">{selectedPayout.bankAccount?.accountHolder || selectedPayout.tutorName}</strong>
+                  </div>
+                </div>
+
+                {/* QR Code container */}
+                <div className="text-center p-3 rounded-3 mb-3" style={{ background: '#fff', border: '1px dashed #cbd5e1' }}>
+                  {selectedPayout.bankAccount?.qrImageUrl ? (
+                    <div>
+                      <div className="small fw-semibold text-danger mb-2">
+                        <i className="bi bi-qr-code-scan me-1"></i>Mã VietQR đã tích hợp số tiền {money(selectedPayout.tutorNet)}
+                      </div>
+                      <img
+                        src={selectedPayout.bankAccount.qrImageUrl}
+                        alt="Mã VietQR"
+                        className="img-fluid rounded-3 shadow-sm"
+                        style={{ maxHeight: 260 }}
+                      />
+                      <div className="small text-muted mt-2">
+                        Mở ứng dụng Ngân hàng trên điện thoại để quét mã chuyển tiền nhanh.
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="py-4 text-warning">
+                      <i className="bi bi-exclamation-triangle fs-2 d-block mb-1"></i>
+                      Gia sư chưa thiết lập thông tin ngân hàng trong mục Thu nhập. Vui lòng liên hệ gia sư cập nhật trước khi chuyển khoản.
+                    </div>
+                  )}
+                </div>
+
+                {!selectedPayout.isSettled ? (
+                  <div>
+                    <label className="form-label small fw-semibold text-dark">Ghi chú giao dịch / Mã tham chiếu ngân hàng:</label>
+                    <input
+                      type="text"
+                      className="form-control form-control-sm"
+                      placeholder="Ví dụ: Đã chuyển khoản qua MBBank lúc 10:30..."
+                      value={payoutNote}
+                      onChange={(e) => setPayoutNote(e.target.value)}
+                    />
+                  </div>
+                ) : (
+                  <div className="alert alert-success py-2 px-3 small mb-0 rounded-3">
+                    <i className="bi bi-check-circle-fill me-1"></i>
+                    Khoản thu nhập này đã được quyết toán và thông báo xác nhận thành công đã gửi đến gia sư.
+                  </div>
+                )}
+              </div>
+
+              <div className="modal-footer border-0 pt-0">
+                <button type="button" className="btn btn-sm btn-secondary" onClick={() => setSelectedPayout(null)}>
+                  Đóng
+                </button>
+                {!selectedPayout.isSettled && (
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-danger fw-semibold px-3"
+                    disabled={payoutLoading}
+                    onClick={handleConfirmPayout}
+                  >
+                    {payoutLoading ? (
+                      <>
+                        <span className="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                        Đang xử lý...
+                      </>
+                    ) : (
+                      <>
+                        <i className="bi bi-check-lg me-1"></i>
+                        Xác nhận đã chuyển tiền cho gia sư
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

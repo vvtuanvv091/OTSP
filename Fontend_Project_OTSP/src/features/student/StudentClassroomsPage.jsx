@@ -290,7 +290,7 @@ export default function StudentClassroomsPage() {
             (s) => s.status === 'Done' || s.status === 1 || s.isCompleted
           ).length;
           const hasLive = sessions.some(
-            (s) => s.status === 'InProgress' || s.status === 3
+            (s) => (s.status === 'InProgress' || s.status === 3) && s.canJoin
           );
           const progressPercent = totalSessions ? Math.round((doneCount / totalSessions) * 100) : 0;
 
@@ -525,8 +525,8 @@ export default function StudentClassroomsPage() {
                             ) : s.canJoin && !isCancelled ? (
                               <Link
                                 to={`/room/${s.sessionId}`}
-                                className="btn btn-sm btn-danger px-3.5 py-1.5 fw-semibold d-inline-flex align-items-center gap-1"
-                                style={{ backgroundColor: '#dc3545', borderColor: '#dc3545' }}
+                                className="btn btn-sm btn-danger px-3.5 py-1.5 fw-semibold d-inline-flex align-items-center gap-1 shadow-sm"
+                                style={{ backgroundColor: '#dc2626', borderColor: '#dc2626' }}
                               >
                                 <i className="bi bi-camera-video me-1"></i>Vào lớp
                               </Link>
@@ -536,9 +536,9 @@ export default function StudentClassroomsPage() {
                                 className="btn btn-sm"
                                 disabled
                                 style={{
-                                  border: '1px solid #fca5a5',
-                                  background: 'transparent',
-                                  color: '#ef4444',
+                                  border: '1px solid #cbd5e1',
+                                  background: '#f8fafc',
+                                  color: '#64748b',
                                   borderRadius: 6,
                                   padding: '5px 16px',
                                   fontSize: 13,
@@ -547,7 +547,7 @@ export default function StudentClassroomsPage() {
                                   cursor: 'not-allowed'
                                 }}
                               >
-                                Chưa tới ngày
+                                Chưa mở lớp
                               </button>
                             )}
                           </div>

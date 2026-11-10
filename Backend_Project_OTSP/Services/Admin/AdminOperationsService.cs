@@ -238,14 +238,116 @@ public sealed class AdminOperationsService : IAdminOperationsService
     {
         var selectedPeriod = DateTime.TryParseExact(period, "yyyy-MM", null, System.Globalization.DateTimeStyles.None, out var parsed)
             ? parsed : DateTime.UtcNow;
+        var periodStr = selectedPeriod.ToString("yyyy-MM");
         var from = new DateTime(selectedPeriod.Year, selectedPeriod.Month, 1, 0, 0, 0, DateTimeKind.Utc);
         var to = from.AddMonths(1);
         var rows = await _db.Payments.AsNoTracking().Where(x => x.Status == PaymentStatus.Success && x.PaidAt >= from && x.PaidAt < to)
-            .GroupBy(x => new { x.Classroom.TutorId, TutorName = x.Classroom.Tutor.User.FullName })
-            .Select(g => new { tutorId = g.Key.TutorId, tutorName = g.Key.TutorName, transactionCount = g.Count(), gross = g.Sum(x => x.Amount) })
+            .GroupBy(x => new { x.Classroom.TutorId, TutorName = x.Classroom.Tutor.User.FullName, TutorEmail = x.Classroom.Tutor.User.Email, TutorUserId = x.Classroom.Tutor.UserId })
+            .Select(g => new { tutorId = g.Key.TutorId, tutorName = g.Key.TutorName, tutorEmail = g.Key.TutorEmail, tutorUserId = g.Key.TutorUserId, transactionCount = g.Count(), gross = g.Sum(x => x.Amount) })
             .OrderByDescending(x => x.gross).ToListAsync(ct);
-        var items = rows.Select(x => new { x.tutorId, x.tutorName, x.transactionCount, totalRevenue = x.gross, platformFee = decimal.Round(x.gross * PlatformFeeRate, 0), tutorNet = x.gross - decimal.Round(x.gross * PlatformFeeRate, 0) }).ToList();
-        return new { period = from.ToString("yyyy-MM"), platformFeeRate = PlatformFeeRate, totals = new { transactionCount = items.Sum(x => x.transactionCount), totalRevenue = items.Sum(x => x.totalRevenue), platformFee = items.Sum(x => x.platformFee), tutorNet = items.Sum(x => x.tutorNet) }, items };
+
+        var settledReconciliations = await _db.Reconciliations.AsNoTracking()
+            .Where(r => r.Period == periodStr)
+            .ToListAsync(ct);
+        var settledMap = settledReconciliations.ToDictionary(r => r.TutorId);
+
+        var defaultBank = "MBBank";
+        var defaultAccountNo = "0984391940";
+
+        var items = rows.Select(x =>
+        {
+            var platformFee = decimal.Round(x.gross * PlatformFeeRate, 0);
+            var tutorNet = x.gross - platformFee;
+            var isSettled = settledMap.TryGetValue(x.tutorId, out var rec);
+            var accountHolder = x.tutorName?.ToUpperInvariant() ?? "GIA SU";
+            var qrUrl = $"https://img.vietqr.io/image/MB-{defaultAccountNo}-compact.png?amount={(long)tutorNet}&addInfo={Uri.EscapeDataString($"OTSP Luong T{selectedPeriod.Month}/{selectedPeriod.Year}")}&accountName={Uri.EscapeDataString(accountHolder)}";
+
+            return new
+            {
+                x.tutorId,
+                x.tutorName,
+                x.tutorEmail,
+                x.tutorUserId,
+                x.transactionCount,
+                totalRevenue = x.gross,
+                platformFee,
+                tutorNet,
+                isSettled,
+                settledAt = isSettled ? rec?.CreatedDate.ToString("yyyy-MM-dd") : null,
+                bankAccount = new
+                {
+                    bankName = defaultBank,
+                    accountNumber = defaultAccountNo,
+                    accountHolder,
+                    qrImageUrl = qrUrl
+                }
+            };
+        }).ToList();
+
+        return new
+        {
+            period = periodStr,
+            platformFeeRate = PlatformFeeRate,
+            totals = new
+            {
+                transactionCount = items.Sum(x => x.transactionCount),
+                totalRevenue = items.Sum(x => x.totalRevenue),
+                platformFee = items.Sum(x => x.platformFee),
+                tutorNet = items.Sum(x => x.tutorNet),
+                settledCount = items.Count(x => x.isSettled),
+                pendingCount = items.Count(x => !x.isSettled)
+            },
+            items
+        };
+    }
+
+    public async Task<(bool Success, string? Error)> SettleTutorPayoutAsync(int tutorId, string period, string adminUserId, CancellationToken ct)
+    {
+        var tutor = await _db.TutorProfiles.Include(t => t.User).FirstOrDefaultAsync(t => t.Id == tutorId, ct);
+        if (tutor == null) return (false, "Không tìm thấy hồ sơ gia sư.");
+
+        var periodStr = string.IsNullOrWhiteSpace(period) ? DateTime.UtcNow.ToString("yyyy-MM") : period.Trim();
+        var exists = await _db.Reconciliations.AnyAsync(r => r.TutorId == tutorId && r.Period == periodStr, ct);
+        if (exists) return (false, $"Gia sư {tutor.User.FullName} đã được quyết toán cho kỳ {periodStr}.");
+
+        var adminProfile = await _db.AdminProfiles.FirstOrDefaultAsync(a => a.UserId == adminUserId, ct);
+        if (adminProfile == null)
+        {
+            adminProfile = new AdminProfile { UserId = adminUserId };
+            _db.AdminProfiles.Add(adminProfile);
+            await _db.SaveChangesAsync(ct);
+        }
+
+        var selectedPeriod = DateTime.TryParseExact(periodStr, "yyyy-MM", null, System.Globalization.DateTimeStyles.None, out var parsed) ? parsed : DateTime.UtcNow;
+        var from = new DateTime(selectedPeriod.Year, selectedPeriod.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+        var to = from.AddMonths(1);
+        var gross = await _db.Payments.AsNoTracking()
+            .Where(x => x.Status == PaymentStatus.Success && x.Classroom.TutorId == tutorId && x.PaidAt >= from && x.PaidAt < to)
+            .SumAsync(x => x.Amount, ct);
+
+        var net = gross - decimal.Round(gross * PlatformFeeRate, 0);
+
+        var rec = new Reconciliation
+        {
+            Period = periodStr,
+            TotalRevenue = gross,
+            CreatedDate = DateOnly.FromDateTime(DateTime.UtcNow),
+            TutorId = tutorId,
+            AdminId = adminProfile.Id
+        };
+        _db.Reconciliations.Add(rec);
+
+        _db.Notifications.Add(new Notification
+        {
+            UserId = tutor.UserId,
+            Title = $"Quyết toán thu nhập kỳ {periodStr}",
+            Content = $"Admin đã quyết toán và giải ngân khoản thu nhập {net:N0} đ kỳ {periodStr} cho bạn. Bạn có thể kiểm tra chi tiết tại trang Thu nhập.",
+            CreatedAt = DateTime.UtcNow,
+            IsRead = false
+        });
+
+        await _db.SaveChangesAsync(ct);
+        return (true, null);
     }
 
     public async Task<object> GetAccountsAsync(AdminOperationsQuery query, CancellationToken ct)

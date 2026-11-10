@@ -13,6 +13,7 @@ export const adminOperationsApi = {
   deleteNews: (id) => axiosClient.delete(`${base}/news/${id}`),
   getPayments: (params) => axiosClient.get(`${base}/payments`, { params }),
   getReconciliation: (period) => axiosClient.get(`${base}/reconciliation`, { params: { period } }),
+  settlePayout: (data) => axiosClient.post(`${base}/reconciliation/settle`, data),
   getAccounts: (params) => axiosClient.get(`${base}/accounts`, { params }),
   createAccount: (data) => axiosClient.post(`${base}/accounts`, data),
   changeAccountRole: (id, role) => axiosClient.put(`${base}/accounts/${encodeURIComponent(id)}/role`, { role }),

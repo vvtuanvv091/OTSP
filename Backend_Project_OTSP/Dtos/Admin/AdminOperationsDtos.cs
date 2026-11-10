@@ -40,3 +40,10 @@ public sealed class AdminAlertStatusRequest
 {
     [Required] public AlertStatus Status { get; set; }
 }
+
+public sealed class AdminSettlePayoutRequest
+{
+    [Required] public int TutorId { get; set; }
+    [Required] public string Period { get; set; } = "";
+    [StringLength(500)] public string? Note { get; set; }
+}

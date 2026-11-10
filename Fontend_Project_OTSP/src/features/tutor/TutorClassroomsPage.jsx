@@ -210,22 +210,29 @@ export default function TutorClassroomsPage() {
               {classrooms.map((c) => {
                 const isGroup = c.type === 'Group' || c.type === 1;
                 const statusLabel = c.status === 'Active' ? 'Đang mở' : c.status === 'Completed' ? 'Đã hoàn thành' : 'Đã hủy';
-                const statusBadge = c.status === 'Active' ? 'bg-success-subtle text-success border border-success-subtle' : c.status === 'Completed' ? 'bg-secondary-subtle text-secondary border border-secondary-subtle' : 'bg-danger-subtle text-danger border border-danger-subtle';
                 const progressPct = c.totalSessions > 0 ? Math.round((c.completedSessions / c.totalSessions) * 100) : 0;
 
                 const rawName = c.nameClass?.trim() || c.name?.trim() || '';
-                const cleanDisplayName = rawName
-                  ? rawName.replace(/\s*\([T|Thứ|Chủ nhật][^)]+\)/gi, '').replace(/\s*\([^)]*·[^)]*\)/gi, '').trim()
-                  : (isGroup ? `Nhóm ${c.subjectName}` : `Lớp 1-1 ${c.subjectName}`);
-                const cleanSchedule = c.formattedSchedule || c.scheduleSummary || 'Chưa xếp';
+                let cleanDisplayName = rawName
+                  .replace(/\s*\([^)]*\)/g, '')
+                  .replace(/\s*\([^)]*\)/g, '')
+                  .trim();
+                if (!cleanDisplayName) {
+                  cleanDisplayName = isGroup ? `Nhóm ${c.subjectName}` : `Lớp 1-1 ${c.subjectName}`;
+                } else if (isGroup && !cleanDisplayName.toLowerCase().startsWith('nhóm') && !cleanDisplayName.toLowerCase().startsWith('lớp')) {
+                  cleanDisplayName = `Nhóm ${cleanDisplayName}`;
+                }
+
+                const cleanSchedule = c.formattedSchedule || c.scheduleSummary || 'Chưa xếp lịch';
 
                 return (
                   <div key={c.id} className="col" style={{ maxWidth: classrooms.length === 1 ? 460 : undefined }}>
-                    <div className="card tutor-classroom-card h-100 rounded-3 p-3 p-sm-3.5 d-flex flex-column justify-content-between">
+                    <div className="card tutor-classroom-card h-100 rounded-3 p-3 p-sm-3.5 d-flex flex-column justify-content-between shadow-sm">
                       <div>
-                        <div className="d-flex align-items-start gap-2.5">
+                        {/* Header: Avatar/Icon + Title + Badges */}
+                        <div className="d-flex align-items-start gap-3">
                           {c.coverImageUrl ? (
-                            <div className="position-relative flex-shrink-0" style={{ width: 60, height: 60 }}>
+                            <div className="position-relative flex-shrink-0" style={{ width: 56, height: 56 }}>
                               <img
                                 src={resolveAssetUrl(c.coverImageUrl)}
                                 alt={cleanDisplayName}
@@ -234,54 +241,76 @@ export default function TutorClassroomsPage() {
                               />
                             </div>
                           ) : (
-                            <div className="tutor-fee-badge p-2 rounded-3 text-center d-flex flex-column justify-content-center flex-shrink-0">
-                              <span className="text-secondary small" style={{ fontSize: '0.72rem', lineHeight: 1.2 }}>Học phí</span>
-                              <span className="fw-bold text-danger mt-0.5" style={{ fontSize: '0.9rem', lineHeight: 1.2 }}>
-                                {formatPrice(c.fee)} đ
-                              </span>
+                            <div
+                              className="rounded-3 d-flex align-items-center justify-content-center flex-shrink-0 shadow-sm"
+                              style={{ width: 56, height: 56, background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)', border: '1px solid #bfdbfe' }}
+                            >
+                              <i className="bi bi-cpu fs-3 text-primary"></i>
                             </div>
                           )}
 
-                          <div className="flex-grow-1 min-w-0 ms-2">
-                            <div className="d-flex align-items-start justify-content-between gap-1 mb-1">
-                              <div className="fw-bold text-dark text-truncate" style={{ fontSize: '0.95rem' }} title={cleanDisplayName}>
-                                <i className="bi bi-collection-play-fill text-danger me-1"></i>
-                                <span className="text-dark fw-bold">{cleanDisplayName}</span>
-                              </div>
-                              {c.coverImageUrl && (
-                                <span className="badge bg-danger-subtle text-danger fw-bold text-nowrap px-2 py-0.5" style={{ fontSize: '0.8rem' }}>
-                                  {formatPrice(c.fee)} đ
-                                </span>
-                              )}
-                            </div>
+                          <div className="flex-grow-1 min-w-0">
+                            <h3 className="h6 fw-bold mb-1 text-dark text-truncate" title={cleanDisplayName} style={{ fontSize: '1rem', lineHeight: 1.3 }}>
+                              {cleanDisplayName}
+                            </h3>
 
-                            <div className="small text-secondary text-truncate mb-1" title={cleanSchedule}>
-                              <i className="bi bi-calendar3 me-1 text-danger"></i>Lịch học: <b>{cleanSchedule}</b>
-                            </div>
+                            {/* Badges row matching mockup */}
+                            <div className="d-flex align-items-center gap-1 flex-wrap mt-1">
+                              <span className="badge fw-semibold d-inline-flex align-items-center gap-1 px-2 py-1 rounded-pill text-white" style={{ backgroundColor: '#dc2626', fontSize: '0.72rem' }}>
+                                <i className="bi bi-tag-fill" style={{ fontSize: '0.65rem' }}></i>
+                                {formatPrice(c.fee)} đ
+                              </span>
 
-                            <div className="d-flex align-items-center gap-1.5 flex-wrap">
-                              <span className="small text-secondary text-nowrap me-1">
-                                <i className="bi bi-people me-1 text-muted"></i>Sĩ số: <b>{c.studentCount}{isGroup ? `/${c.maxStudents}` : ''} hv</b>
+                              <span className="badge fw-semibold d-inline-flex align-items-center gap-1 px-2 py-1 rounded-pill text-white" style={{ backgroundColor: '#0284c7', fontSize: '0.72rem' }}>
+                                <i className="bi bi-book-half" style={{ fontSize: '0.65rem' }}></i>
+                                {c.subjectName} - {c.gradeLevelName || 'Tiểu học'}
                               </span>
-                              <span className={`badge ${!isGroup ? 'bg-info-subtle text-info-emphasis border border-info-subtle' : 'bg-primary-subtle text-primary-emphasis border border-primary-subtle'}`} style={{ fontSize: '0.72rem' }}>
-                                {!isGroup ? 'Lớp 1-1' : 'Lớp nhóm'}
+
+                              <span className="badge fw-semibold d-inline-flex align-items-center gap-1 px-2 py-1 rounded-pill text-white" style={{ backgroundColor: '#6366f1', fontSize: '0.72rem' }}>
+                                <i className="bi bi-people-fill" style={{ fontSize: '0.65rem' }}></i>
+                                {isGroup ? 'Lớp nhóm' : 'Lớp 1-1'}
                               </span>
-                              <span className={`badge ${statusBadge}`} style={{ fontSize: '0.72rem' }}>
+
+                              <span className="badge fw-semibold d-inline-flex align-items-center gap-1 px-2 py-1 rounded-pill text-white" style={{ backgroundColor: c.status === 'Active' ? '#16a34a' : '#64748b', fontSize: '0.72rem' }}>
+                                <i className="bi bi-check-circle-fill" style={{ fontSize: '0.65rem' }}></i>
                                 {statusLabel}
                               </span>
                             </div>
                           </div>
                         </div>
 
-                        {/* Progress */}
-                        <div className="mt-3 pt-2.5 border-top">
-                          <div className="d-flex justify-content-between align-items-center small mb-1.5">
+                        {/* Middle Box: Lịch học + Sĩ số */}
+                        <div className="p-2.5 rounded-3 mt-3 d-flex align-items-center justify-content-between" style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0' }}>
+                          <div className="d-flex align-items-center gap-2 min-w-0" style={{ flex: '1 1 55%' }}>
+                            <i className="bi bi-calendar3 fs-4 text-secondary flex-shrink-0"></i>
+                            <div className="min-w-0">
+                              <div className="text-muted" style={{ fontSize: '0.72rem', lineHeight: 1.1 }}>Lịch học</div>
+                              <div className="fw-bold text-dark text-truncate" style={{ fontSize: '0.825rem' }} title={cleanSchedule}>
+                                {cleanSchedule}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="d-flex align-items-center gap-2 flex-shrink-0" style={{ flex: '1 1 45%', justifyContent: 'flex-end' }}>
+                            <i className="bi bi-people fs-4 text-secondary flex-shrink-0"></i>
+                            <div>
+                              <div className="text-muted" style={{ fontSize: '0.72rem', lineHeight: 1.1 }}>Sĩ số</div>
+                              <div className="fw-bold text-dark" style={{ fontSize: '0.825rem' }}>
+                                {c.studentCount}/{isGroup ? (c.maxStudents || 5) : 1} học viên
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Tiến độ giảng dạy */}
+                        <div className="mt-3">
+                          <div className="d-flex justify-content-between align-items-center small mb-1">
                             <span className="text-secondary" style={{ fontSize: '0.8rem' }}>Tiến độ giảng dạy</span>
                             <span className="fw-bold text-dark" style={{ fontSize: '0.825rem' }}>
                               {c.completedSessions || 0}/{c.totalSessions || 0} buổi
                             </span>
                           </div>
-                          <div className="progress" style={{ height: 6, backgroundColor: '#E2E8F0', borderRadius: 999 }}>
+                          <div className="progress" style={{ height: 6, backgroundColor: '#e2e8f0', borderRadius: 999 }}>
                             <div
                               className="progress-bar progress-bar-custom"
                               role="progressbar"
@@ -298,19 +327,19 @@ export default function TutorClassroomsPage() {
                       <div className="d-flex align-items-center justify-content-between gap-2 mt-3 pt-3 border-top">
                         <Link
                           to={`/tutor/documents?classroomId=${c.id}`}
-                          className="btn btn-sm btn-outline-secondary px-2.5 px-sm-3 py-1.5 d-inline-flex align-items-center gap-1 rounded-2 text-nowrap flex-shrink-0"
-                          style={{ fontSize: '0.825rem' }}
+                          className="btn btn-sm btn-outline-secondary px-2.5 px-sm-3 py-1.5 d-inline-flex align-items-center gap-1.5 rounded-2 text-nowrap flex-shrink-0"
+                          style={{ fontSize: '0.825rem', borderColor: '#cbd5e1' }}
                           title="Xem tài liệu lớp học"
                         >
                           <i className="bi bi-folder2-open"></i><span>Tài liệu lớp</span>
                         </Link>
 
-                        <div className="d-flex align-items-center gap-1">
+                        <div className="d-flex align-items-center gap-1.5">
                           {c.status === 'Active' && (
                             <Link
                               to={`/tutor/classrooms/edit/${c.id}`}
-                              className="btn btn-sm btn-outline-danger px-2.5 px-sm-3 py-1.5 rounded-2 text-nowrap"
-                              style={{ fontSize: '0.825rem' }}
+                              className="btn btn-sm btn-outline-secondary px-2.5 px-sm-3 py-1.5 rounded-2 text-nowrap fw-medium"
+                              style={{ fontSize: '0.825rem', borderColor: '#cbd5e1' }}
                             >
                               Sửa lớp
                             </Link>
@@ -318,19 +347,19 @@ export default function TutorClassroomsPage() {
 
                           <Link
                             to="/tutor/schedule"
-                            className="btn btn-sm btn-danger px-2.5 px-sm-3 py-1.5 rounded-2 text-nowrap"
-                            style={{ fontSize: '0.825rem' }}
+                            className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1 px-2.5 px-sm-3 py-1.5 rounded-2 text-nowrap fw-medium"
+                            style={{ fontSize: '0.825rem', borderColor: '#cbd5e1' }}
                           >
-                            Lịch dạy
+                            <i className="bi bi-calendar3"></i><span>Lịch dạy</span>
                           </Link>
 
                           {/* Dropdown menu */}
                           <div className="dropdown">
                             <button
-                              className="btn btn-sm btn-light border px-2 py-1.5 rounded-2 text-secondary d-flex align-items-center justify-content-center"
+                              className="btn btn-sm btn-outline-secondary px-2 py-1.5 rounded-2 text-secondary d-flex align-items-center justify-content-center"
                               type="button"
                               data-bs-toggle="dropdown"
-                              style={{ height: 32, width: 32 }}
+                              style={{ height: 32, width: 32, borderColor: '#cbd5e1' }}
                               title="Thao tác khác"
                             >
                               <i className="bi bi-three-dots-vertical"></i>

@@ -347,8 +347,8 @@ export default function StudentSchedulePage() {
         }
 
         .schedule-session-card.status-inprogress {
-          border-left-color: #0284c7;
-          background: #f0f9ff;
+          border-left-color: #dc2626;
+          background: #fef2f2;
         }
 
         .schedule-session-card.status-done {
@@ -357,8 +357,8 @@ export default function StudentSchedulePage() {
         }
 
         .schedule-session-card.status-scheduled {
-          border-left-color: #dc2626;
-          background: #fef2f2;
+          border-left-color: #0284c7;
+          background: #f0f9ff;
         }
 
         .schedule-session-card.status-cancelled {
@@ -400,8 +400,8 @@ export default function StudentSchedulePage() {
         }
 
         [data-bs-theme="dark"] .schedule-session-card.status-inprogress {
-          background: #1e293b !important;
-          border-left-color: #38bdf8 !important;
+          background: #7f1d1d33 !important;
+          border-left-color: #f87171 !important;
         }
 
         [data-bs-theme="dark"] .schedule-session-card.status-done {
@@ -410,8 +410,8 @@ export default function StudentSchedulePage() {
         }
 
         [data-bs-theme="dark"] .schedule-session-card.status-scheduled {
-          background: #7f1d1d33 !important;
-          border-left-color: #f87171 !important;
+          background: #1e293b !important;
+          border-left-color: #38bdf8 !important;
         }
 
         [data-bs-theme="dark"] .schedule-session-card.status-cancelled {
@@ -773,12 +773,12 @@ export default function StudentSchedulePage() {
                                     : 'status-scheduled';
 
                                   const sessionBadgeClass = isLive
-                                    ? 'text-bg-primary'
+                                    ? 'text-bg-danger'
                                     : isDone
                                     ? 'text-bg-success'
                                     : isCancelled
                                     ? 'text-bg-secondary'
-                                    : 'text-bg-danger';
+                                    : 'text-bg-primary';
 
                                   const sessionBadgeLabel = isLive
                                     ? 'Đang diễn ra'

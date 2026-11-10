@@ -150,8 +150,14 @@ public class StudentClassroomApiController : ControllerBase
                 var endVn = sVn.AddHours(safeHours);
                 var isCompleted = s.Status == SessionStatus.Done ||
                                   (s.Status != SessionStatus.Cancelled && nowVn > endVn);
-                var canJoin = s.Status != SessionStatus.Cancelled && !isCompleted &&
-                              (s.Status == SessionStatus.InProgress || (s.Status == SessionStatus.Scheduled && sVn <= nowVn.AddMinutes(45) && nowVn <= endVn));
+                // Học viên CHỈ CÓ THỂ vào lớp khi Gia sư đã vào lớp / mở lớp (Status == InProgress) và đang trong khung giờ học
+                var isActuallyLive = s.Status == SessionStatus.InProgress && nowVn >= sVn.AddMinutes(-60) && nowVn <= endVn.AddHours(2);
+                var canJoin = s.Status != SessionStatus.Cancelled && !isCompleted && isActuallyLive;
+
+                // Nếu buổi học còn cách xa giờ học mà bị InProgress do gia sư test sớm, học viên vẫn xem là Scheduled
+                var effectiveStatus = (s.Status == SessionStatus.InProgress && nowVn < sVn.AddMinutes(-60))
+                    ? SessionStatus.Scheduled
+                    : s.Status;
 
                 sessionDtos.Add(new StudentClassroomSessionDto
                 {
@@ -159,7 +165,7 @@ public class StudentClassroomApiController : ControllerBase
                     Index = sessionIndex++,
                     ScheduledAtUtc = s.ScheduledAt,
                     ScheduledAtVn = sVn,
-                    Status = s.Status,
+                    Status = effectiveStatus,
                     VideoRoom = s.VideoRoom,
                     CanJoin = canJoin,
                     HasReviewed = s.Review != null,

@@ -57,6 +57,14 @@ public sealed class AdminOperationsController : ControllerBase
     public async Task<IActionResult> Payments([FromQuery] AdminOperationsQuery query, CancellationToken ct) => Ok(await _service.GetPaymentsAsync(query, ct));
     [HttpGet("reconciliation")]
     public async Task<IActionResult> Reconciliation([FromQuery] string? period, CancellationToken ct) => Ok(await _service.GetReconciliationAsync(period, ct));
+    [HttpPost("reconciliation/settle")]
+    public async Task<IActionResult> SettlePayout([FromBody] AdminSettlePayoutRequest request, CancellationToken ct)
+    {
+        var adminId = AdminUserId;
+        if (string.IsNullOrEmpty(adminId)) return Unauthorized(new { message = "Chưa đăng nhập." });
+        var (success, error) = await _service.SettleTutorPayoutAsync(request.TutorId, request.Period, adminId, ct);
+        return success ? Ok(new { success = true, message = "Đã quyết toán và gửi thông báo thành công cho gia sư." }) : BadRequest(new { message = error });
+    }
 
     [HttpGet("accounts")]
     public async Task<IActionResult> Accounts([FromQuery] AdminOperationsQuery query, CancellationToken ct) => Ok(await _service.GetAccountsAsync(query, ct));

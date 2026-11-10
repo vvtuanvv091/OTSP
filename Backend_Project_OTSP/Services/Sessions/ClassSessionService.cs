@@ -48,11 +48,19 @@ public sealed class ClassSessionService : IClassSessionService
         if (!await IsParticipantAsync(session.ClassroomId, userId, cancellationToken))
             return ClassSessionJoinResultDto.Forbidden();
 
-        // Gia sư có thể mở lớp sớm bất cứ lúc nào để chuẩn bị giảng dạy
-        if (!isTutor && !IsWithinJoinWindow(session, DateTime.UtcNow))
+        // Gia sư có thể mở lớp sớm bất cứ lúc nào để chuẩn bị giảng dạy. Học viên chỉ được vào khi gia sư đã mở phòng.
+        if (!isTutor)
         {
-            var sVn = session.ScheduledAt.AddHours(7);
-            return ClassSessionJoinResultDto.Fail($"Phòng học chỉ mở trước giờ học 60 phút. Buổi học bắt đầu lúc {sVn:HH:mm dd/MM/yyyy}.");
+            if (session.Status == SessionStatus.Scheduled)
+            {
+                return ClassSessionJoinResultDto.Fail("Gia sư chưa mở lớp học. Vui lòng chờ gia sư vào phòng trước khi tham gia.");
+            }
+
+            if (!IsWithinJoinWindow(session, DateTime.UtcNow))
+            {
+                var sVn = session.ScheduledAt.AddHours(7);
+                return ClassSessionJoinResultDto.Fail($"Phòng học chỉ mở trước giờ học 60 phút. Buổi học bắt đầu lúc {sVn:HH:mm dd/MM/yyyy}.");
+            }
         }
 
         if (!isTutor)

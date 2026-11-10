@@ -17,6 +17,7 @@ public interface IAdminOperationsService
     Task<(bool Success, string? Error)> DeleteNewsAsync(int id, string adminUserId, string? ipAddress, CancellationToken cancellationToken);
     Task<object> GetPaymentsAsync(AdminOperationsQuery query, CancellationToken cancellationToken);
     Task<object> GetReconciliationAsync(string? period, CancellationToken cancellationToken);
+    Task<(bool Success, string? Error)> SettleTutorPayoutAsync(int tutorId, string period, string adminUserId, CancellationToken cancellationToken);
     Task<object> GetAccountsAsync(AdminOperationsQuery query, CancellationToken cancellationToken);
     Task<(bool Success, string? Error, string? TemporaryPassword)> CreateAccountAsync(AdminCreateAccountRequest request, string adminUserId, string? ipAddress, CancellationToken cancellationToken);
     Task<(bool Success, string? Error)> ChangeRoleAsync(string id, string role, string adminUserId, string? ipAddress, CancellationToken cancellationToken);
