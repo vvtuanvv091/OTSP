@@ -5,6 +5,7 @@ using Backend_Project_OTSP.Dtos;
 using Backend_Project_OTSP.Dtos.Sessions;
 using Backend_Project_OTSP.Hubs;
 using Backend_Project_OTSP.Models;
+using Backend_Project_OTSP.Services.Common;
 using static Backend_Project_OTSP.Models.Enums;
 
 namespace Backend_Project_OTSP.Services.Sessions;
@@ -17,15 +18,18 @@ public sealed class ClassSessionService : IClassSessionService
     private readonly ApplicationDbContext _db;
     private readonly IHubContext<ConnectionRequestHub> _hubContext;
     private readonly ILogger<ClassSessionService> _logger;
+    private readonly IEmailSenderService? _emailSender;
 
     public ClassSessionService(
         ApplicationDbContext db,
         IHubContext<ConnectionRequestHub> hubContext,
-        ILogger<ClassSessionService> logger)
+        ILogger<ClassSessionService> logger,
+        IEmailSenderService? emailSender = null)
     {
         _db = db;
         _hubContext = hubContext;
         _logger = logger;
+        _emailSender = emailSender;
     }
 
     public async Task<ClassSessionJoinResultDto> JoinSessionAsync(
@@ -378,23 +382,68 @@ public sealed class ClassSessionService : IClassSessionService
         await _db.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task<(bool Success, string Message)> CancelSessionAsync(
+        int sessionId,
+        string tutorUserId,
+        string reason,
+        CancellationToken cancellationToken = default)
+    {
+        var session = await _db.ClassSessions
+            .Include(s => s.Classroom).ThenInclude(c => c.Tutor)
+            .Include(s => s.Classroom).ThenInclude(c => c.Subject)
+            .FirstOrDefaultAsync(s => s.Id == sessionId, cancellationToken);
+
+        if (session == null)
+            return (false, "Không tìm thấy buổi học.");
+
+        if (session.Classroom.Tutor.UserId != tutorUserId)
+            return (false, "Bạn không có quyền thao tác trên buổi học này.");
+
+        if (session.Status == SessionStatus.Done)
+            return (false, "Buổi học này đã hoàn thành, không thể hủy.");
+
+        session.Status = SessionStatus.Cancelled;
+        await _db.SaveChangesAsync(cancellationToken);
+
+        await NotifyParticipantsAsync(session.ClassroomId, session.Id, SessionStatus.Cancelled, cancellationToken, reason);
+        return (true, "Đã hủy buổi học và gửi thông báo tới học viên.");
+    }
+
     private async Task NotifyParticipantsAsync(
         int classroomId,
         int sessionId,
         SessionStatus status,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string? cancelReason = null)
     {
-        var userIds = await _db.Classrooms.AsNoTracking()
-            .Where(classroom => classroom.Id == classroomId)
-            .Select(classroom => classroom.Tutor.UserId)
+        var classroom = await _db.Classrooms.AsNoTracking()
+            .Include(c => c.Subject)
+            .Include(c => c.Tutor).ThenInclude(t => t.User)
+            .FirstOrDefaultAsync(c => c.Id == classroomId, cancellationToken);
+
+        var session = await _db.ClassSessions.AsNoTracking()
+            .FirstOrDefaultAsync(s => s.Id == sessionId, cancellationToken);
+
+        var tutorUserId = classroom?.Tutor?.UserId;
+        var tutorName = classroom?.Tutor?.User?.FullName ?? "Gia sư";
+        var className = classroom?.NameClass ?? "Lớp học OTSP";
+        var subjectName = classroom?.Subject?.Name ?? "Môn học";
+        var scheduledVn = (session?.ScheduledAt ?? DateTime.UtcNow).AddHours(7);
+        var timeStr = scheduledVn.ToString("HH:mm dd/MM/yyyy");
+
+        var students = await _db.ClassroomStudents.AsNoTracking()
+            .Where(cs => cs.ClassroomId == classroomId)
+            .Select(cs => new
+            {
+                UserId = cs.Student.UserId,
+                Email = cs.Student.User.Email,
+                FullName = cs.Student.User.FullName
+            })
             .ToListAsync(cancellationToken);
 
-        var studentUserIds = await _db.ClassroomStudents.AsNoTracking()
-            .Where(student => student.ClassroomId == classroomId)
-            .Select(student => student.Student.UserId)
-            .ToListAsync(cancellationToken);
-
-        userIds.AddRange(studentUserIds);
+        var userIds = new List<string>();
+        if (!string.IsNullOrEmpty(tutorUserId)) userIds.Add(tutorUserId);
+        userIds.AddRange(students.Select(s => s.UserId).Where(id => !string.IsNullOrEmpty(id))!);
 
         await _hubContext.Clients.Users(userIds.Distinct())
             .SendAsync("ClassSessionStatusChanged", new
@@ -413,6 +462,85 @@ public sealed class ClassSessionService : IClassSessionService
                     classSessionId = sessionId,
                     status = status.ToString()
                 }, cancellationToken);
+        }
+
+        // Tự động tạo Notification và gửi Email tùy theo trạng thái
+        try
+        {
+            if (status == SessionStatus.InProgress && session != null)
+            {
+                // 1. Gia sư vừa mở phòng học -> Thông báo cho học sinh vào học
+                foreach (var st in students)
+                {
+                    if (string.IsNullOrEmpty(st.UserId)) continue;
+                    _db.Notifications.Add(new Notification
+                    {
+                        UserId = st.UserId,
+                        Title = "Buổi học đã bắt đầu!",
+                        Content = $"Gia sư {tutorName} đã mở phòng học lớp {className} ({subjectName}). Mời bạn vào lớp ngay! [url:/room/{session.VideoRoom}]",
+                        CreatedAt = DateTime.UtcNow,
+                        IsRead = false
+                    });
+                }
+                await _db.SaveChangesAsync(cancellationToken);
+            }
+            else if (status == SessionStatus.Cancelled)
+            {
+                // 2. Buổi học bị hủy -> Gửi chuông + gửi Gmail khẩn cho học viên
+                var reason = string.IsNullOrWhiteSpace(cancelReason) ? "Gia sư có việc đột xuất" : cancelReason.Trim();
+                foreach (var st in students)
+                {
+                    if (!string.IsNullOrEmpty(st.UserId))
+                    {
+                        _db.Notifications.Add(new Notification
+                        {
+                            UserId = st.UserId,
+                            Title = "Buổi học đã bị hủy",
+                            Content = $"Buổi học lớp {className} ({subjectName}) lúc {timeStr} đã bị hủy. Lý do: {reason}. [url:/Student_Parent/StudentSchedule]",
+                            CreatedAt = DateTime.UtcNow,
+                            IsRead = false
+                        });
+                    }
+
+                    if (!string.IsNullOrEmpty(st.Email) && _emailSender != null)
+                    {
+                        var subject = $"[OTSP] Thông báo hủy buổi học lớp {className}";
+                        var bodyHtml = $@"
+                            <div style=""font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #fee2e2; border-radius: 8px; color: #1e293b;"">
+                                <h3 style=""color: #dc2626; margin-top: 0;"">Thông báo hủy buổi học</h3>
+                                <p>Xin chào <strong>{st.FullName}</strong>,</p>
+                                <p>Gia sư <strong>{tutorName}</strong> đã thông báo hủy buổi học của lớp <strong>{className}</strong> dự kiến diễn ra vào lúc <strong>{timeStr}</strong>.</p>
+                                <p><strong>Lý do:</strong> {reason}</p>
+                                <p>Lịch học bù sẽ được gia sư thống nhất và thông báo lại sau. Vui lòng theo dõi mục <a href=""/Student_Parent/StudentSchedule"">Thời khóa biểu</a> để cập nhật lịch mới nhất.</p>
+                                <hr style=""border: 0; border-top: 1px solid #fee2e2; margin: 20px 0;"" />
+                                <p style=""font-size: 12px; color: #94a3b8;"">© Nền tảng OTSP</p>
+                            </div>";
+                        await _emailSender.SendNotificationEmailAsync(st.Email, subject, bodyHtml, cancellationToken);
+                    }
+                }
+                await _db.SaveChangesAsync(cancellationToken);
+            }
+            else if (status == SessionStatus.Done)
+            {
+                // 3. Buổi học hoàn thành -> Gửi thông báo nhắc học viên đánh giá gia sư
+                foreach (var st in students)
+                {
+                    if (string.IsNullOrEmpty(st.UserId)) continue;
+                    _db.Notifications.Add(new Notification
+                    {
+                        UserId = st.UserId,
+                        Title = "Buổi học đã hoàn thành",
+                        Content = $"Buổi học lớp {className} ({subjectName}) đã kết thúc. Bạn hãy đánh giá và viết nhận xét cho gia sư nhé! [url:/Student_Parent/StudentClassroom]",
+                        CreatedAt = DateTime.UtcNow,
+                        IsRead = false
+                    });
+                }
+                await _db.SaveChangesAsync(cancellationToken);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Lỗi khi lưu thông báo ClassSession {SessionId} trạng thái {Status}", sessionId, status);
         }
     }
 

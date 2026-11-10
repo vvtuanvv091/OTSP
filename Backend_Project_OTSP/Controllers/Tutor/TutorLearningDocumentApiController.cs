@@ -230,6 +230,30 @@ public class TutorLearningDocumentApiController : ControllerBase
             _db.LearningDocuments.Add(doc);
             await _db.SaveChangesAsync(cancellationToken);
 
+            // Tự động gửi thông báo cho học viên trong lớp khi gia sư tải tài liệu
+            if (doc.ClassroomId.HasValue)
+            {
+                var classroomStudents = await _db.ClassroomStudents
+                    .AsNoTracking()
+                    .Where(cs => cs.ClassroomId == doc.ClassroomId.Value)
+                    .Include(cs => cs.Student)
+                    .ToListAsync(cancellationToken);
+
+                foreach (var cs in classroomStudents)
+                {
+                    if (string.IsNullOrEmpty(cs.Student?.UserId)) continue;
+                    _db.Notifications.Add(new Notification
+                    {
+                        UserId = cs.Student.UserId,
+                        Title = "Tài liệu học tập mới",
+                        Content = $"Gia sư vừa tải lên tài liệu mới: '{doc.Title}' cho lớp học của bạn. [url:/Student_Parent/StudentDocuments]",
+                        CreatedAt = DateTime.UtcNow,
+                        IsRead = false
+                    });
+                }
+                await _db.SaveChangesAsync(cancellationToken);
+            }
+
             var message = scope == DocumentScope.Public
                 ? "Tài liệu đã tải lên và đang chờ quản trị viên duyệt trước khi công khai."
                 : "Đã tải tài liệu vào lớp học thành công.";

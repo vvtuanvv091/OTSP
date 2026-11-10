@@ -11,6 +11,7 @@ using Microsoft.Extensions.Logging;
 using Backend_Project_OTSP.Data;
 using Backend_Project_OTSP.Dtos.Payment;
 using Backend_Project_OTSP.Models;
+using Backend_Project_OTSP.Services.Common;
 using static Backend_Project_OTSP.Models.Enums;
 
 namespace Backend_Project_OTSP.Services.Payments;
@@ -22,6 +23,7 @@ public class PaymentService : IPaymentService
     private readonly IMemoryCache _cache;
     private readonly ILogger<PaymentService> _logger;
     private readonly IHttpClientFactory? _httpClientFactory;
+    private readonly IEmailSenderService? _emailSender;
 
     private readonly string _bankName;
     private readonly string _bankId;
@@ -33,13 +35,15 @@ public class PaymentService : IPaymentService
         IConfiguration config,
         IMemoryCache cache,
         ILogger<PaymentService> logger,
-        IHttpClientFactory? httpClientFactory = null)
+        IHttpClientFactory? httpClientFactory = null,
+        IEmailSenderService? emailSender = null)
     {
         _db = db;
         _config = config;
         _cache = cache;
         _logger = logger;
         _httpClientFactory = httpClientFactory;
+        _emailSender = emailSender;
 
         _bankName = _config["SePay:BankName"] ?? _config["VietQR:BankName"] ?? "MBBank";
         _bankId = _config["SePay:BankId"] ?? _config["VietQR:BankId"] ?? "970422";
@@ -309,6 +313,7 @@ public class PaymentService : IPaymentService
                                 });
                             }
                             await _db.SaveChangesAsync(ct);
+                            await TriggerPaymentSuccessNotificationsAsync(dbPayment, ct);
                         }
                         _cache.Set(cacheKey, true, TimeSpan.FromMinutes(5));
                         return true;
@@ -402,6 +407,7 @@ public class PaymentService : IPaymentService
         }
 
         await _db.SaveChangesAsync(ct);
+        await TriggerPaymentSuccessNotificationsAsync(payment, ct);
         _logger.LogInformation("Payment {PaymentId} confirmed via Mock for User {UserId}", paymentId, userId);
         return true;
     }
@@ -463,6 +469,7 @@ public class PaymentService : IPaymentService
         }
 
         await _db.SaveChangesAsync(ct);
+        await TriggerPaymentSuccessNotificationsAsync(payment, ct);
         _logger.LogInformation("Payment {PaymentId} marked as Success from SePay Webhook. Amount: {Amount}", paymentId, payload.transferAmount);
         return true;
     }
@@ -487,5 +494,109 @@ public class PaymentService : IPaymentService
             HoursPerSession = p.Classroom?.HoursPerSession ?? 2.0,
             StartDate = p.Classroom?.StartDate
         };
+    }
+
+    private async Task TriggerPaymentSuccessNotificationsAsync(Payment payment, CancellationToken ct)
+    {
+        try
+        {
+            var p = await _db.Payments
+                .Include(x => x.Student).ThenInclude(s => s.User)
+                .Include(x => x.Classroom).ThenInclude(c => c.Tutor).ThenInclude(t => t.User)
+                .Include(x => x.Classroom).ThenInclude(c => c.Subject)
+                .FirstOrDefaultAsync(x => x.Id == payment.Id, ct) ?? payment;
+
+            var studentUserId = p.Student?.UserId ?? p.Student?.User?.Id;
+            var studentEmail = p.Student?.User?.Email;
+            var studentName = p.Student?.User?.FullName ?? "Học viên";
+
+            var tutorUserId = p.Classroom?.Tutor?.UserId ?? p.Classroom?.Tutor?.User?.Id;
+            var tutorEmail = p.Classroom?.Tutor?.User?.Email;
+            var tutorName = p.Classroom?.Tutor?.User?.FullName ?? "Gia sư";
+
+            var className = p.Classroom?.NameClass ?? "Lớp học OTSP";
+            var subjectName = p.Classroom?.Subject?.Name ?? "Môn học";
+            var amountStr = $"{p.Amount:N0} đ";
+
+            // 1. Thêm chuông thông báo In-App cho Học viên
+            if (!string.IsNullOrEmpty(studentUserId))
+            {
+                _db.Notifications.Add(new Notification
+                {
+                    UserId = studentUserId,
+                    Title = "Thanh toán học phí thành công",
+                    Content = $"Bạn đã thanh toán thành công {amountStr} cho lớp {className} ({subjectName}). Quyền vào phòng học trực tuyến đã được kích hoạt! [url:/Student_Parent/StudentPayments]",
+                    CreatedAt = DateTime.UtcNow,
+                    IsRead = false
+                });
+            }
+
+            // 2. Thêm chuông thông báo In-App cho Gia sư
+            if (!string.IsNullOrEmpty(tutorUserId))
+            {
+                _db.Notifications.Add(new Notification
+                {
+                    UserId = tutorUserId,
+                    Title = "Học viên đã nộp học phí",
+                    Content = $"Học viên {studentName} vừa thanh toán thành công {amountStr} học phí cho lớp {className}. [url:/Tutor/TutorIncome]",
+                    CreatedAt = DateTime.UtcNow,
+                    IsRead = false
+                });
+            }
+
+            await _db.SaveChangesAsync(ct);
+
+            // 3. Gửi Email Biên lai điện tử về Gmail cho Học viên
+            if (!string.IsNullOrEmpty(studentEmail) && _emailSender != null)
+            {
+                var subject = $"[OTSP] Biên lai thanh toán học phí thành công - {className}";
+                var bodyHtml = $@"
+                    <div style=""font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px; color: #1e293b;"">
+                        <div style=""text-align: center; margin-bottom: 20px;"">
+                            <h2 style=""color: #16a34a; margin: 0;"">✓ THANH TOÁN THÀNH CÔNG</h2>
+                            <p style=""color: #64748b; font-size: 14px; margin: 4px 0 0;"">Nền tảng kết nối Gia sư OTSP</p>
+                        </div>
+                        <p>Xin chào <strong>{studentName}</strong>,</p>
+                        <p>Hệ thống OTSP xin xác nhận bạn đã thanh toán thành công học phí với thông tin chi tiết:</p>
+                        <table style=""width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 14px;"">
+                            <tr style=""border-bottom: 1px solid #f1f5f9;""><td style=""padding: 10px 0; color: #64748b;"">Mã thanh toán:</td><td style=""padding: 10px 0; font-weight: bold; text-align: right;"">OTSP{p.Id:D6}</td></tr>
+                            <tr style=""border-bottom: 1px solid #f1f5f9;""><td style=""padding: 10px 0; color: #64748b;"">Lớp học:</td><td style=""padding: 10px 0; font-weight: bold; text-align: right;"">{className}</td></tr>
+                            <tr style=""border-bottom: 1px solid #f1f5f9;""><td style=""padding: 10px 0; color: #64748b;"">Môn học:</td><td style=""padding: 10px 0; font-weight: bold; text-align: right;"">{subjectName}</td></tr>
+                            <tr style=""border-bottom: 1px solid #f1f5f9;""><td style=""padding: 10px 0; color: #64748b;"">Gia sư phụ trách:</td><td style=""padding: 10px 0; font-weight: bold; text-align: right;"">{tutorName}</td></tr>
+                            <tr style=""border-bottom: 1px solid #f1f5f9;""><td style=""padding: 10px 0; color: #64748b;"">Số tiền:</td><td style=""padding: 10px 0; font-size: 18px; font-weight: bold; color: #16a34a; text-align: right;"">{amountStr}</td></tr>
+                            <tr style=""border-bottom: 1px solid #f1f5f9;""><td style=""padding: 10px 0; color: #64748b;"">Phương thức:</td><td style=""padding: 10px 0; text-align: right;"">Chuyển khoản SePay / VietQR 24/7</td></tr>
+                            <tr><td style=""padding: 10px 0; color: #64748b;"">Thời gian:</td><td style=""padding: 10px 0; text-align: right;"">{DateTime.UtcNow.AddHours(7):dd/MM/yyyy HH:mm:ss}</td></tr>
+                        </table>
+                        <div style=""background: #f0fdf4; border-left: 4px solid #16a34a; padding: 12px 16px; border-radius: 4px; font-size: 13px; color: #15803d; margin-bottom: 20px;"">
+                            Quyền vào phòng học trực tuyến (Jitsi Meet) đã được kích hoạt. Bạn có thể vào lớp đúng giờ trên Thời khóa biểu.
+                        </div>
+                        <hr style=""border: 0; border-top: 1px solid #e2e8f0; margin: 24px 0;"" />
+                        <p style=""font-size: 12px; color: #94a3b8; text-align: center; margin: 0;"">© OTSP - Hệ thống quản lý và kết nối gia sư trực tuyến.</p>
+                    </div>";
+
+                await _emailSender.SendNotificationEmailAsync(studentEmail, subject, bodyHtml, ct);
+            }
+
+            // 4. Gửi Email thông báo cho Gia sư
+            if (!string.IsNullOrEmpty(tutorEmail) && _emailSender != null)
+            {
+                var subject = $"[OTSP] Học viên {studentName} đã nộp học phí lớp {className}";
+                var bodyHtml = $@"
+                    <div style=""font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px; color: #1e293b;"">
+                        <h3 style=""color: #2563eb; margin-top: 0;"">Thông báo thu học phí mới</h3>
+                        <p>Kính gửi thầy/cô <strong>{tutorName}</strong>,</p>
+                        <p>Học viên <strong>{studentName}</strong> vừa thanh toán thành công số tiền <strong>{amountStr}</strong> học phí cho lớp <strong>{className}</strong>.</p>
+                        <p>Hệ thống đã tự động cấp quyền vào phòng học trực tuyến cho học viên. Thầy/cô có thể kiểm tra danh sách học viên và bảng kê doanh thu tại mục Quản lý gia sư.</p>
+                        <hr style=""border: 0; border-top: 1px solid #e2e8f0; margin: 16px 0;"" />
+                        <p style=""font-size: 12px; color: #94a3b8;"">© Nền tảng OTSP</p>
+                    </div>";
+
+                await _emailSender.SendNotificationEmailAsync(tutorEmail, subject, bodyHtml, ct);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Lỗi khi gửi thông báo thanh toán cho Payment {PaymentId}", payment.Id);
+        }
     }
 }

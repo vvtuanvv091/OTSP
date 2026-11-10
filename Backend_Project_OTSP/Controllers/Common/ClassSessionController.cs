@@ -114,6 +114,25 @@ public class ClassSessionApiController : ControllerBase
     }
 
     /// <summary>
+    /// API dành cho Gia sư hủy một buổi học sắp tới kèm lý do
+    /// </summary>
+    [HttpPost("{id:int}/cancel")]
+    [Authorize(Roles = "Tutor,Admin")]
+    public async Task<IActionResult> Cancel(int id, [FromBody] CancelClassSessionRequestDto? request, CancellationToken cancellationToken)
+    {
+        var tutorUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrWhiteSpace(tutorUserId))
+            return Unauthorized();
+
+        var reason = request?.Reason ?? "Gia sư có việc đột xuất";
+        var result = await _classSessionService.CancelSessionAsync(id, tutorUserId, reason, cancellationToken);
+        if (!result.Success)
+            return BadRequest(new { success = false, message = result.Message });
+
+        return Ok(new { success = true, message = result.Message });
+    }
+
+    /// <summary>
     /// API kiểm tra trạng thái và thông tin phòng học
     /// </summary>
     [HttpGet("{id:int}/info")]
@@ -136,4 +155,6 @@ public class ClassSessionApiController : ControllerBase
         return await GetInfo(id, cancellationToken);
     }
 }
+
+public record CancelClassSessionRequestDto(string? Reason);
 
