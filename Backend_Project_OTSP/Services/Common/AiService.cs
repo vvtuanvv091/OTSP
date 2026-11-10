@@ -37,8 +37,12 @@ public class AiService : IAiService
         _baseUrl = _config["AiService:BaseUrl"] ?? "http://localhost:8000";
         _apiKey = _config["AiService:InternalApiKey"] ?? "Qxzyo3UdQQ2RtWxJAFGOhhCIDwIbGSWTzsC-ShRA324";
 
-        _http.BaseAddress = new Uri(_baseUrl);
-        _http.Timeout = TimeSpan.FromSeconds(30);
+        if (Uri.TryCreate(_baseUrl, UriKind.Absolute, out var uri))
+        {
+            _http.BaseAddress = uri;
+        }
+        // Giảm timeout xuống 3s để nếu python microservice offline thì lập tức chuyển sang Gemini, không làm người dùng chờ 30s
+        _http.Timeout = TimeSpan.FromSeconds(3);
     }
 
     private HttpRequestMessage CreateAuthorizedRequest(HttpMethod method, string path, object? body = null)
@@ -101,28 +105,38 @@ public class AiService : IAiService
             }
         }
 
-        try
+        // 2. Thử gọi Python Agent service nếu URL hợp lệ và không tự trỏ về chính backend Render
+        if (!string.IsNullOrWhiteSpace(_baseUrl) && !_baseUrl.Contains("onrender.com", StringComparison.OrdinalIgnoreCase))
         {
-            using var reqMsg = CreateAuthorizedRequest(HttpMethod.Post, "/v1/agent/chat", request);
-            var response = await _http.SendAsync(reqMsg, ct);
+            try
+            {
+                using var reqMsg = CreateAuthorizedRequest(HttpMethod.Post, "/v1/agent/chat", request);
+                var response = await _http.SendAsync(reqMsg, ct);
 
-            if (response.IsSuccessStatusCode)
-            {
-                var content = await response.Content.ReadAsStringAsync(ct);
-                var result = JsonSerializer.Deserialize<AgentChatResponseDto>(content, JsonOptions);
-                if (result != null) return result;
+                if (response.IsSuccessStatusCode)
+                {
+                    var content = await response.Content.ReadAsStringAsync(ct);
+                    var result = JsonSerializer.Deserialize<AgentChatResponseDto>(content, JsonOptions);
+                    if (result != null)
+                    {
+                        // Đảm bảo tuyệt đối tắt tự động chuyển trang theo yêu cầu
+                        result.AutoExecute = false;
+                        if (result.UiAction != null) result.UiAction.AutoExecute = false;
+                        return result;
+                    }
+                }
+                else
+                {
+                    _logger.LogWarning("AI agent request returned status {StatusCode}", response.StatusCode);
+                }
             }
-            else
+            catch (Exception ex)
             {
-                _logger.LogWarning("AI agent request returned status {StatusCode}", response.StatusCode);
+                _logger.LogWarning("Python AI agent service offline or unreachable ({Msg}), falling back to direct Gemini", ex.Message);
             }
         }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to call AI Service for Agent Chat");
-        }
 
-        // Fallback to Direct Gemini API if Python service is offline or sleeping
+        // 3. Fallback sang Direct Gemini API tốc độ cao, luôn chạy mượt cả trên Render & Vercel
         return await CallDirectGeminiFallbackAsync(request, ct);
     }
 
@@ -141,19 +155,28 @@ public class AiService : IAiService
         };
 
         StudyAssistantResponseDto? result = null;
-        try
+        if (!string.IsNullOrWhiteSpace(_baseUrl) && !_baseUrl.Contains("onrender.com", StringComparison.OrdinalIgnoreCase))
         {
-            using var reqMsg = CreateAuthorizedRequest(HttpMethod.Post, "/v1/study-assistant", payload);
-            var response = await _http.SendAsync(reqMsg, ct);
-            if (response.IsSuccessStatusCode)
+            try
             {
-                var content = await response.Content.ReadAsStringAsync(ct);
-                result = JsonSerializer.Deserialize<StudyAssistantResponseDto>(content, JsonOptions);
+                using var reqMsg = CreateAuthorizedRequest(HttpMethod.Post, "/v1/study-assistant", payload);
+                var response = await _http.SendAsync(reqMsg, ct);
+                if (response.IsSuccessStatusCode)
+                {
+                    var content = await response.Content.ReadAsStringAsync(ct);
+                    result = JsonSerializer.Deserialize<StudyAssistantResponseDto>(content, JsonOptions);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning("Python AI Service for Study Assistant offline: {Msg}", ex.Message);
             }
         }
-        catch (Exception ex)
+
+        // Fallback sang Gemini giải bài tập trực tiếp nếu Python service chưa bật
+        if (result == null || string.IsNullOrWhiteSpace(result.Answer))
         {
-            _logger.LogError(ex, "Failed to call AI Service for Study Assistant");
+            result = await SolveStudyQuestionWithGeminiAsync(request, ct);
         }
 
         result ??= new StudyAssistantResponseDto
@@ -304,29 +327,139 @@ public class AiService : IAiService
         };
     }
 
+    private string GetGeminiApiKey()
+    {
+        var apiKey = _config["AiService:GeminiApiKey"];
+        if (!string.IsNullOrWhiteSpace(apiKey)) return apiKey;
+
+        apiKey = _config["GEMINI_API_KEY"];
+        if (!string.IsNullOrWhiteSpace(apiKey)) return apiKey;
+
+        apiKey = Environment.GetEnvironmentVariable("GEMINI_API_KEY");
+        if (!string.IsNullOrWhiteSpace(apiKey)) return apiKey;
+
+        // Tự động tìm nạp từ file .env nếu có (local hoặc trên Render)
+        var paths = new[]
+        {
+            Path.Combine(Directory.GetCurrentDirectory(), ".env"),
+            Path.Combine(Directory.GetCurrentDirectory(), "..", ".env"),
+            Path.Combine(Directory.GetCurrentDirectory(), "..", "OTSP_WEIN_AI_AGENTS", ".env")
+        };
+        foreach (var p in paths)
+        {
+            try
+            {
+                if (File.Exists(p))
+                {
+                    foreach (var line in File.ReadAllLines(p))
+                    {
+                        var trimmed = line.Trim();
+                        if (trimmed.StartsWith("GEMINI_API_KEY=", StringComparison.OrdinalIgnoreCase))
+                        {
+                            var val = trimmed.Substring("GEMINI_API_KEY=".Length).Trim(' ', '"', '\'');
+                            if (!string.IsNullOrWhiteSpace(val)) return val;
+                        }
+                    }
+                }
+            }
+            catch { }
+        }
+
+        return "";
+    }
+
     private async Task<AgentChatResponseDto> CallDirectGeminiFallbackAsync(AgentChatRequestDto request, CancellationToken ct)
     {
         try
         {
-            var apiKey = _config["AiService:GeminiApiKey"] 
-                ?? _config["GEMINI_API_KEY"] 
-                ?? "";
+            var apiKey = GetGeminiApiKey();
 
             if (string.IsNullOrWhiteSpace(apiKey))
             {
-                _logger.LogWarning("Gemini API key is not configured in AiService:GeminiApiKey or GEMINI_API_KEY");
+                _logger.LogWarning("Gemini API key is not configured. Please set GEMINI_API_KEY in environment variables or appsettings.json");
             }
             else
             {
-                var model = _config["AiService:GeminiModel"] ?? "gemini-3.5-flash-lite";
-                var url = $"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={apiKey}";
 
-            var systemPrompt = @"Bạn là WEIN - Trợ lý AI thông minh của nền tảng kết nối gia sư và lớp học trực tuyến OTSP (Online Tutor Student Platform).
-Phong cách: Thân thiện, tận tình, xưng 'mình' hoặc 'WEIN', gọi người dùng là 'bạn'. Có thể dùng emoji nhẹ nhàng.
+            var model = _config["AiService:GeminiModel"];
+            if (string.IsNullOrWhiteSpace(model)) model = _config["GEMINI_MODEL"];
+            if (string.IsNullOrWhiteSpace(model)) model = "gemini-3.5-flash-lite";
+
+            // Làm giàu ngữ cảnh bằng dữ liệu thực tế từ PostgreSQL
+            var lowerMsg = (request.Message ?? "").ToLower();
+            var liveContextBuilder = new StringBuilder();
+
+            if (lowerMsg.Contains("gia sư") || lowerMsg.Contains("thầy") || lowerMsg.Contains("cô") || lowerMsg.Contains("toán") || lowerMsg.Contains("anh") || lowerMsg.Contains("văn") || lowerMsg.Contains("lý") || lowerMsg.Contains("hóa") || lowerMsg.Contains("tin") || lowerMsg.Contains("công nghệ"))
+            {
+                try
+                {
+                    var tutors = await _db.TutorProfiles
+                        .AsNoTracking()
+                        .Include(t => t.User)
+                        .Include(t => t.TutorSubjects).ThenInclude(ts => ts.Subject)
+                        .Where(t => t.VerificationStatus == VerificationStatus.Approved)
+                        .Take(4)
+                        .Select(t => new
+                        {
+                            Name = t.User.FullName,
+                            HourlyRate = t.HourlyFee,
+                            Subjects = string.Join(", ", t.TutorSubjects.Select(ts => ts.Subject.Name))
+                        })
+                        .ToListAsync(ct);
+
+                    if (tutors.Any())
+                    {
+                        liveContextBuilder.AppendLine("\n[Dữ liệu gia sư thực tế trên OTSP hiện tại]:");
+                        foreach (var t in tutors)
+                        {
+                            liveContextBuilder.AppendLine($"- Gia sư: {t.Name}, Môn dạy: {t.Subjects}, Học phí: {t.HourlyRate:N0} đ/giờ");
+                        }
+                    }
+                }
+                catch { }
+            }
+
+            if (lowerMsg.Contains("lớp") || lowerMsg.Contains("nhóm") || lowerMsg.Contains("tuyển sinh"))
+            {
+                try
+                {
+                    var classes = await _db.Classrooms
+                        .AsNoTracking()
+                        .Include(c => c.Subject)
+                        .Include(c => c.Tutor).ThenInclude(t => t.User)
+                        .Where(c => c.Status == ClassroomStatus.Active)
+                        .Take(4)
+                        .Select(c => new
+                        {
+                            c.NameClass,
+                            Subject = c.Subject.Name,
+                            Tutor = c.Tutor.User.FullName,
+                            c.Fee,
+                            StudentCount = c.ClassroomStudents.Count,
+                            c.MaxStudents
+                        })
+                        .ToListAsync(ct);
+
+                    if (classes.Any())
+                    {
+                        liveContextBuilder.AppendLine("\n[Dữ liệu lớp học nhóm đang mở trên OTSP]:");
+                        foreach (var c in classes)
+                        {
+                            liveContextBuilder.AppendLine($"- Lớp: {c.NameClass}, Môn: {c.Subject}, Gia sư: {c.Tutor}, Học phí: {c.Fee:N0} đ, Sĩ số: {c.StudentCount}/{c.MaxStudents}");
+                        }
+                    }
+                }
+                catch { }
+            }
+
+            var systemPrompt = $@"Bạn là WEIN - Trợ lý AI thông minh của nền tảng kết nối gia sư và lớp học trực tuyến OTSP (Online Tutor Student Platform).
+Phong cách: Thân thiện, tận tình, xưng 'mình' hoặc 'WEIN', gọi người dùng là 'bạn'. Có thể dùng emoji nhẹ nhàng, văn phong sư phạm chuẩn mực.
 Nhiệm vụ:
-- Giải đáp thắc mắc về tìm gia sư, đăng ký lớp học, học phí, lịch học trực tuyến trên OTSP.
-- Giúp học sinh định hướng học tập, trả lời câu hỏi ngắn gọn, mạch lạc.
-- Nếu người dùng chào hỏi hoặc hỏi bâng quơ (như 'alo', 'ủa', 'hi'), hãy chào mừng nhiệt tình và gợi ý các tính năng nổi bật: Tìm gia sư, Đăng ký lớp học, Xem lịch học.";
+- Giải đáp thắc mắc về tìm gia sư, đăng ký lớp học, học phí, lịch học trực tuyến, chính sách học thử và thanh toán VietQR trên OTSP.
+- Trả lời bài tập toán, lý, hóa, văn, anh, công nghệ hoặc các thắc mắc học tập rõ ràng, mạch lạc theo từng bước.
+- Nếu có danh sách gia sư hoặc lớp học thực tế bên dưới, hãy ưu tiên giới thiệu thông tin chính xác từ danh sách đó.
+- KHÔNG tự động chuyển trang web của người dùng. Chỉ gợi ý liên kết dạng Markdown [Tên nút](/duong-dan) hoặc nút hành động khi cần.
+{liveContextBuilder}";
 
             var contents = new List<object>();
 
@@ -352,19 +485,33 @@ Nhiệm vụ:
                 contents = contents,
                 generationConfig = new
                 {
-                    maxOutputTokens = 800,
+                    maxOutputTokens = 1200,
                     temperature = 0.7
                 }
             };
 
             using var directHttp = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
             var json = JsonSerializer.Serialize(payload);
+
+            var url = $"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={apiKey}";
             using var reqMsg = new HttpRequestMessage(HttpMethod.Post, url)
             {
                 Content = new StringContent(json, Encoding.UTF8, "application/json")
             };
 
             var res = await directHttp.SendAsync(reqMsg, ct);
+
+            // Nếu model 3.5 gặp lỗi, thử tiếp fallback qua gemini-2.5-flash
+            if (!res.IsSuccessStatusCode && model != "gemini-2.5-flash")
+            {
+                var retryUrl = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={apiKey}";
+                using var retryMsg = new HttpRequestMessage(HttpMethod.Post, retryUrl)
+                {
+                    Content = new StringContent(json, Encoding.UTF8, "application/json")
+                };
+                res = await directHttp.SendAsync(retryMsg, ct);
+            }
+
             if (res.IsSuccessStatusCode)
             {
                 var body = await res.Content.ReadAsStringAsync(ct);
@@ -380,18 +527,18 @@ Nhiệm vụ:
                         if (!string.IsNullOrWhiteSpace(text))
                         {
                             var lower = request.Message.ToLower();
-                            UIActionDto uiAction = new UIActionDto { Type = "NONE" };
+                            UIActionDto uiAction = new UIActionDto { Type = "NONE", AutoExecute = false };
                             if (lower.Contains("gia sư") || lower.Contains("tìm"))
                             {
-                                uiAction = new UIActionDto { Type = "NAVIGATE", Target = "/search", Label = "Tìm kiếm gia sư" };
+                                uiAction = new UIActionDto { Type = "NAVIGATE", Target = "/search", Label = "Tìm kiếm gia sư", AutoExecute = false };
                             }
                             else if (lower.Contains("lớp") || lower.Contains("khóa"))
                             {
-                                uiAction = new UIActionDto { Type = "NAVIGATE", Target = "/search?tab=classes", Label = "Xem danh sách lớp" };
+                                uiAction = new UIActionDto { Type = "NAVIGATE", Target = "/search?tab=classes", Label = "Xem danh sách lớp", AutoExecute = false };
                             }
                             else if (lower.Contains("lịch") || lower.Contains("thời khóa biểu"))
                             {
-                                uiAction = new UIActionDto { Type = "NAVIGATE", Target = "/schedule", Label = "Xem thời khóa biểu" };
+                                uiAction = new UIActionDto { Type = "NAVIGATE", Target = "/student/schedule", Label = "Xem thời khóa biểu", AutoExecute = false };
                             }
 
                             return new AgentChatResponseDto
@@ -399,6 +546,7 @@ Nhiệm vụ:
                                 Reply = text,
                                 Intent = "GENERAL",
                                 UiAction = uiAction,
+                                AutoExecute = false,
                                 SuggestedPrompts = new List<string> { "Tìm gia sư môn Toán", "Xem danh sách lớp học mới", "Xem thời khóa biểu của tôi" }
                             };
                         }
@@ -421,8 +569,95 @@ Nhiệm vụ:
         {
             Reply = "Chào bạn! Mình là WEIN, trợ lý AI của OTSP đây ạ. 😊 Bạn cần tìm gia sư môn nào hay muốn tham khảo lớp học nào hôm nay? Mình luôn sẵn sàng hỗ trợ bạn!",
             Intent = "GENERAL",
-            UiAction = new UIActionDto { Type = "NAVIGATE", Target = "/search", Label = "Tìm kiếm gia sư" },
+            UiAction = new UIActionDto { Type = "NAVIGATE", Target = "/search", Label = "Tìm kiếm gia sư", AutoExecute = false },
+            AutoExecute = false,
             SuggestedPrompts = new List<string> { "Tìm gia sư môn Toán", "Xem các lớp học mới", "Xem thời khóa biểu" }
+        };
+    }
+
+    private async Task<StudyAssistantResponseDto> SolveStudyQuestionWithGeminiAsync(StudyAssistantRequestDto request, CancellationToken ct)
+    {
+        try
+        {
+            var apiKey = GetGeminiApiKey();
+            if (string.IsNullOrWhiteSpace(apiKey))
+            {
+                _logger.LogWarning("Gemini API key is not configured for Study Assistant.");
+                return new StudyAssistantResponseDto
+                {
+                    Answer = "Hệ thống AI đang được bảo trì. Vui lòng thử lại sau.",
+                    ConceptSummary = "Kiến thức",
+                    PracticeQuestion = "",
+                    PracticeSolution = ""
+                };
+            }
+
+            var model = _config["AiService:GeminiModel"];
+            if (string.IsNullOrWhiteSpace(model)) model = _config["GEMINI_MODEL"];
+            if (string.IsNullOrWhiteSpace(model)) model = "gemini-3.5-flash-lite";
+
+            var systemPrompt = @"Bạn là Chuyên gia Sư phạm & Trợ lý Giải bài tập WEIN của nền tảng OTSP.
+Nhiệm vụ: Giải bài tập cho học sinh theo phương pháp sư phạm mẫu mực:
+1. Nêu rõ phương pháp / kiến thức trọng tâm cần dùng.
+2. Trình bày lời giải chi tiết, từng bước kèm giải thích dễ hiểu.
+3. Đưa ra kết luận cuối cùng rõ ràng.
+4. Gợi ý 1 bài tập tương tự để học sinh tự luyện tập.";
+
+            var promptText = $"Môn học: {request.Subject ?? "Chung"}, Khối lớp: {request.GradeLevel ?? "Phổ thông"}\nĐề bài / Câu hỏi: {request.Question}";
+
+            var payload = new
+            {
+                system_instruction = new { parts = new[] { new { text = systemPrompt } } },
+                contents = new[] { new { role = "user", parts = new[] { new { text = promptText } } } },
+                generationConfig = new { maxOutputTokens = 1500, temperature = 0.5 }
+            };
+
+            var url = $"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={apiKey}";
+            using var directHttp = new HttpClient { Timeout = TimeSpan.FromSeconds(20) };
+            var json = JsonSerializer.Serialize(payload);
+            using var reqMsg = new HttpRequestMessage(HttpMethod.Post, url)
+            {
+                Content = new StringContent(json, Encoding.UTF8, "application/json")
+            };
+
+            var res = await directHttp.SendAsync(reqMsg, ct);
+            if (res.IsSuccessStatusCode)
+            {
+                var body = await res.Content.ReadAsStringAsync(ct);
+                using var doc = JsonDocument.Parse(body);
+                var candidates = doc.RootElement.GetProperty("candidates");
+                if (candidates.GetArrayLength() > 0)
+                {
+                    var first = candidates[0];
+                    var parts = first.GetProperty("content").GetProperty("parts");
+                    if (parts.GetArrayLength() > 0)
+                    {
+                        var text = parts[0].GetProperty("text").GetString() ?? "";
+                        if (!string.IsNullOrWhiteSpace(text))
+                        {
+                            return new StudyAssistantResponseDto
+                            {
+                                Answer = text,
+                                ConceptSummary = $"Kiến thức trọng tâm môn {request.Subject ?? "Học tập"}",
+                                PracticeQuestion = "Bạn có muốn luyện thêm một bài tập tương tự dạng này không?",
+                                PracticeSolution = ""
+                            };
+                        }
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to solve study question with direct Gemini");
+        }
+
+        return new StudyAssistantResponseDto
+        {
+            Answer = "Hệ thống đã tiếp nhận câu hỏi của bạn. Vui lòng thử lại trong giây lát hoặc tham khảo tài liệu học tập trong mục Tài liệu.",
+            ConceptSummary = "Kiến thức môn học",
+            PracticeQuestion = "",
+            PracticeSolution = ""
         };
     }
 }

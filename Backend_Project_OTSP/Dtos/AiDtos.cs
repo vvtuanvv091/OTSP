@@ -26,7 +26,7 @@ public class UIActionDto
     public string ActionType { get; set; } = "";
 
     [JsonPropertyName("autoExecute")]
-    public bool AutoExecute { get; set; } = true;
+    public bool AutoExecute { get; set; } = false;
 }
 
 public class AgentChatRequestDto
@@ -75,7 +75,7 @@ public class AgentChatResponseDto
 
         //2 DÒNG NÀY ĐỂ ĐÓN LỆNH TỰ HÀNH:
     [JsonPropertyName("autoExecute")]
-    public bool AutoExecute { get; set; } = true;
+    public bool AutoExecute { get; set; } = false;
     [JsonPropertyName("actionType")]
     public string ActionType { get; set; } = "";
 }

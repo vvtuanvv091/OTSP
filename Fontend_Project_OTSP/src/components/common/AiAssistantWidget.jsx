@@ -18,9 +18,9 @@ export default function AiAssistantWidget() {
       role: 'assistant',
       content:
         'Xin chào bạn! Mình là **Trợ lý AI Wein** 🎓.\n\n' +
-        'Mình có thể trò chuyện, giải bài tập và tự động điều khiển web giúp bạn:\n' +
+        'Mình có thể trò chuyện, giải bài tập và hỗ trợ thông tin giúp bạn:\n' +
         '- 🔍 **Tìm gia sư & Lớp học nhóm** phù hợp nhất.\n' +
-        '- ⚡ **Tự động chuyển tab & nhảy trang phân trang** (Trang 1, 2...).\n' +
+        '- 🧭 **Gợi ý liên kết & điều hướng trang** theo yêu cầu.\n' +
         '- 📐 **Giải bài tập sư phạm** và tra cứu quy định học thử, thanh toán VietQR.\n\n' +
         'Bạn muốn Wein hỗ trợ gì hôm nay?',
       intent: 'GENERAL',
@@ -96,13 +96,8 @@ export default function AiAssistantWidget() {
 
       setMessages((prev) => [...prev, botMsg]);
 
-      // TỰ ĐỘNG NHẢY TRANG NẾU CÓ LỆNH AUTO-EXECUTE (Đón cả data.uiAction.autoExecute lẫn data.autoExecute)
-      const isAuto = data.uiAction?.autoExecute === true || data.autoExecute === true;
-      if (data.uiAction && data.uiAction.target && isAuto) {
-        setTimeout(() => {
-          navigate(data.uiAction.target);
-        }, 600);
-      }
+      // Tắt hoàn toàn tự động chuyển trang theo yêu cầu người dùng
+      // Người dùng có thể nhấn nút "Mở trang" hiển thị trong tin nhắn nếu muốn điều hướng.
     } catch (err) {
       console.error('Lỗi khi gửi câu hỏi tới Wein:', err);
       setMessages((prev) => [
