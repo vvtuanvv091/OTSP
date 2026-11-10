@@ -41,8 +41,8 @@ public class AiService : IAiService
         {
             _http.BaseAddress = uri;
         }
-        // Giảm timeout xuống 3s để nếu python microservice offline thì lập tức chuyển sang Gemini, không làm người dùng chờ 30s
-        _http.Timeout = TimeSpan.FromSeconds(3);
+        // Timeout 8s: vừa đủ cho service Python phản hồi nhanh, nếu quá 8s sẽ fallback sang Gemini trực tiếp
+        _http.Timeout = TimeSpan.FromSeconds(8);
     }
 
     private HttpRequestMessage CreateAuthorizedRequest(HttpMethod method, string path, object? body = null)
@@ -105,8 +105,8 @@ public class AiService : IAiService
             }
         }
 
-        // 2. Thử gọi Python Agent service nếu URL hợp lệ và không tự trỏ về chính backend Render
-        if (!string.IsNullOrWhiteSpace(_baseUrl) && !_baseUrl.Contains("onrender.com", StringComparison.OrdinalIgnoreCase))
+        // 2. Thử gọi Python Agent service (https://otsp-1.onrender.com)
+        if (!string.IsNullOrWhiteSpace(_baseUrl))
         {
             try
             {
@@ -155,7 +155,7 @@ public class AiService : IAiService
         };
 
         StudyAssistantResponseDto? result = null;
-        if (!string.IsNullOrWhiteSpace(_baseUrl) && !_baseUrl.Contains("onrender.com", StringComparison.OrdinalIgnoreCase))
+        if (!string.IsNullOrWhiteSpace(_baseUrl))
         {
             try
             {
