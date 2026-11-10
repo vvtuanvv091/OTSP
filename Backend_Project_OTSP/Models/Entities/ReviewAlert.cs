@@ -14,6 +14,10 @@ namespace Backend_Project_OTSP.Models
         public string Reason { get; set; } = null!;
         // Trạng thái: New, Reviewed, Dismissed
         public AlertStatus Status { get; set; } = AlertStatus.New;
+        [MaxLength(50)]
+        public string? Severity { get; set; } = "Medium";
+        [MaxLength(100)]
+        public string? Category { get; set; } = "Review";
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
         [Required]

@@ -428,22 +428,28 @@ public class AiService : IAiService
                     Subjects = string.Join(", ", t.SubjectNames.Distinct())
                 }).ToList();
 
-                // Tìm gia sư khớp với câu hỏi người dùng (theo tên, môn học, từ khóa)
+                var unaccentMsg = RemoveDiacritics(lowerMsg);
+
+                // Tìm gia sư khớp với câu hỏi người dùng (theo tên, môn học, từ khóa - hỗ trợ cả có dấu & không dấu)
                 var matchedTutors = allApprovedTutors.Where(t =>
                 {
                     var nameLower = (t.Name ?? "").ToLower();
+                    var nameUnaccent = RemoveDiacritics(nameLower);
                     if (!string.IsNullOrEmpty(nameLower))
                     {
-                        if (lowerMsg.Contains(nameLower)) return true;
+                        if (lowerMsg.Contains(nameLower) || unaccentMsg.Contains(nameUnaccent)) return true;
                         var parts = nameLower.Split(' ', StringSplitOptions.RemoveEmptyEntries);
                         if (parts.Any(p => p.Length >= 2 && lowerMsg.Contains(p))) return true;
+                        var partsUnaccent = nameUnaccent.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                        if (partsUnaccent.Any(p => p.Length >= 2 && unaccentMsg.Contains(p))) return true;
                     }
 
                     var subLower = (t.Subjects ?? "").ToLower();
+                    var subUnaccent = RemoveDiacritics(subLower);
                     if (!string.IsNullOrEmpty(subLower))
                     {
                         var subs = subLower.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries);
-                        if (subs.Any(s => lowerMsg.Contains(s.Trim()))) return true;
+                        if (subs.Any(s => lowerMsg.Contains(s.Trim()) || unaccentMsg.Contains(RemoveDiacritics(s.Trim())))) return true;
                     }
 
                     return false;
@@ -725,6 +731,22 @@ Nhiệm vụ: Giải bài tập cho học sinh theo phương pháp sư phạm m�
             PracticeQuestion = "",
             PracticeSolution = ""
         };
+    }
+
+    private static string RemoveDiacritics(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return text ?? "";
+        var normalizedString = text.Normalize(System.Text.NormalizationForm.FormD);
+        var sb = new System.Text.StringBuilder();
+        foreach (var c in normalizedString)
+        {
+            var unicodeCategory = System.Globalization.CharUnicodeInfo.GetUnicodeCategory(c);
+            if (unicodeCategory != System.Globalization.UnicodeCategory.NonSpacingMark)
+            {
+                sb.Append(c);
+            }
+        }
+        return sb.ToString().Normalize(System.Text.NormalizationForm.FormC).ToLowerInvariant();
     }
 }
 

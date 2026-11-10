@@ -19,6 +19,27 @@ public sealed class AdminOperationsController : ControllerBase
 
     [HttpGet("reviews")]
     public async Task<IActionResult> Reviews([FromQuery] AdminOperationsQuery query, CancellationToken ct) => Ok(await _service.GetReviewsAsync(query, ct));
+
+    [HttpPut("reviews/{id:int}/visibility")]
+    public async Task<IActionResult> ToggleReviewVisibility(int id, CancellationToken ct)
+    {
+        var result = await _service.ToggleReviewVisibilityAsync(id, AdminUserId ?? "", ClientIp, ct);
+        return result.Success ? Ok(new { success = true, isHidden = result.IsHidden }) : NotFound(new { message = result.Error });
+    }
+
+    [HttpDelete("reviews/{id:int}")]
+    public async Task<IActionResult> DeleteReview(int id, CancellationToken ct)
+    {
+        var result = await _service.DeleteReviewAsync(id, AdminUserId ?? "", ClientIp, ct);
+        return result.Success ? Ok(new { success = true }) : NotFound(new { message = result.Error });
+    }
+
+    [HttpPost("reviews/{id:int}/flag")]
+    public async Task<IActionResult> FlagReviewAlert(int id, [FromBody] AdminFlagReviewRequest? request, CancellationToken ct)
+    {
+        var result = await _service.FlagReviewAlertAsync(id, request?.Reason ?? "Cần rà soát vi phạm", AdminUserId ?? "", ClientIp, ct);
+        return result.Success ? Ok(new { success = true }) : NotFound(new { message = result.Error });
+    }
     [HttpGet("reported-conversations")]
     public async Task<IActionResult> ReportedConversations([FromQuery] AdminOperationsQuery query, CancellationToken ct) => Ok(await _service.GetReportedConversationsAsync(query, ct));
     [HttpGet("complaints")]

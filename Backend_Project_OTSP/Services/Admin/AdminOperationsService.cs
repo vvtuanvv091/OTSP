@@ -29,22 +29,88 @@ public sealed class AdminOperationsService : IAdminOperationsService
         var rows = _db.Reviews.AsNoTracking().AsQueryable();
         if (!string.IsNullOrWhiteSpace(query.Search))
         {
-            var term = query.Search.Trim();
-            rows = rows.Where(x => (x.Comment != null && x.Comment.Contains(term)) || x.Student.User.FullName.Contains(term) || x.ClassSession.Classroom.Tutor.User.FullName.Contains(term));
+            var term = query.Search.Trim().ToLower();
+            rows = rows.Where(x => (x.Comment != null && x.Comment.ToLower().Contains(term)) ||
+                                   x.Student.User.FullName.ToLower().Contains(term) ||
+                                   x.ClassSession.Classroom.Tutor.User.FullName.ToLower().Contains(term));
         }
+
+        if (!string.IsNullOrWhiteSpace(query.Status) && query.Status != "all")
+        {
+            if (query.Status == "Hidden") rows = rows.Where(x => x.IsHidden);
+            else if (query.Status == "Visible") rows = rows.Where(x => !x.IsHidden);
+            else if (query.Status == "Alerted") rows = rows.Where(x => x.ReviewAlerts.Any(a => a.Status == AlertStatus.New));
+            else if (int.TryParse(query.Status, out var starScore) && starScore >= 1 && starScore <= 5)
+                rows = rows.Where(x => x.Score == starScore);
+        }
+
         var stats = await _db.Reviews.AsNoTracking().GroupBy(_ => 1).Select(g => new
         {
-            Total = g.Count(), Average = g.Average(x => x.Score), LowScore = g.Count(x => x.Score <= 2),
-            Reported = g.Sum(x => x.ReviewAlerts.Count(a => a.Status == AlertStatus.New))
+            Total = g.Count(),
+            Average = g.Average(x => x.Score),
+            LowScore = g.Count(x => x.Score <= 2),
+            Reported = g.Sum(x => x.ReviewAlerts.Count(a => a.Status == AlertStatus.New)),
+            HiddenCount = g.Count(x => x.IsHidden)
         }).FirstOrDefaultAsync(ct);
+
         var page = await PageAsync(rows.OrderByDescending(x => x.ReviewedAt).ThenByDescending(x => x.Id)
             .Select(x => new
             {
-                x.Id, x.Score, x.Comment, x.ReviewedAt, StudentName = x.Student.User.FullName,
-                TutorName = x.ClassSession.Classroom.Tutor.User.FullName, ClassroomName = x.ClassSession.Classroom.NameClass,
-                SubjectName = x.ClassSession.Classroom.Subject.Name, AlertCount = x.ReviewAlerts.Count
+                x.Id,
+                x.Score,
+                x.Comment,
+                x.ReviewedAt,
+                x.IsHidden,
+                x.AdminNote,
+                StudentName = x.Student.User.FullName,
+                TutorName = x.ClassSession.Classroom.Tutor.User.FullName,
+                ClassroomName = x.ClassSession.Classroom.NameClass,
+                SubjectName = x.ClassSession.Classroom.Subject.Name,
+                AlertCount = x.ReviewAlerts.Count
             }), query.Page, query.PageSize, ct);
-        return new { stats = stats ?? new { Total = 0, Average = 0d, LowScore = 0, Reported = 0 }, reviews = page };
+
+        return new { stats = stats ?? new { Total = 0, Average = 0d, LowScore = 0, Reported = 0, HiddenCount = 0 }, reviews = page };
+    }
+
+    public async Task<(bool Success, string? Error, bool? IsHidden)> ToggleReviewVisibilityAsync(int id, string adminUserId, string? ipAddress, CancellationToken ct)
+    {
+        var review = await _db.Reviews.FirstOrDefaultAsync(r => r.Id == id, ct);
+        if (review == null) return (false, "Không tìm thấy đánh giá.", null);
+        review.IsHidden = !review.IsHidden;
+        AddAudit(adminUserId, ipAddress, $"AdminToggleReviewVisibility:{id}:IsHidden={review.IsHidden}");
+        await _db.SaveChangesAsync(ct);
+        return (true, null, review.IsHidden);
+    }
+
+    public async Task<(bool Success, string? Error)> DeleteReviewAsync(int id, string adminUserId, string? ipAddress, CancellationToken ct)
+    {
+        var review = await _db.Reviews.Include(r => r.ReviewAlerts).FirstOrDefaultAsync(r => r.Id == id, ct);
+        if (review == null) return (false, "Không tìm thấy đánh giá.");
+        _db.ReviewAlerts.RemoveRange(review.ReviewAlerts);
+        _db.Reviews.Remove(review);
+        AddAudit(adminUserId, ipAddress, $"AdminDeleteReview:{id}");
+        await _db.SaveChangesAsync(ct);
+        return (true, null);
+    }
+
+    public async Task<(bool Success, string? Error)> FlagReviewAlertAsync(int id, string reason, string adminUserId, string? ipAddress, CancellationToken ct)
+    {
+        var review = await _db.Reviews.FirstOrDefaultAsync(r => r.Id == id, ct);
+        if (review == null) return (false, "Không tìm thấy đánh giá.");
+        var adminProfile = await EnsureAdminProfileAsync(adminUserId, ct);
+        _db.ReviewAlerts.Add(new ReviewAlert
+        {
+            ReviewId = id,
+            Reason = string.IsNullOrWhiteSpace(reason) ? "Quản trị viên gắn cờ cần rà soát tiêu chuẩn cộng đồng" : reason.Trim(),
+            Status = AlertStatus.New,
+            Severity = "High",
+            Category = "ReviewViolation",
+            CreatedAt = DateTime.UtcNow,
+            ReviewedByAdminId = adminProfile.Id
+        });
+        AddAudit(adminUserId, ipAddress, $"AdminFlagReviewAlert:{id}");
+        await _db.SaveChangesAsync(ct);
+        return (true, null);
     }
 
     public async Task<object> GetReportedConversationsAsync(AdminOperationsQuery query, CancellationToken ct)
@@ -251,6 +317,11 @@ public sealed class AdminOperationsService : IAdminOperationsService
             .ToListAsync(ct);
         var settledMap = settledReconciliations.ToDictionary(r => r.TutorId);
 
+        var tutorIds = rows.Select(r => r.tutorId).Distinct().ToList();
+        var tutorProfiles = await _db.TutorProfiles.AsNoTracking()
+            .Where(tp => tutorIds.Contains(tp.Id))
+            .ToDictionaryAsync(tp => tp.Id, ct);
+
         var defaultBank = "MBBank";
         var defaultAccountNo = "0984391940";
 
@@ -259,8 +330,17 @@ public sealed class AdminOperationsService : IAdminOperationsService
             var platformFee = decimal.Round(x.gross * PlatformFeeRate, 0);
             var tutorNet = x.gross - platformFee;
             var isSettled = settledMap.TryGetValue(x.tutorId, out var rec);
-            var accountHolder = x.tutorName?.ToUpperInvariant() ?? "GIA SU";
-            var qrUrl = $"https://img.vietqr.io/image/MB-{defaultAccountNo}-compact.png?amount={(long)tutorNet}&addInfo={Uri.EscapeDataString($"OTSP Luong T{selectedPeriod.Month}/{selectedPeriod.Year}")}&accountName={Uri.EscapeDataString(accountHolder)}";
+
+            tutorProfiles.TryGetValue(x.tutorId, out var tp);
+            var bankName = !string.IsNullOrWhiteSpace(tp?.BankName) ? tp.BankName : defaultBank;
+            var accountNo = !string.IsNullOrWhiteSpace(tp?.BankAccountNumber) ? tp.BankAccountNumber : defaultAccountNo;
+            // ƯU TIÊN LẤY TÊN CHỦ TÀI KHOẢN DO GIA SƯ ĐĂNG KÝ THỰC TẾ TRÊN HỆ THỐNG
+            var accountHolder = !string.IsNullOrWhiteSpace(tp?.BankAccountHolder)
+                ? tp.BankAccountHolder.ToUpperInvariant()
+                : (!string.IsNullOrWhiteSpace(x.tutorName) ? x.tutorName.ToUpperInvariant() : "TONG NGOC TUAN");
+
+            var bankCode = MapBankNameToCode(bankName);
+            var qrUrl = $"https://img.vietqr.io/image/{bankCode}-{Uri.EscapeDataString(accountNo)}-compact.png?amount={(long)tutorNet}&addInfo={Uri.EscapeDataString($"OTSP Luong T{selectedPeriod.Month}/{selectedPeriod.Year}")}&accountName={Uri.EscapeDataString(accountHolder)}";
 
             return new
             {
@@ -276,8 +356,8 @@ public sealed class AdminOperationsService : IAdminOperationsService
                 settledAt = isSettled ? rec?.CreatedDate.ToString("yyyy-MM-dd") : null,
                 bankAccount = new
                 {
-                    bankName = defaultBank,
-                    accountNumber = defaultAccountNo,
+                    bankName,
+                    accountNumber = accountNo,
                     accountHolder,
                     qrImageUrl = qrUrl
                 }
@@ -439,30 +519,102 @@ public sealed class AdminOperationsService : IAdminOperationsService
 
     public async Task<object> GetAuditLogsAsync(AdminOperationsQuery query, CancellationToken ct)
     {
-        var rows = _db.AuditLogs.AsNoTracking().AsQueryable();
+        var rows = _db.AuditLogs.AsNoTracking().Include(x => x.User).AsQueryable();
         if (!string.IsNullOrWhiteSpace(query.Search))
         {
-            var term = query.Search.Trim();
-            rows = rows.Where(x => x.Action.Contains(term) || x.User.FullName.Contains(term) || (x.User.Email != null && x.User.Email.Contains(term)));
+            var term = query.Search.Trim().ToLower();
+            rows = rows.Where(x => (x.Action != null && x.Action.ToLower().Contains(term)) ||
+                                   (x.Detail != null && x.Detail.ToLower().Contains(term)) ||
+                                   (x.Category != null && x.Category.ToLower().Contains(term)) ||
+                                   (x.User != null && x.User.FullName != null && x.User.FullName.ToLower().Contains(term)) ||
+                                   (x.User != null && x.User.Email != null && x.User.Email.ToLower().Contains(term)));
         }
+
+        if (!string.IsNullOrWhiteSpace(query.Status) && query.Status != "all")
+        {
+            var cat = query.Status.Trim();
+            rows = rows.Where(x => x.Category == cat);
+        }
+
+        var stats = await _db.AuditLogs.AsNoTracking()
+            .GroupBy(x => x.Category ?? "System")
+            .Select(g => new { category = g.Key, count = g.Count() })
+            .ToListAsync(ct);
+
         var page = await PageAsync(rows.OrderByDescending(x => x.Timestamp).ThenByDescending(x => x.Id)
-            .Select(x => new { x.Id, x.Action, x.Timestamp, x.IpAddress, adminName = x.User.FullName, adminEmail = x.User.Email }), query.Page, query.PageSize, ct);
-        return new { logs = page };
+            .Select(x => new
+            {
+                x.Id,
+                x.Action,
+                category = x.Category ?? "System",
+                x.Detail,
+                x.Timestamp,
+                x.IpAddress,
+                x.UserAgent,
+                userId = x.UserId,
+                adminName = x.User != null ? x.User.FullName : "Người dùng",
+                adminEmail = x.User != null ? x.User.Email : "—",
+                userRole = _db.UserRoles.Where(ur => ur.UserId == x.UserId)
+                    .Join(_db.Roles, ur => ur.RoleId, r => r.Id, (ur, r) => r.Name)
+                    .FirstOrDefault() ?? "Thành viên"
+            }), query.Page, query.PageSize, ct);
+
+        return new { stats, logs = page };
     }
 
     public async Task<object> GetAlertsAsync(AdminOperationsQuery query, CancellationToken ct)
     {
-        var rows = _db.ReviewAlerts.AsNoTracking().AsQueryable();
+        var rows = _db.ReviewAlerts.AsNoTracking()
+            .Include(x => x.Review).ThenInclude(r => r.Student).ThenInclude(s => s.User)
+            .Include(x => x.Review).ThenInclude(r => r.ClassSession).ThenInclude(cs => cs.Classroom).ThenInclude(c => c.Tutor).ThenInclude(t => t.User)
+            .AsQueryable();
+
         if (Enum.TryParse<AlertStatus>(query.Status, true, out var status)) rows = rows.Where(x => x.Status == status);
         if (!string.IsNullOrWhiteSpace(query.Search))
         {
-            var term = query.Search.Trim();
-            rows = rows.Where(x => x.Reason.Contains(term) || (x.Review.Comment != null && x.Review.Comment.Contains(term)) || x.Review.Student.User.Email!.Contains(term));
+            var term = query.Search.Trim().ToLower();
+            rows = rows.Where(x => x.Reason.ToLower().Contains(term) ||
+                                   (x.Review.Comment != null && x.Review.Comment.ToLower().Contains(term)) ||
+                                   (x.Review.Student.User.FullName != null && x.Review.Student.User.FullName.ToLower().Contains(term)) ||
+                                   (x.Review.ClassSession.Classroom.Tutor.User.FullName != null && x.Review.ClassSession.Classroom.Tutor.User.FullName.ToLower().Contains(term)));
         }
+
         var stats = await _db.ReviewAlerts.AsNoTracking().GroupBy(x => x.Status).Select(g => new { status = g.Key.ToString(), count = g.Count() }).ToListAsync(ct);
         var page = await PageAsync(rows.OrderByDescending(x => x.CreatedAt).ThenByDescending(x => x.Id)
-            .Select(x => new { x.Id, x.Reason, status = x.Status.ToString(), x.CreatedAt, reviewScore = x.Review.Score, reviewComment = x.Review.Comment, studentName = x.Review.Student.User.FullName, tutorName = x.Review.ClassSession.Classroom.Tutor.User.FullName }), query.Page, query.PageSize, ct);
+            .Select(x => new
+            {
+                x.Id,
+                x.Reason,
+                severity = x.Severity ?? (x.Review.Score <= 1 ? "High" : "Medium"),
+                category = x.Category ?? "Review",
+                status = x.Status.ToString(),
+                x.CreatedAt,
+                reviewId = x.ReviewId,
+                reviewScore = x.Review.Score,
+                reviewComment = x.Review.Comment,
+                studentName = x.Review.Student.User.FullName,
+                tutorName = x.Review.ClassSession.Classroom.Tutor.User.FullName,
+                classroomName = x.Review.ClassSession.Classroom.NameClass
+            }), query.Page, query.PageSize, ct);
+
         return new { stats, alerts = page };
+    }
+
+    private static string MapBankNameToCode(string bankName)
+    {
+        if (string.IsNullOrWhiteSpace(bankName)) return "MB";
+        var n = bankName.Trim().ToLowerInvariant();
+        if (n.Contains("mb") || n.Contains("quân đội")) return "MB";
+        if (n.Contains("vietcombank") || n.Contains("vcb")) return "vietcombank";
+        if (n.Contains("techcombank") || n.Contains("tcb")) return "techcombank";
+        if (n == "acb") return "ACB";
+        if (n.Contains("vpbank") || n.Contains("vpb")) return "VPB";
+        if (n.Contains("bidv")) return "BIDV";
+        if (n.Contains("agribank")) return "agribank";
+        if (n.Contains("tpbank")) return "tpbank";
+        if (n.Contains("sacombank")) return "sacombank";
+        if (n.Contains("ocb")) return "OCB";
+        return "MB";
     }
 
     public async Task<(bool Success, string? Error)> UpdateAlertAsync(int id, AlertStatus status, string adminUserId, string? ipAddress, CancellationToken ct)

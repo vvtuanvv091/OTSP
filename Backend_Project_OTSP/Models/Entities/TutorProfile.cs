@@ -26,6 +26,19 @@ namespace Backend_Project_OTSP.Models
         // Điểm đánh giá trung bình (tính từ Review, cập nhật khi có đánh giá mới)
         public double AverageRating { get; set; }
 
+        // Thông tin tài khoản ngân hàng nhận tiền / đối soát VietQR
+        [MaxLength(100)]
+        public string? BankName { get; set; }
+
+        [MaxLength(50)]
+        public string? BankAccountNumber { get; set; }
+
+        [MaxLength(200)]
+        public string? BankAccountHolder { get; set; }
+
+        [MaxLength(50)]
+        public string? BankCitizenId { get; set; }
+
         // Khóa ngoại tới tài khoản (1-1, unique trong DbContext)
         [Required]
         [ForeignKey(nameof(User))]

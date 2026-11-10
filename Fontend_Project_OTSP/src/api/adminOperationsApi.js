@@ -4,6 +4,9 @@ const base = '/admin/operations';
 
 export const adminOperationsApi = {
   getReviews: (params) => axiosClient.get(`${base}/reviews`, { params }),
+  toggleReviewVisibility: (id) => axiosClient.put(`${base}/reviews/${id}/visibility`),
+  deleteReview: (id) => axiosClient.delete(`${base}/reviews/${id}`),
+  flagReview: (id, data) => axiosClient.post(`${base}/reviews/${id}/flag`, data),
   getReportedConversations: (params) => axiosClient.get(`${base}/reported-conversations`, { params }),
   getComplaints: (params) => axiosClient.get(`${base}/complaints`, { params }),
   reviewComplaint: (id, data) => axiosClient.put(`${base}/complaints/${id}`, data),

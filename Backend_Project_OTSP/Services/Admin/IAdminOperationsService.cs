@@ -7,6 +7,9 @@ namespace Backend_Project_OTSP.Services.Admin;
 public interface IAdminOperationsService
 {
     Task<object> GetReviewsAsync(AdminOperationsQuery query, CancellationToken cancellationToken);
+    Task<(bool Success, string? Error, bool? IsHidden)> ToggleReviewVisibilityAsync(int id, string adminUserId, string? ipAddress, CancellationToken cancellationToken);
+    Task<(bool Success, string? Error)> DeleteReviewAsync(int id, string adminUserId, string? ipAddress, CancellationToken cancellationToken);
+    Task<(bool Success, string? Error)> FlagReviewAlertAsync(int id, string reason, string adminUserId, string? ipAddress, CancellationToken cancellationToken);
     Task<object> GetReportedConversationsAsync(AdminOperationsQuery query, CancellationToken cancellationToken);
     Task<object> GetComplaintsAsync(AdminOperationsQuery query, CancellationToken cancellationToken);
     Task<(bool Success, string? Error)> ReviewComplaintAsync(int id, AdminComplaintReviewRequest request, string adminUserId, string? ipAddress, CancellationToken cancellationToken);

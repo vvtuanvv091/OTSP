@@ -56,6 +56,10 @@ public class TutorIncomeApiController : ControllerBase
                 profile.Id,
                 FullName = profile.User.FullName,
                 CitizenId = profile.User.CitizenIdNumber,
+                profile.BankName,
+                profile.BankAccountNumber,
+                profile.BankAccountHolder,
+                profile.BankCitizenId,
                 Classrooms = profile.Classrooms.Select(classroom => new
                 {
                     classroom.Fee,
@@ -154,10 +158,10 @@ public class TutorIncomeApiController : ControllerBase
             ?? tutor.FullName?.ToUpperInvariant()
             ?? "TONG NGOC TUAN";
         var bankAccount = CreateBankAccount(
-            Request.Cookies["otsp_tutor_bank_name"] ?? defaultBank,
-            Request.Cookies["otsp_tutor_bank_acc"] ?? defaultAccountNumber,
-            Request.Cookies["otsp_tutor_bank_holder"] ?? defaultAccountHolder,
-            Request.Cookies["otsp_tutor_bank_cccd"] ?? tutor.CitizenId ?? "079*********");
+            tutor.BankName ?? Request.Cookies["otsp_tutor_bank_name"] ?? defaultBank,
+            tutor.BankAccountNumber ?? Request.Cookies["otsp_tutor_bank_acc"] ?? defaultAccountNumber,
+            tutor.BankAccountHolder ?? Request.Cookies["otsp_tutor_bank_holder"] ?? defaultAccountHolder,
+            tutor.BankCitizenId ?? Request.Cookies["otsp_tutor_bank_cccd"] ?? tutor.CitizenId ?? "079*********");
 
         return Ok(new
         {
@@ -179,8 +183,12 @@ public class TutorIncomeApiController : ControllerBase
     }
 
     [HttpPost("bank-account")]
-    public IActionResult SaveBankAccount([FromBody] TutorIncomeBankAccountRequest request)
+    public async Task<IActionResult> SaveBankAccount([FromBody] TutorIncomeBankAccountRequest request, CancellationToken ct)
     {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrWhiteSpace(userId))
+            return Unauthorized();
+
         var supportedBanks = new[]
         {
             "MBBank", "Vietcombank", "Techcombank", "ACB", "VPBank",
@@ -202,6 +210,18 @@ public class TutorIncomeApiController : ControllerBase
 
         var canonicalBankName = supportedBanks.First(name =>
             string.Equals(name, bankName, StringComparison.OrdinalIgnoreCase));
+
+        // Lưu trực tiếp vào Database cho Gia sư để Admin có thể đọc chính xác
+        var tutorProfile = await _db.TutorProfiles.FirstOrDefaultAsync(p => p.UserId == userId, ct);
+        if (tutorProfile != null)
+        {
+            tutorProfile.BankName = canonicalBankName;
+            tutorProfile.BankAccountNumber = accountNumber;
+            tutorProfile.BankAccountHolder = accountHolder.ToUpperInvariant();
+            tutorProfile.BankCitizenId = citizenId;
+            await _db.SaveChangesAsync(ct);
+        }
+
         var cookieOptions = new CookieOptions
         {
             Expires = DateTimeOffset.UtcNow.AddYears(1),

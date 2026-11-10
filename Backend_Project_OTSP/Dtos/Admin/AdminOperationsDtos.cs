@@ -47,3 +47,8 @@ public sealed class AdminSettlePayoutRequest
     [Required] public string Period { get; set; } = "";
     [StringLength(500)] public string? Note { get; set; }
 }
+
+public sealed class AdminFlagReviewRequest
+{
+    [StringLength(500)] public string? Reason { get; set; }
+}

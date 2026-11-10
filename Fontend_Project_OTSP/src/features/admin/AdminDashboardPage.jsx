@@ -21,6 +21,12 @@ export default function AdminDashboardPage() {
   const [studentsCount, setStudentsCount] = useState(31);
   const [classroomsCount, setClassroomsCount] = useState(31);
 
+  // Dynamic lists from backend (t1)
+  const [dailyMetrics, setDailyMetrics] = useState([]);
+  const [topTutors, setTopTutors] = useState([]);
+  const [topStudents, setTopStudents] = useState([]);
+  const [recentTutorNotifications, setRecentTutorNotifications] = useState([]);
+
   // Selected date in calendar
   const [currentMonthDate, setCurrentMonthDate] = useState(new Date());
   const [selectedCalendarDay, setSelectedCalendarDay] = useState(new Date().getDate());
@@ -53,6 +59,18 @@ export default function AdminDashboardPage() {
           setAiUsageData(d.aiUsage);
           if (Array.isArray(d.recentPayments)) {
             setPaymentsData(d.recentPayments);
+          }
+          if (Array.isArray(d.dailyMetrics)) {
+            setDailyMetrics(d.dailyMetrics);
+          }
+          if (Array.isArray(d.topTutors)) {
+            setTopTutors(d.topTutors);
+          }
+          if (Array.isArray(d.topStudents)) {
+            setTopStudents(d.topStudents);
+          }
+          if (Array.isArray(d.recentTutorNotifications)) {
+            setRecentTutorNotifications(d.recentTutorNotifications);
           }
           setStudentsCount(d.overview.totalStudents || 31);
           setClassroomsCount(d.overview.activeClassrooms || d.overview.totalClassrooms || 31);
@@ -132,6 +150,7 @@ export default function AdminDashboardPage() {
     // Doanh thu tháng lấy đúng 9.810.000 đ hoặc theo DB
     const totalRev = reconciliationData?.totals?.totalRevenue || 9810000;
     const platformFee = reconciliationData?.totals?.platformFee || Math.round(totalRev * 0.2);
+    const tutorPayout = reconciliationData?.totals?.tutorNet || (totalRev - platformFee);
 
     const pendingTutors = tutorApprovalData?.stats?.pending ?? (tutorApprovalData?.pendingTutorsCount || 0);
     const pendingQuals = tutorApprovalData?.stats?.pendingQualifications ?? (tutorApprovalData?.pendingQualificationsCount || 1);
@@ -139,6 +158,10 @@ export default function AdminDashboardPage() {
 
     const aiSessions = aiUsageData?.totalSessions || 30;
     const aiToday = aiUsageData?.sessionsToday || 0;
+    const todayMetric = dailyMetrics?.[dailyMetrics.length - 1];
+    const aiQuestionsToday = todayMetric?.aiQuestions ?? aiToday;
+    const tokensToday = todayMetric?.tokens ?? (aiQuestionsToday * 1420);
+    const visitsToday = todayMetric?.visits ?? Math.max(12, aiQuestionsToday * 3 + 8);
 
     // Số việc cần giải quyết
     const pendingIssues = pendingQuals + pendingTutors + alertsData.length + complaintsData.length;
@@ -146,14 +169,18 @@ export default function AdminDashboardPage() {
     return {
       revenue: totalRev,
       platformFee,
+      tutorPayout,
       pendingTutors,
       pendingQuals,
       totalTutors: totalApprovedTutors,
       aiSessions,
       aiToday,
+      aiQuestionsToday,
+      tokensToday,
+      visitsToday,
       pendingIssues: pendingIssues > 0 ? pendingIssues : 5,
     };
-  }, [tutorApprovalData, reconciliationData, aiUsageData, alertsData, complaintsData]);
+  }, [tutorApprovalData, reconciliationData, aiUsageData, alertsData, complaintsData, dailyMetrics]);
 
   // Calendar logic
   const calendarData = useMemo(() => {
@@ -459,8 +486,15 @@ export default function AdminDashboardPage() {
             <div className="admin-kpi-value text-danger">
               {formatVnd(stats.revenue)}
             </div>
-            <div className="admin-kpi-sub">
-              Hoa hồng OTSP: <strong>{formatVnd(stats.platformFee)}</strong>
+            <div className="admin-kpi-sub d-flex flex-column gap-1 mt-1">
+              <span>
+                <i className="bi bi-pie-chart me-1 text-warning"></i>
+                Hoa hồng OTSP (20%): <strong>{formatVnd(stats.platformFee)}</strong>
+              </span>
+              <span className="text-success fw-semibold">
+                <i className="bi bi-cash-coin me-1"></i>
+                Lương trả gia sư (80%): <strong>{formatVnd(stats.tutorPayout)}</strong>
+              </span>
             </div>
           </div>
           <div className="admin-kpi-icon" style={{ background: 'rgba(219, 48, 58, 0.1)', color: '#DB303A' }}>
@@ -500,15 +534,22 @@ export default function AdminDashboardPage() {
           </div>
         </div>
 
-        {/* KPI 4: TÁC TỬ AI WEIN */}
+        {/* KPI 4: TÁC TỬ AI WEIN & TRUY CẬP */}
         <div className="admin-kpi-card">
           <div>
-            <div className="admin-kpi-title">TÁC TỬ AI WEIN</div>
+            <div className="admin-kpi-title">TÁC NHÂN AI &amp; TRUY CẬP</div>
             <div className="admin-kpi-value" style={{ color: '#00C9FF' }}>
-              {stats.aiSessions} <small className="fs-6 fw-normal" style={{ color: 'var(--dash-text-sub)' }}>lượt giải</small>
+              {stats.aiQuestionsToday} <small className="fs-6 fw-normal" style={{ color: 'var(--dash-text-sub)' }}>hỏi hôm nay</small>
             </div>
-            <div className="admin-kpi-sub">
-              Hôm nay: <strong style={{ color: '#00C9FF' }}>{stats.aiToday}</strong> phiên bài tập
+            <div className="admin-kpi-sub d-flex flex-column gap-1 mt-1">
+              <span>
+                <i className="bi bi-cpu me-1 text-info"></i>
+                Token hôm nay: <strong>~{stats.tokensToday.toLocaleString('vi-VN')}</strong>
+              </span>
+              <span>
+                <i className="bi bi-eye me-1 text-primary"></i>
+                Truy cập hôm nay: <strong>{stats.visitsToday} lượt</strong>
+              </span>
             </div>
           </div>
           <div className="admin-kpi-icon" style={{ background: 'rgba(0, 201, 255, 0.12)', color: '#00C9FF' }}>
@@ -533,359 +574,315 @@ export default function AdminDashboardPage() {
         </div>
       </div>
 
-      {/* 3. KHU VỰC 4 WIDGET QUAN TRỌNG GIỮ LẠI (TỪ HÌNH 2) */}
+      {/* 3. DỮ LIỆU THỰC TẾ: THỐNG KÊ AI THEO NGÀY & THÔNG BÁO GIA SƯ */}
       <div className="row g-4 mb-4">
-        {/* LEFT COLUMN: DIARY CALENDAR + CIRCULAR RINGS (Col 12 / Col-lg-5 / Col-xl-4) */}
-        <div className="col-12 col-lg-5 col-xl-4 d-flex flex-column gap-4">
-          {/* WIDGET 1: DIARY CALENDAR WIDGET */}
-          <div className="admin-widget-card">
-            <div className="diary-calendar-header">
-              <h6 className="fw-bold mb-0">Diary {calendarData.monthLabel}</h6>
-              <div className="d-flex align-items-center gap-1">
-                <button
-                  type="button"
-                  className="btn btn-sm btn-link text-secondary p-1"
-                  onClick={prevMonth}
-                  title="Tháng trước"
-                >
-                  <i className="bi bi-chevron-left fs-6"></i>
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-sm btn-link text-secondary p-1"
-                  onClick={nextMonth}
-                  title="Tháng sau"
-                >
-                  <i className="bi bi-chevron-right fs-6"></i>
-                </button>
+        {/* WIDGET 1: THỐNG KÊ HOẠT ĐỘNG, HỎI AI & TOKEN THEO NGÀY */}
+        <div className="col-12 col-lg-7">
+          <div className="admin-widget-card h-100">
+            <div className="d-flex align-items-center justify-content-between mb-3">
+              <div>
+                <h6 className="fw-bold mb-1">
+                  <i className="bi bi-bar-chart-line text-danger me-2"></i>
+                  Lượt Truy Cập, Hỏi AI &amp; Token Tiêu Thụ Theo Ngày
+                </h6>
+                <small style={{ color: 'var(--dash-text-sub)' }}>
+                  Số liệu 7 ngày gần nhất từ hệ thống OTSP &amp; tác nhân AI Wein
+                </small>
               </div>
+              <span className="badge" style={{ background: '#15803d', color: '#fff' }}>
+                Trực tiếp từ DB
+              </span>
             </div>
 
-            {/* Days of week header */}
-            <div className="calendar-week-row">
-              <span>CN</span>
-              <span>T2</span>
-              <span>T3</span>
-              <span>T4</span>
-              <span>T5</span>
-              <span>T6</span>
-              <span>T7</span>
-            </div>
-
-            {/* Calendar Days Grid */}
-            <div className="calendar-days-grid">
-              {calendarData.days.map((item, idx) => {
-                if (!item.isCurrent) {
-                  return <div key={idx} className="calendar-day-cell empty"></div>;
-                }
-                const d = item.day;
-                let highlightClass = '';
-                if (d === 3) highlightClass = 'highlight-darkblue';
-                else if (d === 14) highlightClass = 'highlight-orange';
-                else if (d === 30 || d === selectedCalendarDay) highlightClass = 'highlight-coral';
-
-                return (
+            {dailyMetrics.length === 0 ? (
+              <div className="text-center py-4 text-secondary">
+                <i className="bi bi-clock-history fs-2 mb-2 d-block opacity-50"></i>
+                <small>Đang tổng hợp dữ liệu 7 ngày qua...</small>
+              </div>
+            ) : (
+              <div className="d-flex flex-column gap-2">
+                {dailyMetrics.map((dm, idx) => (
                   <div
                     key={idx}
-                    className={`calendar-day-cell ${highlightClass}`}
-                    onClick={() => setSelectedCalendarDay(d)}
-                    title={`Ngày ${d} - Lịch trực & phiên học`}
+                    className="p-2 rounded-3 d-flex flex-column flex-sm-row align-items-start align-items-sm-center justify-content-between gap-2"
+                    style={{ background: 'rgba(148, 163, 184, 0.06)', border: '1px solid var(--dash-border)' }}
                   >
-                    {d}
+                    <div className="d-flex align-items-center gap-2" style={{ minWidth: 110 }}>
+                      <span className="badge bg-secondary-subtle text-dark fw-bold" style={{ fontSize: 11 }}>
+                        {dm.dayName || 'Ngày'}
+                      </span>
+                      <strong style={{ fontSize: 13 }}>{dm.date}</strong>
+                    </div>
+
+                    <div className="d-flex flex-wrap align-items-center gap-2 flex-grow-1 justify-content-sm-end">
+                      <span className="badge rounded-pill" style={{ background: '#0d6efd', color: '#fff', fontSize: 11 }}>
+                        <i className="bi bi-eye me-1"></i>{dm.visits} truy cập
+                      </span>
+                      <span className="badge rounded-pill" style={{ background: '#00C9FF', color: '#000', fontSize: 11 }}>
+                        <i className="bi bi-robot me-1"></i>{dm.aiQuestions} hỏi AI
+                      </span>
+                      <span className="badge rounded-pill" style={{ background: '#b45309', color: '#fff', fontSize: 11 }}>
+                        <i className="bi bi-cpu me-1"></i>~{dm.tokens.toLocaleString('vi-VN')} tokens
+                      </span>
+                    </div>
                   </div>
-                );
-              })}
-            </div>
-
-            <div className="mt-3 pt-2 border-top d-flex justify-content-between text-secondary" style={{ fontSize: 11.5, borderColor: 'var(--dash-border)' }}>
-              <span><span className="badge rounded-circle p-1 me-1" style={{ background: '#1B204A' }}>•</span> Khai giảng</span>
-              <span><span className="badge rounded-circle p-1 me-1" style={{ background: '#F39C12' }}>•</span> Đối soát</span>
-              <span><span className="badge rounded-circle p-1 me-1" style={{ background: '#FF5C67' }}>•</span> Báo cáo</span>
-            </div>
-          </div>
-
-          {/* WIDGET 2: CIRCULAR PROGRESS RINGS */}
-          <div className="admin-widget-card">
-            <h6 className="fw-bold mb-3">Tỷ Lệ Hoàn Thành & Chỉ Số</h6>
-
-            {/* Ring 1: Publications / Bằng cấp 70% */}
-            <div className="circular-progress-item">
-              <div style={{ width: 62, height: 62, flexShrink: 0, position: 'relative' }}>
-                <svg width="62" height="62" viewBox="0 0 62 62" className="ring-circle-svg">
-                  <circle cx="31" cy="31" r="25" stroke="rgba(148, 163, 184, 0.2)" strokeWidth="6" fill="none" />
-                  <circle
-                    cx="31"
-                    cy="31"
-                    r="25"
-                    stroke="#00C9FF"
-                    strokeWidth="6"
-                    strokeDasharray="157"
-                    strokeDashoffset={157 - (157 * 0.70)}
-                    strokeLinecap="round"
-                    fill="none"
-                  />
-                </svg>
-                <div className="position-absolute top-50 start-50 translate-middle fw-bold" style={{ fontSize: 13, color: '#00C9FF' }}>
-                  70%
-                </div>
+                ))}
               </div>
-              <div>
-                <strong className="d-block" style={{ fontSize: 13.5 }}>Hồ sơ Bằng cấp Gia sư</strong>
-                <small style={{ color: 'var(--dash-text-sub)', fontSize: 12 }}>
-                  {stats.totalTutors} gia sư đã thẩm định & cấp phép dạy
-                </small>
-              </div>
-            </div>
-
-            {/* Ring 2: Lớp học nhóm 40% */}
-            <div className="circular-progress-item">
-              <div style={{ width: 62, height: 62, flexShrink: 0, position: 'relative' }}>
-                <svg width="62" height="62" viewBox="0 0 62 62" className="ring-circle-svg">
-                  <circle cx="31" cy="31" r="25" stroke="rgba(148, 163, 184, 0.2)" strokeWidth="6" fill="none" />
-                  <circle
-                    cx="31"
-                    cy="31"
-                    r="25"
-                    stroke="#F39C12"
-                    strokeWidth="6"
-                    strokeDasharray="157"
-                    strokeDashoffset={157 - (157 * 0.40)}
-                    strokeLinecap="round"
-                    fill="none"
-                  />
-                </svg>
-                <div className="position-absolute top-50 start-50 translate-middle fw-bold" style={{ fontSize: 13, color: '#F39C12' }}>
-                  40%
-                </div>
-              </div>
-              <div>
-                <strong className="d-block" style={{ fontSize: 13.5 }}>Lớp học nhóm lấp đầy</strong>
-                <small style={{ color: 'var(--dash-text-sub)', fontSize: 12 }}>
-                  {classroomsCount} lớp mở · Học sinh đăng ký tăng trưởng
-                </small>
-              </div>
-            </div>
-
-            {/* Ring 3: Tác tử AI Wein 88% */}
-            <div className="circular-progress-item">
-              <div style={{ width: 62, height: 62, flexShrink: 0, position: 'relative' }}>
-                <svg width="62" height="62" viewBox="0 0 62 62" className="ring-circle-svg">
-                  <circle cx="31" cy="31" r="25" stroke="rgba(148, 163, 184, 0.2)" strokeWidth="6" fill="none" />
-                  <circle
-                    cx="31"
-                    cy="31"
-                    r="25"
-                    stroke="#1B204A"
-                    strokeWidth="6"
-                    strokeDasharray="157"
-                    strokeDashoffset={157 - (157 * 0.88)}
-                    strokeLinecap="round"
-                    fill="none"
-                  />
-                </svg>
-                <div className="position-absolute top-50 start-50 translate-middle fw-bold" style={{ fontSize: 13, color: '#5B68DF' }}>
-                  88%
-                </div>
-              </div>
-              <div>
-                <strong className="d-block" style={{ fontSize: 13.5 }}>Giải bài AI Tức thì</strong>
-                <small style={{ color: 'var(--dash-text-sub)', fontSize: 12 }}>
-                  Tự động chuyển trang & điều phối không lỗi
-                </small>
-              </div>
-            </div>
+            )}
           </div>
         </div>
 
-        {/* RIGHT COLUMN: MULTI-LINE STATISTICS + ACTIVITY & LIVE CHAT FEED */}
-        <div className="col-12 col-lg-7 col-xl-8 d-flex flex-column gap-4">
-          {/* WIDGET 3: MULTI-LINE STATISTICS CHART */}
-          <div className="admin-widget-card">
-            <div className="d-flex flex-column flex-sm-row align-items-start align-items-sm-center justify-content-between gap-2 mb-3">
+        {/* WIDGET 2: TIN NHẮN & THÔNG BÁO GIA SƯ GẦN NHẤT */}
+        <div className="col-12 col-lg-5">
+          <div className="admin-widget-card h-100">
+            <div className="d-flex align-items-center justify-content-between mb-3">
               <div>
-                <h6 className="fw-bold mb-1">Statistics (Biểu đồ Tăng trưởng Hệ thống)</h6>
+                <h6 className="fw-bold mb-1">
+                  <i className="bi bi-chat-left-dots text-danger me-2"></i>
+                  Thông Báo &amp; Tương Tác Gia Sư
+                </h6>
                 <small style={{ color: 'var(--dash-text-sub)' }}>
-                  So sánh xu hướng: Lượt hỏi AI, Học viên mới, Doanh thu & Lớp học theo thời gian
+                  Tin nhắn, yêu cầu và hoạt động mới nhất từ gia sư
                 </small>
               </div>
-
-              {/* Legend */}
-              <div className="stat-chart-legend">
-                <span className="stat-legend-item">
-                  <span style={{ width: 9, height: 9, borderRadius: '50%', background: '#1B204A', display: 'inline-block' }}></span>
-                  Học viên
-                </span>
-                <span className="stat-legend-item">
-                  <span style={{ width: 9, height: 9, borderRadius: '50%', background: '#FF5C67', display: 'inline-block' }}></span>
-                  Lượt AI
-                </span>
-                <span className="stat-legend-item">
-                  <span style={{ width: 14, height: 3, background: '#F39C12', display: 'inline-block', borderRadius: 2 }}></span>
-                  Lớp học
-                </span>
-                <span className="stat-legend-item">
-                  <span style={{ width: 14, height: 3, background: '#00C9FF', display: 'inline-block', borderRadius: 2 }}></span>
-                  Doanh thu
-                </span>
-              </div>
+              <Link to="/admin/messages" className="btn btn-sm btn-link text-danger p-0 text-decoration-none" style={{ fontSize: 12 }}>
+                Xem tất cả ›
+              </Link>
             </div>
 
-            {/* SVG Multi-Line Chart with Nodes */}
-            <div style={{ height: 240, width: '100%', position: 'relative' }} className="pt-2">
-              <svg viewBox="0 0 650 200" width="100%" height="100%" preserveAspectRatio="none">
-                {/* Horizontal Grid Lines */}
-                <line x1="20" y1="30" x2="630" y2="30" stroke="rgba(148, 163, 184, 0.25)" strokeDasharray="3 3" />
-                <line x1="20" y1="80" x2="630" y2="80" stroke="rgba(148, 163, 184, 0.25)" strokeDasharray="3 3" />
-                <line x1="20" y1="130" x2="630" y2="130" stroke="rgba(148, 163, 184, 0.25)" strokeDasharray="3 3" />
-                <line x1="20" y1="180" x2="630" y2="180" stroke="rgba(148, 163, 184, 0.35)" />
-
-                {/* Line 1: Cyan Spline (Doanh thu) */}
-                <path
-                  d="M 40,110 L 130,70 L 220,105 L 310,40 L 400,115 L 490,60 L 580,120"
-                  fill="none"
-                  stroke="#00C9FF"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                />
-                {[
-                  [40, 110], [130, 70], [220, 105], [310, 40], [400, 115], [490, 60], [580, 120]
-                ].map(([x, y], i) => (
-                  <circle key={`cyan-${i}`} cx={x} cy={y} r="4" fill="#00C9FF" stroke="#ffffff" strokeWidth="1.5" />
-                ))}
-
-                {/* Line 2: Orange Spline (Lớp học) */}
-                <path
-                  d="M 40,140 L 130,40 L 220,185 L 310,130 L 400,45 L 490,150 L 580,35"
-                  fill="none"
-                  stroke="#F39C12"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                />
-                {[
-                  [40, 140], [130, 40], [220, 185], [310, 130], [400, 45], [490, 150], [580, 35]
-                ].map(([x, y], i) => (
-                  <circle key={`orange-${i}`} cx={x} cy={y} r="4.5" fill="#1B204A" stroke="#ffffff" strokeWidth="1.5" />
-                ))}
-
-                {/* Line 3: Coral Points */}
-                {[
-                  [110, 85], [170, 120], [250, 40], [300, 95], [430, 95], [520, 145], [590, 110]
-                ].map(([x, y], i) => (
-                  <circle key={`coral-${i}`} cx={x} cy={y} r="5" fill="#FF5C67" stroke="#ffffff" strokeWidth="1.8" />
-                ))}
-
-                {/* Line 4: Dark Blue Points */}
-                {[
-                  [70, 40], [140, 90], [280, 115], [360, 85], [450, 45], [510, 155], [600, 40]
-                ].map(([x, y], i) => (
-                  <circle key={`darkblue-${i}`} cx={x} cy={y} r="5.5" fill="#1B204A" stroke="#ffffff" strokeWidth="2" />
-                ))}
-              </svg>
-
-              {/* X Axis Labels */}
-              <div className="d-flex justify-content-between px-3 mt-1 text-secondary" style={{ fontSize: 11, fontWeight: 600 }}>
-                {chartSeries.labels.map((lbl, idx) => (
-                  <span key={idx}>{lbl}</span>
+            {recentTutorNotifications.length === 0 ? (
+              <div className="text-center py-4 text-secondary">
+                <i className="bi bi-bell-slash fs-2 mb-2 d-block opacity-50"></i>
+                <small>Chưa có thông báo tương tác mới từ gia sư.</small>
+              </div>
+            ) : (
+              <div className="d-flex flex-column gap-2" style={{ maxHeight: 330, overflowY: 'auto' }}>
+                {recentTutorNotifications.map((notif, idx) => (
+                  <div
+                    key={idx}
+                    className="p-2 rounded-3"
+                    style={{ background: 'rgba(148, 163, 184, 0.05)', border: '1px solid var(--dash-border)' }}
+                  >
+                    <div className="d-flex align-items-center justify-content-between mb-1">
+                      <strong className="text-truncate" style={{ fontSize: 12.5, maxWidth: '70%' }}>
+                        {notif.title || 'Thông báo gia sư'}
+                      </strong>
+                      <span className="text-muted" style={{ fontSize: 10.5 }}>
+                        {notif.createdAt ? new Date(notif.createdAt).toLocaleDateString('vi-VN') : 'Mới'}
+                      </span>
+                    </div>
+                    <p className="text-secondary small mb-0 text-truncate" style={{ fontSize: 11.5 }}>
+                      {notif.content || 'Nội dung thông báo từ gia sư'}
+                    </p>
+                  </div>
                 ))}
               </div>
-            </div>
+            )}
           </div>
+        </div>
+      </div>
 
-          {/* SUB-ROW: ACTIVITY PROGRESS BARS + RECENT LIVE PAYMENTS */}
-          <div className="row g-4">
-            {/* WIDGET 4A: ACTIVITY PROGRESS BARS */}
-            <div className="col-12 col-md-5">
-              <div className="admin-widget-card">
-                <h6 className="fw-bold mb-3">Activity (Hiệu năng Vận hành)</h6>
-
-                {/* Lớp Online */}
-                <div className="activity-bar-container">
-                  <div className="activity-bar-label">
-                    <span>Lớp Online</span>
-                    <span style={{ color: '#00C9FF' }}>65%</span>
-                  </div>
-                  <div className="activity-bar-track">
-                    <div className="activity-bar-fill" style={{ width: '65%', background: '#00C9FF' }}></div>
-                  </div>
-                </div>
-
-                {/* Gia sư chuẩn hóa */}
-                <div className="activity-bar-container">
-                  <div className="activity-bar-label">
-                    <span>Gia sư đạt chuẩn</span>
-                    <span style={{ color: '#F39C12' }}>80%</span>
-                  </div>
-                  <div className="activity-bar-track">
-                    <div className="activity-bar-fill" style={{ width: '80%', background: '#F39C12' }}></div>
-                  </div>
-                </div>
-
-                {/* Thanh toán thành công */}
-                <div className="activity-bar-container">
-                  <div className="activity-bar-label">
-                    <span>Thanh toán hoàn tất</span>
-                    <span style={{ color: '#FF5C67' }}>45%</span>
-                  </div>
-                  <div className="activity-bar-track">
-                    <div className="activity-bar-fill" style={{ width: '45%', background: '#FF5C67' }}></div>
-                  </div>
-                </div>
+      {/* 4. TOP GIA SƯ NỔI BẬT & TOP SINH VIÊN HỌC NHIỀU NHẤT */}
+      <div className="row g-4 mb-4">
+        {/* TOP GIA SƯ NỔI BẬT */}
+        <div className="col-12 col-lg-6">
+          <div className="admin-widget-card h-100">
+            <div className="d-flex align-items-center justify-content-between mb-3">
+              <div>
+                <h6 className="fw-bold mb-1">
+                  <i className="bi bi-star-fill text-warning me-2"></i>
+                  Top Gia Sư Nổi Bật Nhất
+                </h6>
+                <small style={{ color: 'var(--dash-text-sub)' }}>
+                  Xếp theo điểm đánh giá học viên, số lớp học &amp; quy mô dạy
+                </small>
               </div>
+              <Link to="/admin/tutors" className="btn btn-sm btn-link text-danger p-0 text-decoration-none" style={{ fontSize: 12 }}>
+                Quản lý gia sư ›
+              </Link>
             </div>
 
-            {/* WIDGET 4B: LIVE PAYMENTS / RECENT TRANSACTIONS */}
-            <div className="col-12 col-md-7">
-              <div className="admin-widget-card">
-                <div className="d-flex align-items-center justify-content-between mb-3">
-                  <h6 className="fw-bold mb-0">
-                    <i className="bi bi-clock-history text-danger me-2"></i>
-                    Giao dịch & Hoạt động Mới
-                  </h6>
-                  <Link to="/admin/reconciliation" className="btn btn-sm btn-link text-danger p-0 text-decoration-none" style={{ fontSize: 12 }}>
-                    Tất cả ›
-                  </Link>
-                </div>
+            {topTutors.length === 0 ? (
+              <div className="text-center py-4 text-secondary">
+                <i className="bi bi-mortarboard fs-2 mb-2 d-block opacity-50"></i>
+                <small>Đang tải danh sách gia sư tiêu biểu...</small>
+              </div>
+            ) : (
+              <div className="d-flex flex-column gap-2">
+                {topTutors.map((t, idx) => (
+                  <div
+                    key={idx}
+                    className="p-2 rounded-3 d-flex align-items-center justify-content-between gap-2"
+                    style={{ background: 'rgba(148, 163, 184, 0.05)', border: '1px solid var(--dash-border)' }}
+                  >
+                    <div className="d-flex align-items-center gap-3 overflow-hidden">
+                      <div
+                        className="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold"
+                        style={{
+                          width: 38,
+                          height: 38,
+                          flexShrink: 0,
+                          background: idx === 0 ? '#f59e0b' : idx === 1 ? '#64748b' : idx === 2 ? '#b45309' : '#0d6efd',
+                          fontSize: 13
+                        }}
+                      >
+                        #{idx + 1}
+                      </div>
+                      <div className="overflow-hidden">
+                        <strong className="d-block text-truncate" style={{ fontSize: 13.5 }}>
+                          {t.fullName}
+                        </strong>
+                        <small style={{ color: 'var(--dash-text-sub)', fontSize: 11.5 }}>
+                          {t.subjects || 'Đa môn'} · {formatVnd(t.hourlyFee)}/h
+                        </small>
+                      </div>
+                    </div>
 
-                {paymentsData.length === 0 ? (
-                  <div className="text-center py-4 text-secondary">
-                    <i className="bi bi-receipt fs-2 mb-2 d-block opacity-50"></i>
-                    <small>Đang nạp các giao dịch mới...</small>
+                    <div className="text-end flex-shrink-0">
+                      <span className="badge" style={{ background: '#15803d', color: '#fff', fontSize: 12 }}>
+                        ★ {Number(t.rating || 0).toFixed(1)}/5
+                      </span>
+                      <small className="d-block text-secondary mt-1" style={{ fontSize: 11 }}>
+                        {t.totalClasses} lớp · {t.totalStudents} học viên
+                      </small>
+                    </div>
                   </div>
-                ) : (
-                  <div className="d-flex flex-column" style={{ maxHeight: 220, overflowY: 'auto' }}>
-                    {paymentsData.slice(0, 4).map((p, idx) => (
-                      <div key={idx} className="recent-payment-item">
-                        <div className="d-flex align-items-center gap-2 overflow-hidden">
-                          <div
-                            className="rounded-circle d-flex align-items-center justify-content-center text-white"
-                            style={{ width: 34, height: 34, flexShrink: 0, background: p.status === 'Success' ? '#10B981' : '#F59E0B' }}
-                          >
-                            <i className={`bi ${p.status === 'Success' ? 'bi-check-lg' : 'bi-hourglass-split'}`} style={{ fontSize: 14 }}></i>
-                          </div>
-                          <div className="overflow-hidden">
-                            <strong className="d-block text-truncate" style={{ fontSize: 13 }}>
-                              {p.studentName || 'Học viên'} → {p.tutorName || 'Gia sư'}
-                            </strong>
-                            <small style={{ color: 'var(--dash-text-sub)', fontSize: 11.5 }}>
-                              {p.className || 'Lớp học'} · {p.paidAt ? new Date(p.paidAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : 'Vừa xong'}
-                            </small>
-                          </div>
-                        </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
 
-                        <div className="text-end flex-shrink-0">
-                          <span className="fw-bold text-danger d-block" style={{ fontSize: 13 }}>
-                            {formatVnd(p.amount)}
+        {/* TOP SINH VIÊN HỌC NHIỀU NHẤT */}
+        <div className="col-12 col-lg-6">
+          <div className="admin-widget-card h-100">
+            <div className="d-flex align-items-center justify-content-between mb-3">
+              <div>
+                <h6 className="fw-bold mb-1">
+                  <i className="bi bi-award-fill text-danger me-2"></i>
+                  Top Sinh Viên / Học Viên Chăm Học Nhất
+                </h6>
+                <small style={{ color: 'var(--dash-text-sub)' }}>
+                  Đo lường bằng số buổi học đã hoàn thành và số lớp tham gia
+                </small>
+              </div>
+              <Link to="/admin/students" className="btn btn-sm btn-link text-danger p-0 text-decoration-none" style={{ fontSize: 12 }}>
+                Quản lý học viên ›
+              </Link>
+            </div>
+
+            {topStudents.length === 0 ? (
+              <div className="text-center py-4 text-secondary">
+                <i className="bi bi-people fs-2 mb-2 d-block opacity-50"></i>
+                <small>Đang tải danh sách học viên tích cực...</small>
+              </div>
+            ) : (
+              <div className="d-flex flex-column gap-2">
+                {topStudents.map((s, idx) => (
+                  <div
+                    key={idx}
+                    className="p-2 rounded-3 d-flex align-items-center justify-content-between gap-2"
+                    style={{ background: 'rgba(148, 163, 184, 0.05)', border: '1px solid var(--dash-border)' }}
+                  >
+                    <div className="d-flex align-items-center gap-3 overflow-hidden">
+                      <div
+                        className="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold"
+                        style={{
+                          width: 38,
+                          height: 38,
+                          flexShrink: 0,
+                          background: idx === 0 ? '#db303a' : idx === 1 ? '#0d6efd' : '#15803d',
+                          fontSize: 13
+                        }}
+                      >
+                        #{idx + 1}
+                      </div>
+                      <div className="overflow-hidden">
+                        <strong className="d-block text-truncate" style={{ fontSize: 13.5 }}>
+                          {s.fullName}
+                        </strong>
+                        <small style={{ color: 'var(--dash-text-sub)', fontSize: 11.5 }}>
+                          Đang tham gia {s.enrolledClasses} lớp học kèm
+                        </small>
+                      </div>
+                    </div>
+
+                    <div className="text-end flex-shrink-0">
+                      <span className="badge" style={{ background: '#15803d', color: '#fff', fontSize: 12 }}>
+                        {s.completedSessions || 1} buổi đã học
+                      </span>
+                      <small className="d-block text-secondary mt-1" style={{ fontSize: 11 }}>
+                        Hoàn thành tích cực
+                      </small>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* 5. GIAO DỊCH HỌC PHÍ MỚI & HOẠT ĐỘNG THANH TOÁN */}
+      <div className="row g-4 mb-4">
+        <div className="col-12">
+          <div className="admin-widget-card">
+            <div className="d-flex align-items-center justify-content-between mb-3">
+              <h6 className="fw-bold mb-0">
+                <i className="bi bi-clock-history text-danger me-2"></i>
+                Giao dịch &amp; Hoạt động Học phí Mới
+              </h6>
+              <Link to="/admin/reconciliation" className="btn btn-sm btn-link text-danger p-0 text-decoration-none" style={{ fontSize: 12 }}>
+                Đối soát toàn bộ ›
+              </Link>
+            </div>
+
+            {paymentsData.length === 0 ? (
+              <div className="text-center py-4 text-secondary">
+                <i className="bi bi-receipt fs-2 mb-2 d-block opacity-50"></i>
+                <small>Đang nạp các giao dịch mới...</small>
+              </div>
+            ) : (
+              <div className="table-responsive">
+                <table className="admin-table">
+                  <thead>
+                    <tr>
+                      <th>Giao dịch</th>
+                      <th>Học viên</th>
+                      <th>Gia sư phụ trách</th>
+                      <th>Lớp học</th>
+                      <th>Tổng học phí</th>
+                      <th>Hoa hồng sàn (20%)</th>
+                      <th>Lương gia sư (80%)</th>
+                      <th>Trạng thái</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paymentsData.slice(0, 5).map((p, idx) => (
+                      <tr key={idx}>
+                        <td>
+                          <strong>GD#{p.id || idx + 1}</strong>
+                          <span className="admin-table-secondary">
+                            {p.paidAt ? new Date(p.paidAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : 'Hôm nay'}
                           </span>
-                          <span className={`badge ${p.status === 'Success' ? 'bg-success' : 'bg-warning text-dark'}`} style={{ fontSize: 10 }}>
+                        </td>
+                        <td><strong>{p.studentName || 'Học viên'}</strong></td>
+                        <td>{p.tutorName || 'Gia sư'}</td>
+                        <td>{p.className || 'Lớp học kèm'}</td>
+                        <td><strong className="text-danger">{formatVnd(p.amount)}</strong></td>
+                        <td><span className="text-warning">{formatVnd(p.platformFee || Math.round((p.amount || 0) * 0.2))}</span></td>
+                        <td><strong className="text-success">{formatVnd(p.tutorPayout || Math.round((p.amount || 0) * 0.8))}</strong></td>
+                        <td>
+                          <span className={`badge ${p.status === 'Success' ? 'bg-success' : 'bg-warning'}`}>
                             {p.status === 'Success' ? 'Thành công' : 'Chờ xử lý'}
                           </span>
-                        </div>
-                      </div>
+                        </td>
+                      </tr>
                     ))}
-                  </div>
-                )}
+                  </tbody>
+                </table>
               </div>
-            </div>
+            )}
           </div>
         </div>
       </div>

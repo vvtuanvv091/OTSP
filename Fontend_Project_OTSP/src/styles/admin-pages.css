@@ -46,10 +46,60 @@
 .admin-table-secondary { display: block; margin-top: 3px; color: #94a3b8; font-size: 13px; }
 .admin-subjects { display: flex; flex-wrap: wrap; gap: 4px; max-width: 240px; }
 .admin-subject-tag { padding: 3px 7px; color: #64748b; background: #f1f5f9; border-radius: 5px; font-size: 12px; white-space: nowrap; }
-.admin-status { display: inline-flex; padding: 4px 8px; border-radius: 5px; font-size: 12px; white-space: nowrap; }
-.admin-status.is-active { color: #16834c; background: #e9f7ef; }
-.admin-status.is-locked { color: #b42318; background: #fef0ef; }
-.admin-status.is-pending { color: #9a6700; background: #fff7e0; }
+.admin-status { 
+  display: inline-flex; 
+  align-items: center;
+  justify-content: center;
+  padding: 4px 10px; 
+  border-radius: 6px; 
+  font-size: 12px; 
+  font-weight: 700;
+  white-space: nowrap; 
+  letter-spacing: 0.2px;
+}
+/* Màu xanh lá đậm chuẩn Hình 2 (thay màu xanh nhạt) */
+.admin-status.is-active,
+.admin-status.is-success,
+.badge-status-success { 
+  color: #ffffff !important; 
+  background-color: #15803d !important; 
+  border: 1px solid #166534;
+  box-shadow: 0 1px 3px rgba(21, 128, 61, 0.25);
+}
+/* Màu vàng hổ phách đậm (thay màu vàng nhạt) */
+.admin-status.is-pending,
+.admin-status.is-warning,
+.badge-status-warning { 
+  color: #ffffff !important; 
+  background-color: #b45309 !important; 
+  border: 1px solid #92400e;
+  box-shadow: 0 1px 3px rgba(180, 83, 9, 0.25);
+}
+/* Màu đỏ đậm cho trạng thái khóa / hủy / từ chối */
+.admin-status.is-locked,
+.admin-status.is-danger,
+.badge-status-danger { 
+  color: #ffffff !important; 
+  background-color: #dc2626 !important; 
+  border: 1px solid #b91c1c;
+}
+.admin-status.is-info {
+  color: #ffffff !important;
+  background-color: #1d4ed8 !important;
+  border: 1px solid #1e40af;
+}
+
+/* Đồng bộ badge trên toàn bộ 10 trang quản trị */
+.badge.bg-success, .badge.text-bg-success {
+  background-color: #15803d !important;
+  color: #ffffff !important;
+  font-weight: 700 !important;
+}
+.badge.bg-warning, .badge.text-bg-warning {
+  background-color: #b45309 !important;
+  color: #ffffff !important;
+  font-weight: 700 !important;
+}
 .admin-message-cell { max-width: 210px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .admin-format { color: #475569; font-size: 13px; }
 .admin-action {
@@ -291,9 +341,10 @@
 .admin-account-form small,
 .admin-ai-bar small,
 .admin-ai-chart > p { color: #64748b; }
-.admin-status.is-active { color: #12643a; background: #d9f2e2; }
-.admin-status.is-pending { color: #805700; background: #ffedb5; }
-.admin-status.is-locked { color: #a52018; background: #fde2df; }
+/* Màu huy hiệu chuẩn hình ảnh: Xanh lá đậm (#15803d) và Vàng hổ phách đậm (#b45309) */
+.admin-status.is-active, .admin-status.is-success { color: #ffffff !important; background: #15803d !important; border: 1px solid #166534; font-weight: 700; }
+.admin-status.is-pending, .admin-status.is-warning { color: #ffffff !important; background: #b45309 !important; border: 1px solid #92400e; font-weight: 700; }
+.admin-status.is-locked, .admin-status.is-danger { color: #ffffff !important; background: #dc2626 !important; border: 1px solid #b91c1c; font-weight: 700; }
 
 @media (max-width: 991.98px) {
   .admin-stats,

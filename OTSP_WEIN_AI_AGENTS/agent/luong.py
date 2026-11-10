@@ -326,12 +326,12 @@ def run_agent_workflow(
 
         tutor_ids = [t["tutorId"] for t in tutors]
         return _make_response(
-            reply=f"Wein đã lọc các gia sư phù hợp nhất và đang tự động điều hướng kết quả cho bạn:\n\n{tutor_cards}",
+            reply=f"Wein đã gợi ý các gia sư phù hợp nhất với yêu cầu của bạn bên dưới:\n\n{tutor_cards}",
             intent="FIND_TUTOR",
             target=url_target,
             action_type="FILTER_SEARCH",
             label="Xem kết quả tìm kiếm",
-            auto_execute=True,
+            auto_execute=False,
             suggested_prompts=["Xem trang 2", "Lớp học nhóm giá rẻ hơn", "Cách thanh toán học phí"],
             recommended_tutor_ids=tutor_ids
         )
@@ -343,23 +343,30 @@ def run_agent_workflow(
     all_ram_tutors = get_tutors_from_ram(limit=60)
     all_ram_classes = get_classrooms_from_ram(limit=20)
 
-    # Tìm kiếm gia sư khớp với tin nhắn người dùng (theo tên hoặc môn học)
+    def _strip_vn(text: str) -> str:
+        import unicodedata
+        return ''.join(c for c in unicodedata.normalize('NFD', text.lower()) if unicodedata.category(c) != 'Mn')
+
+    msg_unaccent = _strip_vn(user_message)
+
+    # Tìm kiếm gia sư khớp với tin nhắn người dùng (theo tên, môn học - hỗ trợ cả có dấu và không dấu)
     matched_tutors = []
     for t in all_ram_tutors:
         name_lower = (t.get("fullName") or "").lower()
-        if name_lower and (name_lower in msg_low or any(p in msg_low for p in name_lower.split() if len(p) >= 2)):
+        name_unaccent = _strip_vn(name_lower)
+        if name_lower and (name_lower in msg_low or name_unaccent in msg_unaccent or any(p in msg_low for p in name_lower.split() if len(p) >= 2) or any(p in msg_unaccent for p in name_unaccent.split() if len(p) >= 2)):
             matched_tutors.append(t)
-        elif any(s.strip().lower() in msg_low for s in (t.get("subjects") or "").split(",")):
+        elif any(s.strip().lower() in msg_low or _strip_vn(s.strip()) in msg_unaccent for s in (t.get("subjects") or "").split(",")):
             matched_tutors.append(t)
 
     context_db = f"\n[Dữ liệu thực tế hệ thống OTSP]:\n- Tổng số gia sư đã kiểm duyệt: {len(all_ram_tutors)} gia sư.\n- Tổng số lớp học đang mở: {len(all_ram_classes)} lớp.\n"
     if matched_tutors:
         context_db += "[Gia sư thực tế phù hợp]:\n" + "\n".join([
-            f"- Gia sư: {t['fullName']} | Môn dạy: {t['subjects']} | Học phí: {t['hourlyFee']:,} đ/giờ | Đánh giá: {t['rating']}★"
-            for t in matched_tutors[:6]
+            f"- Gia sư: {t['fullName']} | Môn dạy: {t['subjects']} | Học phí: {t['hourlyFee']:,} đ/giờ | Đánh giá: {t['rating']}★ | Cấp học: {t.get('grades', 'Phổ thông')}"
+            for t in matched_tutors[:10]
         ])
     else:
-        sample_names = ", ".join([f"{t['fullName']} ({t['subjects']})" for t in all_ram_tutors[:5]])
+        sample_names = ", ".join([f"{t['fullName']} ({t['subjects']})" for t in all_ram_tutors[:6]])
         context_db += f"- Một số gia sư tiêu biểu: {sample_names} (Hệ thống có nhiều gia sư khác, người dùng có thể tìm theo tên hoặc môn bất kỳ)."
 
     role_desc = "học viên" if user_role == "Student" else ("gia sư" if user_role == "Tutor" else "khách")

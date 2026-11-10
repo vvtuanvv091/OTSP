@@ -12,6 +12,12 @@ namespace Backend_Project_OTSP.Models
         [MaxLength(1000)]
         public string? Comment { get; set; }
         public DateTime ReviewedAt { get; set; } = DateTime.UtcNow;
+
+        // Quản trị viên ẩn / hiện đánh giá
+        public bool IsHidden { get; set; } = false;
+        [MaxLength(500)]
+        public string? AdminNote { get; set; }
+
         [ForeignKey("ClassSession")]
         public int ClassSessionId { get; set; }
         public ClassSession ClassSession { get; set; } = null!;
