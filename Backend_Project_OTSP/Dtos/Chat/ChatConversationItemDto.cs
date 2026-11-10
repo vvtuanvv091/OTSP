@@ -9,7 +9,7 @@ public sealed class ChatConversationItemDto
     public string LastMessageContent { get; init; } = string.Empty;
     public DateTime? LastMessageTimeUtc { get; init; }
     public int UnreadCount { get; init; }
-    public bool IsOnline { get; init; }
+    public bool IsOnline { get; set; }
     public int? RequestId { get; init; }
     public int? ClassroomId { get; init; }
     public bool IsGroupClass { get; init; }

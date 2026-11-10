@@ -37,6 +37,15 @@ public sealed class ChatHub : Hub
         await base.OnDisconnectedAsync(exception);
     }
 
+    public void TouchActivity()
+    {
+        var userId = Context.User?.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (!string.IsNullOrWhiteSpace(userId))
+        {
+            _presenceService.TouchUserActivity(userId);
+        }
+    }
+
     public async Task JoinUserRoom(string contactUserId)
     {
         var userId = Context.User?.FindFirstValue(ClaimTypes.NameIdentifier);

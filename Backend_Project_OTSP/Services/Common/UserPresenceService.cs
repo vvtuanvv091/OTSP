@@ -55,11 +55,13 @@ public sealed class UserPresenceService : IUserPresenceService
     {
         if (string.IsNullOrWhiteSpace(userId)) return false;
 
-        if (_userConnections.TryGetValue(userId, out var connections) && !connections.IsEmpty)
+        // 1. Phải có kết nối SignalR đang mở (đang mở tab ứng dụng OTSP)
+        if (!_userConnections.TryGetValue(userId, out var connections) || connections.IsEmpty)
         {
-            return true;
+            return false;
         }
 
+        // 2. VÀ phải có hoạt động trong vòng 3 phút (inactivity > 3 phút => Offline)
         if (_lastSeenUtc.TryGetValue(userId, out var lastSeen))
         {
             return (DateTime.UtcNow - lastSeen) <= ActivityTtl;

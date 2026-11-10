@@ -6,6 +6,7 @@ using Backend_Project_OTSP.Dtos.Chat;
 using Backend_Project_OTSP.Models;
 using static Backend_Project_OTSP.Models.Enums;
 using Backend_Project_OTSP.Services;
+using Backend_Project_OTSP.Services.Common;
 
 namespace Backend_Project_OTSP.Services.Chat
 {
@@ -16,6 +17,7 @@ namespace Backend_Project_OTSP.Services.Chat
         private const string DeletedMessageText = "Tin nhắn đã được thu hồi";
         private readonly ApplicationDbContext _db;
         private readonly IMemoryCache _cache;
+        private readonly IUserPresenceService _presenceService;
         private readonly IChatEventBus? _eventBus;
         private readonly TimeSpan _messageEditWindow;
 
@@ -23,10 +25,12 @@ namespace Backend_Project_OTSP.Services.Chat
             ApplicationDbContext db,
             IMemoryCache cache,
             IConfiguration configuration,
+            IUserPresenceService presenceService,
             IChatEventBus? eventBus = null)
         {
             _db = db;
             _cache = cache;
+            _presenceService = presenceService;
             _eventBus = eventBus;
             var editWindowMinutes = configuration.GetValue<int?>("Chat:MessageEditWindowMinutes") ?? 15;
             if (editWindowMinutes <= 0)
@@ -41,6 +45,10 @@ namespace Backend_Project_OTSP.Services.Chat
             var cacheKey = $"chat_convs_{currentUserId}";
             if (_cache.TryGetValue(cacheKey, out IReadOnlyList<ChatConversationItemDto>? cached) && cached != null)
             {
+                foreach (var item in cached)
+                {
+                    item.IsOnline = _presenceService.IsUserOnline(item.ContactUserId);
+                }
                 return cached;
             }
 
@@ -273,7 +281,7 @@ namespace Backend_Project_OTSP.Services.Chat
                     LastMessageContent = stats?.LastMessage.Content ?? "Bắt đầu cuộc trò chuyện...",
                     LastMessageTimeUtc = stats?.LastMessage.SentAt,
                     UnreadCount = stats?.UnreadCount ?? 0,
-                    IsOnline = true,
+                    IsOnline = _presenceService.IsUserOnline(partnerId),
                     RequestId = roleInfo.RequestId
                 });
             }

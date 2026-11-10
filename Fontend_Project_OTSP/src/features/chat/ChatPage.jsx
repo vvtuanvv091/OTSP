@@ -315,6 +315,57 @@ export default function ChatPage() {
     };
   }, [user?.id]);
 
+  // 3.1 Gửi heartbeat hoạt động (TouchActivity) khi người dùng thao tác chuột/phím (giãn cách 45s)
+  useEffect(() => {
+    let lastActivityTime = 0;
+    const sendActivityHeartbeat = () => {
+      const now = Date.now();
+      if (now - lastActivityTime >= 45000 && hubConnectionRef.current?.state === 'Connected') {
+        lastActivityTime = now;
+        hubConnectionRef.current.invoke('TouchActivity').catch(() => { });
+      }
+    };
+
+    const activityEvents = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'];
+    activityEvents.forEach((evt) => window.addEventListener(evt, sendActivityHeartbeat, { passive: true }));
+    return () => {
+      activityEvents.forEach((evt) => window.removeEventListener(evt, sendActivityHeartbeat));
+    };
+  }, []);
+
+  // 3.2 Tự động đồng bộ trạng thái Online / Offline (sau 3 phút không hoạt động sẽ chuyển sang Offline)
+  useEffect(() => {
+    const presenceTimer = setInterval(async () => {
+      try {
+        const res = await chatApi.getConversations();
+        if (res.data && Array.isArray(res.data)) {
+          const isStudentUser = user?.role === 'Student_Parent' || user?.role === 'Student' ||
+            (Array.isArray(user?.roles) && user.roles.some((r) => String(r).toLowerCase().includes('student')));
+
+          let list = res.data;
+          if (isStudentUser) {
+            list = list.filter((c) => c.roleLabel !== 'Bạn cùng lớp' && c.roleLabel !== 'Học viên');
+          }
+
+          setConversations((prev) =>
+            prev.map((c) => {
+              const fresh = list.find((item) => String(item.contactUserId).toLowerCase() === String(c.contactUserId).toLowerCase());
+              return fresh ? { ...c, isOnline: fresh.isOnline } : c;
+            })
+          );
+
+          setSelectedContact((curr) => {
+            if (!curr) return curr;
+            const fresh = list.find((item) => String(item.contactUserId).toLowerCase() === String(curr.contactUserId).toLowerCase());
+            return fresh ? { ...curr, isOnline: fresh.isOnline } : curr;
+          });
+        }
+      } catch { }
+    }, 30000);
+
+    return () => clearInterval(presenceTimer);
+  }, [user]);
+
   // 4. Xử lý gửi tin nhắn văn bản
   const handleSendMessage = async (e) => {
     e?.preventDefault();
@@ -986,6 +1037,12 @@ export default function ChatPage() {
                             contactName.charAt(0).toUpperCase()
                           )}
                         </div>
+                        {/* Chấm tròn trạng thái Online / Offline */}
+                        <span
+                          className={`position-absolute bottom-0 end-0 rounded-circle border border-white ${conv.isOnline ? 'bg-success' : 'bg-secondary'}`}
+                          style={{ width: 10, height: 10 }}
+                          title={conv.isOnline ? 'Đang hoạt động' : 'Không hoạt động'}
+                        />
                       </div>
 
                       <div className="chat-conv-info flex-grow-1 min-w-0">
@@ -1081,7 +1138,7 @@ export default function ChatPage() {
                         </span>
                       ) : (
                         <span className="chat-status-indicator small text-secondary">
-                          <span className="chat-online-dot text-secondary" aria-hidden="true">○</span> Đang hoạt động
+                          <span className="chat-online-dot text-secondary" aria-hidden="true">○</span> Không hoạt động
                         </span>
                       )}
                     </div>
