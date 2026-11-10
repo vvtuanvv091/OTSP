@@ -99,6 +99,11 @@ namespace Backend_Project_OTSP.Services.Chat
             }
             else
             {
+                var isCurrentStudent = await (from ur in _db.UserRoles
+                                              join r in _db.Roles on ur.RoleId equals r.Id
+                                              where ur.UserId == currentUserId && (r.Name == "Student_Parent" || r.Name == "Student")
+                                              select ur.UserId).AnyAsync(cancellationToken);
+
                 // 2. Tìm các yêu cầu kết nối (Accepted hoặc Pending để trao đổi trước khi chốt lịch)
                 var connectionRequests = await _db.ConnectionRequests
                     .AsNoTracking()
@@ -122,18 +127,21 @@ namespace Backend_Project_OTSP.Services.Chat
                 }
 
                 // 3. Gia sư: Lấy tất cả học viên đang dạy trong các lớp học (ClassroomStudents)
-                var tutorStudentIds = await _db.ClassroomStudents
-                    .AsNoTracking()
-                    .Where(cs => cs.Classroom.Tutor.UserId == currentUserId)
-                    .Select(cs => cs.Student.UserId)
-                    .Distinct()
-                    .ToListAsync(cancellationToken);
-
-                foreach (var sId in tutorStudentIds)
+                if (!isCurrentStudent)
                 {
-                    if (!string.IsNullOrWhiteSpace(sId) && sId != currentUserId && !partnerRoleMap.ContainsKey(sId))
+                    var tutorStudentIds = await _db.ClassroomStudents
+                        .AsNoTracking()
+                        .Where(cs => cs.Classroom.Tutor.UserId == currentUserId)
+                        .Select(cs => cs.Student.UserId)
+                        .Distinct()
+                        .ToListAsync(cancellationToken);
+
+                    foreach (var sId in tutorStudentIds)
                     {
-                        partnerRoleMap[sId] = ("Học viên", null);
+                        if (!string.IsNullOrWhiteSpace(sId) && sId != currentUserId && !partnerRoleMap.ContainsKey(sId))
+                        {
+                            partnerRoleMap[sId] = ("Học viên", null);
+                        }
                     }
                 }
 
@@ -153,24 +161,9 @@ namespace Backend_Project_OTSP.Services.Chat
                     }
                 }
 
-                // 5. Học viên: Lấy danh sách bạn cùng lớp (Classmates - cùng ClassroomId)
-                var classmateUserIds = await (
-                    from myEnroll in _db.ClassroomStudents.AsNoTracking()
-                    where myEnroll.Student.UserId == currentUserId
-                    join otherEnroll in _db.ClassroomStudents.AsNoTracking() on myEnroll.ClassroomId equals otherEnroll.ClassroomId
-                    where otherEnroll.Student.UserId != currentUserId
-                    select otherEnroll.Student.UserId
-                ).Distinct().ToListAsync(cancellationToken);
+                // 5. Học viên: TUYỆT ĐỐI KHÔNG thêm bạn cùng lớp ("Bạn cùng lớp"). Học viên chỉ được phép trao đổi với Gia sư và Quản trị viên.
 
-                foreach (var cId in classmateUserIds)
-                {
-                    if (!string.IsNullOrWhiteSpace(cId) && !partnerRoleMap.ContainsKey(cId))
-                    {
-                        partnerRoleMap[cId] = ("Bạn cùng lớp", null);
-                    }
-                }
-
-                // 6. Những người đã từng nhắn tin trước đây: Chỉ giữ lại nếu thỏa mãn phân quyền
+                // 6. Những người đã từng nhắn tin trước đây: Phải thỏa mãn nghiêm ngặt phân quyền (Học viên không chat với học viên khác)
                 var pastPartnerIds = await _db.Messagers
                     .AsNoTracking()
                     .Where(m => m.SenderId == currentUserId || m.ReceiverId == currentUserId)
@@ -178,12 +171,39 @@ namespace Backend_Project_OTSP.Services.Chat
                     .Distinct()
                     .ToListAsync(cancellationToken);
 
+                var tutorUserIdsSet = (await _db.TutorProfiles.AsNoTracking().Select(t => t.UserId).ToListAsync(cancellationToken)).ToHashSet();
+                var adminUserIdsSet = (await (from ur in _db.UserRoles
+                                              join r in _db.Roles on ur.RoleId equals r.Id
+                                              where r.NormalizedName == "ADMIN"
+                                              select ur.UserId).ToListAsync(cancellationToken)).ToHashSet();
+
                 foreach (var pastId in pastPartnerIds)
                 {
-                    if (!string.IsNullOrWhiteSpace(pastId) && pastId != currentUserId && !partnerRoleMap.ContainsKey(pastId))
+                    if (string.IsNullOrWhiteSpace(pastId) || pastId == currentUserId || partnerRoleMap.ContainsKey(pastId))
+                        continue;
+
+                    if (isCurrentStudent)
                     {
-                        // Hai người đã có lịch sử nhắn tin nên luôn được phép tiếp tục cuộc trò chuyện
-                        partnerRoleMap[pastId] = ("Thành viên OTSP", null);
+                        // Học viên CHỈ được giữ lại cuộc trò chuyện với Gia sư hoặc Admin
+                        if (tutorUserIdsSet.Contains(pastId))
+                        {
+                            partnerRoleMap[pastId] = ("Gia sư", null);
+                        }
+                        else if (adminUserIdsSet.Contains(pastId))
+                        {
+                            partnerRoleMap[pastId] = ("Hỗ trợ OTSP", null);
+                        }
+                    }
+                    else
+                    {
+                        if (adminUserIdsSet.Contains(pastId))
+                        {
+                            partnerRoleMap[pastId] = ("Hỗ trợ OTSP", null);
+                        }
+                        else
+                        {
+                            partnerRoleMap[pastId] = ("Học viên", null);
+                        }
                     }
                 }
             }
@@ -560,16 +580,17 @@ namespace Backend_Project_OTSP.Services.Chat
                 return true;
             }
 
-            // 2. Hai người đã từng có tin nhắn trao đổi trong DB -> Luôn cho phép tiếp tục trò chuyện
-            var hasPastMessages = await _db.Messagers
-                .AsNoTracking()
-                .AnyAsync(m => (m.SenderId == userAId && m.ReceiverId == userBId) ||
-                               (m.SenderId == userBId && m.ReceiverId == userAId),
-                          cancellationToken);
-            if (hasPastMessages)
+            // 2. Phân loại vai trò của 2 người
+            var roleA = await (from ur in _db.UserRoles join r in _db.Roles on ur.RoleId equals r.Id where ur.UserId == userAId select r.Name).FirstOrDefaultAsync(cancellationToken);
+            var roleB = await (from ur in _db.UserRoles join r in _db.Roles on ur.RoleId equals r.Id where ur.UserId == userBId select r.Name).FirstOrDefaultAsync(cancellationToken);
+            var isStudentA = roleA == "Student_Parent" || roleA == "Student";
+            var isStudentB = roleB == "Student_Parent" || roleB == "Student";
+
+            // TUYỆT ĐỐI CẤM: Hai học viên KHÔNG ĐƯỢC CHAT với nhau dưới mọi hình thức
+            if (isStudentA && isStudentB)
             {
-                _cache.Set(cacheKey, true, TimeSpan.FromMinutes(10));
-                return true;
+                _cache.Set(cacheKey, false, TimeSpan.FromMinutes(10));
+                return false;
             }
 
             // 3. Gia sư <-> Học viên có ConnectionRequest (Accepted, Pending, hoặc chưa bị từ chối)
@@ -600,25 +621,19 @@ namespace Backend_Project_OTSP.Services.Chat
                 return true;
             }
 
-            // 5. Học viên <-> Học viên cùng một lớp học (cùng ClassroomId)
-            var shareCommonClassroom = await (
-                from csA in _db.ClassroomStudents.AsNoTracking()
-                join csB in _db.ClassroomStudents.AsNoTracking() on csA.ClassroomId equals csB.ClassroomId
-                where csA.Student.UserId == userAId && csB.Student.UserId == userBId
-                select csA.ClassroomId
-            ).AnyAsync(cancellationToken);
-
-            if (shareCommonClassroom)
+            // 5. Hai người đã từng có tin nhắn trao đổi trong DB (không phải 2 học viên) -> Cho phép tiếp tục trò chuyện
+            var hasPastMessages = await _db.Messagers
+                .AsNoTracking()
+                .AnyAsync(m => (m.SenderId == userAId && m.ReceiverId == userBId) ||
+                               (m.SenderId == userBId && m.ReceiverId == userAId),
+                          cancellationToken);
+            if (hasPastMessages)
             {
                 _cache.Set(cacheKey, true, TimeSpan.FromMinutes(10));
                 return true;
             }
 
             // 6. Cho phép trao đổi giữa Gia sư và Học viên/Phụ huynh
-            var roleA = await (from ur in _db.UserRoles join r in _db.Roles on ur.RoleId equals r.Id where ur.UserId == userAId select r.Name).FirstOrDefaultAsync(cancellationToken);
-            var roleB = await (from ur in _db.UserRoles join r in _db.Roles on ur.RoleId equals r.Id where ur.UserId == userBId select r.Name).FirstOrDefaultAsync(cancellationToken);
-            var isStudentA = roleA == "Student_Parent" || roleA == "Student";
-            var isStudentB = roleB == "Student_Parent" || roleB == "Student";
             if ((roleA == "Tutor" && isStudentB) || (isStudentA && roleB == "Tutor"))
             {
                 _cache.Set(cacheKey, true, TimeSpan.FromMinutes(10));

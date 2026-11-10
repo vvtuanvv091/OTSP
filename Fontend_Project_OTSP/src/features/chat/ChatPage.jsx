@@ -8,9 +8,10 @@ import chatApi from '../../api/chatApi';
 // Hàm helper hợp nhất và chuẩn hóa tin nhắn chống trùng lặp / race condition khi 2 người gửi cùng lúc
 function upsertChatMessage(prevList, incoming, currentUserId) {
   if (!incoming || !incoming.id) return prevList;
-  const currentUidStr = String(currentUserId || '').toLowerCase();
-  const incomingSenderStr = String(incoming.senderId || '').toLowerCase();
-  const isMine = Boolean(incoming.isOwn) || (Boolean(currentUidStr) && incomingSenderStr === currentUidStr);
+  const currentUidStr = String(currentUserId || '').trim().toLowerCase();
+  const incomingSenderStr = String(incoming.senderId || '').trim().toLowerCase();
+  // CHỈ tính isMine dựa trên ID người gửi thực tế khớp với user hiện tại (TUYỆT ĐỐI không dùng incoming.isOwn vì SignalR broadcast chung)
+  const isMine = Boolean(currentUidStr) && incomingSenderStr === currentUidStr;
 
   // 1. Kiểm tra nếu tin nhắn đã tồn tại theo ID thực
   const existingByIdIndex = prevList.findIndex((m) => m.id === incoming.id);
@@ -102,7 +103,26 @@ export default function ChatPage() {
         setLoadingConversations(true);
         const res = await chatApi.getConversations();
         if (isMounted && res.data) {
-          const list = Array.isArray(res.data) ? res.data : [];
+          let list = Array.isArray(res.data) ? res.data : [];
+
+          // Học viên CHỈ được phép chat với Gia sư và Hỗ trợ OTSP (xóa bạn cùng lớp / học viên khác)
+          const isStudentUser = user?.role === 'Student_Parent' || user?.role === 'Student' ||
+            (Array.isArray(user?.roles) && user.roles.some((r) => String(r).toLowerCase().includes('student')));
+
+          if (isStudentUser) {
+            list = list.filter((c) => c.roleLabel !== 'Bạn cùng lớp' && c.roleLabel !== 'Học viên');
+          }
+
+          // Khử trùng lặp liên hệ theo contactUserId
+          const seenIds = new Set();
+          list = list.filter((c) => {
+            if (!c.contactUserId) return true;
+            const norm = String(c.contactUserId).trim().toLowerCase();
+            if (seenIds.has(norm)) return false;
+            seenIds.add(norm);
+            return true;
+          });
+
           setConversations(list);
 
           // Nếu có tham số người liên hệ trên URL, tìm và chọn hoặc tạo liên hệ tạm
@@ -158,12 +178,12 @@ export default function ChatPage() {
         const res = await chatApi.getMessages(selectedContact.contactUserId, 80);
         if (isMounted && res.data) {
           const list = Array.isArray(res.data) ? res.data : [];
-          const myId = String(user?.id || '').toLowerCase();
+          const myId = String(user?.id || '').trim().toLowerCase();
           const mapped = list.map((m) => {
-            const senderStr = String(m.senderId || '').toLowerCase();
+            const senderStr = String(m.senderId || '').trim().toLowerCase();
             return {
               ...m,
-              isMine: Boolean(m.isOwn) || (Boolean(myId) && senderStr === myId)
+              isMine: Boolean(myId) && senderStr === myId
             };
           });
           setMessages(mapped);
@@ -206,17 +226,16 @@ export default function ChatPage() {
     const handleIncomingMessage = (newMsg) => {
       if (!newMsg) return;
       const activeContact = selectedContactRef.current;
-      const myId = String(user?.id || '').toLowerCase();
-      const activeContactId = String(activeContact?.contactUserId || '').toLowerCase();
-      const msgSender = String(newMsg.senderId || '').toLowerCase();
-      const msgReceiver = String(newMsg.receiverId || '').toLowerCase();
+      const myId = String(user?.id || '').trim().toLowerCase();
+      const activeContactId = String(activeContact?.contactUserId || '').trim().toLowerCase();
+      const msgSender = String(newMsg.senderId || '').trim().toLowerCase();
+      const msgReceiver = String(newMsg.receiverId || '').trim().toLowerCase();
 
-      // Kiểm tra xem tin nhắn có thuộc về hội thoại hiện tại đang mở hay không (so sánh không phân biệt hoa thường)
+      // Kiểm tra xem tin nhắn có thuộc về hội thoại 1-1 hiện tại đang mở hay không
       const isCurrentConversation =
         Boolean(activeContactId) &&
-        (msgSender === activeContactId ||
-          (msgSender === myId && msgReceiver === activeContactId) ||
-          msgReceiver === activeContactId);
+        ((msgSender === activeContactId && (!msgReceiver || msgReceiver === myId)) ||
+          (msgSender === myId && msgReceiver === activeContactId));
 
       if (isCurrentConversation) {
         setMessages((prev) => upsertChatMessage(prev, newMsg, user?.id));
@@ -226,7 +245,7 @@ export default function ChatPage() {
       // Cập nhật nội dung xem trước và thời gian trong danh sách cuộc trò chuyện
       setConversations((prev) =>
         prev.map((c) => {
-          const cId = String(c.contactUserId || '').toLowerCase();
+          const cId = String(c.contactUserId || '').trim().toLowerCase();
           const isMatch = cId === msgSender || cId === msgReceiver;
 
           if (isMatch) {
@@ -246,7 +265,6 @@ export default function ChatPage() {
     };
 
     connection.on('ReceiveMessage', handleIncomingMessage);
-    connection.on('ReceiveDirectMessage', handleIncomingMessage);
 
     connection.on('MessageEdited', (event) => {
       setMessages((prev) => prev.map((message) => message.id === event.messageId

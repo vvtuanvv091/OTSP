@@ -92,22 +92,16 @@ public class ChatApiController : ControllerBase
         {
             var directRoom = ChatHub.GetDirectRoomName(userId, contactUserId);
 
-            // Bắn tín hiệu đa kênh đảm bảo 100% người nhận nhận được tức thì:
+            // Bắn tín hiệu qua SignalR bằng sự kiện chuẩn ReceiveMessage:
             // 1. Kênh phòng trò chuyện trực tiếp của 2 người
-            await _hubContext.Clients.Group(directRoom).SendAsync("ReceiveDirectMessage", message, cancellationToken);
             await _hubContext.Clients.Group(directRoom).SendAsync("ReceiveMessage", message, cancellationToken);
 
-            // 2. Kênh cá nhân của người nhận
-            await _hubContext.Clients.Group($"user:{contactUserId}").SendAsync("ReceiveDirectMessage", message, cancellationToken);
+            // 2. Kênh cá nhân của người nhận (nếu chưa join directRoom)
             await _hubContext.Clients.Group($"user:{contactUserId}").SendAsync("ReceiveMessage", message, cancellationToken);
-
-            // 3. Kênh cá nhân của người gửi (để đồng bộ các tab)
-            await _hubContext.Clients.Group($"user:{userId}").SendAsync("ReceiveDirectMessage", message, cancellationToken);
-            await _hubContext.Clients.Group($"user:{userId}").SendAsync("ReceiveMessage", message, cancellationToken);
-
-            // 4. Kênh Clients.User
-            await _hubContext.Clients.User(contactUserId).SendAsync("ReceiveDirectMessage", message, cancellationToken);
             await _hubContext.Clients.User(contactUserId).SendAsync("ReceiveMessage", message, cancellationToken);
+
+            // 3. Kênh cá nhân của người gửi (để đồng bộ các tab khác)
+            await _hubContext.Clients.Group($"user:{userId}").SendAsync("ReceiveMessage", message, cancellationToken);
         }
         catch { }
 
