@@ -589,6 +589,12 @@ public class ConnectionRequestService : IConnectionRequestService
                     return new AcceptConnectionRequestResult { InvalidClassroom = true, Message = "Lớp nhóm hiện không hoạt động." };
                 }
 
+                // Khóa bi quan (Pessimistic Row Lock) trên lớp học để ngăn chặn race condition khi 2 yêu cầu duyệt cùng lúc
+                await _db.Database.ExecuteSqlRawAsync(
+                    "SELECT id FROM \"Classrooms\" WHERE id = {0} FOR UPDATE",
+                    new object[] { groupClass.Id },
+                    cancellationToken);
+
                 var currentCount = await _db.ClassroomStudents.CountAsync(cs => cs.ClassroomId == groupClass.Id, cancellationToken);
                 var alreadyInClass = await _db.ClassroomStudents.AnyAsync(cs => cs.ClassroomId == groupClass.Id && cs.StudentId == request.StudentId, cancellationToken);
 
@@ -597,7 +603,7 @@ public class ConnectionRequestService : IConnectionRequestService
                     if (currentCount >= groupClass.MaxStudents)
                     {
                         await transaction.RollbackAsync(cancellationToken);
-                        return new AcceptConnectionRequestResult { ClassroomFull = true, Message = "Lớp nhóm đã đủ sĩ số tối đa." };
+                        return new AcceptConnectionRequestResult { ClassroomFull = true, Message = "Lớp nhóm đã đủ sĩ số tối đa. Không thể nhận thêm học viên!" };
                     }
 
                     _db.ClassroomStudents.Add(new ClassroomStudent
@@ -704,6 +710,23 @@ public class ConnectionRequestService : IConnectionRequestService
                         ?? request.TrialSchedules.FirstOrDefault()?.ScheduledAt
                         ?? DateTime.UtcNow.AddDays(1);
 
+                    // Kiểm tra chống Race Condition / Double Booking: Khung giờ đã được xác nhận cho lớp/học viên khác chưa
+                    var isSlotConflict = await _db.ClassSessions.AnyAsync(cs =>
+                        cs.Classroom.TutorId == request.TutorId
+                        && cs.Status == SessionStatus.Scheduled
+                        && cs.ScheduledAt >= trialSlotUtc.AddMinutes(-90)
+                        && cs.ScheduledAt <= trialSlotUtc.AddMinutes(90), cancellationToken);
+
+                    if (isSlotConflict)
+                    {
+                        await transaction.RollbackAsync(cancellationToken);
+                        return new AcceptConnectionRequestResult
+                        {
+                            SlotConflict = true,
+                            Message = "Khung giờ học thử này đã được gia sư xác nhận cho một học viên khác trước đó. Không thể duyệt trùng giờ!"
+                        };
+                    }
+
                     var videoRoomId = $"OTSP-Trial-{request.Id}-{Guid.NewGuid():N}"[..28];
                     var trialSession = new ClassSession
                     {
@@ -783,12 +806,33 @@ public class ConnectionRequestService : IConnectionRequestService
                     // Thiết lập lịch cố định hàng tuần (ClassroomWeeklySchedule) từ các buổi học viên đã chọn
                     if (!officialClassroom.WeeklySchedules.Any())
                     {
+                        var existingSchedules = await _db.ClassroomWeeklySchedules
+                            .AsNoTracking()
+                            .Where(ws => ws.Classroom.TutorId == request.TutorId && ws.Classroom.Status == ClassroomStatus.Active && ws.ClassroomId != officialClassroom.Id)
+                            .ToListAsync(cancellationToken);
+
                         int sessionIdx = 1;
                         foreach (var sched in request.TrialSchedules)
                         {
                             var vn = sched.ScheduledAt.AddHours(VietnamUtcOffsetHours);
                             var start = TimeOnly.FromTimeSpan(vn.TimeOfDay);
                             var end = start.AddHours(2);
+
+                            var isConflict = existingSchedules.Any(ws =>
+                                ws.DayOfWeek == vn.DayOfWeek &&
+                                start < ws.EndTime &&
+                                end > ws.StartTime);
+
+                            if (isConflict)
+                            {
+                                await transaction.RollbackAsync(cancellationToken);
+                                return new AcceptConnectionRequestResult
+                                {
+                                    SlotConflict = true,
+                                    Message = $"Khung giờ {start:HH\\:mm} - {end:HH\\:mm} vào {vn.DayOfWeek} đã bị trùng với lịch dạy của một lớp khác của gia sư. Không thể duyệt yêu cầu này!"
+                                };
+                            }
+
                             officialClassroom.WeeklySchedules.Add(new ClassroomWeeklySchedule
                             {
                                 Classroom = officialClassroom,

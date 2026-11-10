@@ -56,6 +56,8 @@ export default function ChatPage() {
   const { user } = useAuth();
   const [searchParams] = useSearchParams();
   const contactIdParam = searchParams.get('contactId') || searchParams.get('recipientId');
+  const contactNameParam = searchParams.get('contactName');
+  const contactAvatarParam = searchParams.get('contactAvatar');
   const inquiryParam = searchParams.get('inquiry');
   const classTitleParam = searchParams.get('classTitle');
 
@@ -132,14 +134,20 @@ export default function ChatPage() {
                 String(c.requestId) === String(contactIdParam)
             );
             if (found) {
+              if (contactNameParam && (!found.contactName || found.contactName === 'Người dùng OTSP' || found.contactName === 'Thành viên OTSP')) {
+                found.contactName = decodeURIComponent(contactNameParam);
+              }
+              if (contactAvatarParam && !found.contactAvatarUrl) {
+                found.contactAvatarUrl = decodeURIComponent(contactAvatarParam);
+              }
               setSelectedContact(found);
             } else {
               // Tạo liên hệ tạm thời để người dùng có thể gửi tin nhắn ngay
               const tempContact = {
                 contactUserId: contactIdParam,
-                contactName: classTitleParam ? `Gia sư phụ trách` : 'Thành viên OTSP',
-                roleLabel: classTitleParam ? 'Tư vấn' : '',
-                contactAvatarUrl: null,
+                contactName: contactNameParam ? decodeURIComponent(contactNameParam) : (classTitleParam ? `Gia sư phụ trách` : 'Thành viên OTSP'),
+                roleLabel: 'Gia sư',
+                contactAvatarUrl: contactAvatarParam ? decodeURIComponent(contactAvatarParam) : null,
                 lastMessageContent: 'Bắt đầu cuộc trò chuyện...',
                 unreadCount: 0,
                 isOnline: false,

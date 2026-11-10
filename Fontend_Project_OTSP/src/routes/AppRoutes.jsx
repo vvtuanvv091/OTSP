@@ -1,5 +1,5 @@
 import { Suspense, lazy } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 // Các bố cục giao diện (Layout)
@@ -87,18 +87,20 @@ function RouteFallback() {
 // Component phụ trợ tự động gán Layout tương ứng theo vai trò cho /chat và /notifications
 function AdaptiveChatRoute() {
   const { user, isTutor, isStudent, isAdmin } = useAuth();
+  const location = useLocation();
+  const searchStr = location.search || '';
   const tutorMode = isTutor || user?.roles?.includes('Tutor') || user?.role === 'Tutor';
   const studentMode = isStudent || user?.roles?.includes('Student_Parent') || user?.roles?.includes('Student') || user?.role === 'Student_Parent' || user?.role === 'Student';
   const adminMode = isAdmin || user?.roles?.includes('Admin') || user?.role === 'Admin';
 
   if (adminMode) {
-    return <Navigate to="/admin/chat" replace />;
+    return <Navigate to={`/admin/chat${searchStr}`} replace />;
   }
   if (tutorMode) {
-    return <Navigate to="/tutor/chat" replace />;
+    return <Navigate to={`/tutor/chat${searchStr}`} replace />;
   }
   if (studentMode) {
-    return <Navigate to="/student/chat" replace />;
+    return <Navigate to={`/student/chat${searchStr}`} replace />;
   }
   return (
     <MainLayout>

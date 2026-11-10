@@ -279,7 +279,8 @@ app.Use(async (context, next) =>
         {
             presence.MarkOffline(userId);
         }
-        else
+        else if (!context.Request.Path.StartsWithSegments("/api/chat/conversations") &&
+                 !context.Request.Path.StartsWithSegments("/api/notifications/unread-count"))
         {
             presence.TouchUserActivity(userId);
         }

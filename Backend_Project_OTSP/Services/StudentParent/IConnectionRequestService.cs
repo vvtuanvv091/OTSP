@@ -20,6 +20,7 @@ public class AcceptConnectionRequestResult
     public bool AlreadyHandled { get; set; }
     public bool InvalidClassroom { get; set; }
     public bool ClassroomFull { get; set; }
+    public bool SlotConflict { get; set; }
     public int? ClassroomId { get; set; }
     public int? SessionId { get; set; }
     public bool IsTrial { get; set; }
