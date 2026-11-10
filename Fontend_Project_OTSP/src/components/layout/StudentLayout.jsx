@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import Header from './Header';
 import Footer from './Footer';
@@ -250,7 +250,16 @@ export default function StudentLayout({ children }) {
         ></button>
 
         <main id="studentPageContent" role="main" className="student-dashboard-main pb-3">
-          {children || <Outlet />}
+          <Suspense
+            fallback={
+              <div className="d-flex flex-column align-items-center justify-content-center py-5 text-secondary" style={{ minHeight: '50vh' }}>
+                <span className="spinner-border spinner-border-sm text-danger mb-2" role="status" aria-hidden="true" />
+                <span className="small">Đang mở trang học tập…</span>
+              </div>
+            }
+          >
+            {children || <Outlet />}
+          </Suspense>
         </main>
       </div>
 

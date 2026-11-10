@@ -28,7 +28,19 @@ export const AuthProvider = ({ children }) => {
     || localStorage.getItem('otsp_token')
     || ''
   ));
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => {
+    const hasToken = Boolean(
+      localStorage.getItem('token')
+      || sessionStorage.getItem('token')
+      || localStorage.getItem('otsp_token')
+    );
+    const hasSavedUser = Boolean(
+      localStorage.getItem('user')
+      || sessionStorage.getItem('user')
+    );
+    // Tải tức thì không trắng trang: nếu không có token hoặc đã có sẵn cache user thì không block giao diện
+    return hasToken && !hasSavedUser;
+  });
 
   const clearSession = useCallback(() => {
     setToken('');

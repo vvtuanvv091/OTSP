@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import Header from './Header';
 import Footer from './Footer';
@@ -171,7 +171,16 @@ export default function AdminLayout() {
         <button type="button" className="admin-sidebar-backdrop" aria-label="Đóng thanh điều hướng" onClick={() => setSidebarOpen(false)} />
 
         <main id="adminPageContent" role="main" className="admin-layout-main">
-          <Outlet />
+          <Suspense
+            fallback={
+              <div className="d-flex flex-column align-items-center justify-content-center py-5 text-secondary" style={{ minHeight: '50vh' }}>
+                <span className="spinner-border spinner-border-sm text-danger mb-2" role="status" aria-hidden="true" />
+                <span className="small">Đang mở trang quản trị…</span>
+              </div>
+            }
+          >
+            <Outlet />
+          </Suspense>
         </main>
       </div>
 

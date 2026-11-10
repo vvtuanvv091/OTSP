@@ -62,6 +62,10 @@ export default function ClassDetailModal({ classId, initialData = null, onClose,
   const tutorRating = Number(c.tutor?.rating ?? c.tutor?.averageRating ?? c.tutorRating ?? 0);
   const tutorContactId = c.tutor?.userId || c.tutorUserId || '';
 
+  // Kiểm tra thời điểm đăng ký so với ngày khai giảng
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const isStarted = Boolean(c.startDate && c.startDate < todayIso);
+
   const handleEnrollSubmit = async (e) => {
     e.preventDefault();
     if (!user) {
@@ -174,6 +178,11 @@ export default function ClassDetailModal({ classId, initialData = null, onClose,
                   <span className="badge bg-secondary-subtle text-secondary rounded-pill px-3 py-1.5">
                     {c.type === 'Group' || c.type === 1 || !c.type ? 'Lớp nhóm tuyển sinh' : 'Lớp kèm 1-1'}
                   </span>
+                  {isStarted && (
+                    <span className="badge rounded-pill px-3 py-1.5 fw-semibold" style={{ backgroundColor: '#fff7ed', color: '#b45309', border: '1px solid #fed7aa' }}>
+                      <i className="bi bi-clock-history me-1"></i>Đã khai giảng ({c.startDate}) · Đang tuyển sinh bổ sung
+                    </span>
+                  )}
                   {isEnrolled && (
                     <span className="badge bg-success text-white rounded-pill px-3 py-1.5 fw-semibold">
                       <i className="bi bi-check-circle me-1"></i>Bạn đang theo học
@@ -238,6 +247,11 @@ export default function ClassDetailModal({ classId, initialData = null, onClose,
                       <strong className="text-body fs-6 d-block mt-1">
                         {c.startDate ? c.startDate : 'Nhận học viên ngay'}
                       </strong>
+                      {isStarted && (
+                        <span className="badge rounded-pill mt-1" style={{ backgroundColor: '#fff7ed', color: '#b45309', fontSize: '0.68rem', border: '1px solid #fed7aa' }}>
+                          Đang học dở dang
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -314,6 +328,21 @@ export default function ClassDetailModal({ classId, initialData = null, onClose,
                     </div>
                   </div>
                 </div>
+
+                {/* Lưu ý quyền lợi tuyển sinh bổ sung khi lớp đã qua ngày khai giảng */}
+                {isStarted && !isEnrolled && (
+                  <div className="p-3 rounded-3 mb-4" style={{ backgroundColor: '#fffbeb', border: '1px solid #fef08a', color: '#78350f' }}>
+                    <div className="d-flex align-items-center gap-2 fw-semibold mb-1">
+                      <i className="bi bi-info-circle-fill fs-5" style={{ color: '#b45309' }}></i>
+                      <span>Lưu ý khi đăng ký lớp học đã qua ngày khai giảng ({c.startDate}):</span>
+                    </div>
+                    <ul className="mb-0 ps-3 small" style={{ lineHeight: 1.65 }}>
+                      <li><strong>Tiến độ học tập:</strong> Lịch học của bạn sẽ bắt đầu tính từ buổi học kế tiếp sau khi được gia sư phê duyệt.</li>
+                      <li><strong>Quyền lợi bù kiến thức:</strong> Bạn được tự động mở toàn quyền truy cập tài liệu ôn tập, slide và video ghi hình (Recording) của các buổi trước đó trong kho tài liệu lớp.</li>
+                      <li><strong>Hỗ trợ kèm cặp:</strong> Gia sư phụ trách sẽ chủ động nhắn tin hỗ trợ tóm tắt kiến thức để bạn nhanh chóng hòa nhập cùng cả lớp.</li>
+                    </ul>
+                  </div>
+                )}
 
                 {/* Vùng thao tác đăng ký lớp học */}
                 <div className="border-top pt-3">
