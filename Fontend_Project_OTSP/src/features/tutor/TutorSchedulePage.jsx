@@ -849,28 +849,48 @@ export default function TutorSchedulePage() {
                                           {session.classroomName}
                                         </div>
 
-                                        <div className="session-meta d-flex align-items-center justify-content-between gap-1 text-truncate">
-                                          <span className="text-truncate">
-                                            <i className="bi bi-person me-0.5"></i>
-                                            <span>{session.studentName || 'Học viên'}</span>
-                                          </span>
-                                          <span className="badge bg-light text-secondary border flex-shrink-0" style={{ fontSize: 9, padding: '1px 5px' }}>
-                                            {session.subjectName}
-                                          </span>
+                                        <div className="session-meta text-truncate">
+                                          <i className="bi bi-person me-0.5"></i>
+                                          <span>{session.studentName || 'Học viên'}</span>
                                         </div>
 
-                                        {Number(session.sessionId) > 0 && !isDone && !isCancelled && (
-                                          <Link
-                                            to={`/room/${session.sessionId}`}
-                                            className={`btn btn-sm btn-danger w-100 py-1 px-1 mt-auto fw-bold d-flex align-items-center justify-content-center text-nowrap shadow-sm ${isInProgress ? 'animate-pulse' : ''}`}
-                                            style={{ fontSize: 11, lineHeight: 1.2, borderRadius: 6 }}
-                                            onClick={(e) => e.stopPropagation()}
-                                            title={isInProgress ? 'Đang diễn ra - Bấm để vào lớp' : 'Bấm để vào lớp'}
+                                        <div className="d-flex align-items-center justify-content-between gap-1 mt-auto pt-1">
+                                          <span
+                                            className="badge bg-light text-secondary border text-truncate flex-shrink-1"
+                                            style={{ fontSize: 9, padding: '2px 4px', maxWidth: '48%' }}
+                                            title={session.subjectName}
                                           >
-                                            <i className="bi bi-camera-video-fill me-1" style={{ fontSize: 11 }} aria-hidden="true" />
-                                            <span>Vào lớp</span>
-                                          </Link>
-                                        )}
+                                            {session.subjectName}
+                                          </span>
+
+                                          {Number(session.sessionId) > 0 && !isDone && !isCancelled && (
+                                            <Link
+                                              to={`/room/${session.sessionId}`}
+                                              className={`btn btn-sm text-nowrap fw-bold d-inline-flex align-items-center gap-1 ${
+                                                isInProgress
+                                                  ? 'btn-danger animate-pulse shadow-sm'
+                                                  : 'btn-outline-danger'
+                                              }`}
+                                              style={{
+                                                fontSize: 9.5,
+                                                padding: '2px 6px',
+                                                lineHeight: 1.2,
+                                                borderRadius: 5,
+                                                whiteSpace: 'nowrap',
+                                                flexShrink: 0
+                                              }}
+                                              onClick={(e) => e.stopPropagation()}
+                                              title={isInProgress ? 'Đang diễn ra - Bấm để vào lớp' : 'Bấm để mở lớp sớm'}
+                                            >
+                                              <i
+                                                className={isInProgress ? 'bi bi-camera-video-fill' : 'bi bi-camera-video'}
+                                                style={{ fontSize: 10 }}
+                                                aria-hidden="true"
+                                              />
+                                              <span>{isInProgress ? 'Vào lớp' : 'Mở lớp'}</span>
+                                            </Link>
+                                          )}
+                                        </div>
                                       </div>
                                     );
                                   })}
@@ -969,12 +989,12 @@ export default function TutorSchedulePage() {
                             {Number(s.sessionId) > 0 && !isDone && !isCancelled && (
                               <Link
                                 to={`/room/${s.sessionId}`}
-                                className={`btn btn-sm btn-danger px-2.5 py-1 text-nowrap fw-semibold d-inline-flex align-items-center gap-1 shadow-sm ${isInProgress ? 'animate-pulse' : ''}`}
+                                className={`btn btn-sm ${isInProgress ? 'btn-danger animate-pulse shadow-sm' : 'btn-outline-danger'} px-2.5 py-1 text-nowrap fw-semibold d-inline-flex align-items-center gap-1`}
                                 style={{ fontSize: 12, borderRadius: 6 }}
-                                title={isInProgress ? 'Đang diễn ra - Bấm để vào lớp' : 'Bấm để vào lớp'}
+                                title={isInProgress ? 'Đang diễn ra - Bấm để vào lớp' : 'Bấm để mở lớp sớm'}
                               >
-                                <i className="bi bi-camera-video-fill" aria-hidden="true" />
-                                <span>Vào lớp</span>
+                                <i className={isInProgress ? 'bi bi-camera-video-fill' : 'bi bi-camera-video'} aria-hidden="true" />
+                                <span>{isInProgress ? 'Vào lớp' : 'Mở lớp'}</span>
                               </Link>
                             )}
                             <button
@@ -1173,11 +1193,11 @@ export default function TutorSchedulePage() {
                     {Number(selectedSession.sessionId) > 0 && !['Done', 'Cancelled'].includes(selectedSession.normalizedStatus) && (
                       <Link
                         to={`/room/${selectedSession.sessionId}`}
-                        className="btn btn-danger btn-sm px-3 fw-semibold d-inline-flex align-items-center gap-1.5"
-                        style={{ backgroundColor: '#DB303A', borderColor: '#DB303A' }}
+                        className={`btn ${selectedSession.normalizedStatus === 'InProgress' ? 'btn-danger' : 'btn-outline-danger'} btn-sm px-3 fw-semibold d-inline-flex align-items-center gap-1.5`}
+                        style={selectedSession.normalizedStatus === 'InProgress' ? { backgroundColor: '#DB303A', borderColor: '#DB303A' } : {}}
                       >
-                        <i className="bi bi-camera-video-fill" aria-hidden="true" />
-                        <span>Vào lớp</span>
+                        <i className={selectedSession.normalizedStatus === 'InProgress' ? 'bi bi-camera-video-fill' : 'bi bi-camera-video'} aria-hidden="true" />
+                        <span>{selectedSession.normalizedStatus === 'InProgress' ? 'Vào lớp' : 'Mở lớp'}</span>
                       </Link>
                     )}
                   </div>
