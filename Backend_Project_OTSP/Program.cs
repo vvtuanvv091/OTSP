@@ -183,6 +183,7 @@ builder.Services.AddControllers()
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddOpenApi();
 builder.Services.AddSignalR();
+builder.Services.AddSingleton<Microsoft.AspNetCore.SignalR.IUserIdProvider, Backend_Project_OTSP.Hubs.CustomUserIdProvider>();
 builder.Services.AddLocalization();
 builder.Services.AddMemoryCache();
 builder.Services.AddDistributedMemoryCache();

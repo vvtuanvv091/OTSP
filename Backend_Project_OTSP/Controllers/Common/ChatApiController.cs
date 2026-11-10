@@ -90,15 +90,24 @@ public class ChatApiController : ControllerBase
 
         try
         {
-            if (contactUserId.StartsWith("class_") && int.TryParse(contactUserId[6..], out var cId))
-            {
-                await _hubContext.Clients.Group($"classroom:{cId}").SendAsync("ReceiveMessage", message, cancellationToken);
-                await _hubContext.Clients.Group($"classroom:{cId}").SendAsync("ReceiveClassroomMessage", message, cancellationToken);
-            }
-            else
-            {
-                await _hubContext.Clients.User(contactUserId).SendAsync("ReceiveMessage", message, cancellationToken);
-            }
+            var directRoom = ChatHub.GetDirectRoomName(userId, contactUserId);
+
+            // Bắn tín hiệu đa kênh đảm bảo 100% người nhận nhận được tức thì:
+            // 1. Kênh phòng trò chuyện trực tiếp của 2 người
+            await _hubContext.Clients.Group(directRoom).SendAsync("ReceiveDirectMessage", message, cancellationToken);
+            await _hubContext.Clients.Group(directRoom).SendAsync("ReceiveMessage", message, cancellationToken);
+
+            // 2. Kênh cá nhân của người nhận
+            await _hubContext.Clients.Group($"user:{contactUserId}").SendAsync("ReceiveDirectMessage", message, cancellationToken);
+            await _hubContext.Clients.Group($"user:{contactUserId}").SendAsync("ReceiveMessage", message, cancellationToken);
+
+            // 3. Kênh cá nhân của người gửi (để đồng bộ các tab)
+            await _hubContext.Clients.Group($"user:{userId}").SendAsync("ReceiveDirectMessage", message, cancellationToken);
+            await _hubContext.Clients.Group($"user:{userId}").SendAsync("ReceiveMessage", message, cancellationToken);
+
+            // 4. Kênh Clients.User
+            await _hubContext.Clients.User(contactUserId).SendAsync("ReceiveDirectMessage", message, cancellationToken);
+            await _hubContext.Clients.User(contactUserId).SendAsync("ReceiveMessage", message, cancellationToken);
         }
         catch { }
 

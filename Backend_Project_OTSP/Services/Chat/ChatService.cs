@@ -258,63 +258,6 @@ namespace Backend_Project_OTSP.Services.Chat
                 });
             }
 
-            // 10. Bổ sung các nhóm lớp học (Group Classroom Channels) mà user đang tham gia
-            try
-            {
-                var myClassrooms = await _db.Classrooms
-                    .AsNoTracking()
-                    .Where(c => c.Status == ClassroomStatus.Active && (
-                        c.Tutor.UserId == currentUserId ||
-                        c.ClassroomStudents.Any(cs => cs.Student.UserId == currentUserId)
-                    ))
-                    .Select(c => new
-                    {
-                        c.Id,
-                        c.NameClass,
-                        c.CoverImageUrl,
-                        c.Type,
-                        MemberCount = c.ClassroomStudents.Count() + 1
-                    })
-                    .ToListAsync(cancellationToken);
-
-                if (myClassrooms.Count > 0)
-                {
-                    var classIds = myClassrooms.Select(c => c.Id).ToList();
-                    var recentClassMessages = await _db.Messagers
-                        .AsNoTracking()
-                        .Where(m => m.ClassroomId.HasValue && classIds.Contains(m.ClassroomId.Value))
-                        .OrderByDescending(m => m.SentAt)
-                        .GroupBy(m => m.ClassroomId!.Value)
-                        .Select(g => new
-                        {
-                            ClassroomId = g.Key,
-                            LastMessage = g.First()
-                        })
-                        .ToDictionaryAsync(x => x.ClassroomId, x => x.LastMessage, cancellationToken);
-
-                    foreach (var cls in myClassrooms)
-                    {
-                        recentClassMessages.TryGetValue(cls.Id, out var lastMsg);
-                        conversations.Add(new ChatConversationItemDto
-                        {
-                            ContactUserId = $"class_{cls.Id}",
-                            ContactName = cls.NameClass,
-                            ContactAvatarUrl = cls.CoverImageUrl,
-                            RoleLabel = cls.Type == ClassroomType.Group ? $"Lớp nhóm ({cls.MemberCount} TV)" : "Lớp học 1-1",
-                            LastMessageContent = lastMsg != null ? (!string.IsNullOrWhiteSpace(lastMsg.Content) ? lastMsg.Content : "Kênh chat chung của lớp học") : "Kênh chat chung của lớp học",
-                            LastMessageTimeUtc = lastMsg?.SentAt,
-                            UnreadCount = 0,
-                            IsOnline = true,
-                            RequestId = null,
-                            ClassroomId = cls.Id,
-                            IsGroupClass = true,
-                            MemberCount = cls.MemberCount
-                        });
-                    }
-                }
-            }
-            catch { }
-
             // Sắp xếp: có tin chưa đọc -> tin mới nhất -> chưa chat -> theo tên
             var sorted = conversations
                 .OrderByDescending(c => c.UnreadCount > 0)

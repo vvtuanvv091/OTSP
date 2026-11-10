@@ -7,7 +7,10 @@ import chatApi from '../../api/chatApi';
 
 // Hàm helper hợp nhất và chuẩn hóa tin nhắn chống trùng lặp / race condition khi 2 người gửi cùng lúc
 function upsertChatMessage(prevList, incoming, currentUserId) {
-  if (!incoming) return prevList;
+  if (!incoming || !incoming.id) return prevList;
+  const currentUidStr = String(currentUserId || '').toLowerCase();
+  const incomingSenderStr = String(incoming.senderId || '').toLowerCase();
+  const isMine = Boolean(incoming.isOwn) || (Boolean(currentUidStr) && incomingSenderStr === currentUidStr);
 
   // 1. Kiểm tra nếu tin nhắn đã tồn tại theo ID thực
   const existingByIdIndex = prevList.findIndex((m) => m.id === incoming.id);
@@ -16,13 +19,13 @@ function upsertChatMessage(prevList, incoming, currentUserId) {
     updated[existingByIdIndex] = {
       ...updated[existingByIdIndex],
       ...incoming,
-      isMine: incoming.senderId === currentUserId || incoming.isOwn
+      isMine
     };
     return updated;
   }
 
-  // 2. Nếu là tin nhắn từ chính user gửi, kiểm tra xem có tin nhắn tạm (optimistic tempId) tương ứng không
-  if (incoming.senderId === currentUserId || incoming.isOwn) {
+  // 2. Nếu là tin nhắn từ chính user gửi, thay thế optimistic temp message
+  if (isMine) {
     const tempIndex = prevList.findIndex((m) =>
       typeof m.id === 'number' &&
       m.id > 1000000000000 &&
@@ -39,12 +42,12 @@ function upsertChatMessage(prevList, incoming, currentUserId) {
   }
 
   // 3. Nếu chưa có, thêm mới và sắp xếp theo sentAtUtc đảm bảo thứ tự thời gian không bị đảo lộn
-  const isMine = incoming.senderId === currentUserId || incoming.isOwn;
   const nextList = [...prevList, { ...incoming, isMine }];
   return nextList.sort((a, b) => {
-    const timeA = new Date(a.sentAtUtc || a.sentAt || 0).getTime();
-    const timeB = new Date(b.sentAtUtc || b.sentAt || 0).getTime();
-    return timeA - timeB;
+    const timeA = Number(new Date(a.sentAtUtc || a.sentAt || 0).getTime()) || 0;
+    const timeB = Number(new Date(b.sentAtUtc || b.sentAt || 0).getTime()) || 0;
+    if (timeA !== timeB) return timeA - timeB;
+    return (Number(a.id) || 0) - (Number(b.id) || 0);
   });
 }
 
@@ -54,7 +57,6 @@ export default function ChatPage() {
   const contactIdParam = searchParams.get('contactId') || searchParams.get('recipientId');
   const inquiryParam = searchParams.get('inquiry');
   const classTitleParam = searchParams.get('classTitle');
-  const classroomIdParam = searchParams.get('classroomId');
 
   const [conversations, setConversations] = useState([]);
   const [selectedContact, setSelectedContact] = useState(null);
@@ -63,7 +65,6 @@ export default function ChatPage() {
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [inputText, setInputText] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
-  const [chatFilter, setChatFilter] = useState('all'); // 'all' | 'direct' | 'group'
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [isMobileChatActive, setIsMobileChatActive] = useState(false);
   const [hubConnected, setHubConnected] = useState(false);
@@ -107,10 +108,8 @@ export default function ChatPage() {
           // Nếu có tham số người liên hệ trên URL, tìm và chọn hoặc tạo liên hệ tạm
           if (contactIdParam) {
             const found = list.find(
-              (c) => c.contactUserId === contactIdParam ||
-                     String(c.requestId) === String(contactIdParam) ||
-                     (c.classroomId && String(c.classroomId) === String(contactIdParam)) ||
-                     (classroomIdParam && String(c.classroomId) === String(classroomIdParam))
+              (c) => String(c.contactUserId).toLowerCase() === String(contactIdParam).toLowerCase() ||
+                String(c.requestId) === String(contactIdParam)
             );
             if (found) {
               setSelectedContact(found);
@@ -118,14 +117,13 @@ export default function ChatPage() {
               // Tạo liên hệ tạm thời để người dùng có thể gửi tin nhắn ngay
               const tempContact = {
                 contactUserId: contactIdParam,
-                contactName: classTitleParam ? `Lớp ${decodeURIComponent(classTitleParam)}` : 'Thành viên OTSP',
-                roleLabel: classTitleParam ? 'Tư vấn lớp học' : '',
+                contactName: classTitleParam ? `Gia sư phụ trách` : 'Thành viên OTSP',
+                roleLabel: classTitleParam ? 'Tư vấn' : '',
                 contactAvatarUrl: null,
                 lastMessageContent: 'Bắt đầu cuộc trò chuyện...',
                 unreadCount: 0,
                 isOnline: false,
-                requestId: null,
-                classroomId: classroomIdParam ? Number(classroomIdParam) : null
+                requestId: null
               };
               setConversations((prev) => [tempContact, ...prev]);
               setSelectedContact(tempContact);
@@ -143,7 +141,7 @@ export default function ChatPage() {
 
     loadConversations();
     return () => { isMounted = false; };
-  }, [contactIdParam, classroomIdParam, classTitleParam]);
+  }, [contactIdParam, classTitleParam]);
 
   // 2. Tải lịch sử tin nhắn khi chọn một cuộc trò chuyện
   useEffect(() => {
@@ -157,13 +155,17 @@ export default function ChatPage() {
 
       try {
         setLoadingMessages(true);
-        const res = await chatApi.getMessages(selectedContact.contactUserId, 60);
+        const res = await chatApi.getMessages(selectedContact.contactUserId, 80);
         if (isMounted && res.data) {
           const list = Array.isArray(res.data) ? res.data : [];
-          const mapped = list.map((m) => ({
-            ...m,
-            isMine: m.isOwn || m.senderId === user?.id
-          }));
+          const myId = String(user?.id || '').toLowerCase();
+          const mapped = list.map((m) => {
+            const senderStr = String(m.senderId || '').toLowerCase();
+            return {
+              ...m,
+              isMine: Boolean(m.isOwn) || (Boolean(myId) && senderStr === myId)
+            };
+          });
           setMessages(mapped);
           setTimeout(scrollToBottom, 60);
         }
@@ -178,12 +180,12 @@ export default function ChatPage() {
     return () => { isMounted = false; };
   }, [selectedContact?.contactUserId, user?.id]);
 
-  // Khi chọn kênh nhóm lớp học, gia nhập SignalR group của lớp đó
+  // Khi chọn một người liên hệ, gia nhập phòng SignalR direct chat
   useEffect(() => {
-    if (selectedContact?.classroomId && hubConnectionRef.current?.state === 'Connected') {
-      hubConnectionRef.current.invoke('JoinClassroomRoom', selectedContact.classroomId).catch(() => {});
+    if (selectedContact?.contactUserId && hubConnectionRef.current?.state === 'Connected') {
+      hubConnectionRef.current.invoke('JoinUserRoom', selectedContact.contactUserId).catch(() => { });
     }
-  }, [selectedContact?.classroomId, hubConnected]);
+  }, [selectedContact?.contactUserId, hubConnected]);
 
   // 3. Kết nối Hub chat thời gian thực qua SignalR
   useEffect(() => {
@@ -204,12 +206,17 @@ export default function ChatPage() {
     const handleIncomingMessage = (newMsg) => {
       if (!newMsg) return;
       const activeContact = selectedContactRef.current;
+      const myId = String(user?.id || '').toLowerCase();
+      const activeContactId = String(activeContact?.contactUserId || '').toLowerCase();
+      const msgSender = String(newMsg.senderId || '').toLowerCase();
+      const msgReceiver = String(newMsg.receiverId || '').toLowerCase();
+
+      // Kiểm tra xem tin nhắn có thuộc về hội thoại hiện tại đang mở hay không (so sánh không phân biệt hoa thường)
       const isCurrentConversation =
-        activeContact &&
-        (newMsg.senderId === activeContact.contactUserId ||
-         newMsg.receiverId === activeContact.contactUserId ||
-         (activeContact.classroomId && newMsg.classroomId === activeContact.classroomId) ||
-         (activeContact.contactUserId?.startsWith('class_') && newMsg.receiverId === activeContact.contactUserId));
+        Boolean(activeContactId) &&
+        (msgSender === activeContactId ||
+          (msgSender === myId && msgReceiver === activeContactId) ||
+          msgReceiver === activeContactId);
 
       if (isCurrentConversation) {
         setMessages((prev) => upsertChatMessage(prev, newMsg, user?.id));
@@ -219,10 +226,8 @@ export default function ChatPage() {
       // Cập nhật nội dung xem trước và thời gian trong danh sách cuộc trò chuyện
       setConversations((prev) =>
         prev.map((c) => {
-          const isMatch =
-            c.contactUserId === newMsg.senderId ||
-            c.contactUserId === newMsg.receiverId ||
-            (c.classroomId && newMsg.classroomId === c.classroomId);
+          const cId = String(c.contactUserId || '').toLowerCase();
+          const isMatch = cId === msgSender || cId === msgReceiver;
 
           if (isMatch) {
             return {
@@ -232,7 +237,7 @@ export default function ChatPage() {
               unreadCount:
                 isCurrentConversation
                   ? 0
-                  : (c.unreadCount || 0) + (newMsg.senderId === c.contactUserId ? 1 : 0)
+                  : (c.unreadCount || 0) + (msgSender === cId ? 1 : 0)
             };
           }
           return c;
@@ -242,7 +247,6 @@ export default function ChatPage() {
 
     connection.on('ReceiveMessage', handleIncomingMessage);
     connection.on('ReceiveDirectMessage', handleIncomingMessage);
-    connection.on('ReceiveClassroomMessage', handleIncomingMessage);
 
     connection.on('MessageEdited', (event) => {
       setMessages((prev) => prev.map((message) => message.id === event.messageId
@@ -277,8 +281,8 @@ export default function ChatPage() {
       .then(() => {
         if (isMounted) {
           setHubConnected(true);
-          if (selectedContactRef.current?.classroomId) {
-            connection.invoke('JoinClassroomRoom', selectedContactRef.current.classroomId).catch(() => {});
+          if (selectedContactRef.current?.contactUserId) {
+            connection.invoke('JoinUserRoom', selectedContactRef.current.contactUserId).catch(() => { });
           }
         }
       })
@@ -289,7 +293,7 @@ export default function ChatPage() {
     return () => {
       isMounted = false;
       hubConnectionRef.current = null;
-      connection.stop().catch(() => {});
+      connection.stop().catch(() => { });
     };
   }, [user?.id]);
 
@@ -307,7 +311,6 @@ export default function ChatPage() {
       senderId: user?.id || 'me',
       senderName: user?.fullName || 'Tôi',
       receiverId: selectedContact.contactUserId,
-      classroomId: selectedContact.classroomId || null,
       content,
       sentAtUtc: new Date().toISOString(),
       isMine: true
@@ -330,16 +333,19 @@ export default function ChatPage() {
           }
           return prev
             .map((m) => (m.id === tempId ? { ...res.data, isMine: true } : m))
-            .sort((a, b) => new Date(a.sentAtUtc || 0) - new Date(b.sentAtUtc || 0));
+            .sort((a, b) => {
+              const timeA = Number(new Date(a.sentAtUtc || a.sentAt || 0).getTime()) || 0;
+              const timeB = Number(new Date(b.sentAtUtc || b.sentAt || 0).getTime()) || 0;
+              if (timeA !== timeB) return timeA - timeB;
+              return (Number(a.id) || 0) - (Number(b.id) || 0);
+            });
         });
       }
 
       // Cập nhật xem trước ngay trên giao diện danh sách chat
       setConversations((prev) =>
         prev.map((c) => {
-          const isMatch =
-            c.contactUserId === selectedContact.contactUserId ||
-            (selectedContact.classroomId && c.classroomId === selectedContact.classroomId);
+          const isMatch = String(c.contactUserId).toLowerCase() === String(selectedContact.contactUserId).toLowerCase();
           return isMatch
             ? { ...c, lastMessageContent: content, lastMessageTimeUtc: new Date().toISOString() }
             : c;
@@ -491,11 +497,7 @@ export default function ChatPage() {
   };
 
   const filteredConversations = conversations.filter((c) => {
-    const matchesSearch = (c.contactName || c.fullName || '').toLowerCase().includes(searchQuery.toLowerCase());
-    if (!matchesSearch) return false;
-    if (chatFilter === 'direct') return !c.isGroupClass && !c.contactUserId?.startsWith('class_');
-    if (chatFilter === 'group') return c.isGroupClass || c.contactUserId?.startsWith('class_');
-    return true;
+    return (c.contactName || c.fullName || '').toLowerCase().includes(searchQuery.toLowerCase());
   });
 
   return (
@@ -683,13 +685,23 @@ export default function ChatPage() {
           background-color: rgba(220, 38, 38, 0.12) !important;
         }
         .chat-bubble {
-          max-width: 72%;
+          display: inline-block;
+          width: fit-content;
+          max-width: 100%;
+          min-width: 32px;
           padding: 10px 16px;
           border-radius: 18px;
           font-size: 14px;
           line-height: 1.5;
-          word-break: break-word;
+          white-space: pre-wrap;
+          word-break: normal;
+          overflow-wrap: break-word;
           box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+        }
+        .chat-bubble-text {
+          white-space: pre-wrap;
+          word-break: normal;
+          overflow-wrap: break-word;
         }
         .chat-message-row.is-mine .chat-bubble {
           background-color: #DB303A;
@@ -880,34 +892,6 @@ export default function ChatPage() {
             className={`col-12 col-md-5 col-lg-4 chat-sidebar-column border-end ${isMobileChatActive ? 'd-none d-md-flex' : 'd-flex'}`}
             aria-label="Danh sách cuộc trò chuyện"
           >
-            {/* Bộ lọc phân loại: Tất cả / Trực tiếp / Nhóm lớp */}
-            <div className="px-3 pt-2.5 pb-2 d-flex gap-1.5 border-bottom bg-light-subtle">
-              <button
-                type="button"
-                className={`btn btn-sm rounded-pill px-2.5 py-0.5 fw-semibold ${chatFilter === 'all' ? 'btn-danger text-white' : 'btn-outline-secondary'}`}
-                style={chatFilter === 'all' ? { backgroundColor: '#DB303A', borderColor: '#DB303A', fontSize: '11px' } : { fontSize: '11px' }}
-                onClick={() => setChatFilter('all')}
-              >
-                Tất cả
-              </button>
-              <button
-                type="button"
-                className={`btn btn-sm rounded-pill px-2.5 py-0.5 fw-semibold ${chatFilter === 'direct' ? 'btn-danger text-white' : 'btn-outline-secondary'}`}
-                style={chatFilter === 'direct' ? { backgroundColor: '#DB303A', borderColor: '#DB303A', fontSize: '11px' } : { fontSize: '11px' }}
-                onClick={() => setChatFilter('direct')}
-              >
-                <i className="bi bi-person me-1"></i>Cá nhân
-              </button>
-              <button
-                type="button"
-                className={`btn btn-sm rounded-pill px-2.5 py-0.5 fw-semibold ${chatFilter === 'group' ? 'btn-danger text-white' : 'btn-outline-secondary'}`}
-                style={chatFilter === 'group' ? { backgroundColor: '#DB303A', borderColor: '#DB303A', fontSize: '11px' } : { fontSize: '11px' }}
-                onClick={() => setChatFilter('group')}
-              >
-                <i className="bi bi-people-fill me-1"></i>Nhóm lớp
-              </button>
-            </div>
-
             {/* Ô tìm kiếm cuộc trò chuyện */}
             <div className="chat-search-wrap p-3 border-bottom">
               <div className="chat-search-input-group">
@@ -1052,25 +1036,16 @@ export default function ChatPage() {
                       <div
                         className="chat-avatar-fallback"
                         style={{
-                          display: (selectedContact.contactAvatarUrl || selectedContact.avatarUrl) ? 'none' : 'flex',
-                          backgroundColor: selectedContact.isGroupClass || selectedContact.contactUserId?.startsWith('class_') ? 'rgba(219, 48, 58, 0.12)' : undefined,
-                          color: selectedContact.isGroupClass || selectedContact.contactUserId?.startsWith('class_') ? '#DB303A' : undefined
+                          display: (selectedContact.contactAvatarUrl || selectedContact.avatarUrl) ? 'none' : 'flex'
                         }}
                       >
-                        {selectedContact.isGroupClass || selectedContact.contactUserId?.startsWith('class_') ? (
-                          <i className="bi bi-people-fill" style={{ fontSize: '16px' }}></i>
-                        ) : (
-                          (selectedContact.contactName || selectedContact.fullName || 'U').charAt(0).toUpperCase()
-                        )}
+                        {(selectedContact.contactName || selectedContact.fullName || 'U').charAt(0).toUpperCase()}
                       </div>
                     </div>
 
                     <div className="min-w-0">
                       <div className="d-flex align-items-center gap-1 gap-md-2 flex-wrap">
                         <h2 className="h6 fw-bold mb-0 text-body text-truncate">
-                          {(selectedContact.isGroupClass || selectedContact.contactUserId?.startsWith('class_')) && (
-                            <i className="bi bi-people-fill text-danger me-1"></i>
-                          )}
                           {selectedContact.contactName || selectedContact.fullName}
                         </h2>
                         {selectedContact.roleLabel && (
@@ -1082,17 +1057,13 @@ export default function ChatPage() {
                           </span>
                         )}
                       </div>
-                      {selectedContact.isGroupClass || selectedContact.contactUserId?.startsWith('class_') ? (
-                        <span className="chat-status-indicator small text-secondary">
-                          <span className="chat-online-dot text-danger" aria-hidden="true">●</span> Kênh chat chung của lớp học ({selectedContact.memberCount || 2} thành viên)
-                        </span>
-                      ) : selectedContact.isOnline ? (
+                      {selectedContact.isOnline ? (
                         <span className="chat-status-indicator small text-success">
                           <span className="chat-online-dot text-success" aria-hidden="true">●</span> Đang hoạt động
                         </span>
                       ) : (
                         <span className="chat-status-indicator small text-secondary">
-                          <span className="chat-online-dot text-secondary" aria-hidden="true">○</span> Ngoại tuyến
+                          <span className="chat-online-dot text-secondary" aria-hidden="true">○</span> Đang hoạt động
                         </span>
                       )}
                     </div>
@@ -1121,17 +1092,7 @@ export default function ChatPage() {
                 </div>
 
                 {/* Banner cảnh báo an toàn OTSP & chống giao dịch ngoài để bảo vệ 20% hoa hồng và quyền lợi học viên */}
-                <div
-                  className="chat-security-banner px-3 py-1.5 border-bottom d-flex align-items-center justify-content-between"
-                  style={{ backgroundColor: '#fffbeb', borderColor: '#fef3c7' }}
-                >
-                  <div className="d-flex align-items-center gap-2" style={{ color: '#92400e', fontSize: '11.5px' }}>
-                    <i className="bi bi-shield-fill-check text-success fs-6"></i>
-                    <span>
-                      <strong>Quy chuẩn an toàn OTSP:</strong> Vui lòng <u>không</u> chia sẻ SĐT cá nhân, Zalo, STK ngân hàng hay giao dịch ngoài hệ thống để đảm bảo bảo hiểm học tập và hoàn tiền 100%.
-                    </span>
-                  </div>
-                </div>
+
 
                 {/* Vùng hiển thị nội dung tin nhắn */}
                 <div
@@ -1166,8 +1127,6 @@ export default function ChatPage() {
                           : msg.content
                         : null;
 
-                      const isGroup = selectedContact?.isGroupClass || selectedContact?.contactUserId?.startsWith('class_') || Boolean(msg.classroomId);
-
                       return (
                         <div
                           key={msg.id}
@@ -1180,31 +1139,7 @@ export default function ChatPage() {
                               alignItems: msg.isMine ? 'flex-end' : 'flex-start'
                             }}
                           >
-                            {!msg.isMine && isGroup && (
-                              <div className="d-flex align-items-center gap-1.5 mb-1 px-1">
-                                {msg.senderAvatarUrl ? (
-                                  <img
-                                    src={resolveAssetUrl(msg.senderAvatarUrl)}
-                                    alt=""
-                                    style={{ width: 18, height: 18, borderRadius: '50%', objectFit: 'cover' }}
-                                  />
-                                ) : (
-                                  <span className="badge rounded-circle bg-secondary text-white p-0 d-inline-flex align-items-center justify-content-center" style={{ width: 18, height: 18, fontSize: 10 }}>
-                                    {(msg.senderName || 'U').charAt(0).toUpperCase()}
-                                  </span>
-                                )}
-                                <span className="fw-bold text-dark small" style={{ fontSize: '11px' }}>
-                                  {msg.senderName || 'Thành viên lớp'}
-                                </span>
-                                {msg.senderRole && (
-                                  <span className="badge bg-danger-subtle text-danger" style={{ fontSize: '9px' }}>
-                                    {msg.senderRole}
-                                  </span>
-                                )}
-                              </div>
-                            )}
-
-                            <div className="d-flex align-items-end gap-1 w-100" style={{ justifyContent: msg.isMine ? 'flex-end' : 'flex-start' }}>
+                            <div className="d-flex align-items-end gap-1" style={{ maxWidth: '100%', justifyContent: msg.isMine ? 'flex-end' : 'flex-start' }}>
                               {msg.isMine && !msg.isDeleted && editingMessageId !== msg.id && (
                                 <div className="chat-message-actions">
                                   {!isImg && (
