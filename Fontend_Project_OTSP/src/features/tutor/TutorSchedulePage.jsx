@@ -426,6 +426,15 @@ export default function TutorSchedulePage() {
           100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }
         }
 
+        .animate-pulse {
+          animation: pulseBtn 1.8s infinite;
+        }
+        @keyframes pulseBtn {
+          0% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.6); }
+          70% { box-shadow: 0 0 0 5px rgba(220, 38, 38, 0); }
+          100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }
+        }
+
         .session-title {
           font-weight: 700;
           font-size: 11px;
@@ -840,29 +849,28 @@ export default function TutorSchedulePage() {
                                           {session.classroomName}
                                         </div>
 
-                                        <div className="session-meta text-truncate">
-                                          <i className="bi bi-person me-0.5"></i>
-                                          <span>{session.studentName || 'Học viên'}</span>
-                                        </div>
-
-                                        <div className="d-flex align-items-center justify-content-between gap-1 mt-auto pt-1">
-                                          <span className="badge bg-light text-secondary border" style={{ fontSize: 9 }}>
+                                        <div className="session-meta d-flex align-items-center justify-content-between gap-1 text-truncate">
+                                          <span className="text-truncate">
+                                            <i className="bi bi-person me-0.5"></i>
+                                            <span>{session.studentName || 'Học viên'}</span>
+                                          </span>
+                                          <span className="badge bg-light text-secondary border flex-shrink-0" style={{ fontSize: 9, padding: '1px 5px' }}>
                                             {session.subjectName}
                                           </span>
-
-                                          {Number(session.sessionId) > 0 && !isDone && !isCancelled && (
-                                            <Link
-                                              to={`/room/${session.sessionId}`}
-                                              className={`btn btn-sm py-0 px-1.5 fw-semibold ${isInProgress ? 'btn-danger animate-pulse' : 'btn-outline-danger'}`}
-                                              style={{ fontSize: 10 }}
-                                              onClick={(e) => e.stopPropagation()}
-                                              title={isInProgress ? 'Đang diễn ra - Bấm để vào lớp' : 'Bấm để mở lớp học'}
-                                            >
-                                              <i className="bi bi-camera-video me-1" aria-hidden="true" />
-                                              {isInProgress ? 'Vào lớp' : 'Mở lớp'}
-                                            </Link>
-                                          )}
                                         </div>
+
+                                        {Number(session.sessionId) > 0 && !isDone && !isCancelled && (
+                                          <Link
+                                            to={`/room/${session.sessionId}`}
+                                            className={`btn btn-sm btn-danger w-100 py-1 px-1 mt-auto fw-bold d-flex align-items-center justify-content-center text-nowrap shadow-sm ${isInProgress ? 'animate-pulse' : ''}`}
+                                            style={{ fontSize: 11, lineHeight: 1.2, borderRadius: 6 }}
+                                            onClick={(e) => e.stopPropagation()}
+                                            title={isInProgress ? 'Đang diễn ra - Bấm để vào lớp' : 'Bấm để vào lớp'}
+                                          >
+                                            <i className="bi bi-camera-video-fill me-1" style={{ fontSize: 11 }} aria-hidden="true" />
+                                            <span>Vào lớp</span>
+                                          </Link>
+                                        )}
                                       </div>
                                     );
                                   })}
@@ -957,15 +965,16 @@ export default function TutorSchedulePage() {
                           </span>
                         </td>
                         <td className="text-end">
-                          <div className="d-inline-flex gap-1">
+                          <div className="d-inline-flex align-items-center gap-1.5">
                             {Number(s.sessionId) > 0 && !isDone && !isCancelled && (
                               <Link
                                 to={`/room/${s.sessionId}`}
-                                className={`btn btn-sm px-2.5 ${isInProgress ? 'btn-danger animate-pulse' : 'btn-outline-danger'}`}
-                                title={isInProgress ? 'Đang diễn ra - Bấm để vào lớp' : 'Bấm để mở lớp sớm'}
+                                className={`btn btn-sm btn-danger px-2.5 py-1 text-nowrap fw-semibold d-inline-flex align-items-center gap-1 shadow-sm ${isInProgress ? 'animate-pulse' : ''}`}
+                                style={{ fontSize: 12, borderRadius: 6 }}
+                                title={isInProgress ? 'Đang diễn ra - Bấm để vào lớp' : 'Bấm để vào lớp'}
                               >
-                                <i className="bi bi-camera-video me-1" aria-hidden="true" />
-                                {isInProgress ? 'Vào lớp' : 'Mở lớp'}
+                                <i className="bi bi-camera-video-fill" aria-hidden="true" />
+                                <span>Vào lớp</span>
                               </Link>
                             )}
                             <button
@@ -1164,11 +1173,11 @@ export default function TutorSchedulePage() {
                     {Number(selectedSession.sessionId) > 0 && !['Done', 'Cancelled'].includes(selectedSession.normalizedStatus) && (
                       <Link
                         to={`/room/${selectedSession.sessionId}`}
-                        className="btn btn-danger btn-sm px-3 fw-semibold"
+                        className="btn btn-danger btn-sm px-3 fw-semibold d-inline-flex align-items-center gap-1.5"
                         style={{ backgroundColor: '#DB303A', borderColor: '#DB303A' }}
                       >
-                        <i className="bi bi-camera-video me-1" aria-hidden="true" />
-                        {selectedSession.normalizedStatus === 'InProgress' ? 'Vào phòng học' : 'Mở lớp sớm / Vào phòng'}
+                        <i className="bi bi-camera-video-fill" aria-hidden="true" />
+                        <span>Vào lớp</span>
                       </Link>
                     )}
                   </div>
