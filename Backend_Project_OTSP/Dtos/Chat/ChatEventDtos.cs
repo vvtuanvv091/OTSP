@@ -8,3 +8,4 @@ public record ChatMessageCreatedEvent(
     string Content,
     DateTime SentAtUtc
 );
+

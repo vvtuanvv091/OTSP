@@ -31,3 +31,4 @@ public class RejectConnectionRequestResult
     public bool AlreadyHandled { get; set; }
     public string? StudentUserId { get; set; }
 }
+

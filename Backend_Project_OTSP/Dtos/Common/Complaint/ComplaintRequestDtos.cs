@@ -5,3 +5,4 @@ public class UpdateComplaintStatusRequest
     public string Status { get; set; } = "";
     public string? Resolution { get; set; }
 }
+

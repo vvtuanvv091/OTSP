@@ -110,7 +110,7 @@ public class InvoiceDetailsDto
 
     // Platform Info
     public string PlatformName { get; set; } = "Hệ thống kết nối Gia sư OTSP";
-    public string PlatformHotline { get; set; } = "1900 6868";
-    public string PlatformEmail { get; set; } = "hotro@otsp.edu.vn";
-    public string PlatformAddress { get; set; } = "Khu Công Nghệ Cao, TP. Thủ Đức, TP. Hồ Chí Minh";
+    public string PlatformHotline { get; set; } = "098 439 1940";
+    public string PlatformEmail { get; set; } = "tongngoctuan09@gmail.com";
+    public string PlatformAddress { get; set; } = "Khu Biên Hòa Đồng Nai";
 }

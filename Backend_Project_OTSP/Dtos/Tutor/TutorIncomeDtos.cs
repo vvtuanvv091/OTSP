@@ -15,3 +15,4 @@ public sealed class TutorIncomeBankAccountRequest
 
     public string? CitizenId { get; set; }
 }
+

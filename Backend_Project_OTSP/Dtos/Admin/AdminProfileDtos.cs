@@ -10,3 +10,4 @@ public sealed class UpdateAdminProfileRequest
     [StringLength(30)]
     public string? PhoneNumber { get; set; }
 }
+

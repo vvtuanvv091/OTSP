@@ -12,3 +12,4 @@ public class ContactFormRequest
     public string Topic { get; set; } = "Tư vấn chọn gia sư / lớp học";
     public string Message { get; set; } = string.Empty;
 }
+

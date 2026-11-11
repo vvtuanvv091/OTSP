@@ -66,3 +66,4 @@ public sealed record ChatMessageNotificationEvent(
     string SenderName,
     string Content
 );
+

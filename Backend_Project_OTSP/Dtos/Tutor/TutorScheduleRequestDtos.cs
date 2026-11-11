@@ -12,3 +12,4 @@ public class CreateSessionRequest
     public string? Title { get; set; }
     public DateTime ScheduledAtUtc { get; set; }
 }
+
