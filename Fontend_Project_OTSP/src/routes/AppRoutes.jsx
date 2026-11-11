@@ -1,6 +1,7 @@
-import { Suspense, lazy } from 'react';
+import { Suspense, lazy, useEffect, useRef } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { API_BASE_URL } from '../api/config';
 
 // Các bố cục giao diện (Layout)
 import MainLayout from '../components/layout/MainLayout';
@@ -170,6 +171,34 @@ function AdaptiveRoomRoute() {
 }
 
 export default function AppRoutes() {
+  const location = useLocation();
+  const lastVisitRef = useRef({ path: '', time: 0 });
+
+  useEffect(() => {
+    const path = location.pathname || '/';
+    const now = Date.now();
+    // Tránh gửi trùng khi React StrictMode mount 2 lần hoặc người dùng bấm lại route trong < 5 giây
+    if (lastVisitRef.current.path === path && now - lastVisitRef.current.time < 5000) {
+      return;
+    }
+    lastVisitRef.current = { path, time: now };
+
+    const token =
+      localStorage.getItem('token') ||
+      sessionStorage.getItem('token') ||
+      localStorage.getItem('otsp_token');
+
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers.Authorization = `Bearer ${token}`;
+
+    fetch(`${API_BASE_URL}/home/visit`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ path }),
+      keepalive: true
+    }).catch(() => {});
+  }, [location.pathname]);
+
   return (
     <Suspense fallback={<RouteFallback />}>
       <Routes>

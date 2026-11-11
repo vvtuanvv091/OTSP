@@ -552,11 +552,13 @@ public sealed class AdminOperationsService : IAdminOperationsService
                 x.IpAddress,
                 x.UserAgent,
                 userId = x.UserId,
-                adminName = x.User != null ? x.User.FullName : "Người dùng",
-                adminEmail = x.User != null ? x.User.Email : "—",
-                userRole = _db.UserRoles.Where(ur => ur.UserId == x.UserId)
-                    .Join(_db.Roles, ur => ur.RoleId, r => r.Id, (ur, r) => r.Name)
-                    .FirstOrDefault() ?? "Thành viên"
+                adminName = x.User != null ? x.User.FullName : "Khách truy cập",
+                adminEmail = x.User != null ? x.User.Email : "Ẩn danh",
+                userRole = x.UserId == null
+                    ? "Khách"
+                    : (_db.UserRoles.Where(ur => ur.UserId == x.UserId)
+                        .Join(_db.Roles, ur => ur.RoleId, r => r.Id, (ur, r) => r.Name)
+                        .FirstOrDefault() ?? "Thành viên")
             }), query.Page, query.PageSize, ct);
 
         return new { stats, logs = page };
@@ -631,13 +633,50 @@ public sealed class AdminOperationsService : IAdminOperationsService
 
     public async Task<object> GetAiUsageAsync(CancellationToken ct)
     {
-        var total = await _db.AiStudySessions.AsNoTracking().CountAsync(ct);
-        var today = DateTime.UtcNow.Date;
-        var todayCount = await _db.AiStudySessions.AsNoTracking().CountAsync(x => x.CreatedAt >= today, ct);
-        var byDay = await _db.AiStudySessions.AsNoTracking().Where(x => x.CreatedAt >= today.AddDays(-13))
-            .GroupBy(x => x.CreatedAt.Date).Select(g => new { date = g.Key, count = g.Count() }).OrderBy(x => x.date).ToListAsync(ct);
-        var students = await _db.AiStudySessions.AsNoTracking().Select(x => x.StudentId).Distinct().CountAsync(ct);
-        return new { totalSessions = total, sessionsToday = todayCount, activeStudents = students, recentActivity = byDay };
+        var vnNow = DateTime.UtcNow.AddHours(7);
+        var todayUtc = DateTime.SpecifyKind(vnNow.Date.AddHours(-7), DateTimeKind.Utc);
+        var sinceUtc = todayUtc.AddDays(-13);
+
+        var aiLogs = await _db.AuditLogs.AsNoTracking()
+            .Where(x => x.Category == "AiUsage")
+            .Select(x => new { x.Timestamp, x.UserId, x.Detail })
+            .ToListAsync(ct);
+
+        var linkedIds = new HashSet<int>();
+        foreach (var log in aiLogs)
+        {
+            if (string.IsNullOrWhiteSpace(log.Detail)) continue;
+            foreach (var part in log.Detail.Split(';', StringSplitOptions.RemoveEmptyEntries))
+            {
+                if (part.StartsWith("studySessionId=", StringComparison.OrdinalIgnoreCase)
+                    && int.TryParse(part["studySessionId=".Length..], out var sid))
+                {
+                    linkedIds.Add(sid);
+                }
+            }
+        }
+
+        var unlinkedSessions = await _db.AiStudySessions.AsNoTracking()
+            .Where(x => !linkedIds.Contains(x.Id))
+            .Select(x => new { x.CreatedAt, x.StudentId })
+            .ToListAsync(ct);
+
+        var total = aiLogs.Count + unlinkedSessions.Count;
+        var todayCount = aiLogs.Count(x => x.Timestamp >= todayUtc)
+            + unlinkedSessions.Count(x => x.CreatedAt >= todayUtc);
+
+        var byDay = aiLogs.Where(x => x.Timestamp >= sinceUtc)
+            .Select(x => x.Timestamp.AddHours(7).Date)
+            .Concat(unlinkedSessions.Where(x => x.CreatedAt >= sinceUtc).Select(x => x.CreatedAt.AddHours(7).Date))
+            .GroupBy(d => d)
+            .Select(g => new { date = g.Key, count = g.Count() })
+            .OrderBy(x => x.date)
+            .ToList();
+
+        var activeUsers = aiLogs.Where(x => !string.IsNullOrWhiteSpace(x.UserId)).Select(x => x.UserId!).Distinct().Count()
+            + unlinkedSessions.Select(x => x.StudentId).Distinct().Count();
+
+        return new { totalSessions = total, sessionsToday = todayCount, activeStudents = activeUsers, recentActivity = byDay };
     }
 
     private void AddAudit(string userId, string? ipAddress, string action) => _db.AuditLogs.Add(new AuditLog { UserId = userId, IpAddress = ipAddress, Action = action, Timestamp = DateTime.UtcNow });

@@ -275,6 +275,52 @@ public class HomeApiController : ControllerBase
             message = "Thông tin liên hệ đã được gửi thành công. Ban quản trị sẽ phản hồi tới bạn trong thời gian sớm nhất."
         });
     }
+
+    [HttpPost("visit")]
+    public async Task<IActionResult> RecordVisit([FromBody] VisitTrackRequest? request, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            var ip = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+            var path = string.IsNullOrWhiteSpace(request?.Path) ? "/" : request.Path.Trim();
+            if (path.Length > 120) path = path[..120];
+
+            var throttleKey = $"visit:{userId ?? ip}:{path}";
+            if (_cache.TryGetValue(throttleKey, out _))
+            {
+                return Ok(new { recorded = false, throttled = true });
+            }
+
+            _cache.Set(throttleKey, true, TimeSpan.FromSeconds(5));
+
+            var ua = HttpContext.Request.Headers.UserAgent.ToString();
+            if (!string.IsNullOrEmpty(ua) && ua.Length > 480) ua = ua[..480];
+
+            _db.AuditLogs.Add(new AuditLog
+            {
+                UserId = string.IsNullOrWhiteSpace(userId) ? null : userId,
+                Category = "WebVisit",
+                Action = $"Truy cập: {path}",
+                Detail = $"Lượt truy cập trang {path}",
+                IpAddress = ip,
+                UserAgent = ua,
+                Timestamp = DateTime.UtcNow
+            });
+
+            await _db.SaveChangesAsync(cancellationToken);
+            return Ok(new { recorded = true });
+        }
+        catch
+        {
+            return Ok(new { recorded = false });
+        }
+    }
+}
+
+public class VisitTrackRequest
+{
+    public string? Path { get; set; }
 }
 
 public class ContactFormRequest

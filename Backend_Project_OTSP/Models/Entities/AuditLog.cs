@@ -16,7 +16,6 @@ namespace Backend_Project_OTSP.Models
         public DateTime Timestamp { get; set; } //thời điểm thao tác UTC
         [MaxLength(500)]
         public string? IpAddress{get; set; }
-        [Required]
         [ForeignKey("User")]
         public string? UserId { get; set; }
         public ApplicationUser? User { get; set; }

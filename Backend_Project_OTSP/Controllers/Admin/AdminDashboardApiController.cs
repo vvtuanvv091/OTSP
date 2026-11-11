@@ -52,21 +52,54 @@ public class AdminDashboardApiController : ControllerBase
             .SumAsync(p => (decimal?)p.Amount, ct) ?? 0m;
         var allTimePlatformFee = decimal.Round(allTimeRevenue * PlatformFeeRate, 0);
 
-        // 3. Tác tử AI Wein
-        var totalAiSessions = await _db.AiStudySessions.AsNoTracking().CountAsync(ct);
-        var todayUtc = DateTime.SpecifyKind(DateTime.UtcNow.Date, DateTimeKind.Utc);
-        var sessionsToday = await _db.AiStudySessions.AsNoTracking()
-            .CountAsync(x => x.CreatedAt >= todayUtc, ct);
-        var activeAiStudents = await _db.AiStudySessions.AsNoTracking()
-            .Select(x => x.StudentId).Distinct().CountAsync(ct);
-
+        // 3. Tác tử AI Wein (Tổng hợp cả AiStudySessions lẫn AuditLogs Category="AiUsage" để tính đúng cho mọi vai trò & token thực tế)
+        var vnNow = DateTime.UtcNow.AddHours(7);
+        var todayUtc = DateTime.SpecifyKind(vnNow.Date.AddHours(-7), DateTimeKind.Utc);
         var fourteenDaysAgo = DateTime.SpecifyKind(todayUtc.AddDays(-13), DateTimeKind.Utc);
-        var rawAiTimestamps = await _db.AiStudySessions.AsNoTracking()
-            .Where(x => x.CreatedAt >= fourteenDaysAgo)
-            .Select(x => x.CreatedAt)
+
+        var aiUsageLogs = await _db.AuditLogs.AsNoTracking()
+            .Where(x => x.Category == "AiUsage")
+            .Select(x => new { x.Id, x.Detail, x.Timestamp, x.UserId })
             .ToListAsync(ct);
-        var aiRecentActivity = rawAiTimestamps
-            .GroupBy(d => d.Date)
+
+        var parsedAiLogs = aiUsageLogs.Select(x => new
+        {
+            x.Timestamp,
+            x.UserId,
+            Tokens = ParseDetailInt(x.Detail, "tokens", 850),
+            StudySessionId = ParseDetailNullableInt(x.Detail, "studySessionId")
+        }).ToList();
+
+        var linkedStudySessionIds = parsedAiLogs
+            .Where(x => x.StudySessionId.HasValue)
+            .Select(x => x.StudySessionId!.Value)
+            .ToHashSet();
+
+        var studySessions = await _db.AiStudySessions.AsNoTracking()
+            .Select(x => new { x.Id, x.CreatedAt, x.StudentId })
+            .ToListAsync(ct);
+
+        var unlinkedStudySessions = studySessions
+            .Where(s => !linkedStudySessionIds.Contains(s.Id))
+            .ToList();
+
+        var totalAiSessions = parsedAiLogs.Count + unlinkedStudySessions.Count;
+        var sessionsToday = parsedAiLogs.Count(x => x.Timestamp >= todayUtc)
+                          + unlinkedStudySessions.Count(x => x.CreatedAt >= todayUtc);
+
+        var distinctAiStudentIds = studySessions.Select(x => $"s:{x.StudentId}");
+        var distinctAiLogUsers = parsedAiLogs
+            .Where(x => !string.IsNullOrWhiteSpace(x.UserId))
+            .Select(x => $"u:{x.UserId}");
+        var activeAiStudents = distinctAiStudentIds.Concat(distinctAiLogUsers).Distinct().Count();
+
+        var aiRecentActivity = parsedAiLogs
+            .Where(x => x.Timestamp >= fourteenDaysAgo)
+            .Select(x => x.Timestamp.AddHours(7).Date)
+            .Concat(unlinkedStudySessions
+                .Where(x => x.CreatedAt >= fourteenDaysAgo)
+                .Select(x => x.CreatedAt.AddHours(7).Date))
+            .GroupBy(d => d)
             .Select(g => new { date = g.Key, count = g.Count() })
             .OrderBy(x => x.date)
             .ToList();
@@ -175,15 +208,16 @@ public class AdminDashboardApiController : ControllerBase
             var dayStart = DateTime.SpecifyKind(todayUtc.AddDays(-i), DateTimeKind.Utc);
             var dayEnd = DateTime.SpecifyKind(dayStart.AddDays(1), DateTimeKind.Utc);
 
-            // Số lượt hỏi AI thực tế trong ngày từ AiStudySessions
-            var qCount = await _db.AiStudySessions.AsNoTracking()
-                .CountAsync(x => x.CreatedAt >= dayStart && x.CreatedAt < dayEnd, ct);
+            // Số lượt hỏi AI thực tế trong ngày từ AuditLogs (AiUsage) + AiStudySessions chưa liên kết
+            var dayAiLogs = parsedAiLogs.Where(x => x.Timestamp >= dayStart && x.Timestamp < dayEnd).ToList();
+            var dayUnlinkedCount = unlinkedStudySessions.Count(x => x.CreatedAt >= dayStart && x.CreatedAt < dayEnd);
+            var qCount = dayAiLogs.Count + dayUnlinkedCount;
 
             // Số lượt thao tác / truy cập thực tế trong ngày từ AuditLogs
             var vCount = await _db.AuditLogs.AsNoTracking()
                 .CountAsync(x => x.Timestamp >= dayStart && x.Timestamp < dayEnd, ct);
 
-            var tokens = qCount * 1420; // 1.420 tokens / câu hỏi thực tế
+            var tokens = dayAiLogs.Sum(x => x.Tokens) + (dayUnlinkedCount * 1420);
 
             // Doanh thu thanh toán thành công phát sinh đúng trong ngày từ bảng Payments
             var dayRev = await _db.Payments.AsNoTracking()
@@ -218,11 +252,12 @@ public class AdminDashboardApiController : ControllerBase
                 dayStudents = totalStudents;
             }
 
+            var vnDay = dayStart.AddHours(7);
             dailyMetrics.Add(new
             {
-                date = dayStart.ToString("dd/MM"),
-                dayName = dayStart.ToString("ddd", new System.Globalization.CultureInfo("vi-VN")),
-                fullDate = dayStart.ToString("dd/MM/yyyy"),
+                date = vnDay.ToString("dd/MM"),
+                dayName = vnDay.ToString("ddd", new System.Globalization.CultureInfo("vi-VN")),
+                fullDate = vnDay.ToString("dd/MM/yyyy"),
                 aiQuestions = qCount,
                 tokens,
                 visits = vCount,
@@ -276,5 +311,23 @@ public class AdminDashboardApiController : ControllerBase
             teachingFormats,
             serverTime = DateTime.UtcNow
         });
+    }
+
+    private static int ParseDetailInt(string? detail, string key, int fallback)
+        => ParseDetailNullableInt(detail, key) ?? fallback;
+
+    private static int? ParseDetailNullableInt(string? detail, string key)
+    {
+        if (string.IsNullOrWhiteSpace(detail)) return null;
+        var prefix = $"{key}=";
+        foreach (var part in detail.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            if (part.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)
+                && int.TryParse(part[prefix.Length..], out var value))
+            {
+                return value;
+            }
+        }
+        return null;
     }
 }

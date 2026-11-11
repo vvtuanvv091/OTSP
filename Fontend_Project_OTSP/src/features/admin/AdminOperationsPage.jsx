@@ -694,6 +694,8 @@ export default function AdminOperationsPage() {
           <label className="admin-select">
             <select value={status} onChange={(event) => setStatusSafely(event.target.value)}>
               <option value="all">Tất cả danh mục thao tác</option>
+              <option value="WebVisit">Truy cập trang web</option>
+              <option value="AiUsage">Sử dụng AI Wein</option>
               <option value="Auth">Đăng nhập &amp; Xác thực</option>
               <option value="Payment">Thanh toán &amp; Quyết toán</option>
               <option value="Classroom">Lớp học &amp; Buổi học</option>
@@ -730,7 +732,7 @@ export default function AdminOperationsPage() {
                     </td>
                     <td>
                       <span className="badge rounded-pill" style={{
-                        background: (item.userRole === 'Admin' || item.adminEmail?.includes('admin')) ? '#db303a' : item.userRole === 'Tutor' ? '#0d6efd' : '#15803d',
+                        background: (item.userRole === 'Admin' || item.adminEmail?.includes('admin')) ? '#db303a' : item.userRole === 'Tutor' ? '#0d6efd' : item.userRole === 'Khách' ? '#64748b' : '#15803d',
                         color: '#fff',
                         fontSize: 11
                       }}>

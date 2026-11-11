@@ -234,6 +234,7 @@ builder.Services.AddScoped<IPaymentService, PaymentService>();
 builder.Services.AddSingleton<VietQrService>();
 builder.Services.AddHttpClient();
 builder.Services.AddHttpClient<IAiService, AiService>();
+builder.Services.AddHttpContextAccessor();
 
 builder.Services.AddDataProtection();
 //7 build
@@ -244,6 +245,16 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
     await db.Database.MigrateAsync();
+    try
+    {
+        await db.Database.ExecuteSqlRawAsync(@"
+            ALTER TABLE ""AuditLogs"" ALTER COLUMN ""UserId"" DROP NOT NULL;
+            ALTER TABLE ""AuditLogs"" ADD COLUMN IF NOT EXISTS ""Category"" character varying(100) NULL;
+            ALTER TABLE ""AuditLogs"" ADD COLUMN IF NOT EXISTS ""Detail"" text NULL;
+            ALTER TABLE ""AuditLogs"" ADD COLUMN IF NOT EXISTS ""UserAgent"" character varying(500) NULL;
+        ");
+    }
+    catch { }
     if (app.Environment.IsDevelopment())
     {
         await DbSeeder.SeedAsync(scope.ServiceProvider);

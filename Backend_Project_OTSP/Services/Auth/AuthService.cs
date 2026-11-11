@@ -24,6 +24,7 @@ public class AuthService : IAuthService
     private readonly IConfiguration _configuration;
     private readonly ILogger<AuthService> _logger;
     private readonly GoogleIdTokenValidator _googleIdTokenValidator;
+    private readonly IHttpContextAccessor? _httpContextAccessor;
 
     public AuthService(
         UserManager<ApplicationUser> userManager,
@@ -34,7 +35,8 @@ public class AuthService : IAuthService
         IEmailSenderService emailSender,
         IConfiguration configuration,
         GoogleIdTokenValidator googleIdTokenValidator,
-        ILogger<AuthService> logger)
+        ILogger<AuthService> logger,
+        IHttpContextAccessor? httpContextAccessor = null)
     {
         _userManager = userManager;
         _signInManager = signInManager;
@@ -45,6 +47,30 @@ public class AuthService : IAuthService
         _configuration = configuration;
         _googleIdTokenValidator = googleIdTokenValidator;
         _logger = logger;
+        _httpContextAccessor = httpContextAccessor;
+    }
+
+    private async Task RecordAuthAuditAsync(string userId, string action, string detail)
+    {
+        try
+        {
+            var http = _httpContextAccessor?.HttpContext;
+            var ua = http?.Request.Headers.UserAgent.ToString();
+            if (!string.IsNullOrEmpty(ua) && ua.Length > 480) ua = ua[..480];
+
+            _db.AuditLogs.Add(new AuditLog
+            {
+                UserId = userId,
+                Category = "Auth",
+                Action = action,
+                Detail = detail,
+                IpAddress = http?.Connection.RemoteIpAddress?.ToString(),
+                UserAgent = ua,
+                Timestamp = DateTime.UtcNow
+            });
+            await _db.SaveChangesAsync();
+        }
+        catch { }
     }
 
     public async Task<(bool Success, string? ErrorMessage, AuthResponse? Data)> LoginAsync(LoginRequest request)
@@ -74,6 +100,7 @@ public class AuthService : IAuthService
         }
 
         var authResponse = await _jwtService.GenerateAuthResponseAsync(user, request.RememberMe);
+        await RecordAuthAuditAsync(user.Id, "Đăng nhập hệ thống", $"Đăng nhập bằng Email: {user.Email}");
         return (true, null, authResponse);
     }
 
@@ -112,6 +139,7 @@ public class AuthService : IAuthService
             }
 
             var authResp = await _jwtService.GenerateAuthResponseAsync(user, rememberMe: true);
+            await RecordAuthAuditAsync(user.Id, "Đăng nhập Google", $"Đăng nhập Google: {user.Email}");
             return (true, null, authResp);
         }
 
@@ -197,6 +225,7 @@ public class AuthService : IAuthService
             }
 
             var authResponse = await _jwtService.GenerateAuthResponseAsync(user, rememberMe: true);
+            await RecordAuthAuditAsync(user.Id, "Đăng ký Google", $"Tạo tài khoản mới qua Google ({role}): {user.Email}");
             return (true, null, authResponse);
         }
         catch (Exception ex)
@@ -387,6 +416,7 @@ public class AuthService : IAuthService
         }
 
         var authResponse = await _jwtService.GenerateAuthResponseAsync(user, rememberMe: true);
+        await RecordAuthAuditAsync(user.Id, "Đăng ký tài khoản", $"Tạo tài khoản mới ({role}): {user.Email}");
         return (true, null, authResponse);
     }
 

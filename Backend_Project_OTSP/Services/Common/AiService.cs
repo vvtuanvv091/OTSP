@@ -15,6 +15,7 @@ public class AiService : IAiService
     private readonly ApplicationDbContext _db;
     private readonly IConfiguration _config;
     private readonly ILogger<AiService> _logger;
+    private readonly IHttpContextAccessor? _httpContextAccessor;
     private readonly string _baseUrl;
     private readonly string _apiKey;
 
@@ -27,12 +28,14 @@ public class AiService : IAiService
         HttpClient http,
         ApplicationDbContext db,
         IConfiguration config,
-        ILogger<AiService> logger)
+        ILogger<AiService> logger,
+        IHttpContextAccessor? httpContextAccessor = null)
     {
         _http = http;
         _db = db;
         _config = config;
         _logger = logger;
+        _httpContextAccessor = httpContextAccessor;
 
         _baseUrl = _config["AiService:BaseUrl"] ?? "http://localhost:8000";
         _apiKey = _config["AiService:InternalApiKey"] ?? "Qxzyo3UdQQ2RtWxJAFGOhhCIDwIbGSWTzsC-ShRA324";
@@ -122,6 +125,9 @@ public class AiService : IAiService
                         // Đảm bảo tuyệt đối tắt tự động chuyển trang theo yêu cầu
                         result.AutoExecute = false;
                         if (result.UiAction != null) result.UiAction.AutoExecute = false;
+
+                        var pythonTokens = EstimateTokens(request.Message, result.Reply);
+                        await RecordAiUsageAsync(currentUserId, "Hỏi AI Wein (Chat)", request.Message, pythonTokens, null, ct);
                         return result;
                     }
                 }
@@ -137,7 +143,9 @@ public class AiService : IAiService
         }
 
         // 3. Fallback sang Direct Gemini API tốc độ cao, luôn chạy mượt cả trên Render & Vercel
-        return await CallDirectGeminiFallbackAsync(request, ct);
+        var (fallbackResult, geminiTokens) = await CallDirectGeminiFallbackAsync(request, ct);
+        await RecordAiUsageAsync(currentUserId, "Hỏi AI Wein (Chat)", request.Message, geminiTokens, null, ct);
+        return fallbackResult;
     }
 
     public async Task<StudyAssistantResponseDto> AskStudyAssistantAsync(StudyAssistantRequestDto request, string currentUserId, CancellationToken ct = default)
@@ -155,6 +163,8 @@ public class AiService : IAiService
         };
 
         StudyAssistantResponseDto? result = null;
+        int tokensUsed = 0;
+
         if (!string.IsNullOrWhiteSpace(_baseUrl))
         {
             try
@@ -165,6 +175,10 @@ public class AiService : IAiService
                 {
                     var content = await response.Content.ReadAsStringAsync(ct);
                     result = JsonSerializer.Deserialize<StudyAssistantResponseDto>(content, JsonOptions);
+                    if (result != null && !string.IsNullOrWhiteSpace(result.Answer))
+                    {
+                        tokensUsed = EstimateTokens(request.Question, result.Answer);
+                    }
                 }
             }
             catch (Exception ex)
@@ -176,7 +190,7 @@ public class AiService : IAiService
         // Fallback sang Gemini giải bài tập trực tiếp nếu Python service chưa bật
         if (result == null || string.IsNullOrWhiteSpace(result.Answer))
         {
-            result = await SolveStudyQuestionWithGeminiAsync(request, ct);
+            (result, tokensUsed) = await SolveStudyQuestionWithGeminiAsync(request, ct);
         }
 
         result ??= new StudyAssistantResponseDto
@@ -186,8 +200,13 @@ public class AiService : IAiService
             PracticeQuestion = "",
             PracticeSolution = ""
         };
+        if (tokensUsed <= 0)
+        {
+            tokensUsed = EstimateTokens(request.Question, result.Answer);
+        }
 
         // Automatically persist into AiStudySessions table for Admin metrics and student history!
+        int? savedSessionId = null;
         if (student != null)
         {
             try
@@ -201,6 +220,7 @@ public class AiService : IAiService
                 };
                 _db.AiStudySessions.Add(session);
                 await _db.SaveChangesAsync(ct);
+                savedSessionId = session.Id;
                 _logger.LogInformation("Saved AiStudySession for studentId={StudentId}", student.Id);
             }
             catch (Exception ex)
@@ -208,6 +228,8 @@ public class AiService : IAiService
                 _logger.LogError(ex, "Failed to save AiStudySession in database");
             }
         }
+
+        await RecordAiUsageAsync(currentUserId, "Trợ lý giải bài tập AI", request.Question, tokensUsed, savedSessionId, ct);
 
         return result;
     }
@@ -368,7 +390,7 @@ public class AiService : IAiService
         return "";
     }
 
-    private async Task<AgentChatResponseDto> CallDirectGeminiFallbackAsync(AgentChatRequestDto request, CancellationToken ct)
+    private async Task<(AgentChatResponseDto Response, int TokensUsed)> CallDirectGeminiFallbackAsync(AgentChatRequestDto request, CancellationToken ct)
     {
         try
         {
@@ -616,14 +638,15 @@ Nhiệm vụ:
                                 uiAction = new UIActionDto { Type = "NAVIGATE", Target = "/student/schedule", Label = "Xem thời khóa biểu", AutoExecute = false };
                             }
 
-                            return new AgentChatResponseDto
+                            var realTokens = ExtractGeminiTokens(doc, systemPrompt + "\n" + request.Message, text);
+                            return (new AgentChatResponseDto
                             {
                                 Reply = text,
                                 Intent = "GENERAL",
                                 UiAction = uiAction,
                                 AutoExecute = false,
                                 SuggestedPrompts = new List<string> { "Tìm gia sư môn Toán", "Xem danh sách lớp học mới", "Xem thời khóa biểu của tôi" }
-                            };
+                            }, realTokens);
                         }
                     }
                 }
@@ -640,17 +663,18 @@ Nhiệm vụ:
             _logger.LogError(ex, "Error in Direct Gemini fallback");
         }
 
-        return new AgentChatResponseDto
+        var defaultReply = "Chào bạn! Mình là WEIN, trợ lý AI của OTSP đây ạ. 😊 Bạn cần tìm gia sư môn nào hay muốn tham khảo lớp học nào hôm nay? Mình luôn sẵn sàng hỗ trợ bạn!";
+        return (new AgentChatResponseDto
         {
-            Reply = "Chào bạn! Mình là WEIN, trợ lý AI của OTSP đây ạ. 😊 Bạn cần tìm gia sư môn nào hay muốn tham khảo lớp học nào hôm nay? Mình luôn sẵn sàng hỗ trợ bạn!",
+            Reply = defaultReply,
             Intent = "GENERAL",
             UiAction = new UIActionDto { Type = "NAVIGATE", Target = "/search", Label = "Tìm kiếm gia sư", AutoExecute = false },
             AutoExecute = false,
             SuggestedPrompts = new List<string> { "Tìm gia sư môn Toán", "Xem các lớp học mới", "Xem thời khóa biểu" }
-        };
+        }, EstimateTokens(request.Message, defaultReply));
     }
 
-    private async Task<StudyAssistantResponseDto> SolveStudyQuestionWithGeminiAsync(StudyAssistantRequestDto request, CancellationToken ct)
+    private async Task<(StudyAssistantResponseDto Response, int TokensUsed)> SolveStudyQuestionWithGeminiAsync(StudyAssistantRequestDto request, CancellationToken ct)
     {
         try
         {
@@ -658,13 +682,13 @@ Nhiệm vụ:
             if (string.IsNullOrWhiteSpace(apiKey))
             {
                 _logger.LogWarning("Gemini API key is not configured for Study Assistant.");
-                return new StudyAssistantResponseDto
+                return (new StudyAssistantResponseDto
                 {
                     Answer = "Hệ thống AI đang được bảo trì. Vui lòng thử lại sau.",
                     ConceptSummary = "Kiến thức",
                     PracticeQuestion = "",
                     PracticeSolution = ""
-                };
+                }, 0);
             }
 
             var model = _config["AiService:GeminiModel"];
@@ -710,13 +734,14 @@ Nhiệm vụ: Giải bài tập cho học sinh theo phương pháp sư phạm m�
                         var text = parts[0].GetProperty("text").GetString() ?? "";
                         if (!string.IsNullOrWhiteSpace(text))
                         {
-                            return new StudyAssistantResponseDto
+                            var realTokens = ExtractGeminiTokens(doc, systemPrompt + "\n" + promptText, text);
+                            return (new StudyAssistantResponseDto
                             {
                                 Answer = text,
                                 ConceptSummary = $"Kiến thức trọng tâm môn {request.Subject ?? "Học tập"}",
                                 PracticeQuestion = "Bạn có muốn luyện thêm một bài tập tương tự dạng này không?",
                                 PracticeSolution = ""
-                            };
+                            }, realTokens);
                         }
                     }
                 }
@@ -727,13 +752,79 @@ Nhiệm vụ: Giải bài tập cho học sinh theo phương pháp sư phạm m�
             _logger.LogError(ex, "Failed to solve study question with direct Gemini");
         }
 
-        return new StudyAssistantResponseDto
+        var fallbackAnswer = "Hệ thống đã tiếp nhận câu hỏi của bạn. Vui lòng thử lại trong giây lát hoặc tham khảo tài liệu học tập trong mục Tài liệu.";
+        return (new StudyAssistantResponseDto
         {
-            Answer = "Hệ thống đã tiếp nhận câu hỏi của bạn. Vui lòng thử lại trong giây lát hoặc tham khảo tài liệu học tập trong mục Tài liệu.",
+            Answer = fallbackAnswer,
             ConceptSummary = "Kiến thức môn học",
             PracticeQuestion = "",
             PracticeSolution = ""
-        };
+        }, EstimateTokens(request.Question, fallbackAnswer));
+    }
+
+    private static int ExtractGeminiTokens(JsonDocument doc, string prompt, string reply)
+    {
+        try
+        {
+            if (doc.RootElement.TryGetProperty("usageMetadata", out var usage))
+            {
+                if (usage.TryGetProperty("totalTokenCount", out var totalProp) && totalProp.TryGetInt32(out var total) && total > 0)
+                {
+                    return total;
+                }
+
+                int promptTok = usage.TryGetProperty("promptTokenCount", out var p) && p.TryGetInt32(out var pt) ? pt : 0;
+                int candTok = usage.TryGetProperty("candidatesTokenCount", out var c) && c.TryGetInt32(out var ctVal) ? ctVal : 0;
+                if (promptTok + candTok > 0)
+                {
+                    return promptTok + candTok;
+                }
+            }
+        }
+        catch { }
+
+        return EstimateTokens(prompt, reply);
+    }
+
+    private static int EstimateTokens(string? prompt, string? reply)
+    {
+        var chars = (prompt?.Length ?? 0) + (reply?.Length ?? 0);
+        return Math.Max(150, (int)Math.Ceiling(chars / 3.0) + 120);
+    }
+
+    private async Task RecordAiUsageAsync(string? userId, string action, string? question, int tokensUsed, int? studySessionId, CancellationToken ct)
+    {
+        try
+        {
+            var httpCtx = _httpContextAccessor?.HttpContext;
+            var ip = httpCtx?.Connection.RemoteIpAddress?.ToString();
+            var ua = httpCtx?.Request.Headers.UserAgent.ToString();
+            if (!string.IsNullOrEmpty(ua) && ua.Length > 480) ua = ua[..480];
+
+            var qPreview = (question ?? "").Replace("\r", " ").Replace("\n", " ").Trim();
+            if (qPreview.Length > 100) qPreview = qPreview[..100] + "...";
+
+            var detail = studySessionId.HasValue
+                ? $"tokens={tokensUsed};studySessionId={studySessionId.Value};q={qPreview}"
+                : $"tokens={tokensUsed};q={qPreview}";
+
+            _db.AuditLogs.Add(new AuditLog
+            {
+                UserId = string.IsNullOrWhiteSpace(userId) ? null : userId,
+                Category = "AiUsage",
+                Action = action,
+                Detail = detail,
+                IpAddress = ip,
+                UserAgent = ua,
+                Timestamp = DateTime.UtcNow
+            });
+
+            await _db.SaveChangesAsync(ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Không thể ghi log sử dụng AI vào AuditLogs");
+        }
     }
 
     private static string RemoveDiacritics(string text)
