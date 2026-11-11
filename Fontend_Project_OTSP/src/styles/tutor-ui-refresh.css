@@ -118,7 +118,7 @@
 .income-stat-success .income-stat-value { color: #16a34a; }
 .income-stat-warning .income-stat-value { color: #ca8a04; }
 .income-stat-info .income-stat-value { color: #0284c7; }
-.income-stat-emphasized { border-left: 4px solid #22c55e; }
+.income-stat-emphasized { border-top: 2px solid #22c55e; }
 .income-section-card { margin-bottom: 24px; padding: clamp(18px, 2.5vw, 28px); }
 .income-progress { height: 14px; border-radius: 999px; }
 .income-input { width: min(100%, 220px); min-height: 42px; border-color: #dfe4ec; border-radius: 10px; }

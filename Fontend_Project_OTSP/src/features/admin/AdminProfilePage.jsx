@@ -2,12 +2,14 @@ import { useEffect, useRef, useState } from 'react';
 import adminApi from '../../api/adminApi';
 import { resolveAssetUrl } from '../../api/config';
 import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../../context/ToastContext';
 import CollapsibleProfileSection from '../../components/common/CollapsibleProfileSection';
 import ChangePasswordPanel from '../auth/ChangePasswordPanel';
 import compressImageFile from '../../utils/imageCompressor';
 
 export default function AdminProfilePage() {
   const { user, updateUser } = useAuth();
+  const toast = useToast();
   const fileInputRef = useRef(null);
   const [profile, setProfile] = useState({ fullName: '', email: '', phoneNumber: '', avatarUrl: '' });
   const [loading, setLoading] = useState(true);
@@ -45,12 +47,15 @@ export default function AdminProfilePage() {
     setSaving(true);
     try {
       const response = await adminApi.updateProfile({ fullName: profile.fullName, phoneNumber: profile.phoneNumber });
-      const updated = response.data?.profile || {};
+      const updated = response.data?.profile || { fullName: profile.fullName, phoneNumber: profile.phoneNumber };
       setProfile((current) => ({ ...current, ...updated }));
       updateUser(updated);
+      toast.success(response.data?.message || 'Đã cập nhật hồ sơ.');
       setMessage(response.data?.message || 'Đã cập nhật hồ sơ.');
     } catch (requestError) {
-      setError(requestError?.response?.data?.message || 'Không thể cập nhật hồ sơ.');
+      const msg = requestError?.response?.data?.message || 'Không thể cập nhật hồ sơ.';
+      toast.error(msg);
+      setError(msg);
     } finally {
       setSaving(false);
     }
@@ -61,7 +66,9 @@ export default function AdminProfilePage() {
     event.target.value = '';
     if (!file) return;
     if (!file.type.startsWith('image/')) {
-      setError('Vui lòng chọn tệp ảnh.');
+      const msg = 'Vui lòng chọn tệp ảnh.';
+      toast.warning(msg);
+      setError(msg);
       return;
     }
     setError('');
@@ -75,9 +82,12 @@ export default function AdminProfilePage() {
         setProfile((current) => ({ ...current, avatarUrl }));
         updateUser({ avatarUrl });
       }
+      toast.success(response.data?.message || 'Đã cập nhật ảnh đại diện.');
       setMessage(response.data?.message || 'Đã cập nhật ảnh đại diện.');
     } catch (requestError) {
-      setError(requestError?.response?.data?.message || 'Không thể tải ảnh đại diện lên.');
+      const msg = requestError?.response?.data?.message || 'Không thể tải ảnh đại diện lên.';
+      toast.error(msg);
+      setError(msg);
     } finally {
       setUploading(false);
     }

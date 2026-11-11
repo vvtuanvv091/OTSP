@@ -582,9 +582,7 @@ body, .header, .card, .btn, .features-item, .course-item, .member, .stats-item, 
 }
 
 .otsp-text-gradient {
-  background: linear-gradient(135deg, #ffffff 0%, #ff9ca2 60%, #DB303A 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+  color: #ff9ca2;
   display: inline-block;
 }
 

@@ -456,8 +456,7 @@ export default function StudentDashboardPage() {
         }
         .student-guardian-alert-card {
           background-color: var(--bs-card-bg, #ffffff);
-          border: 1px solid var(--bs-border-color, #e5e7eb);
-          border-left: 4px solid #f59e0b;
+          border: 1px solid var(--bs-warning-border-subtle, #fcd34d);
           border-radius: 10px;
           padding: 16px 20px;
           font-size: 0.95rem;
@@ -466,8 +465,7 @@ export default function StudentDashboardPage() {
         }
         .student-banner-card {
           background-color: var(--bs-card-bg, #ffffff);
-          border: 1px solid var(--bs-border-color, #e5e7eb);
-          border-left: 4px solid #dc2626;
+          border: 1px solid var(--bs-danger-border-subtle, #fca5a5);
           border-radius: 12px;
           padding: 22px 28px;
         }

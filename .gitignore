@@ -35,3 +35,8 @@ npm-debug.log*
 Thumbs.db
 .DS_Store
 
+# Local Skills & Documentation Guides
+BACKEND_SKILLS_GUIDE.md
+IMPECCABLE_SKILL_GUIDE.md
+TONG_QUAN_DU_AN_OTSP.md
+

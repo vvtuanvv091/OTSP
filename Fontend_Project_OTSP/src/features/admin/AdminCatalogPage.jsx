@@ -1,11 +1,15 @@
 import { useEffect, useState } from 'react';
 import adminApi from '../../api/adminApi';
+import { useToast } from '../../context/ToastContext';
+import { useConfirm } from '../../context/ConfirmDialogContext';
 import { AdminFeedback, AdminPageHeader, AdminPagination } from './AdminPageShared';
 
 const emptyForm = { id: null, code: '', name: '', description: '' };
 const PAGE_SIZE = 10;
 
 export default function AdminCatalogPage() {
+  const toast = useToast();
+  const confirm = useConfirm();
   const [tab, setTab] = useState('subjects');
   const [data, setData] = useState({ items: [], total: 0, totalPages: 1 });
   const [search, setSearch] = useState('');
@@ -85,18 +89,22 @@ export default function AdminCatalogPage() {
   };
 
   const remove = async (item) => {
-    if (!window.confirm(`Xóa ${tab === 'subjects' ? 'môn học' : 'cấp học'} “${item.name}”? Thao tác này chỉ thực hiện khi danh mục chưa được sử dụng.`)) return;
+    const ok = await confirm({
+      title: 'Xóa danh mục',
+      message: `Xóa ${tab === 'subjects' ? 'môn học' : 'cấp học'} “${item.name}”? Thao tác này chỉ thực hiện khi danh mục chưa được sử dụng.`,
+      confirmText: 'Xóa',
+      variant: 'danger',
+    });
+    if (!ok) return;
     setDeletingId(item.id);
-    setError('');
-    setMessage('');
     try {
       if (tab === 'subjects') await adminApi.deleteSubject(item.id);
       else await adminApi.deleteGradeLevel(item.id);
-      setMessage('Đã xóa danh mục.');
+      toast.success('Đã xóa danh mục thành công.');
       if (form.id === item.id) resetForm();
       setReload((value) => value + 1);
     } catch (requestError) {
-      setError(requestError.response?.data?.message || 'Không thể xóa danh mục.');
+      toast.error(requestError.response?.data?.message || 'Không thể xóa danh mục.');
     } finally { setDeletingId(null); }
   };
 

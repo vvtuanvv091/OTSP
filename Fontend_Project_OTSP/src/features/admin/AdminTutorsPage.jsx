@@ -1,10 +1,14 @@
 import { useEffect, useState } from 'react';
 import adminApi from '../../api/adminApi';
+import { useToast } from '../../context/ToastContext';
+import { useConfirm } from '../../context/ConfirmDialogContext';
 import { AdminFeedback, AdminLoadingRows, AdminPageHeader, AdminPagination, AdminStats, AdminStatus } from './AdminPageShared';
 
 const PAGE_SIZE = 10;
 
 export default function AdminTutorsPage() {
+  const toast = useToast();
+  const confirm = useConfirm();
   const [data, setData] = useState(null);
   const [search, setSearch] = useState('');
   const [querySearch, setQuerySearch] = useState('');
@@ -95,16 +99,20 @@ export default function AdminTutorsPage() {
   };
 
   const handleDeleteTutor = async (tutor) => {
-    if (!window.confirm(`Bạn có chắc chắn muốn xóa gia sư "${tutor.fullName}"?`)) return;
+    const ok = await confirm({
+      title: 'Xóa gia sư',
+      message: `Bạn có chắc chắn muốn xóa gia sư "${tutor.fullName}"?`,
+      confirmText: 'Xóa',
+      variant: 'danger',
+    });
+    if (!ok) return;
     setBusyUserId(tutor.userId);
-    setError('');
-    setMessage('');
     try {
       await adminApi.deleteTutor(tutor.userId);
-      setMessage('Đã xóa gia sư thành công.');
+      toast.success('Đã xóa gia sư thành công.');
       setReload((v) => v + 1);
     } catch (err) {
-      setError(err.response?.data?.message || 'Không thể xóa gia sư.');
+      toast.error(err.response?.data?.message || 'Không thể xóa gia sư.');
     } finally {
       setBusyUserId('');
     }

@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import adminOperationsApi from '../../api/adminOperationsApi';
 import { resolveAssetUrl } from '../../api/config';
+import { useToast } from '../../context/ToastContext';
+import { useConfirm } from '../../context/ConfirmDialogContext';
 import { AdminFeedback, AdminLoadingRows, AdminPageHeader, AdminPagination, AdminStats } from './AdminPageShared';
 
 const PAGE_SIZE = 10;
@@ -36,6 +38,8 @@ function downloadCsv(filename, rows) {
 }
 
 export default function AdminOperationsPage() {
+  const toast = useToast();
+  const confirm = useConfirm();
   const location = useLocation();
   const mode = location.pathname.split('/').filter(Boolean).at(-1) || 'reviews';
   const [prevMode, setPrevMode] = useState(mode);
@@ -139,10 +143,16 @@ export default function AdminOperationsPage() {
   };
 
   const removeNews = async (article) => {
-    if (!window.confirm(`Xóa bài viết “${article.title}”?`)) return;
+    const ok = await confirm({
+      title: 'Xóa bài viết',
+      message: `Bạn có chắc chắn muốn xóa bài viết “${article.title}”?`,
+      confirmText: 'Xóa',
+      variant: 'danger',
+    });
+    if (!ok) return;
     setBusyId(article.id); clearFeedback();
-    try { await adminOperationsApi.deleteNews(article.id); setMessage('Đã xóa bài viết.'); const response = await adminOperationsApi.getNews({ search: query, page, pageSize: PAGE_SIZE }); setData(response.data); }
-    catch (requestError) { setError(errorText(requestError, 'Không thể xóa bài viết.')); }
+    try { await adminOperationsApi.deleteNews(article.id); toast.success('Đã xóa bài viết.'); const response = await adminOperationsApi.getNews({ search: query, page, pageSize: PAGE_SIZE }); setData(response.data); }
+    catch (requestError) { toast.error(errorText(requestError, 'Không thể xóa bài viết.')); }
     finally { setBusyId(null); }
   };
 
@@ -163,7 +173,7 @@ export default function AdminOperationsPage() {
     event.preventDefault(); clearFeedback(); setBusyId('account');
     try {
       const response = await adminOperationsApi.createAccount(accountForm);
-      window.alert(`Tài khoản đã được tạo. Mật khẩu tạm thời (hãy sao chép và gửi an toàn):\n\n${response.data.temporaryPassword}`);
+      toast.info(`Tài khoản đã được tạo. Mật khẩu tạm thời: ${response.data.temporaryPassword}`, 'Tạo tài khoản');
       setAccountForm({ fullName: '', email: '', role: 'Student_Parent' }); setMessage('Đã tạo tài khoản.');
       const result = await adminOperationsApi.getAccounts({ search: query, page, pageSize: PAGE_SIZE }); setData(result.data);
     } catch (requestError) { setError(errorText(requestError, 'Không thể tạo tài khoản.')); }
@@ -215,16 +225,22 @@ export default function AdminOperationsPage() {
   };
 
   const handleDeleteReview = async (review) => {
-    if (!window.confirm(`Xóa vĩnh viễn nhận xét của "${review.studentName}" cho gia sư "${review.tutorName}"?`)) return;
+    const ok = await confirm({
+      title: 'Xóa đánh giá',
+      message: `Xóa vĩnh viễn nhận xét của "${review.studentName}" cho gia sư "${review.tutorName}"?`,
+      confirmText: 'Xóa vĩnh viễn',
+      variant: 'danger',
+    });
+    if (!ok) return;
     setBusyId(review.id);
     clearFeedback();
     try {
       await adminOperationsApi.deleteReview(review.id);
-      setMessage('Đã xóa đánh giá vi phạm thành công.');
+      toast.success('Đã xóa đánh giá vi phạm thành công.');
       const response = await adminOperationsApi.getReviews({ search: query, page, pageSize: PAGE_SIZE, ...(status !== 'all' ? { status } : {}) });
       setData(response.data);
     } catch (err) {
-      setError(errorText(err, 'Không thể xóa đánh giá.'));
+      toast.error(errorText(err, 'Không thể xóa đánh giá.'));
     } finally {
       setBusyId(null);
     }
@@ -283,6 +299,8 @@ export default function AdminOperationsPage() {
     return data?.[keys[mode]] || null;
   }, [data, mode]);
   const items = pageData?.items || [];
+  const statsArray = useMemo(() => (Array.isArray(data?.stats) ? data.stats : []), [data?.stats]);
+  const findStatCount = (statusKey) => statsArray.find((item) => item.status === statusKey)?.count || 0;
   const pagination = <AdminPagination page={pageData?.page || page} totalPages={pageData?.totalPages} total={pageData?.total || 0} pageSize={PAGE_SIZE} onChange={setPage} />;
 
   const renderSearch = (placeholder, filters = null) => (
@@ -424,7 +442,7 @@ export default function AdminOperationsPage() {
       </>}
 
       {mode === 'complaints' && <>
-        <AdminStats items={['New', 'Processing', 'Resolved'].map((key) => ({ label: complaintLabels[key], value: data?.stats?.find((item) => item.status === key)?.count || 0 }))} />
+        <AdminStats items={['New', 'Processing', 'Resolved'].map((key) => ({ label: complaintLabels[key], value: findStatCount(key) }))} />
         {renderSearch('Tìm mã khiếu nại hoặc người gửi…', <label className="admin-select"><select value={status} onChange={(event) => setStatusSafely(event.target.value)}><option value="all">Tất cả trạng thái</option>{Object.entries(complaintLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>)}
         <section className="admin-panel"><div className="admin-panel-heading">Danh sách khiếu nại <span className="admin-count">{pageData?.total ?? 0}</span></div><div className="admin-table-scroll"><table className="admin-table admin-wide-table"><thead><tr><th>Mã / Người liên quan</th><th>Nội dung phản ánh</th><th>Ngày gửi</th><th>Trạng thái</th><th>Kết quả</th><th>Thao tác</th></tr></thead><tbody>{renderRows(6, items.length, 'Không có khiếu nại phù hợp.')}{!loading && items.map((item) => <tr key={item.id}><td><strong>KN{String(item.id).padStart(3, '0')}</strong><span className="admin-table-secondary">{item.senderName}{item.targetName ? ` → ${item.targetName}` : ''}</span></td><td>{item.content}{item.evidenceUrl && <a className="admin-table-secondary" href={resolveAssetUrl(item.evidenceUrl)} target="_blank" rel="noreferrer">Mở minh chứng</a>}</td><td>{date(item.createdAt)}</td><td><span className={`admin-status ${item.status === 'New' ? 'is-pending' : item.status === 'Resolved' ? 'is-active' : item.status === 'Rejected' ? 'is-locked' : ''}`}>{complaintLabels[item.status] || item.status}</span></td><td>{item.resolution || '—'}</td><td><div className="admin-actions-inline">{item.status === 'New' && <button type="button" className="admin-action is-approve" disabled={busyId === item.id} onClick={() => updateComplaint(item, 'Processing')}>Tiếp nhận</button>}{item.status !== 'Resolved' && item.status !== 'Rejected' && <button type="button" className="admin-action" disabled={busyId === item.id} onClick={() => updateComplaint(item, 'Resolved')}>Giải quyết</button>}{item.status === 'Processing' && <button type="button" className="admin-action is-danger" disabled={busyId === item.id} onClick={() => updateComplaint(item, 'Rejected')}>Từ chối</button>}</div></td></tr>)}</tbody></table></div>{pagination}</section>
       </>}
@@ -568,11 +586,11 @@ export default function AdminOperationsPage() {
 
       {mode === 'payments' && <>
         <AdminStats items={[
-          { label: 'Giao dịch', value: data?.stats?.reduce((sum, row) => sum + row.count, 0) || 0 },
-          { label: 'Đã thanh toán', value: data?.stats?.find((x) => x.status === 'Success')?.count || 0 },
-          { label: 'Tổng học phí', value: money(data?.summary?.totalAmount ?? data?.stats?.find((x) => x.status === 'Success')?.amount) },
-          { label: 'Phí sàn (20%)', value: money(data?.summary?.totalPlatformFee ?? (data?.stats?.find((x) => x.status === 'Success')?.amount ? Math.round(data?.stats?.find((x) => x.status === 'Success')?.amount * 0.2) : 0)) },
-          { label: 'Cần thanh toán lại cho gia sư', value: money(data?.summary?.totalTutorPayout ?? (data?.stats?.find((x) => x.status === 'Success')?.amount ? Math.round(data?.stats?.find((x) => x.status === 'Success')?.amount * 0.8) : 0)) }
+          { label: 'Giao dịch', value: statsArray.reduce((sum, row) => sum + (Number(row.count) || 0), 0) },
+          { label: 'Đã thanh toán', value: findStatCount('Success') },
+          { label: 'Tổng học phí', value: money(data?.summary?.totalAmount ?? statsArray.find((x) => x.status === 'Success')?.amount) },
+          { label: 'Phí sàn (20%)', value: money(data?.summary?.totalPlatformFee ?? (statsArray.find((x) => x.status === 'Success')?.amount ? Math.round(statsArray.find((x) => x.status === 'Success').amount * 0.2) : 0)) },
+          { label: 'Cần thanh toán lại cho gia sư', value: money(data?.summary?.totalTutorPayout ?? (statsArray.find((x) => x.status === 'Success')?.amount ? Math.round(statsArray.find((x) => x.status === 'Success').amount * 0.8) : 0)) }
         ]} />
         {renderSearch('Tìm học viên, gia sư, lớp hoặc mã giao dịch…', <label className="admin-select"><select value={status} onChange={(event) => setStatusSafely(event.target.value)}><option value="all">Tất cả trạng thái</option><option value="Pending">Đang chờ</option><option value="Success">Thành công</option><option value="Failed">Thất bại</option></select></label>)}
         <section className="admin-panel"><div className="admin-panel-heading">Giao dịch học phí <span className="admin-count">{pageData?.total ?? 0}</span></div><div className="admin-table-scroll"><table className="admin-table"><thead><tr><th>Mã / Ngày</th><th>Học viên</th><th>Gia sư / Lớp</th><th>Tổng học phí</th><th>Phí sàn (20%)</th><th>Cần thanh toán lại cho gia sư</th><th>Phương thức</th><th>Trạng thái</th></tr></thead><tbody>{renderRows(8, items.length, 'Không tìm thấy giao dịch.')}{!loading && items.map((item) => <tr key={item.id}><td>GD{item.id}<span className="admin-table-secondary">{dateTime(item.paidAt)}</span></td><td>{item.studentName}</td><td>{item.tutorName}<span className="admin-table-secondary">{item.classroomName}</span></td><td>{money(item.amount)}</td><td><span className="text-muted">{money(item.platformFee ?? Math.round(item.amount * 0.2))}</span></td><td><strong style={{ color: '#16834c' }}>{money(item.tutorPayout ?? (item.amount - Math.round(item.amount * 0.2)))}</strong></td><td>{item.method}<span className="admin-table-secondary">{item.gatewayTransactionCode || ''}</span></td><td><span className={`admin-status ${item.status === 'Success' ? 'is-active' : item.status === 'Failed' ? 'is-locked' : 'is-pending'}`}>{item.status === 'Success' ? 'Thành công' : item.status === 'Failed' ? 'Thất bại' : 'Đang chờ'}</span></td></tr>)}</tbody></table></div>{pagination}</section>
@@ -762,9 +780,9 @@ export default function AdminOperationsPage() {
 
       {mode === 'alerts' && <>
         <AdminStats items={[
-          { label: 'Cảnh báo mới', value: data?.stats?.find((item) => item.status === 'New')?.count || 0 },
-          { label: 'Đã xem xét', value: data?.stats?.find((item) => item.status === 'Reviewed')?.count || 0 },
-          { label: 'Đã bỏ qua', value: data?.stats?.find((item) => item.status === 'Dismissed')?.count || 0 }
+          { label: 'Cảnh báo mới', value: findStatCount('New') },
+          { label: 'Đã xem xét', value: findStatCount('Reviewed') },
+          { label: 'Đã bỏ qua', value: findStatCount('Dismissed') }
         ]} columns={3} />
         {renderSearch('Tìm tài khoản hoặc nội dung cảnh báo…', (
           <label className="admin-select">

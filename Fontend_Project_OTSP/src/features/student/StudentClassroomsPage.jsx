@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import studentApi from '../../api/studentApi';
+import { useToast } from '../../context/ToastContext';
 import ComplaintModal from '../../components/common/ComplaintModal';
 import OtspPagination from '../../components/common/OtspPagination';
 
 export default function StudentClassroomsPage() {
+  const toast = useToast();
   const [loading, setLoading] = useState(true);
   const [classrooms, setClassrooms] = useState([]);
   const [pendingRequests, setPendingRequests] = useState([]);
@@ -162,7 +164,7 @@ export default function StudentClassroomsPage() {
         setReviewSuccess('');
       }, 1500);
     } catch {
-      alert('Không thể gửi đánh giá, vui lòng thử lại.');
+      toast.error('Không thể gửi đánh giá, vui lòng thử lại.');
     } finally {
       setSubmittingReview(false);
     }

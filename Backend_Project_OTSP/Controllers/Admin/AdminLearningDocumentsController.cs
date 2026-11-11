@@ -27,6 +27,10 @@ public sealed class AdminLearningDocumentsController : ControllerBase
         var (filePath, fileName, contentType) = await _service.GetFileAsync(id, cancellationToken);
         if (filePath == null || fileName == null || contentType == null)
             return NotFound(new { message = "Không tìm thấy tệp tài liệu." });
+
+        if (contentType == "url" || filePath.StartsWith("http://", StringComparison.OrdinalIgnoreCase) || filePath.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            return Redirect(filePath);
+
         return PhysicalFile(filePath, contentType, fileName, enableRangeProcessing: true);
     }
 

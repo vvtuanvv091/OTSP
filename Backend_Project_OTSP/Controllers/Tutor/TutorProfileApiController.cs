@@ -169,6 +169,9 @@ public class TutorProfileApiController : ControllerBase
 
         await _db.SaveChangesAsync(cancellationToken);
 
+        _cache.Remove($"hdr_summary_{userId}");
+        _cache.Remove($"hdr_user_{userId}");
+
         return Ok(new { success = true, message = "Cập nhật hồ sơ thành công." });
     }
 

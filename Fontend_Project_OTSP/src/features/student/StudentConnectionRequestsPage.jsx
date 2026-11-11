@@ -3,6 +3,8 @@ import { hubUrl, resolveAssetUrl } from '../../api/config';
 import { Link } from 'react-router-dom';
 import * as signalR from '@microsoft/signalr';
 import studentApi from '../../api/studentApi';
+import { useConfirm } from '../../context/ConfirmDialogContext';
+import { useToast } from '../../context/ToastContext';
 
 const formatMoney = (val) =>
   new Intl.NumberFormat('vi-VN').format(val || 0);
@@ -14,6 +16,8 @@ const getStoredToken = () =>
   '';
 
 export default function StudentConnectionRequestsPage() {
+  const confirm = useConfirm();
+  const toast = useToast();
   const [loading, setLoading] = useState(true);
   const [requests, setRequests] = useState([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -112,20 +116,23 @@ export default function StudentConnectionRequestsPage() {
   }, []);
 
   const handleCancel = async (id) => {
-    if (!window.confirm('Bạn có chắc chắn muốn hủy yêu cầu kết nối này không?')) return;
+    const ok = await confirm({
+      title: 'Hủy yêu cầu kết nối',
+      message: 'Bạn có chắc chắn muốn hủy yêu cầu kết nối này không?',
+      confirmText: 'Hủy yêu cầu',
+      variant: 'danger',
+    });
+    if (!ok) return;
     try {
       const res = await studentApi.cancelConnectionRequest(id);
       if (res.data?.success) {
-        setActionMsg({ type: 'success', text: res.data.message || 'Đã hủy yêu cầu kết nối thành công.' });
+        toast.success(res.data.message || 'Đã hủy yêu cầu kết nối thành công.');
         setRequests((prev) =>
           prev.map((r) => (r.id === id ? { ...r, status: 'Cancelled' } : r))
         );
       }
     } catch (err) {
-      setActionMsg({
-        type: 'danger',
-        text: err?.response?.data?.message || 'Không thể hủy yêu cầu, vui lòng thử lại sau.'
-      });
+      toast.error(err?.response?.data?.message || 'Không thể hủy yêu cầu, vui lòng thử lại sau.');
     }
   };
 

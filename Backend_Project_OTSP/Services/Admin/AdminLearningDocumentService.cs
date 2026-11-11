@@ -99,7 +99,16 @@ public sealed class AdminLearningDocumentService : IAdminLearningDocumentService
             .Where(document => document.Id == documentId)
             .Select(document => document.FileUrl)
             .SingleOrDefaultAsync(cancellationToken);
-        if (string.IsNullOrWhiteSpace(storedName) || Path.GetFileName(storedName) != storedName)
+        if (string.IsNullOrWhiteSpace(storedName))
+            return (null, null, null);
+
+        if (storedName.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+            storedName.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+        {
+            return (storedName, Path.GetFileName(storedName), "url");
+        }
+
+        if (Path.GetFileName(storedName) != storedName)
             return (null, null, null);
 
         var filePath = Path.Combine(_environment.ContentRootPath, "App_Data", "tutor-learning-documents", storedName);

@@ -1,8 +1,12 @@
 import { useState, useEffect } from 'react';
 import tutorApi from '../../api/tutorApi';
+import { useToast } from '../../context/ToastContext';
+import { useConfirm } from '../../context/ConfirmDialogContext';
 import OtspPagination from '../../components/common/OtspPagination';
 
 export default function TutorSubjectsPage() {
+  const toast = useToast();
+  const confirm = useConfirm();
   const [subjectsList, setSubjectsList] = useState([]);
   const [groupBy, setGroupBy] = useState('subject');
   const [allSubjects, setAllSubjects] = useState([]);
@@ -113,17 +117,20 @@ export default function TutorSubjectsPage() {
   };
 
   const handleRemove = async (id) => {
-    if (!window.confirm('Bạn có chắc chắn muốn xóa môn và cấp học này khỏi danh sách dạy?')) return;
-
-    setMessage('');
-    setError('');
+    const ok = await confirm({
+      title: 'Xóa môn dạy',
+      message: 'Bạn có chắc chắn muốn xóa môn và cấp học này khỏi danh sách dạy?',
+      confirmText: 'Xóa',
+      variant: 'danger',
+    });
+    if (!ok) return;
 
     try {
       const res = await tutorApi.removeSubject(id);
-      setMessage(res.data?.message || 'Đã xóa môn dạy thành công.');
+      toast.success(res.data?.message || 'Đã xóa môn dạy thành công.');
       setReloadKey((k) => k + 1);
     } catch (err) {
-      setError(err.response?.data?.message || 'Không thể xóa môn dạy.');
+      toast.error(err.response?.data?.message || 'Không thể xóa môn dạy.');
     }
   };
 

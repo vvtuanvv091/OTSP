@@ -131,6 +131,12 @@ public class PublicLearningDocumentApiController : ControllerBase
         if (document is null || string.IsNullOrWhiteSpace(document.FileUrl))
             return NotFound(new { message = "Không tìm thấy tài liệu công khai." });
 
+        if (document.FileUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+            document.FileUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+        {
+            return Redirect(document.FileUrl);
+        }
+
         var fileName = Path.GetFileName(document.FileUrl);
         var folder = Path.Combine(_environment.ContentRootPath, "App_Data", "tutor-learning-documents");
         var fullPath = Path.Combine(folder, fileName);

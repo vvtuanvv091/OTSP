@@ -393,7 +393,7 @@ export default function NewsArticlePage() {
         .news-detail-cover img { width: 100%; max-height: 390px; object-fit: cover; display: block; }
         .news-detail-cover figcaption { padding: 9px 14px; font-size: 12px; color: #64748b; background: #f8fafc; border-top: 1px solid #e2e8f0; }
 
-        .news-detail-lead { position: relative; margin: 0 0 24px; padding: 16px 20px 16px 46px; background: #fff8f8; border-left: 4px solid #db303a; border-radius: 0 12px 12px 0; }
+        .news-detail-lead { position: relative; margin: 0 0 24px; padding: 16px 20px 16px 46px; background: var(--bs-tertiary-bg, #fff8f8); border: 1px solid var(--bs-border-color, #fecdd3); border-radius: 12px; }
         .news-lead-icon { position: absolute; left: 14px; top: 12px; font-size: 24px; color: #db303a; opacity: .65; }
         .news-detail-lead p { margin: 0; font-size: 16px; font-weight: 600; color: #1e293b; line-height: 1.65; }
 

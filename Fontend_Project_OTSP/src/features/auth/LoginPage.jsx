@@ -54,7 +54,7 @@ export default function LoginPage() {
     if (isFromValidForRole && from) {
       navigate(from, { replace: true });
     } else if (isAdmin) {
-      navigate('/admin/tutor-approvals', { replace: true });
+      navigate('/admin/dashboard', { replace: true });
     } else if (isTutor) {
       navigate('/tutor/dashboard', { replace: true });
     } else {
@@ -118,11 +118,10 @@ export default function LoginPage() {
 
           {error && (
             <div
-              className="d-flex align-items-center justify-content-between p-3 mb-3 rounded-3 shadow-sm bg-white"
-              style={{ border: '1px solid #fee2e2', borderLeft: '4px solid #DB303A' }}
+              className="d-flex align-items-center justify-content-between p-3 mb-3 rounded-3 shadow-sm alert alert-danger"
               role="alert"
             >
-              <div className="d-flex align-items-center text-dark">
+              <div className="d-flex align-items-center">
                 <i className="bi bi-exclamation-circle-fill text-danger fs-5 me-2" aria-hidden="true"></i>
                 <span className="small fw-medium">{error}</span>
               </div>
@@ -137,11 +136,10 @@ export default function LoginPage() {
 
           {sessionNotice && (
             <div
-              className="d-flex align-items-center justify-content-between p-3 mb-3 rounded-3 shadow-sm bg-white"
-              style={{ border: '1px solid #fed7aa', borderLeft: '4px solid #f97316' }}
+              className="d-flex align-items-center justify-content-between p-3 mb-3 rounded-3 shadow-sm alert alert-warning"
               role="status"
             >
-              <div className="d-flex align-items-center text-dark">
+              <div className="d-flex align-items-center">
                 <i className="bi bi-info-circle-fill text-warning fs-5 me-2" aria-hidden="true"></i>
                 <span className="small fw-medium">{sessionNotice}</span>
               </div>
@@ -156,12 +154,11 @@ export default function LoginPage() {
 
           {location.state?.authRequired && !location.state?.loggedOut && !sessionNotice && (
             <div
-              className="d-flex align-items-center p-3 mb-3 rounded-3 shadow-sm bg-white"
-              style={{ border: '1px solid #e2e8f0', borderLeft: '4px solid #DB303A' }}
+              className="d-flex align-items-center p-3 mb-3 rounded-3 shadow-sm alert alert-danger"
               role="status"
             >
               <i className="bi bi-shield-lock-fill text-danger fs-5 me-2" aria-hidden="true"></i>
-              <span className="small fw-medium text-dark">
+              <span className="small fw-medium">
                 Vui lòng đăng nhập để tiếp tục đến trang bạn đã chọn.
               </span>
             </div>
@@ -171,7 +168,7 @@ export default function LoginPage() {
             <div className="mb-3">
               <label className="form-label small fw-semibold" htmlFor="loginEmail">Email</label>
               <div className="input-group">
-                <span className="input-group-text bg-white border-end-0">
+                <span className="input-group-text bg-body border-end-0">
                   <i className="bi bi-envelope text-muted"></i>
                 </span>
                 <input

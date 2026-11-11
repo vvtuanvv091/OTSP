@@ -1,12 +1,16 @@
 import { useEffect, useState } from 'react';
 import adminApi from '../../api/adminApi';
 import { repairMojibake } from '../../utils/repairMojibake';
+import { useToast } from '../../context/ToastContext';
+import { useConfirm } from '../../context/ConfirmDialogContext';
 import { AdminFeedback, AdminLoadingRows, AdminPageHeader, AdminPagination, AdminStats } from './AdminPageShared';
 
 const PAGE_SIZE = 10;
 const statusLabel = { Pending: 'Chờ duyệt', Approved: 'Đã duyệt', Rejected: 'Đã gỡ / từ chối' };
 
 export default function AdminLearningDocumentsPage() {
+  const toast = useToast();
+  const confirm = useConfirm();
   const [data, setData] = useState(null);
   const [search, setSearch] = useState('');
   const [querySearch, setQuerySearch] = useState('');
@@ -96,16 +100,20 @@ export default function AdminLearningDocumentsPage() {
   };
 
   const handleDeleteDocument = async (document) => {
-    if (!window.confirm(`Bạn có chắc chắn muốn xóa tài liệu "${document.title}" khỏi hệ thống?`)) return;
+    const ok = await confirm({
+      title: 'Xóa tài liệu',
+      message: `Bạn có chắc chắn muốn xóa tài liệu "${document.title}" khỏi hệ thống?`,
+      confirmText: 'Xóa',
+      variant: 'danger',
+    });
+    if (!ok) return;
     setBusyId(document.id);
-    setError('');
-    setMessage('');
     try {
       await adminApi.deleteLearningDocument(document.id);
-      setMessage('Đã xóa tài liệu thành công.');
+      toast.success('Đã xóa tài liệu thành công.');
       setReload((v) => v + 1);
     } catch (err) {
-      setError(err.response?.data?.message || 'Không thể xóa tài liệu.');
+      toast.error(err.response?.data?.message || 'Không thể xóa tài liệu.');
     } finally {
       setBusyId(null);
     }
@@ -140,7 +148,19 @@ export default function AdminLearningDocumentsPage() {
       window.setTimeout(() => URL.revokeObjectURL(fileUrl), 60_000);
     } catch (requestError) {
       if (preview) preview.close();
-      setError(requestError.response?.data?.message || 'Không mở được tệp tài liệu.');
+      let errorMsg = 'Không mở được tệp tài liệu.';
+      if (requestError.response?.data instanceof Blob) {
+        try {
+          const text = await requestError.response.data.text();
+          const parsed = JSON.parse(text);
+          if (parsed?.message) errorMsg = parsed.message;
+        } catch {
+          // fallback
+        }
+      } else if (requestError.response?.data?.message) {
+        errorMsg = requestError.response.data.message;
+      }
+      setError(errorMsg);
     }
   };
 

@@ -3,12 +3,16 @@ import { useLocation } from 'react-router-dom';
 import studentApi from '../../api/studentApi';
 import { resolveAssetUrl } from '../../api/config';
 import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../../context/ToastContext';
+import { useConfirm } from '../../context/ConfirmDialogContext';
 import CollapsibleProfileSection from '../../components/common/CollapsibleProfileSection';
 import ChangePasswordPanel from '../auth/ChangePasswordPanel';
 import compressImageFile from '../../utils/imageCompressor';
 
 export default function StudentProfilePage() {
   const { user, updateUser } = useAuth();
+  const toast = useToast();
+  const confirm = useConfirm();
   const location = useLocation();
 
   const [loading, setLoading] = useState(true);
@@ -46,7 +50,6 @@ export default function StudentProfilePage() {
     let isMounted = true;
     async function fetchProfile() {
       try {
-        setLoading(true);
         const res = await studentApi.getProfile();
         if (isMounted && res.data) {
           const prof = res.data.profile || {};
@@ -86,7 +89,7 @@ export default function StudentProfilePage() {
     return () => {
       isMounted = false;
     };
-  }, [user]);
+  }, [user?.id]);
 
   useEffect(() => {
     if (location.hash === '#guardians') {
@@ -119,6 +122,7 @@ export default function StudentProfilePage() {
       if (profile.fullName) {
         updateUser({ fullName: profile.fullName });
       }
+      toast.success('Cập nhật hồ sơ cá nhân thành công!');
       setMessage({ type: 'success', text: 'Cập nhật hồ sơ cá nhân thành công!' });
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err) {
@@ -159,7 +163,7 @@ export default function StudentProfilePage() {
   const handleAddGuardian = async (e) => {
     e.preventDefault();
     if (!newGuardian.fullName || !newGuardian.contactInfo) {
-      alert('Vui lòng nhập họ tên và thông tin liên hệ của người giám hộ.');
+      toast.warning('Vui lòng nhập họ tên và thông tin liên hệ của người giám hộ.');
       return;
     }
 
@@ -169,24 +173,27 @@ export default function StudentProfilePage() {
         setGuardians((prev) => [...prev, res.data]);
         setNewGuardian({ fullName: '', contactInfo: '', citizenIdNumber: '', residenceAddress: '' });
         setShowOptionalGuardianForm(false);
-        setMessage({ type: 'success', text: 'Thêm người giám hộ thành công!' });
+        toast.success('Thêm người giám hộ thành công!');
       }
     } catch (err) {
-      setMessage({
-        type: 'danger',
-        text: err?.response?.data?.message || 'Không thể thêm người giám hộ.'
-      });
+      toast.error(err?.response?.data?.message || 'Không thể thêm người giám hộ.');
     }
   };
 
   const handleRemoveGuardian = async (id) => {
-    if (!window.confirm('Bạn có chắc chắn muốn xóa người giám hộ này không?')) return;
+    const ok = await confirm({
+      title: 'Xóa người giám hộ',
+      message: 'Bạn có chắc chắn muốn xóa người giám hộ này không?',
+      confirmText: 'Xóa',
+      variant: 'danger',
+    });
+    if (!ok) return;
     try {
       await studentApi.removeGuardian(id);
       setGuardians((prev) => prev.filter((g) => g.id !== id));
-      setMessage({ type: 'success', text: 'Đã xóa người giám hộ.' });
+      toast.success('Đã xóa người giám hộ.');
     } catch {
-      setMessage({ type: 'danger', text: 'Không thể xóa người giám hộ.' });
+      toast.error('Không thể xóa người giám hộ.');
     }
   };
 

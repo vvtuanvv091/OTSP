@@ -3,11 +3,15 @@ import { Link } from 'react-router-dom';
 import tutorApi from '../../api/tutorApi';
 import { resolveAssetUrl } from '../../api/config';
 import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../../context/ToastContext';
+import { useConfirm } from '../../context/ConfirmDialogContext';
 import ComplaintModal from '../../components/common/ComplaintModal';
 import OtspPagination from '../../components/common/OtspPagination';
 
 export default function TutorClassroomsPage() {
   const { user } = useAuth();
+  const toast = useToast();
+  const confirm = useConfirm();
   const [classrooms, setClassrooms] = useState([]);
   const [statusFilter, setStatusFilter] = useState('');
   const [page, setPage] = useState(1);
@@ -49,21 +53,23 @@ export default function TutorClassroomsPage() {
   }, [statusFilter, page, reloadKey]);
 
   const handleCancelClassroom = async (id, canHardDelete) => {
-    const promptMsg = canHardDelete
-      ? 'Xóa vĩnh viễn lớp này? Dữ liệu lớp và lịch học sẽ bị xóa hoàn toàn khỏi hệ thống.'
-      : 'Hủy lớp này và thông báo cho học viên?';
+    const ok = await confirm({
+      title: canHardDelete ? 'Xóa vĩnh viễn lớp học' : 'Hủy lớp học',
+      message: canHardDelete
+        ? 'Xóa vĩnh viễn lớp này? Dữ liệu lớp và lịch học sẽ bị xóa hoàn toàn khỏi hệ thống.'
+        : 'Hủy lớp này và thông báo cho học viên?',
+      confirmText: canHardDelete ? 'Xóa vĩnh viễn' : 'Hủy lớp',
+      variant: 'danger',
+    });
 
-    if (!window.confirm(promptMsg)) return;
-
-    setMessage('');
-    setError('');
+    if (!ok) return;
 
     try {
       const res = await tutorApi.cancelClassroom(id);
-      setMessage(res.data?.message || 'Đã thao tác lớp học thành công.');
+      toast.success(res.data?.message || 'Đã thao tác lớp học thành công.');
       setReloadKey((k) => k + 1);
     } catch (err) {
-      setError(err.response?.data?.message || 'Không thể hủy/xóa lớp học.');
+      toast.error(err.response?.data?.message || 'Không thể hủy/xóa lớp học.');
     }
   };
 

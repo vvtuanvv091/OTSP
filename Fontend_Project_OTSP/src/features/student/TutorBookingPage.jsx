@@ -362,8 +362,8 @@ export default function TutorBookingPage() {
     return (
       <div className="container py-5 text-center">
         <div
-          className="p-4 mx-auto rounded-3 shadow-sm bg-white text-dark mb-3"
-          style={{ maxWidth: 540, border: '1px solid #fed7aa', borderLeft: '4px solid #f59e0b' }}
+          className="p-4 mx-auto rounded-3 shadow-sm alert alert-warning mb-3"
+          style={{ maxWidth: 540 }}
         >
           <i className="bi bi-exclamation-triangle-fill text-warning fs-3 d-block mb-2"></i>
           Không tìm thấy hồ sơ gia sư này hoặc gia sư chưa được kích hoạt.
@@ -393,7 +393,7 @@ export default function TutorBookingPage() {
                 <i className="bi bi-search me-1"></i> Tìm gia sư
               </Link>
             </li>
-            <li className="breadcrumb-item active fw-semibold text-dark" aria-current="page">
+            <li className="breadcrumb-item active fw-semibold text-body" aria-current="page">
               Hồ sơ: {tutor.fullName}
             </li>
           </ol>
@@ -413,21 +413,19 @@ export default function TutorBookingPage() {
       {/* Thông báo hệ thống */}
       {successMsg && (
         <div
-          className="d-flex align-items-center justify-content-between p-3 mb-4 rounded-3 shadow-sm bg-white"
-          style={{ border: '1px solid #dcfce7', borderLeft: '4px solid #16a34a' }}
+          className="d-flex align-items-center justify-content-between p-3 mb-4 rounded-3 shadow-sm alert alert-success"
           role="alert"
         >
           <div className="d-flex align-items-start">
             <i className="bi bi-check-circle-fill fs-4 me-3 text-success mt-1"></i>
             <div>
-              <div className="fw-bold text-dark">
+              <div className="fw-bold">
                 Thành công! <span className="fw-normal text-secondary">{successMsg}</span>
               </div>
               <div className="mt-2">
                 <Link
                   to="/student/connection-requests"
                   className="btn btn-sm btn-danger text-white rounded-pill px-3 shadow-sm"
-                  style={{ backgroundColor: '#DB303A' }}
                 >
                   Xem danh sách yêu cầu đã gửi <i className="bi bi-arrow-right ms-1"></i>
                 </Link>
@@ -440,11 +438,10 @@ export default function TutorBookingPage() {
 
       {errorMsg && (
         <div
-          className="d-flex align-items-center justify-content-between p-3 mb-4 rounded-3 shadow-sm bg-white"
-          style={{ border: '1px solid #fee2e2', borderLeft: '4px solid #DB303A' }}
+          className="d-flex align-items-center justify-content-between p-3 mb-4 rounded-3 shadow-sm alert alert-danger"
           role="alert"
         >
-          <div className="d-flex align-items-center text-dark">
+          <div className="d-flex align-items-center">
             <i className="bi bi-exclamation-circle-fill fs-4 me-3 text-danger"></i>
             <span className="fw-medium">{errorMsg}</span>
           </div>
@@ -454,15 +451,14 @@ export default function TutorBookingPage() {
 
       {existingRequest && (
         <div
-          className="d-flex align-items-start gap-3 p-3 mb-4 rounded-3 shadow-sm bg-white"
-          style={{ border: '1px solid #fed7aa', borderLeft: '4px solid #f59e0b' }}
+          className="d-flex align-items-start gap-3 p-3 mb-4 rounded-3 shadow-sm alert alert-warning"
         >
           <i className="bi bi-hourglass-split fs-3 text-warning mt-1"></i>
           <div>
-            <strong className="d-block mb-1 text-dark">Bạn đã gửi yêu cầu kết nối tới gia sư này!</strong>
+            <strong className="d-block mb-1">Bạn đã gửi yêu cầu kết nối tới gia sư này!</strong>
             <span className="small text-secondary">
               Yêu cầu môn <strong>{existingRequest.subjectName || 'học tập'}</strong> đang ở trạng thái{' '}
-              <strong className="text-dark">{existingRequest.status === 'Accepted' ? 'Đã chấp nhận' : 'Chờ phản hồi'}</strong>.
+              <strong>{existingRequest.status === 'Accepted' ? 'Đã chấp nhận' : 'Chờ phản hồi'}</strong>.
               Bạn có thể theo dõi trong mục{' '}
               <Link to="/student/connection-requests" className="fw-semibold text-danger text-decoration-underline">
                 Yêu cầu đã gửi

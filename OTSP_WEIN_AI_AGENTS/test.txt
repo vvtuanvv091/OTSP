@@ -16,3 +16,6 @@ test action phân trạng mức 1
 Ý định: PAGINATION
 Lệnh UI: type='NAVIGATE' target='/search?tab=tutors&page=2' actionType='PAGINATION' label='Nhảy sang Trang 2' autoExecute=True
 (.venv) PS C:\Users\GIGABYTE\Downloads\OTSP_WEIN_AI_AGENTS> 
+
+
+//chạy python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload      

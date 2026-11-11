@@ -78,11 +78,10 @@ export default function StudentPaymentsPage() {
 
       {statusSuccess && (
         <div
-          className="d-flex align-items-center justify-content-between p-3 mb-4 rounded-3 shadow-sm bg-white"
-          style={{ border: '1px solid #dcfce7', borderLeft: '4px solid #16a34a' }}
+          className="d-flex align-items-center justify-content-between p-3 mb-4 rounded-3 shadow-sm alert alert-success"
           role="alert"
         >
-          <div className="d-flex align-items-center text-dark">
+          <div className="d-flex align-items-center">
             <i className="bi bi-check-circle-fill text-success fs-5 me-2" aria-hidden="true"></i>
             <span className="fw-semibold">Giao dịch thanh toán của bạn đã hoàn tất thành công!</span>
           </div>
@@ -93,12 +92,11 @@ export default function StudentPaymentsPage() {
       {/* Cảnh báo học viên dưới 18 tuổi cần người giám hộ */}
       {data?.isMinor && (
         <div
-          className="d-flex align-items-start p-3 mb-4 rounded-3 shadow-sm bg-white"
-          style={{ border: '1px solid #fed7aa', borderLeft: '4px solid #f59e0b' }}
+          className="d-flex align-items-start p-3 mb-4 rounded-3 shadow-sm alert alert-warning"
         >
           <i className="bi bi-shield-lock-fill fs-4 me-3 text-warning mt-1"></i>
           <div>
-            <strong className="text-dark">Học viên dưới 18 tuổi:</strong>{' '}
+            <strong>Học viên dưới 18 tuổi:</strong>{' '}
             <span className="text-secondary">
               Học phí và các khoản thanh toán được quản lý bởi người giám hộ{' '}
               {data.guardianName ? `(${data.guardianName})` : ''}.

@@ -258,14 +258,14 @@
 .student-schedule-page .schedule-mobile-session {
   margin-top: 8px;
   padding: 12px;
-  border: 1px solid #d1d5db;
-  border-left: 4px solid #b4232d;
-  border-radius: 4px;
-  background: #f9fafb;
+  border: 1px solid var(--bs-border-color, #d1d5db);
+  border-top: 2px solid var(--otsp-primary, #b4232d);
+  border-radius: 8px;
+  background: var(--bs-body-bg, #f9fafb);
 }
-.student-schedule-page .schedule-mobile-session.inprogress { border-left-color: #0369a1; }
-.student-schedule-page .schedule-mobile-session.done { border-left-color: #166534; }
-.student-schedule-page .schedule-mobile-session.cancelled { border-left-color: #4b5563; }
+.student-schedule-page .schedule-mobile-session.inprogress { border-top-color: #0369a1; }
+.student-schedule-page .schedule-mobile-session.done { border-top-color: #166534; }
+.student-schedule-page .schedule-mobile-session.cancelled { border-top-color: #4b5563; }
 @media (max-width: 767px) {
   .student-schedule-page .schedule-desktop { display: none; }
   .student-schedule-page .schedule-mobile-list { display: block; }

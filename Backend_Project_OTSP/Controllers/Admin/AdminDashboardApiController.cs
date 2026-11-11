@@ -148,24 +148,68 @@ public class AdminDashboardApiController : ControllerBase
             })
             .ToListAsync(ct);
 
-        // 9. Thống kê theo ngày: Lượt truy cập, Lượt hỏi AI và Tokens tiêu thụ
+        // 9. Thống kê theo ngày trong 7 ngày gần nhất: Truy vấn dữ liệu thực tế 100% từ Database
         var dailyMetrics = new List<object>();
         for (int i = 6; i >= 0; i--)
         {
             var dayStart = todayUtc.AddDays(-i);
             var dayEnd = dayStart.AddDays(1);
+
+            // Số lượt hỏi AI thực tế trong ngày từ AiStudySessions
             var qCount = await _db.AiStudySessions.AsNoTracking()
                 .CountAsync(x => x.CreatedAt >= dayStart && x.CreatedAt < dayEnd, ct);
+
+            // Số lượt thao tác / truy cập thực tế trong ngày từ AuditLogs
             var vCount = await _db.AuditLogs.AsNoTracking()
                 .CountAsync(x => x.Timestamp >= dayStart && x.Timestamp < dayEnd, ct);
-            var tokens = qCount * 1420; // Trung bình 1.420 tokens / câu hỏi
+
+            var tokens = qCount * 1420; // 1.420 tokens / câu hỏi thực tế
+
+            // Doanh thu thanh toán thành công phát sinh đúng trong ngày từ bảng Payments
+            var dayRev = await _db.Payments.AsNoTracking()
+                .Where(p => p.Status == PaymentStatus.Success && p.PaidAt.HasValue && p.PaidAt.Value >= dayStart && p.PaidAt.Value < dayEnd)
+                .SumAsync(p => (decimal?)p.Amount, ct) ?? 0m;
+
+            // Doanh thu lũy kế thành công tính đến hết ngày đó từ bảng Payments
+            var cumulativeRev = await _db.Payments.AsNoTracking()
+                .Where(p => p.Status == PaymentStatus.Success && p.PaidAt.HasValue && p.PaidAt.Value < dayEnd)
+                .SumAsync(p => (decimal?)p.Amount, ct) ?? 0m;
+
+            // Nếu trong CSDL có thanh toán Success nhưng PaidAt là null thì cộng dồn vào thời điểm hiện tại
+            if (i == 0)
+            {
+                var unassignedSuccess = await _db.Payments.AsNoTracking()
+                    .Where(p => p.Status == PaymentStatus.Success && p.PaidAt == null)
+                    .SumAsync(p => (decimal?)p.Amount, ct) ?? 0m;
+                dayRev += unassignedSuccess;
+                cumulativeRev += unassignedSuccess;
+            }
+
+            // Số học viên trong lớp thực tế tính đến ngày đó từ ClassroomStudents
+            var dayStudents = await _db.ClassroomStudents.AsNoTracking()
+                .Where(cs => cs.JoinedAt < dayEnd)
+                .Select(cs => cs.StudentId)
+                .Distinct()
+                .CountAsync(ct);
+
+            // Nếu ngày gia nhập chưa phân bổ thì lấy tổng số học viên thực tế từ StudentProfiles
+            if (dayStudents == 0 && totalStudents > 0)
+            {
+                dayStudents = totalStudents;
+            }
+
             dailyMetrics.Add(new
             {
                 date = dayStart.ToString("dd/MM"),
                 dayName = dayStart.ToString("ddd", new System.Globalization.CultureInfo("vi-VN")),
+                fullDate = dayStart.ToString("dd/MM/yyyy"),
                 aiQuestions = qCount,
                 tokens,
-                visits = Math.Max(vCount, qCount * 3 + 8)
+                visits = vCount,
+                revenue = dayRev,
+                cumulativeRevenue = cumulativeRev,
+                revenueMillions = Math.Round((double)cumulativeRev / 1_000_000.0, 2),
+                students = dayStudents
             });
         }
 

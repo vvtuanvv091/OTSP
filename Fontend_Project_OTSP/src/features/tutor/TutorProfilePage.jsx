@@ -2,12 +2,16 @@ import { useState, useEffect } from 'react';
 import tutorApi from '../../api/tutorApi';
 import { resolveAssetUrl } from '../../api/config';
 import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../../context/ToastContext';
+import { useConfirm } from '../../context/ConfirmDialogContext';
 import CollapsibleProfileSection from '../../components/common/CollapsibleProfileSection';
 import ChangePasswordPanel from '../auth/ChangePasswordPanel';
 import compressImageFile from '../../utils/imageCompressor';
 
 export default function TutorProfilePage() {
   const { user, updateUser } = useAuth();
+  const toast = useToast();
+  const confirm = useConfirm();
   const [profile, setProfile] = useState(null);
   const [tutorSubjects, setTutorSubjects] = useState([]);
   const [qualifications, setQualifications] = useState([]);
@@ -91,9 +95,19 @@ export default function TutorProfilePage() {
         introduction,
         hourlyFee: profile?.hourlyFee,
       });
+
+      setProfile((prev) => ({
+        ...prev,
+        fullName: displayName,
+        citizenIdNumber,
+        residenceAddress,
+        introduction,
+      }));
+
       if (displayName) {
         updateUser({ fullName: displayName });
       }
+      toast.success('Cập nhật hồ sơ thành công!');
       setMessage('Cập nhật hồ sơ thành công!');
     } catch (err) {
       setError(err.response?.data?.message || 'Có lỗi xảy ra khi cập nhật hồ sơ.');
@@ -151,17 +165,20 @@ export default function TutorProfilePage() {
   };
 
   const handleRemoveSubject = async (id) => {
-    if (!window.confirm('Xóa môn dạy này?')) return;
-
-    setMessage('');
-    setError('');
+    const ok = await confirm({
+      title: 'Xóa môn dạy',
+      message: 'Bạn có chắc chắn muốn xóa môn dạy này khỏi danh sách?',
+      confirmText: 'Xóa',
+      variant: 'danger',
+    });
+    if (!ok) return;
 
     try {
       const res = await tutorApi.removeSubject(id);
-      setMessage(res.data?.message || 'Đã xóa môn dạy thành công.');
+      toast.success(res.data?.message || 'Đã xóa môn dạy thành công.');
       setTutorSubjects((prev) => prev.filter((item) => item.id !== id));
     } catch (err) {
-      setError(err.response?.data?.message || 'Không thể xóa môn dạy.');
+      toast.error(err.response?.data?.message || 'Không thể xóa môn dạy.');
     }
   };
 
@@ -197,17 +214,20 @@ export default function TutorProfilePage() {
   };
 
   const handleRemoveQualification = async (id) => {
-    if (!window.confirm('Xóa bằng cấp này?')) return;
-
-    setMessage('');
-    setError('');
+    const ok = await confirm({
+      title: 'Xóa bằng cấp',
+      message: 'Bạn có chắc chắn muốn xóa bằng cấp này khỏi hồ sơ?',
+      confirmText: 'Xóa',
+      variant: 'danger',
+    });
+    if (!ok) return;
 
     try {
       await tutorApi.deleteQualification(id);
-      setMessage('Đã xóa bằng cấp thành công.');
+      toast.success('Đã xóa bằng cấp thành công.');
       setQualifications((prev) => prev.filter((q) => q.id !== id));
     } catch (err) {
-      setError(err.response?.data?.message || 'Không thể xóa bằng cấp.');
+      toast.error(err.response?.data?.message || 'Không thể xóa bằng cấp.');
     }
   };
 

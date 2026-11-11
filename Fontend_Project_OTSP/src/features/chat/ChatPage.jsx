@@ -3,6 +3,8 @@ import { hubUrl, resolveAssetUrl } from '../../api/config';
 import { useSearchParams } from 'react-router-dom';
 import { HubConnectionBuilder, LogLevel } from '@microsoft/signalr';
 import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../../context/ToastContext';
+import { useConfirm } from '../../context/ConfirmDialogContext';
 import chatApi from '../../api/chatApi';
 
 // Hàm helper hợp nhất và chuẩn hóa tin nhắn chống trùng lặp / race condition khi 2 người gửi cùng lúc
@@ -54,6 +56,8 @@ function upsertChatMessage(prevList, incoming, currentUserId) {
 
 export default function ChatPage() {
   const { user } = useAuth();
+  const toast = useToast();
+  const confirm = useConfirm();
   const [searchParams] = useSearchParams();
   const contactIdParam = searchParams.get('contactId') || searchParams.get('recipientId');
   const contactNameParam = searchParams.get('contactName');
@@ -432,7 +436,7 @@ export default function ChatPage() {
       console.error('Lỗi gửi tin nhắn:', err);
       setMessages((prev) => prev.filter((m) => m.id !== tempId));
       const errMsg = err?.response?.data?.message || 'Không thể gửi tin nhắn. Vui lòng thử lại.';
-      alert(errMsg);
+      toast.error(errMsg);
     }
   };
 
@@ -536,12 +540,18 @@ export default function ChatPage() {
       setEditingMessageId(null);
       setEditText('');
     } catch (err) {
-      window.alert(err?.response?.data?.message || err?.message || 'Không thể chỉnh sửa tin nhắn.');
+      toast.error(err?.response?.data?.message || err?.message || 'Không thể chỉnh sửa tin nhắn.');
     }
   };
 
   const handleDeleteMessage = async (message) => {
-    if (!window.confirm('Bạn có chắc muốn thu hồi tin nhắn này không?')) return;
+    const ok = await confirm({
+      title: 'Thu hồi tin nhắn',
+      message: 'Bạn có chắc chắn muốn thu hồi tin nhắn này không?',
+      confirmText: 'Thu hồi',
+      variant: 'danger',
+    });
+    if (!ok) return;
     try {
       const connection = hubConnectionRef.current;
       if (connection?.state === 'Connected') {
@@ -559,7 +569,7 @@ export default function ChatPage() {
         ));
       }
     } catch (err) {
-      window.alert(err?.response?.data?.message || err?.message || 'Không thể thu hồi tin nhắn.');
+      toast.error(err?.response?.data?.message || err?.message || 'Không thể thu hồi tin nhắn.');
     }
   };
 

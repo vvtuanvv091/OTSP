@@ -5,6 +5,8 @@ import * as signalR from '@microsoft/signalr';
 import classroomApi from '../../api/classroomApi';
 import studentApi from '../../api/studentApi';
 import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../../context/ToastContext';
+import { useConfirm } from '../../context/ConfirmDialogContext';
 
 /**
  * Trang điều khiển phòng học trực tuyến.
@@ -20,6 +22,8 @@ export default function RoomPage() {
   const sessionId = paramSessionId || searchParams.get('sessionId') || '';
   const navigate = useNavigate();
   const { user, isTutor } = useAuth();
+  const toast = useToast();
+  const confirm = useConfirm();
 
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -156,7 +160,7 @@ export default function RoomPage() {
         navigate(backUrl);
       }, 1500);
     } catch (err) {
-      alert(err.response?.data?.message || 'Không thể gửi đánh giá, vui lòng thử lại.');
+      toast.error(err.response?.data?.message || 'Không thể gửi đánh giá, vui lòng thử lại.');
     } finally {
       setSubmittingReview(false);
     }
@@ -226,13 +230,19 @@ export default function RoomPage() {
   }, [session, sessionId]);
 
   const handleEndSession = async () => {
-    if (!window.confirm('Bạn có chắc chắn muốn kết thúc buổi học này? Thao tác này sẽ đánh dấu hoàn thành buổi học cho tất cả thành viên.')) return;
+    const ok = await confirm({
+      title: 'Kết thúc buổi học',
+      message: 'Bạn có chắc chắn muốn kết thúc buổi học này? Thao tác này sẽ đánh dấu hoàn thành buổi học cho tất cả thành viên.',
+      confirmText: 'Kết thúc',
+      variant: 'danger',
+    });
+    if (!ok) return;
     setEnding(true);
     try {
       await classroomApi.endSession(sessionId);
       triggerSessionEnded();
     } catch (err) {
-      alert(err.response?.data?.message || err.message || 'Không thể kết thúc buổi học.');
+      toast.error(err.response?.data?.message || err.message || 'Không thể kết thúc buổi học.');
     } finally {
       setEnding(false);
     }

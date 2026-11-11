@@ -1,6 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import tutorApi from '../../api/tutorApi';
+import { useToast } from '../../context/ToastContext';
+import { useConfirm } from '../../context/ConfirmDialogContext';
 
 const TIME_BLOCKS = [
   { start: 6, end: 8, label: '06:00 – 08:00', period: 'Sáng' },
@@ -53,6 +55,8 @@ const getVietnamTodayStr = () => {
 };
 
 export default function TutorSchedulePage() {
+  const toast = useToast();
+  const confirm = useConfirm();
   const [scheduleData, setScheduleData] = useState(null);
   const [weekOffset, setWeekOffset] = useState(0);
   const [jumpDate, setJumpDate] = useState('');
@@ -219,15 +223,21 @@ export default function TutorSchedulePage() {
 
   // Xử lý hủy buổi học
   const handleCancelSession = async (sessionId) => {
-    if (!window.confirm('Bạn có chắc chắn muốn hủy buổi học này không?')) return;
+    const ok = await confirm({
+      title: 'Hủy buổi học',
+      message: 'Bạn có chắc chắn muốn hủy buổi học này không?',
+      confirmText: 'Hủy buổi học',
+      variant: 'danger',
+    });
+    if (!ok) return;
     setCancelling(true);
     try {
       await tutorApi.cancelSession(sessionId);
-      setMessage('Đã hủy buổi học thành công.');
+      toast.success('Đã hủy buổi học thành công.');
       setSelectedSession(null);
       setReloadKey((k) => k + 1);
     } catch (err) {
-      setError(err.response?.data?.message || 'Không thể hủy buổi học.');
+      toast.error(err.response?.data?.message || 'Không thể hủy buổi học.');
     } finally {
       setCancelling(false);
     }
@@ -383,7 +393,8 @@ export default function TutorSchedulePage() {
           cursor: pointer;
           transition: transform .15s ease, box-shadow .15s ease;
           box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
-          border-left: 4px solid #DB303A;
+          border: 1px solid var(--bs-border-color, #E2E8F0);
+          border-top: 2px solid var(--otsp-primary, #DB303A);
           background: var(--bs-body-bg);
           height: 100%;
         }
@@ -395,27 +406,27 @@ export default function TutorSchedulePage() {
 
         .session-card-item.status-scheduled {
           border-color: #E2E8F0;
-          border-left-color: #3B82F6;
+          border-top-color: #3B82F6;
           background: #F8FAFC;
         }
 
         .session-card-item.status-inprogress {
           border-color: #FCA5A5;
-          border-left-color: #DC2626;
+          border-top-color: #DC2626;
           background: #FEF2F2;
           animation: pulseBorder 2s infinite;
         }
 
         .session-card-item.status-done {
           border-color: #E2E8F0;
-          border-left-color: #10B981;
+          border-top-color: #10B981;
           background: #F0FDF4;
           opacity: 0.9;
         }
 
         .session-card-item.status-cancelled {
           border-color: #E2E8F0;
-          border-left-color: #64748B;
+          border-top-color: #64748B;
           background: #F1F5F9;
           opacity: 0.7;
         }

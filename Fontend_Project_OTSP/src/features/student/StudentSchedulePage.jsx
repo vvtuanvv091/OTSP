@@ -353,7 +353,7 @@ export default function StudentSchedulePage() {
         /* Session Card inside Cell */
         .schedule-session-card {
           border: 1px solid var(--availability-border, #E5E7EB);
-          border-left: 3px solid #DB303A;
+          border-top: 2px solid var(--otsp-primary, #DB303A);
           border-radius: 6px;
           padding: 6px 7px;
           background: var(--bs-body-bg, #ffffff);

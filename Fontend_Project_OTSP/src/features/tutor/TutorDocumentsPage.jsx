@@ -2,9 +2,13 @@ import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import tutorApi from '../../api/tutorApi';
 import { repairMojibake } from '../../utils/repairMojibake';
+import { useToast } from '../../context/ToastContext';
+import { useConfirm } from '../../context/ConfirmDialogContext';
 import OtspPagination from '../../components/common/OtspPagination';
 
 export default function TutorDocumentsPage() {
+  const toast = useToast();
+  const confirm = useConfirm();
   const [searchParams] = useSearchParams();
   const classroomIdFilter = searchParams.get('classroomId') || '';
 
@@ -120,17 +124,20 @@ export default function TutorDocumentsPage() {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm('Bạn có chắc chắn muốn xóa tài liệu này?')) return;
-
-    setMessage('');
-    setError('');
+    const ok = await confirm({
+      title: 'Xóa tài liệu',
+      message: 'Bạn có chắc chắn muốn xóa tài liệu này khỏi hệ thống?',
+      confirmText: 'Xóa',
+      variant: 'danger',
+    });
+    if (!ok) return;
 
     try {
       const res = await tutorApi.deleteDocument(id);
-      setMessage(res.data?.message || 'Đã xóa tài liệu thành công.');
+      toast.success(res.data?.message || 'Đã xóa tài liệu thành công.');
       setReloadKey((k) => k + 1);
     } catch (err) {
-      setError(err.response?.data?.message || 'Không thể xóa tài liệu.');
+      toast.error(err.response?.data?.message || 'Không thể xóa tài liệu.');
     }
   };
 

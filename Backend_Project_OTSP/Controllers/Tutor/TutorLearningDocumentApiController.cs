@@ -305,6 +305,12 @@ public class TutorLearningDocumentApiController : ControllerBase
 
         if (doc == null) return NotFound();
 
+        if (doc.FileUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+            doc.FileUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+        {
+            return Redirect(doc.FileUrl);
+        }
+
         var fullPath = Path.Combine(GetUploadFolder(), doc.FileUrl);
         if (!System.IO.File.Exists(fullPath)) return NotFound(new { message = "Tệp không tồn tại." });
 
@@ -333,6 +339,12 @@ public class TutorLearningDocumentApiController : ControllerBase
             .FirstOrDefaultAsync(d => d.Id == id && d.Tutor.UserId == userId, cancellationToken);
 
         if (doc == null) return NotFound();
+
+        if (doc.FileUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+            doc.FileUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+        {
+            return Redirect(doc.FileUrl);
+        }
 
         var fullPath = Path.Combine(GetUploadFolder(), doc.FileUrl);
         if (System.IO.File.Exists(fullPath))

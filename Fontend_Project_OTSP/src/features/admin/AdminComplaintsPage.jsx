@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import adminApi from '../../api/adminApi';
 import complaintApi from '../../api/complaintApi';
 import { resolveAssetUrl } from '../../api/config';
+import { useToast } from '../../context/ToastContext';
+import { useConfirm } from '../../context/ConfirmDialogContext';
 import {
   AdminFeedback,
   AdminLoadingRows,
@@ -19,6 +21,8 @@ const statusLabel = {
 };
 
 export default function AdminComplaintsPage() {
+  const toast = useToast();
+  const confirm = useConfirm();
   const [data, setData] = useState(null);
   const [search, setSearch] = useState('');
   const [querySearch, setQuerySearch] = useState('');
@@ -107,16 +111,20 @@ export default function AdminComplaintsPage() {
   };
 
   const handleDeleteComplaint = async (item) => {
-    if (!window.confirm(`Bạn có chắc chắn muốn xóa khiếu nại #${item.id}?`)) return;
+    const ok = await confirm({
+      title: 'Xóa khiếu nại',
+      message: `Bạn có chắc chắn muốn xóa khiếu nại #${item.id}?`,
+      confirmText: 'Xóa',
+      variant: 'danger',
+    });
+    if (!ok) return;
     setBusyId(item.id);
-    setError('');
-    setMessage('');
     try {
       await adminApi.deleteComplaint(item.id);
-      setMessage(`Đã xóa khiếu nại #${item.id} thành công.`);
+      toast.success(`Đã xóa khiếu nại #${item.id} thành công.`);
       setReload((r) => r + 1);
     } catch (err) {
-      setError(err.response?.data?.message || 'Lỗi khi xóa khiếu nại.');
+      toast.error(err.response?.data?.message || 'Lỗi khi xóa khiếu nại.');
     } finally {
       setBusyId(null);
     }

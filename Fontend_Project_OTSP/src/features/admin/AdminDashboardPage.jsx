@@ -18,8 +18,9 @@ export default function AdminDashboardPage() {
   const [paymentsData, setPaymentsData] = useState([]);
   const [alertsData, setAlertsData] = useState([]);
   const [complaintsData, setComplaintsData] = useState([]);
-  const [studentsCount, setStudentsCount] = useState(31);
-  const [classroomsCount, setClassroomsCount] = useState(31);
+  const [studentsCount, setStudentsCount] = useState(0);
+  const [classroomsCount, setClassroomsCount] = useState(0);
+  const [tutorsCount, setTutorsCount] = useState(0);
 
   // Dynamic lists from backend
   const [dailyMetrics, setDailyMetrics] = useState([]);
@@ -27,8 +28,9 @@ export default function AdminDashboardPage() {
   const [topStudents, setTopStudents] = useState([]);
   const [recentTutorNotifications, setRecentTutorNotifications] = useState([]);
 
-  // Tab điều khiển sơ đồ tăng trưởng
+  // Tab điều khiển sơ đồ tăng trưởng & con trỏ rê chuột
   const [chartActiveSeries, setChartActiveSeries] = useState('all'); // 'all' | 'revenue' | 'ai' | 'students'
+  const [hoveredIdx, setHoveredIdx] = useState(null);
 
   // Load all data from real backend APIs
   const loadAllDashboardData = async (isManualRefresh = false) => {
@@ -43,19 +45,19 @@ export default function AdminDashboardPage() {
           const d = directStatsRes.data;
           setTutorApprovalData({
             stats: {
-              pending: d.overview.pendingTutors,
-              pendingQualifications: d.overview.pendingQualifications
+              pending: d.overview.pendingTutors ?? 0,
+              pendingQualifications: d.overview.pendingQualifications ?? 0
             },
-            totalApprovedTutors: d.overview.approvedTutors || d.overview.totalTutors
+            totalApprovedTutors: d.overview.approvedTutors ?? d.overview.totalTutors ?? 0
           });
           setReconciliationData({
             totals: {
-              totalRevenue: d.overview.totalRevenue,
-              platformFee: d.overview.platformFee,
-              tutorNet: d.overview.tutorPayout
+              totalRevenue: d.overview.totalRevenue ?? 0,
+              platformFee: d.overview.platformFee ?? 0,
+              tutorNet: d.overview.tutorPayout ?? 0
             }
           });
-          setAiUsageData(d.aiUsage);
+          setAiUsageData(d.aiUsage ?? null);
           if (Array.isArray(d.recentPayments)) {
             setPaymentsData(d.recentPayments);
           }
@@ -71,8 +73,9 @@ export default function AdminDashboardPage() {
           if (Array.isArray(d.recentTutorNotifications)) {
             setRecentTutorNotifications(d.recentTutorNotifications);
           }
-          setStudentsCount(d.overview.totalStudents || 31);
-          setClassroomsCount(d.overview.activeClassrooms || d.overview.totalClassrooms || 31);
+          setStudentsCount(d.overview.totalStudents ?? 0);
+          setClassroomsCount(d.overview.activeClassrooms ?? d.overview.totalClassrooms ?? 0);
+          setTutorsCount(d.overview.totalTutors ?? 0);
           setAlertsData(new Array(d.overview.pendingAlerts || 0).fill({}));
           setComplaintsData(new Array(d.overview.pendingComplaints || 0).fill({}));
           setLastUpdated(new Date());
@@ -119,10 +122,10 @@ export default function AdminDashboardPage() {
         setComplaintsData(Array.isArray(rawComplaints) ? rawComplaints : []);
       }
       if (studentsRes.status === 'fulfilled') {
-        setStudentsCount(studentsRes.value?.data?.total || studentsRes.value?.data?.students?.total || 31);
+        setStudentsCount(studentsRes.value?.data?.total || studentsRes.value?.data?.students?.total || 0);
       }
       if (classroomsRes.status === 'fulfilled') {
-        setClassroomsCount(classroomsRes.value?.data?.total || classroomsRes.value?.data?.classrooms?.total || 31);
+        setClassroomsCount(classroomsRes.value?.data?.total || classroomsRes.value?.data?.classrooms?.total || 0);
       }
 
       setLastUpdated(new Date());
@@ -146,20 +149,20 @@ export default function AdminDashboardPage() {
 
   // Tính toán KPI thực tế khớp 100% Backend
   const stats = useMemo(() => {
-    const totalRev = reconciliationData?.totals?.totalRevenue || 9810000;
-    const platformFee = reconciliationData?.totals?.platformFee || Math.round(totalRev * 0.2);
-    const tutorPayout = reconciliationData?.totals?.tutorNet || (totalRev - platformFee);
+    const totalRev = Number(reconciliationData?.totals?.totalRevenue ?? 0);
+    const platformFee = Number(reconciliationData?.totals?.platformFee ?? Math.round(totalRev * 0.2));
+    const tutorPayout = Number(reconciliationData?.totals?.tutorNet ?? (totalRev - platformFee));
 
-    const pendingTutors = tutorApprovalData?.stats?.pending ?? (tutorApprovalData?.pendingTutorsCount || 0);
-    const pendingQuals = tutorApprovalData?.stats?.pendingQualifications ?? (tutorApprovalData?.pendingQualificationsCount || 1);
-    const totalApprovedTutors = tutorApprovalData?.totalApprovedTutors || tutorApprovalData?.tutors?.total || 31;
+    const pendingTutors = Number(tutorApprovalData?.stats?.pending ?? 0);
+    const pendingQuals = Number(tutorApprovalData?.stats?.pendingQualifications ?? 0);
+    const totalApprovedTutors = Number(tutorApprovalData?.totalApprovedTutors ?? tutorsCount ?? 0);
 
-    const aiSessions = aiUsageData?.totalSessions || 30;
-    const aiToday = aiUsageData?.sessionsToday || 0;
+    const aiSessions = Number(aiUsageData?.totalSessions ?? 0);
+    const aiToday = Number(aiUsageData?.sessionsToday ?? 0);
     const todayMetric = dailyMetrics?.[dailyMetrics.length - 1];
-    const aiQuestionsToday = todayMetric?.aiQuestions ?? (aiToday > 0 ? aiToday : 30);
-    const tokensToday = todayMetric?.tokens ?? (aiQuestionsToday * 1420);
-    const visitsToday = todayMetric?.visits ?? Math.max(12, aiQuestionsToday * 3 + 8);
+    const aiQuestionsToday = todayMetric ? Number(todayMetric.aiQuestions ?? 0) : aiToday;
+    const tokensToday = todayMetric ? Number(todayMetric.tokens ?? 0) : (aiQuestionsToday * 1420);
+    const visitsToday = todayMetric ? Number(todayMetric.visits ?? 0) : 0;
 
     const pendingIssues = pendingQuals + pendingTutors + alertsData.length + complaintsData.length;
 
@@ -170,44 +173,141 @@ export default function AdminDashboardPage() {
       pendingTutors,
       pendingQuals,
       totalTutors: totalApprovedTutors,
+      approvedTutors: totalApprovedTutors,
       aiSessions,
       aiToday,
       aiQuestionsToday,
       tokensToday,
       visitsToday,
-      pendingIssues: pendingIssues > 0 ? pendingIssues : 5,
+      pendingIssues,
     };
-  }, [tutorApprovalData, reconciliationData, aiUsageData, alertsData, complaintsData, dailyMetrics]);
+  }, [tutorApprovalData, reconciliationData, aiUsageData, alertsData, complaintsData, dailyMetrics, tutorsCount]);
 
-  // Dữ liệu sơ đồ tăng trưởng 7 ngày
-  const chartSeries = useMemo(() => {
-    const baseLabels = ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'CN'];
+  // Dữ liệu sơ đồ tăng trưởng 7 ngày - NẠP TRỰC TIẾP 100% TỪ BACKEND API .NET
+  const chartData = useMemo(() => {
+    if (!Array.isArray(dailyMetrics) || dailyMetrics.length === 0) {
+      return {
+        items: [],
+        labels: [],
+        revenuePoints: [],
+        aiPoints: [],
+        studentPoints: [],
+        classPoints: [],
+        maxCumRev: 1,
+        maxDayRev: 1,
+        maxAi: 1,
+        maxStud: 1,
+        maxVisits: 1,
+        totalWeekRevenue: 0,
+        totalWeekAi: 0,
+        totalWeekVisits: 0,
+        peakDay: null
+      };
+    }
+
+    const items = dailyMetrics.map((dm, idx) => {
+      const dayName = dm?.dayName || `T.${idx + 1}`;
+      const date = dm?.date || '';
+      const fullDate = dm?.fullDate || `${dayName}, ${date}`;
+
+      const rev = Number(dm?.revenue) || 0;
+      const cumRev = Number(dm?.cumulativeRevenue) || (Number(dm?.revenueMillions) ? Number(dm.revenueMillions) * 1_000_000 : rev);
+      const aiQ = Number(dm?.aiQuestions) || 0;
+      const tok = Number(dm?.tokens) || (aiQ * 1420);
+      const vis = Number(dm?.visits) || 0;
+      const stud = Number(dm?.students) || 0;
+
+      return {
+        idx,
+        dayName,
+        date,
+        fullDate,
+        revenue: rev,
+        cumulativeRevenue: cumRev,
+        revenueMillions: Math.round((cumRev / 1_000_000) * 100) / 100,
+        aiQuestions: aiQ,
+        tokens: tok,
+        visits: vis,
+        students: stud
+      };
+    });
+
+    const maxCumRev = Math.max(...items.map(i => i.cumulativeRevenue), 1);
+    const maxDayRev = Math.max(...items.map(i => i.revenue), 1);
+    const maxAi = Math.max(...items.map(i => i.aiQuestions), 1);
+    const maxStud = Math.max(...items.map(i => i.students), 1);
+    const maxVisits = Math.max(...items.map(i => i.visits), 1);
+
+    const totalWeekRevenue = items.reduce((sum, i) => sum + i.revenue, 0);
+    const totalWeekAi = items.reduce((sum, i) => sum + i.aiQuestions, 0);
+    const totalWeekVisits = items.reduce((sum, i) => sum + i.visits, 0);
+
+    // Xác định ngày cao điểm
+    let peakIdx = 0;
+    let maxCompositeScore = -1;
+    items.forEach((item, i) => {
+      const score = (item.revenue / maxDayRev) + (item.aiQuestions / maxAi) + (item.visits / maxVisits);
+      if (score > maxCompositeScore) {
+        maxCompositeScore = score;
+        peakIdx = i;
+      }
+    });
+
     return {
-      labels: baseLabels,
-      revenuePoints: [4.2, 5.5, 6.1, 7.8, 8.4, 9.2, 9.81], // Triệu VNĐ
-      aiPoints: [12, 18, 15, 25, 22, 28, 30], // Câu hỏi
-      studentPoints: [18, 22, 25, 27, 29, 30, 31], // Học viên
-      classPoints: [14, 18, 22, 24, 28, 30, 31] // Lớp học
+      items,
+      labels: items.map(i => i.date),
+      revenuePoints: items.map(i => i.revenueMillions),
+      aiPoints: items.map(i => i.aiQuestions),
+      studentPoints: items.map(i => i.students),
+      classPoints: items.map(i => i.students),
+      maxCumRev,
+      maxDayRev,
+      maxAi,
+      maxStud,
+      maxVisits,
+      totalWeekRevenue,
+      totalWeekAi,
+      totalWeekVisits,
+      peakDay: items[peakIdx]
     };
-  }, []);
+  }, [dailyMetrics]);
+
+  const chartSeries = chartData;
+
+  // Hằng số tọa độ SVG chuẩn hóa
+  const CHART_LEFT = 52;
+  const CHART_RIGHT = 624;
+  const CHART_TOP = 22;
+  const CHART_BOTTOM = 170;
+  const CHART_W = CHART_RIGHT - CHART_LEFT; // 572
+  const CHART_H = CHART_BOTTOM - CHART_TOP; // 148
+
+  // Tọa độ X cho điểm idx
+  const getChartX = (idx, total = 7) => {
+    return CHART_LEFT + idx * (CHART_W / (total - 1 || 1));
+  };
+
+  // Tọa độ Y theo giá trị thực tế
+  const getChartY = (val, maxVal) => {
+    if (!maxVal || maxVal <= 0) return CHART_BOTTOM;
+    const ratio = Math.max(0, Math.min(1, Number(val) / Number(maxVal)));
+    return CHART_BOTTOM - ratio * CHART_H;
+  };
 
   // Hàm tạo đường cong Bézier mượt mà chuẩn SVG (Smooth Curved Path)
   const buildSmoothCurve = (points, width = 640, height = 200, maxVal = 100) => {
     if (!points || points.length === 0) return '';
     const pts = points.map((val, idx) => ({
-      x: idx * (width / (points.length - 1 || 1)),
-      y: height - (Math.min(val, maxVal) / maxVal) * (height - 36) - 18
+      x: getChartX(idx, points.length),
+      y: getChartY(val, maxVal)
     }));
 
     let d = `M ${pts[0].x.toFixed(1)},${pts[0].y.toFixed(1)}`;
     for (let i = 0; i < pts.length - 1; i++) {
       const p0 = pts[i];
       const p1 = pts[i + 1];
-      const cx1 = p0.x + (p1.x - p0.x) / 2;
-      const cy1 = p0.y;
-      const cx2 = p0.x + (p1.x - p0.x) / 2;
-      const cy2 = p1.y;
-      d += ` C ${cx1.toFixed(1)},${cy1.toFixed(1)} ${cx2.toFixed(1)},${cy2.toFixed(1)} ${p1.x.toFixed(1)},${p1.y.toFixed(1)}`;
+      const cx = (p0.x + p1.x) / 2;
+      d += ` C ${cx.toFixed(1)},${p0.y.toFixed(1)} ${cx.toFixed(1)},${p1.y.toFixed(1)} ${p1.x.toFixed(1)},${p1.y.toFixed(1)}`;
     }
     return d;
   };
@@ -215,8 +315,10 @@ export default function AdminDashboardPage() {
   // Hàm tạo vùng tô bóng mờ dưới đường cong (Area Path)
   const buildSmoothArea = (points, width = 640, height = 200, maxVal = 100) => {
     const curve = buildSmoothCurve(points, width, height, maxVal);
-    if (!curve) return '';
-    return `${curve} L ${width},${height} L 0,${height} Z`;
+    if (!curve || points.length === 0) return '';
+    const lastX = getChartX(points.length - 1, points.length).toFixed(1);
+    const firstX = getChartX(0, points.length).toFixed(1);
+    return `${curve} L ${lastX},${CHART_BOTTOM} L ${firstX},${CHART_BOTTOM} Z`;
   };
 
   // Tính giá trị cực đại cho biểu đồ cột
@@ -429,6 +531,42 @@ export default function AdminDashboardPage() {
           border-color: #DB303A;
         }
 
+        .chart-summary-chip {
+          background: var(--dash-surface);
+          border: 1px solid var(--dash-border);
+          border-radius: 8px;
+          padding: 4px 10px;
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          font-size: 11.5px;
+          box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+        }
+
+        .chart-y-axis-text {
+          font-size: 9.5px;
+          fill: var(--dash-text-muted);
+          font-weight: 500;
+          font-family: inherit;
+        }
+
+        .chart-inspector-panel {
+          animation: chartFadeIn 0.12s ease-out;
+        }
+        @keyframes chartFadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+
+        .pulse-ring {
+          animation: chartPulse 1.8s infinite;
+        }
+        @keyframes chartPulse {
+          0% { r: 5px; opacity: 0.6; }
+          50% { r: 9px; opacity: 0.15; }
+          100% { r: 5px; opacity: 0.6; }
+        }
+
         /* 7. SƠ ĐỒ CỘT 7 NGÀY (Daily Bars Diagram) */
         .daily-bars-container {
           display: grid;
@@ -537,7 +675,7 @@ export default function AdminDashboardPage() {
       {/* 2. 5 THẺ BENTO KPI TỔNG QUAN */}
       <div className="dash-kpi-grid">
         {/* KPI 1: TỔNG DOANH THU */}
-        <div className="dash-kpi-box" style={{ borderLeft: '4px solid #DB303A' }}>
+        <div className="dash-kpi-box" style={{ borderTop: '2px solid #DB303A' }}>
           <div className="d-flex align-items-start justify-content-between">
             <div>
               <div className="dash-kpi-title">TỔNG DOANH THU</div>
@@ -554,24 +692,24 @@ export default function AdminDashboardPage() {
         </div>
 
         {/* KPI 2: GIA SƯ NỀN TẢNG */}
-        <div className="dash-kpi-box" style={{ borderLeft: '4px solid #0284c7' }}>
+        <div className="dash-kpi-box" style={{ borderTop: '2px solid #0284c7' }}>
           <div className="d-flex align-items-start justify-content-between">
             <div>
               <div className="dash-kpi-title">GIA SƯ NỀN TẢNG</div>
-              <div className="dash-kpi-val">{stats.totalTutors || 31} <small className="fs-6 fw-normal text-secondary">gia sư</small></div>
+              <div className="dash-kpi-val">{stats.totalTutors} <small className="fs-6 fw-normal text-secondary">gia sư</small></div>
             </div>
             <div className="dash-kpi-icon" style={{ background: 'var(--dash-blue-soft)', color: '#0284c7' }}>
               <i className="bi bi-mortarboard"></i>
             </div>
           </div>
           <div className="mt-3 pt-2 border-top d-flex align-items-center justify-content-between small" style={{ fontSize: 11.5 }}>
-            <span className="text-secondary">{stats.pendingTutors > 0 ? `${stats.pendingTutors} hồ sơ chờ xác minh` : '30 gia sư đã xác minh'}</span>
+            <span className="text-secondary">{stats.pendingTutors > 0 ? `${stats.pendingTutors} hồ sơ chờ xác minh` : `${stats.approvedTutors} gia sư đã duyệt`}</span>
             <Link to="/admin/tutors" className="text-decoration-none fw-semibold text-primary">Chi tiết ›</Link>
           </div>
         </div>
 
         {/* KPI 3: HỌC VIÊN & LỚP HỌC */}
-        <div className="dash-kpi-box" style={{ borderLeft: '4px solid #15803d' }}>
+        <div className="dash-kpi-box" style={{ borderTop: '2px solid #15803d' }}>
           <div className="d-flex align-items-start justify-content-between">
             <div>
               <div className="dash-kpi-title">HỌC VIÊN &amp; LỚP HỌC</div>
@@ -588,7 +726,7 @@ export default function AdminDashboardPage() {
         </div>
 
         {/* KPI 4: TÁC TỬ AI WEIN */}
-        <div className="dash-kpi-box" style={{ borderLeft: '4px solid #06b6d4' }}>
+        <div className="dash-kpi-box" style={{ borderTop: '2px solid #06b6d4' }}>
           <div className="d-flex align-items-start justify-content-between">
             <div>
               <div className="dash-kpi-title">TÁC TỬ AI WEIN</div>
@@ -605,7 +743,7 @@ export default function AdminDashboardPage() {
         </div>
 
         {/* KPI 5: VIỆC CẦN GIẢI QUYẾT */}
-        <div className="dash-kpi-box" style={{ borderLeft: '4px solid #b45309' }}>
+        <div className="dash-kpi-box" style={{ borderTop: '2px solid #b45309' }}>
           <div className="d-flex align-items-start justify-content-between">
             <div>
               <div className="dash-kpi-title">VIỆC CẦN GIẢI QUYẾT</div>
@@ -737,130 +875,531 @@ export default function AdminDashboardPage() {
 
       {/* 4. SƠ ĐỒ 2 & 3: BIỂU ĐỒ SÓNG MƯỢT TĂNG TRƯỞNG & SƠ ĐỒ CỘT 7 NGÀY */}
       <div className="row g-4 mb-4">
-        {/* SƠ ĐỒ TĂNG TRƯỞNG SÓNG MƯỢT (SMOOTH SVG AREA CHART) */}
+        {/* SƠ ĐỒ TĂNG TRƯỞNG TỔNG QUÁT TƯƠNG TÁC RÊ CHUỘT (INTERACTIVE SVG EXECUTIVE CHART) */}
         <div className="col-12 col-xl-7">
-          <div className="diagram-card">
-            <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
-              <div className="d-flex align-items-center">
-                <span className="diagram-header-badge" style={{ background: 'var(--dash-primary-soft)', color: '#DB303A' }}>
-                  <i className="bi bi-activity"></i>
-                </span>
-                <div>
-                  <h6 className="fw-bold mb-0">Sơ Đồ Nhịp Độ Vận Hành &amp; Tăng Trưởng Hệ Thống</h6>
-                  <small className="text-secondary">Đường cong phân tích 7 ngày qua từ dữ liệu thực tế</small>
+          <div className="diagram-card d-flex flex-column justify-content-between">
+            <div>
+              <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+                <div className="d-flex align-items-center">
+                  <span className="diagram-header-badge" style={{ background: 'var(--dash-primary-soft)', color: '#DB303A' }}>
+                    <i className="bi bi-activity"></i>
+                  </span>
+                  <div>
+                    <h6 className="fw-bold mb-0">Sơ Đồ Nhịp Độ Vận Hành &amp; Tăng Trưởng Hệ Thống</h6>
+                    <small className="text-secondary">Dữ liệu thực tế 7 ngày từ Database &amp; API Backend .NET</small>
+                  </div>
+                </div>
+
+                {/* Bộ lọc chuyển đổi góc nhìn phân tích */}
+                <div className="d-flex align-items-center gap-1.5 flex-wrap">
+                  <button
+                    type="button"
+                    className={`chart-filter-pill ${chartActiveSeries === 'all' ? 'active' : ''}`}
+                    onClick={() => setChartActiveSeries('all')}
+                  >
+                    Tổng quan 3D
+                  </button>
+                  <button
+                    type="button"
+                    className={`chart-filter-pill ${chartActiveSeries === 'revenue' ? 'active' : ''}`}
+                    onClick={() => setChartActiveSeries('revenue')}
+                  >
+                    Doanh thu (VNĐ)
+                  </button>
+                  <button
+                    type="button"
+                    className={`chart-filter-pill ${chartActiveSeries === 'ai' ? 'active' : ''}`}
+                    onClick={() => setChartActiveSeries('ai')}
+                  >
+                    AI Wein
+                  </button>
+                  <button
+                    type="button"
+                    className={`chart-filter-pill ${chartActiveSeries === 'students' ? 'active' : ''}`}
+                    onClick={() => setChartActiveSeries('students')}
+                  >
+                    Học viên &amp; Lớp
+                  </button>
                 </div>
               </div>
 
-              {/* Bộ lọc chọn chuỗi dữ liệu */}
-              <div className="d-flex align-items-center gap-1.5 flex-wrap">
-                <button
-                  type="button"
-                  className={`chart-filter-pill ${chartActiveSeries === 'all' ? 'active' : ''}`}
-                  onClick={() => setChartActiveSeries('all')}
-                >
-                  Tất cả
-                </button>
-                <button
-                  type="button"
-                  className={`chart-filter-pill ${chartActiveSeries === 'revenue' ? 'active' : ''}`}
-                  onClick={() => setChartActiveSeries('revenue')}
-                >
-                  Doanh thu
-                </button>
-                <button
-                  type="button"
-                  className={`chart-filter-pill ${chartActiveSeries === 'ai' ? 'active' : ''}`}
-                  onClick={() => setChartActiveSeries('ai')}
-                >
-                  AI Wein
-                </button>
-                <button
-                  type="button"
-                  className={`chart-filter-pill ${chartActiveSeries === 'students' ? 'active' : ''}`}
-                  onClick={() => setChartActiveSeries('students')}
-                >
-                  Học viên
-                </button>
-              </div>
-            </div>
-
-            {/* SVG AREA CHART MƯỢT MÀ */}
-            <div className="chart-svg-wrap flex-grow-1 d-flex flex-column justify-content-between">
-              <div className="d-flex justify-content-between align-items-center mb-2 px-1 text-secondary" style={{ fontSize: 11 }}>
-                <span><i className="bi bi-graph-up me-1 text-danger"></i>Đồ thị chuẩn hóa</span>
-                <span className="d-flex gap-3">
-                  <span className="d-flex align-items-center gap-1"><span style={{ width: 8, height: 8, borderRadius: '50%', background: '#DB303A' }}></span> Doanh thu (Tr.đ)</span>
-                  <span className="d-flex align-items-center gap-1"><span style={{ width: 8, height: 8, borderRadius: '50%', background: '#0284c7' }}></span> AI Wein</span>
-                  <span className="d-flex align-items-center gap-1"><span style={{ width: 8, height: 8, borderRadius: '50%', background: '#15803d' }}></span> Học viên</span>
-                </span>
+              {/* Dải chỉ số tóm tắt nhanh tuần (Executive Summary Strip) */}
+              <div className="d-flex flex-wrap align-items-center gap-2 mb-3 pt-2 border-top">
+                <div className="chart-summary-chip">
+                  <span className="text-secondary" style={{ fontSize: 11 }}>Doanh thu tuần:</span>
+                  <strong className="text-danger fw-bold">{formatVnd(chartData.totalWeekRevenue)}</strong>
+                </div>
+                <div className="chart-summary-chip">
+                  <span className="text-secondary" style={{ fontSize: 11 }}>Hỏi AI Wein:</span>
+                  <strong className="text-info-emphasis fw-bold">{chartData.totalWeekAi} câu</strong>
+                </div>
+                <div className="chart-summary-chip">
+                  <span className="text-secondary" style={{ fontSize: 11 }}>Truy cập web:</span>
+                  <strong className="text-body fw-bold">{chartData.totalWeekVisits.toLocaleString('vi-VN')} lượt</strong>
+                </div>
+                <div className="chart-summary-chip ms-auto">
+                  <span className="badge bg-success-subtle text-success border border-success-subtle d-flex align-items-center gap-1" style={{ fontSize: 10.5 }}>
+                    <i className="bi bi-lightning-charge-fill"></i>
+                    <span>Cao điểm: {chartData.peakDay?.dayName} ({chartData.peakDay?.date})</span>
+                  </span>
+                </div>
               </div>
 
-              <svg viewBox="0 0 640 190" className="w-100" style={{ height: 190, overflow: 'visible' }}>
-                <defs>
-                  <linearGradient id="revenueGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#DB303A" stopOpacity="0.28" />
-                    <stop offset="100%" stopColor="#DB303A" stopOpacity="0.0" />
-                  </linearGradient>
-                  <linearGradient id="aiGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#0284c7" stopOpacity="0.22" />
-                    <stop offset="100%" stopColor="#0284c7" stopOpacity="0.0" />
-                  </linearGradient>
-                </defs>
+              {/* KHUNG BIỂU ĐỒ SVG TƯƠNG TÁC RÊ CHUỘT (INSPECTOR READY) */}
+              <div className="chart-svg-wrap position-relative flex-grow-1 d-flex flex-column justify-content-between">
+                {/* Chú giải góc trên biểu đồ */}
+                <div className="d-flex justify-content-between align-items-center mb-2 px-1 text-secondary" style={{ fontSize: 11 }}>
+                  <span>
+                    <i className="bi bi-cursor-fill me-1 text-danger"></i>
+                    {hoveredIdx !== null ? (
+                      <span className="text-danger fw-semibold">
+                        Đang xem: {chartData.items[hoveredIdx]?.fullDate}
+                      </span>
+                    ) : (
+                      <span>Rê chuột trên đồ thị để xem chi tiết từng ngày</span>
+                    )}
+                  </span>
+                  <span className="d-flex gap-3">
+                    {(chartActiveSeries === 'all' || chartActiveSeries === 'revenue') && (
+                      <span className="d-flex align-items-center gap-1">
+                        <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#DB303A' }}></span>
+                        <span>Doanh thu {chartActiveSeries === 'revenue' ? '(VNĐ & Lũy kế)' : '(Tr.đ)'}</span>
+                      </span>
+                    )}
+                    {(chartActiveSeries === 'all' || chartActiveSeries === 'ai') && (
+                      <span className="d-flex align-items-center gap-1">
+                        <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#0284c7' }}></span>
+                        <span>AI Wein (Câu hỏi)</span>
+                      </span>
+                    )}
+                    {(chartActiveSeries === 'all' || chartActiveSeries === 'students') && (
+                      <span className="d-flex align-items-center gap-1">
+                        <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#15803d' }}></span>
+                        <span>Học viên kết nối</span>
+                      </span>
+                    )}
+                  </span>
+                </div>
 
-                {/* Đường lưới tọa độ mảnh */}
-                {[35, 75, 115, 155].map((y, i) => (
-                  <line key={i} x1="0" y1={y} x2="640" y2={y} stroke="rgba(148, 163, 184, 0.18)" strokeDasharray="3 3" />
-                ))}
+                {/* SVG CANVAS */}
+                {dailyMetrics.length === 0 ? (
+                  <div className="text-center py-5 text-secondary">
+                    <div className="spinner-border spinner-border-sm text-danger me-2" role="status"></div>
+                    <small>Đang nạp dữ liệu thống kê từ Backend .NET...</small>
+                  </div>
+                ) : (
+                  <>
+                    <div className="position-relative">
+                      <svg
+                        viewBox="0 0 640 200"
+                        className="w-100"
+                        style={{ height: 200, overflow: 'visible', cursor: 'crosshair', userSelect: 'none' }}
+                        onMouseMove={(e) => {
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          const clientX = e.clientX - rect.left;
+                          const svgX = (clientX / rect.width) * 640;
+                          const step = CHART_W / (chartData.items.length - 1 || 1);
+                          const rawIdx = Math.round((svgX - CHART_LEFT) / step);
+                          const clampedIdx = Math.max(0, Math.min(chartData.items.length - 1, rawIdx));
+                          setHoveredIdx(clampedIdx);
+                        }}
+                        onMouseLeave={() => setHoveredIdx(null)}
+                      >
+                        <defs>
+                          <linearGradient id="revenueGrad" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="#DB303A" stopOpacity="0.32" />
+                            <stop offset="100%" stopColor="#DB303A" stopOpacity="0.02" />
+                          </linearGradient>
+                          <linearGradient id="aiGrad" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="#0284c7" stopOpacity="0.25" />
+                            <stop offset="100%" stopColor="#0284c7" stopOpacity="0.01" />
+                          </linearGradient>
+                          <linearGradient id="studentGrad" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="#15803d" stopOpacity="0.22" />
+                            <stop offset="100%" stopColor="#15803d" stopOpacity="0.01" />
+                          </linearGradient>
+                          <linearGradient id="dailyBarGrad" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="#DB303A" stopOpacity="0.75" />
+                            <stop offset="100%" stopColor="#DB303A" stopOpacity="0.2" />
+                          </linearGradient>
+                        </defs>
 
-                {/* Area fills */}
-                {(chartActiveSeries === 'all' || chartActiveSeries === 'revenue') && (
-                  <path d={buildSmoothArea(chartSeries.revenuePoints, 640, 190, 10.5)} fill="url(#revenueGrad)" />
-                )}
-                {(chartActiveSeries === 'all' || chartActiveSeries === 'ai') && (
-                  <path d={buildSmoothArea(chartSeries.aiPoints, 640, 190, 36)} fill="url(#aiGrad)" />
-                )}
+                        {/* Đường lưới tọa độ Y và nhãn số liệu trục tung */}
+                        {[0, 0.25, 0.5, 0.75, 1].map((ratio, i) => {
+                          const yPos = CHART_BOTTOM - ratio * CHART_H;
+                          let yLabel = '';
+                          if (chartActiveSeries === 'all') {
+                            yLabel = `${Math.round(ratio * 100)}%`;
+                          } else if (chartActiveSeries === 'revenue') {
+                            const mVal = (chartData.maxCumRev / 1000000) * ratio;
+                            yLabel = ratio === 0 ? '0 đ' : `${mVal >= 1 ? mVal.toFixed(1) : mVal.toFixed(2)} Tr`;
+                          } else if (chartActiveSeries === 'ai') {
+                            yLabel = `${Math.round(chartData.maxAi * ratio)} câu`;
+                          } else {
+                            yLabel = `${Math.round(chartData.maxStud * ratio)} HV`;
+                          }
 
-                {/* Smooth lines */}
-                {(chartActiveSeries === 'all' || chartActiveSeries === 'revenue') && (
-                  <path
-                    d={buildSmoothCurve(chartSeries.revenuePoints, 640, 190, 10.5)}
-                    fill="none"
-                    stroke="#DB303A"
-                    strokeWidth="3"
-                    strokeLinecap="round"
-                  />
-                )}
-                {(chartActiveSeries === 'all' || chartActiveSeries === 'ai') && (
-                  <path
-                    d={buildSmoothCurve(chartSeries.aiPoints, 640, 190, 36)}
-                    fill="none"
-                    stroke="#0284c7"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                  />
-                )}
-                {(chartActiveSeries === 'all' || chartActiveSeries === 'students') && (
-                  <path
-                    d={buildSmoothCurve(chartSeries.studentPoints, 640, 190, 35)}
-                    fill="none"
-                    stroke="#15803d"
-                    strokeWidth="2.5"
-                    strokeDasharray="4 3"
-                    strokeLinecap="round"
-                  />
-                )}
-              </svg>
+                          return (
+                            <g key={i}>
+                              <line
+                                x1={CHART_LEFT}
+                                y1={yPos}
+                                x2={CHART_RIGHT}
+                                y2={yPos}
+                                stroke="rgba(148, 163, 184, 0.22)"
+                                strokeDasharray={ratio === 0 ? '0' : '3 3'}
+                              />
+                              <text
+                                x={CHART_LEFT - 8}
+                                y={yPos + 3.5}
+                                textAnchor="end"
+                                className="chart-y-axis-text"
+                              >
+                                {yLabel}
+                              </text>
+                            </g>
+                          );
+                        })}
 
-              <div className="d-flex justify-content-between px-1 mt-2 text-secondary fw-semibold" style={{ fontSize: 11 }}>
-                {chartSeries.labels.map((lb, i) => (
-                  <span key={i}>{lb}</span>
-                ))}
+                        {/* Khi ở chế độ Doanh thu: Vẽ thêm các cột doanh thu ngày (Daily Intake Bars) */}
+                        {chartActiveSeries === 'revenue' &&
+                          chartData.items.map((it, i) => {
+                            const x = getChartX(i);
+                            const barW = 22;
+                            const barH = Math.max(6, (it.revenue / chartData.maxDayRev) * (CHART_H * 0.42));
+                            const isHovered = hoveredIdx === i;
+                            return (
+                              <rect
+                                key={i}
+                                x={x - barW / 2}
+                                y={CHART_BOTTOM - barH}
+                                width={barW}
+                                height={barH}
+                                rx="4"
+                                fill="url(#dailyBarGrad)"
+                                opacity={isHovered ? 1 : 0.65}
+                                stroke={isHovered ? '#DB303A' : 'none'}
+                                strokeWidth="1.5"
+                              />
+                            );
+                          })}
+
+                        {/* Vùng diện tích (Area Fills) */}
+                        {(chartActiveSeries === 'all' || chartActiveSeries === 'revenue') && (
+                          <path
+                            d={buildSmoothArea(
+                              chartActiveSeries === 'all'
+                                ? chartData.items.map(it => (it.cumulativeRevenue / chartData.maxCumRev) * 100)
+                                : chartData.items.map(it => it.cumulativeRevenue),
+                              640,
+                              200,
+                              chartActiveSeries === 'all' ? 100 : chartData.maxCumRev
+                            )}
+                            fill="url(#revenueGrad)"
+                          />
+                        )}
+                        {(chartActiveSeries === 'all' || chartActiveSeries === 'ai') && (
+                          <path
+                            d={buildSmoothArea(
+                              chartActiveSeries === 'all'
+                                ? chartData.items.map(it => (it.aiQuestions / chartData.maxAi) * 100)
+                                : chartData.items.map(it => it.aiQuestions),
+                              640,
+                              200,
+                              chartActiveSeries === 'all' ? 100 : chartData.maxAi
+                            )}
+                            fill="url(#aiGrad)"
+                          />
+                        )}
+                        {(chartActiveSeries === 'all' || chartActiveSeries === 'students') && (
+                          <path
+                            d={buildSmoothArea(
+                              chartActiveSeries === 'all'
+                                ? chartData.items.map(it => (it.students / chartData.maxStud) * 100)
+                                : chartData.items.map(it => it.students),
+                              640,
+                              200,
+                              chartActiveSeries === 'all' ? 100 : chartData.maxStud
+                            )}
+                            fill="url(#studentGrad)"
+                          />
+                        )}
+
+                        {/* Đường cong Bézier sắc nét (Smooth Line Curves) */}
+                        {(chartActiveSeries === 'all' || chartActiveSeries === 'revenue') && (
+                          <path
+                            d={buildSmoothCurve(
+                              chartActiveSeries === 'all'
+                                ? chartData.items.map(it => (it.cumulativeRevenue / chartData.maxCumRev) * 100)
+                                : chartData.items.map(it => it.cumulativeRevenue),
+                              640,
+                              200,
+                              chartActiveSeries === 'all' ? 100 : chartData.maxCumRev
+                            )}
+                            fill="none"
+                            stroke="#DB303A"
+                            strokeWidth="3"
+                            strokeLinecap="round"
+                          />
+                        )}
+                        {(chartActiveSeries === 'all' || chartActiveSeries === 'ai') && (
+                          <path
+                            d={buildSmoothCurve(
+                              chartActiveSeries === 'all'
+                                ? chartData.items.map(it => (it.aiQuestions / chartData.maxAi) * 100)
+                                : chartData.items.map(it => it.aiQuestions),
+                              640,
+                              200,
+                              chartActiveSeries === 'all' ? 100 : chartData.maxAi
+                            )}
+                            fill="none"
+                            stroke="#0284c7"
+                            strokeWidth="2.5"
+                            strokeLinecap="round"
+                          />
+                        )}
+                        {(chartActiveSeries === 'all' || chartActiveSeries === 'students') && (
+                          <path
+                            d={buildSmoothCurve(
+                              chartActiveSeries === 'all'
+                                ? chartData.items.map(it => (it.students / chartData.maxStud) * 100)
+                                : chartData.items.map(it => it.students),
+                              640,
+                              200,
+                              chartActiveSeries === 'all' ? 100 : chartData.maxStud
+                            )}
+                            fill="none"
+                            stroke="#15803d"
+                            strokeWidth="2.5"
+                            strokeDasharray={chartActiveSeries === 'all' ? '4 3' : 'none'}
+                            strokeLinecap="round"
+                          />
+                        )}
+
+                        {/* HIỆU ỨNG RÊ CHUỘT: ĐƯỜNG DÓNG VÀ ĐIỂM CHẠM XUNG NHỊP */}
+                        {hoveredIdx !== null && (
+                          <g>
+                            {/* Đường dóng dọc (Vertical Hairline Guide) */}
+                            <line
+                              x1={getChartX(hoveredIdx)}
+                              y1={CHART_TOP - 6}
+                              x2={getChartX(hoveredIdx)}
+                              y2={CHART_BOTTOM}
+                              stroke="#DB303A"
+                              strokeWidth="1.5"
+                              strokeDasharray="3 3"
+                              opacity="0.75"
+                            />
+
+                            {/* Điểm neo Doanh thu */}
+                            {(chartActiveSeries === 'all' || chartActiveSeries === 'revenue') && (
+                              <g>
+                                <circle
+                                  cx={getChartX(hoveredIdx)}
+                                  cy={getChartY(
+                                    chartActiveSeries === 'all'
+                                      ? (chartData.items[hoveredIdx].cumulativeRevenue / chartData.maxCumRev) * 100
+                                      : chartData.items[hoveredIdx].cumulativeRevenue,
+                                    chartActiveSeries === 'all' ? 100 : chartData.maxCumRev
+                                  )}
+                                  r="7"
+                                  fill="#DB303A"
+                                  opacity="0.3"
+                                  className="pulse-ring"
+                                />
+                                <circle
+                                  cx={getChartX(hoveredIdx)}
+                                  cy={getChartY(
+                                    chartActiveSeries === 'all'
+                                      ? (chartData.items[hoveredIdx].cumulativeRevenue / chartData.maxCumRev) * 100
+                                      : chartData.items[hoveredIdx].cumulativeRevenue,
+                                    chartActiveSeries === 'all' ? 100 : chartData.maxCumRev
+                                  )}
+                                  r="4.5"
+                                  fill="#ffffff"
+                                  stroke="#DB303A"
+                                  strokeWidth="2.5"
+                                />
+                              </g>
+                            )}
+
+                            {/* Điểm neo AI */}
+                            {(chartActiveSeries === 'all' || chartActiveSeries === 'ai') && (
+                              <g>
+                                <circle
+                                  cx={getChartX(hoveredIdx)}
+                                  cy={getChartY(
+                                    chartActiveSeries === 'all'
+                                      ? (chartData.items[hoveredIdx].aiQuestions / chartData.maxAi) * 100
+                                      : chartData.items[hoveredIdx].aiQuestions,
+                                    chartActiveSeries === 'all' ? 100 : chartData.maxAi
+                                  )}
+                                  r="7"
+                                  fill="#0284c7"
+                                  opacity="0.3"
+                                  className="pulse-ring"
+                                />
+                                <circle
+                                  cx={getChartX(hoveredIdx)}
+                                  cy={getChartY(
+                                    chartActiveSeries === 'all'
+                                      ? (chartData.items[hoveredIdx].aiQuestions / chartData.maxAi) * 100
+                                      : chartData.items[hoveredIdx].aiQuestions,
+                                    chartActiveSeries === 'all' ? 100 : chartData.maxAi
+                                  )}
+                                  r="4.5"
+                                  fill="#ffffff"
+                                  stroke="#0284c7"
+                                  strokeWidth="2.5"
+                                />
+                              </g>
+                            )}
+
+                            {/* Điểm neo Học viên */}
+                            {(chartActiveSeries === 'all' || chartActiveSeries === 'students') && (
+                              <g>
+                                <circle
+                                  cx={getChartX(hoveredIdx)}
+                                  cy={getChartY(
+                                    chartActiveSeries === 'all'
+                                      ? (chartData.items[hoveredIdx].students / chartData.maxStud) * 100
+                                      : chartData.items[hoveredIdx].students,
+                                    chartActiveSeries === 'all' ? 100 : chartData.maxStud
+                                  )}
+                                  r="7"
+                                  fill="#15803d"
+                                  opacity="0.3"
+                                  className="pulse-ring"
+                                />
+                                <circle
+                                  cx={getChartX(hoveredIdx)}
+                                  cy={getChartY(
+                                    chartActiveSeries === 'all'
+                                      ? (chartData.items[hoveredIdx].students / chartData.maxStud) * 100
+                                      : chartData.items[hoveredIdx].students,
+                                    chartActiveSeries === 'all' ? 100 : chartData.maxStud
+                                  )}
+                                  r="4.5"
+                                  fill="#ffffff"
+                                  stroke="#15803d"
+                                  strokeWidth="2.5"
+                                />
+                              </g>
+                            )}
+                          </g>
+                        )}
+                      </svg>
+
+                      {/* BẢNG TOOLTIP NỔI THÔNG MINH KHI RÊ CHUỘT (FLOATING INSPECTOR CARD) */}
+                      {hoveredIdx !== null && chartData.items[hoveredIdx] && (
+                        <div
+                          className="chart-inspector-panel position-absolute"
+                          style={{
+                            top: '12px',
+                            left: `${(getChartX(hoveredIdx) / 640) * 100}%`,
+                            transform: hoveredIdx >= 4 ? 'translate(-104%, 0)' : 'translate(12px, 0)',
+                            pointerEvents: 'none',
+                            zIndex: 25,
+                            minWidth: '230px',
+                            background: 'var(--dash-surface)',
+                            border: '1px solid var(--dash-border)',
+                            borderRadius: '12px',
+                            boxShadow: '0 12px 28px -4px rgba(15, 23, 42, 0.2), 0 4px 8px -2px rgba(0, 0, 0, 0.08)',
+                            padding: '10px 14px',
+                            transition: 'left 0.08s ease-out, transform 0.08s ease-out'
+                          }}
+                        >
+                          <div className="d-flex align-items-center justify-content-between pb-1.5 mb-1.5 border-bottom">
+                            <div className="d-flex align-items-center gap-1.5">
+                              <i className="bi bi-calendar-check text-danger" style={{ fontSize: 12 }}></i>
+                              <strong className="text-body" style={{ fontSize: 12 }}>
+                                {chartData.items[hoveredIdx].fullDate}
+                              </strong>
+                            </div>
+                            <span className="badge bg-danger-subtle text-danger border border-danger-subtle" style={{ fontSize: 9.5 }}>
+                              {hoveredIdx === chartData.items.length - 1 ? 'Hôm nay' : `Ngày ${hoveredIdx + 1}/7`}
+                            </span>
+                          </div>
+
+                          <div className="d-flex flex-column gap-1.5" style={{ fontSize: 11.5 }}>
+                            {/* Doanh thu */}
+                            <div className="d-flex align-items-center justify-content-between">
+                              <span className="d-flex align-items-center gap-1.5 text-secondary">
+                                <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#DB303A' }}></span>
+                                Doanh thu ngày:
+                              </span>
+                              <strong className="text-danger">+{formatVnd(chartData.items[hoveredIdx].revenue)}</strong>
+                            </div>
+                            <div className="d-flex justify-content-between text-secondary ps-3" style={{ fontSize: 10.5 }}>
+                              <span>Lũy kế tuần:</span>
+                              <span className="fw-semibold text-body">{formatVnd(chartData.items[hoveredIdx].cumulativeRevenue)}</span>
+                            </div>
+
+                            {/* Tác tử AI */}
+                            <div className="d-flex align-items-center justify-content-between pt-1 border-top">
+                              <span className="d-flex align-items-center gap-1.5 text-secondary">
+                                <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#0284c7' }}></span>
+                                Hỏi AI Wein:
+                              </span>
+                              <strong className="text-primary">{chartData.items[hoveredIdx].aiQuestions} câu hỏi</strong>
+                            </div>
+                            <div className="d-flex justify-content-between text-secondary ps-3" style={{ fontSize: 10.5 }}>
+                              <span>Tiêu thụ token:</span>
+                              <span className="fw-semibold text-body">~{chartData.items[hoveredIdx].tokens.toLocaleString('vi-VN')} tok</span>
+                            </div>
+
+                            {/* Học viên & Lớp học */}
+                            <div className="d-flex align-items-center justify-content-between pt-1 border-top">
+                              <span className="d-flex align-items-center gap-1.5 text-secondary">
+                                <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#15803d' }}></span>
+                                Học viên kết nối:
+                              </span>
+                              <strong className="text-success">{chartData.items[hoveredIdx].students} HV</strong>
+                            </div>
+
+                            {/* Lượt truy cập */}
+                            <div className="d-flex align-items-center justify-content-between">
+                              <span className="d-flex align-items-center gap-1.5 text-secondary">
+                                <i className="bi bi-activity text-secondary" style={{ fontSize: 11 }}></i>
+                                Lượt truy cập:
+                              </span>
+                              <strong className="text-body">{chartData.items[hoveredIdx].visits} lượt</strong>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* TRỤC HOÀNH X: DANH SÁCH 7 NGÀY TƯƠNG TÁC RÊ CHUỘT */}
+                    <div
+                      className="d-flex justify-content-between px-1 mt-2 pt-1 border-top text-secondary fw-semibold"
+                      style={{ fontSize: 11, marginLeft: 44, marginRight: 8 }}
+                    >
+                      {chartData.items.map((it, i) => {
+                        const isHovered = hoveredIdx === i;
+                        return (
+                          <div
+                            key={i}
+                            className={`d-flex flex-column align-items-center px-2 py-0.5 rounded cursor-pointer ${
+                              isHovered ? 'bg-danger text-white shadow-sm' : ''
+                            }`}
+                            style={{ cursor: 'pointer', transition: 'all 0.15s ease' }}
+                            onMouseEnter={() => setHoveredIdx(i)}
+                          >
+                            <span style={{ fontSize: 9.5, opacity: isHovered ? 0.95 : 0.75 }}>{it.dayName}</span>
+                            <strong style={{ fontSize: 11 }}>{it.date}</strong>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           </div>
         </div>
 
-        {/* SƠ ĐỒ CỘT 7 NGÀY: TRUY CẬP & TOKEN AI */}
+        {/* SƠ ĐỒ CỘT 7 NGÀY: TRUY CẬP & TOKEN AI (ĐỒNG BỘ RÊ CHUỘT) */}
         <div className="col-12 col-xl-5">
           <div className="diagram-card justify-content-between">
             <div>
@@ -891,21 +1430,45 @@ export default function AdminDashboardPage() {
                       {dailyMetrics.map((dm, idx) => {
                         const vH = Math.max(14, Math.round(((Number(dm.visits) || 0) / maxDailyMetric.visits) * 110));
                         const aH = Math.max(10, Math.round(((Number(dm.aiQuestions) || 0) / maxDailyMetric.ai) * 110));
+                        const isHovered = hoveredIdx === idx;
                         return (
-                          <div key={idx} className="daily-bar-column">
+                          <div
+                            key={idx}
+                            className="daily-bar-column"
+                            style={{
+                              cursor: 'pointer',
+                              transform: isHovered ? 'scale(1.05)' : 'none',
+                              transition: 'transform 0.15s ease'
+                            }}
+                            onMouseEnter={() => setHoveredIdx(idx)}
+                            onMouseLeave={() => setHoveredIdx(null)}
+                          >
                             <div className="d-flex gap-1 align-items-end h-100">
                               <div
                                 className="daily-bar-fill"
-                                style={{ height: `${vH}px`, background: '#0284c7' }}
+                                style={{
+                                  height: `${vH}px`,
+                                  background: isHovered ? '#0ea5e9' : '#0284c7',
+                                  boxShadow: isHovered ? '0 0 8px rgba(14, 165, 233, 0.5)' : 'none'
+                                }}
                                 title={`${dm.date}: ${dm.visits} truy cập`}
                               ></div>
                               <div
                                 className="daily-bar-fill"
-                                style={{ height: `${aH}px`, background: '#06b6d4' }}
+                                style={{
+                                  height: `${aH}px`,
+                                  background: isHovered ? '#22d3ee' : '#06b6d4',
+                                  boxShadow: isHovered ? '0 0 8px rgba(34, 211, 238, 0.5)' : 'none'
+                                }}
                                 title={`${dm.date}: ${dm.aiQuestions} hỏi AI`}
                               ></div>
                             </div>
-                            <small className="text-secondary mt-1" style={{ fontSize: 10 }}>{dm.dayName || 'T'}</small>
+                            <small
+                              className={`mt-1 fw-semibold ${isHovered ? 'text-danger fw-bold' : 'text-secondary'}`}
+                              style={{ fontSize: 10 }}
+                            >
+                              {dm.dayName || 'T'}
+                            </small>
                           </div>
                         );
                       })}
@@ -964,7 +1527,7 @@ export default function AdminDashboardPage() {
                   Tiếp nhận hồ sơ cơ bản, số điện thoại &amp; CCCD
                 </small>
                 <span className="badge rounded-pill bg-primary-subtle text-primary mt-1" style={{ fontSize: 11 }}>
-                  31 gia sư đã đăng ký
+                  {stats.totalTutors} gia sư trong hệ thống
                 </span>
               </div>
 

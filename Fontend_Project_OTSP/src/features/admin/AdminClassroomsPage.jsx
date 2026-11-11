@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import adminApi from '../../api/adminApi';
+import { useToast } from '../../context/ToastContext';
+import { useConfirm } from '../../context/ConfirmDialogContext';
 import { AdminFeedback, AdminLoadingRows, AdminPageHeader, AdminPagination, AdminStats } from './AdminPageShared';
 
 const PAGE_SIZE = 10;
@@ -7,6 +9,8 @@ const classroomStatus = { Active: 'Đang hoạt động', Completed: 'Hoàn thà
 const typeLabel = { OneToOne: '1 kèm 1', Group: 'Lớp nhóm' };
 
 export default function AdminClassroomsPage() {
+  const toast = useToast();
+  const confirm = useConfirm();
   const [data, setData] = useState(null);
   const [search, setSearch] = useState('');
   const [querySearch, setQuerySearch] = useState('');
@@ -97,16 +101,20 @@ export default function AdminClassroomsPage() {
   };
 
   const handleDeleteClassroom = async (item) => {
-    if (!window.confirm(`Bạn có chắc chắn muốn xóa lớp học "${item.name}"?`)) return;
+    const ok = await confirm({
+      title: 'Xóa lớp học',
+      message: `Bạn có chắc chắn muốn xóa lớp học "${item.name}"?`,
+      confirmText: 'Xóa',
+      variant: 'danger',
+    });
+    if (!ok) return;
     setBusyKey(`delete-${item.id}`);
-    setError('');
-    setMessage('');
     try {
       await adminApi.deleteClassroom(item.id);
-      setMessage('Đã xóa lớp học thành công.');
+      toast.success('Đã xóa lớp học thành công.');
       setReload((v) => v + 1);
     } catch (err) {
-      setError(err.response?.data?.message || 'Không thể xóa lớp học.');
+      toast.error(err.response?.data?.message || 'Không thể xóa lớp học.');
     } finally {
       setBusyKey('');
     }

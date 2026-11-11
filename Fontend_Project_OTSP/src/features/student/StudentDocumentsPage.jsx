@@ -2,9 +2,11 @@ import { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import studentApi from '../../api/studentApi';
 import { repairMojibake } from '../../utils/repairMojibake';
+import { useToast } from '../../context/ToastContext';
 import OtspPagination from '../../components/common/OtspPagination';
 
 export default function StudentDocumentsPage() {
+  const toast = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClassroomId = searchParams.get('classroomId') || '';
 
@@ -116,7 +118,7 @@ export default function StudentDocumentsPage() {
       document.body.removeChild(link);
       window.URL.revokeObjectURL(blobUrl);
     } catch (err) {
-      alert(err.response?.data?.message || 'Không thể tải xuống tài liệu này. Vui lòng thử lại.');
+      toast.error(err.response?.data?.message || 'Không thể tải xuống tài liệu này. Vui lòng thử lại.');
     } finally {
       setDownloadingId(null);
     }

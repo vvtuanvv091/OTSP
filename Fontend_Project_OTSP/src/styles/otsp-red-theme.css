@@ -35,6 +35,10 @@
     --bs-danger-bg-subtle: #F8D7DA;
     --bs-primary-border-subtle: #F1AEB5;
     --bs-danger-border-subtle: #F1AEB5;
+    --otsp-primary: #DB303A;
+    --otsp-primary-soft: rgba(219, 48, 58, 0.08);
+    --otsp-skeleton-bg: rgba(148, 163, 184, 0.18);
+    --otsp-empty-icon-bg: rgba(219, 48, 58, 0.08);
 }
 
 [data-bs-theme="dark"] {
@@ -47,6 +51,10 @@
   --bs-secondary-color: #94a3b8;
   --bs-tertiary-bg: #1B1C38;
   --bs-dark-rgb: 248, 250, 252;
+  --otsp-primary: #E95760;
+  --otsp-primary-soft: rgba(233, 87, 96, 0.15);
+  --otsp-skeleton-bg: rgba(255, 255, 255, 0.08);
+  --otsp-empty-icon-bg: rgba(233, 87, 96, 0.15);
   
   --bs-primary: #E95760;
   --bs-primary-text-emphasis: #FF9CA2;
@@ -622,3 +630,20 @@ html[data-bs-theme="dark"] .notifications-empty-state > span { background: #4927
 .tutor-sidebar-avatar { background: rgba(219, 48, 58, .12); color: #B7212B; }
 .tutor-sidebar-link.active { background: rgba(219, 48, 58, .09); color: #B7212B; }
 .tutor-sidebar-link.active i { color: #DB303A; }
+
+/* Micro-animations & Skeleton Effects */
+@keyframes otsp-shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+}
+
+@keyframes otsp-slide-in-right {
+    from {
+        opacity: 0;
+        transform: translateX(100%);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
