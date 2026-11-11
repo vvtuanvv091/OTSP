@@ -4,8 +4,11 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Backend_Project_OTSP.Data;
 using Backend_Project_OTSP.Dtos;
+using Backend_Project_OTSP.Dtos.Common.Home;
+using Backend_Project_OTSP.Dtos.Common.Notification;
 using Backend_Project_OTSP.Models;
 using Backend_Project_OTSP.Services.Common;
+using Backend_Project_OTSP.Services.Notifications;
 using static Backend_Project_OTSP.Models.Enums;
 
 namespace Backend_Project_OTSP.Controllers.Common;
@@ -215,9 +218,10 @@ public class HomeApiController : ControllerBase
     [AllowAnonymous]
     public async Task<IActionResult> SubmitContact(
         [FromBody] ContactFormRequest request,
-        [FromServices] IEmailSenderService emailSender,
         [FromServices] IConfiguration configuration,
-        CancellationToken cancellationToken)
+        [FromServices] IEmailQueue? emailQueue = null,
+        [FromServices] IEmailSenderService? emailSender = null,
+        CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(request.FullName) ||
             string.IsNullOrWhiteSpace(request.Email) ||
@@ -228,23 +232,21 @@ public class HomeApiController : ControllerBase
 
         var adminEmail = configuration["AdminNotification:Email"] ?? "tongngoctuan09@gmail.com";
         var topic = string.IsNullOrWhiteSpace(request.Topic) ? "Hỗ trợ chung" : request.Topic.Trim();
-        var subject = $"[OTSP - Liên hệ mới] {topic} từ {request.FullName.Trim()}";
+        var (subject, bodyHtml) = NotificationEmailTemplates.ForContactSubmitted(
+            request.FullName.Trim(),
+            request.Email.Trim(),
+            topic,
+            DateTime.UtcNow.AddHours(7).ToString("dd/MM/yyyy HH:mm:ss") + " (GMT+7)",
+            request.Message.Trim());
 
-        var bodyHtml = $@"
-            <div style=""font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px; color: #1e293b;"">
-                <div style=""border-bottom: 2px solid #dc2626; padding-bottom: 12px; margin-bottom: 16px;"">
-                    <h2 style=""color: #dc2626; margin: 0;"">Yêu cầu liên hệ mới từ khách hàng OTSP</h2>
-                </div>
-                <p><strong>Họ và tên:</strong> {request.FullName.Trim()}</p>
-                <p><strong>Thông tin liên hệ (Email/SĐT):</strong> {request.Email.Trim()}</p>
-                <p><strong>Chủ đề cần hỗ trợ:</strong> {topic}</p>
-                <p><strong>Thời gian gửi:</strong> {DateTime.UtcNow.AddHours(7):dd/MM/yyyy HH:mm:ss} (GMT+7)</p>
-                <hr style=""border: 0; border-top: 1px solid #e2e8f0; margin: 16px 0;"" />
-                <p><strong>Nội dung chi tiết:</strong></p>
-                <div style=""background-color: #f8fafc; border-left: 4px solid #dc2626; padding: 12px 16px; border-radius: 4px; white-space: pre-wrap;"">{request.Message.Trim()}</div>
-            </div>";
-
-        await emailSender.SendNotificationEmailAsync(adminEmail, subject, bodyHtml, cancellationToken);
+        if (emailQueue != null)
+        {
+            emailQueue.Enqueue(new EmailQueueItemDto(adminEmail, subject, bodyHtml));
+        }
+        else if (emailSender != null)
+        {
+            await emailSender.SendNotificationEmailAsync(adminEmail, subject, bodyHtml, cancellationToken);
+        }
 
         // Lưu thông báo vào database cho Admin
         var adminRole = await _db.Roles.FirstOrDefaultAsync(r => r.Name == "Admin", cancellationToken);
@@ -316,18 +318,5 @@ public class HomeApiController : ControllerBase
             return Ok(new { recorded = false });
         }
     }
-}
-
-public class VisitTrackRequest
-{
-    public string? Path { get; set; }
-}
-
-public class ContactFormRequest
-{
-    public string FullName { get; set; } = string.Empty;
-    public string Email { get; set; } = string.Empty;
-    public string Topic { get; set; } = "Tư vấn chọn gia sư / lớp học";
-    public string Message { get; set; } = string.Empty;
 }
 

@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using Backend_Project_OTSP.Data;
 using Backend_Project_OTSP.Dtos;
+using Backend_Project_OTSP.Dtos.Common.Notification;
 using Backend_Project_OTSP.Dtos.StudentParent;
 using Backend_Project_OTSP.Hubs;
 using Backend_Project_OTSP.Models;

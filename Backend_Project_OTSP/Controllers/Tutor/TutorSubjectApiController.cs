@@ -222,15 +222,3 @@ public class TutorSubjectApiController : ControllerBase
     }
 }
 
-public class AddTutorSubjectRequest
-{
-    public int SubjectId { get; set; }
-    public int GradeLevelId { get; set; }
-    public decimal HourlyFee { get; set; }
-}
-
-public class EditTutorSubjectRequest
-{
-    public decimal HourlyFee { get; set; }
-}
-

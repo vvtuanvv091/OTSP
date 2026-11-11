@@ -9,9 +9,11 @@ using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Backend_Project_OTSP.Data;
+using Backend_Project_OTSP.Dtos.Common.Notification;
 using Backend_Project_OTSP.Dtos.Payment;
 using Backend_Project_OTSP.Models;
 using Backend_Project_OTSP.Services.Common;
+using Backend_Project_OTSP.Services.Notifications;
 using static Backend_Project_OTSP.Models.Enums;
 
 namespace Backend_Project_OTSP.Services.Payments;
@@ -24,6 +26,7 @@ public class PaymentService : IPaymentService
     private readonly ILogger<PaymentService> _logger;
     private readonly IHttpClientFactory? _httpClientFactory;
     private readonly IEmailSenderService? _emailSender;
+    private readonly IEmailQueue? _emailQueue;
 
     private readonly string _bankName;
     private readonly string _bankId;
@@ -36,7 +39,8 @@ public class PaymentService : IPaymentService
         IMemoryCache cache,
         ILogger<PaymentService> logger,
         IHttpClientFactory? httpClientFactory = null,
-        IEmailSenderService? emailSender = null)
+        IEmailSenderService? emailSender = null,
+        IEmailQueue? emailQueue = null)
     {
         _db = db;
         _config = config;
@@ -44,6 +48,7 @@ public class PaymentService : IPaymentService
         _logger = logger;
         _httpClientFactory = httpClientFactory;
         _emailSender = emailSender;
+        _emailQueue = emailQueue;
 
         _bankName = _config["SePay:BankName"] ?? _config["VietQR:BankName"] ?? "MBBank";
         _bankId = _config["SePay:BankId"] ?? _config["VietQR:BankId"] ?? "970422";
@@ -546,52 +551,35 @@ public class PaymentService : IPaymentService
 
             await _db.SaveChangesAsync(ct);
 
-            // 3. Gửi Email Biên lai điện tử về Gmail cho Học viên
-            if (!string.IsNullOrEmpty(studentEmail) && _emailSender != null)
+            // 3. Gửi Email Biên lai điện tử về Gmail cho Học viên qua hàng đợi nền
+            if (!string.IsNullOrEmpty(studentEmail) && (_emailQueue != null || _emailSender != null))
             {
-                var subject = $"[OTSP] Biên lai thanh toán học phí thành công - {className}";
-                var bodyHtml = $@"
-                    <div style=""font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px; color: #1e293b;"">
-                        <div style=""text-align: center; margin-bottom: 20px;"">
-                            <h2 style=""color: #16a34a; margin: 0;"">✓ THANH TOÁN THÀNH CÔNG</h2>
-                            <p style=""color: #64748b; font-size: 14px; margin: 4px 0 0;"">Nền tảng kết nối Gia sư OTSP</p>
-                        </div>
-                        <p>Xin chào <strong>{studentName}</strong>,</p>
-                        <p>Hệ thống OTSP xin xác nhận bạn đã thanh toán thành công học phí với thông tin chi tiết:</p>
-                        <table style=""width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 14px;"">
-                            <tr style=""border-bottom: 1px solid #f1f5f9;""><td style=""padding: 10px 0; color: #64748b;"">Mã thanh toán:</td><td style=""padding: 10px 0; font-weight: bold; text-align: right;"">OTSP{p.Id:D6}</td></tr>
-                            <tr style=""border-bottom: 1px solid #f1f5f9;""><td style=""padding: 10px 0; color: #64748b;"">Lớp học:</td><td style=""padding: 10px 0; font-weight: bold; text-align: right;"">{className}</td></tr>
-                            <tr style=""border-bottom: 1px solid #f1f5f9;""><td style=""padding: 10px 0; color: #64748b;"">Môn học:</td><td style=""padding: 10px 0; font-weight: bold; text-align: right;"">{subjectName}</td></tr>
-                            <tr style=""border-bottom: 1px solid #f1f5f9;""><td style=""padding: 10px 0; color: #64748b;"">Gia sư phụ trách:</td><td style=""padding: 10px 0; font-weight: bold; text-align: right;"">{tutorName}</td></tr>
-                            <tr style=""border-bottom: 1px solid #f1f5f9;""><td style=""padding: 10px 0; color: #64748b;"">Số tiền:</td><td style=""padding: 10px 0; font-size: 18px; font-weight: bold; color: #16a34a; text-align: right;"">{amountStr}</td></tr>
-                            <tr style=""border-bottom: 1px solid #f1f5f9;""><td style=""padding: 10px 0; color: #64748b;"">Phương thức:</td><td style=""padding: 10px 0; text-align: right;"">Chuyển khoản SePay / VietQR 24/7</td></tr>
-                            <tr><td style=""padding: 10px 0; color: #64748b;"">Thời gian:</td><td style=""padding: 10px 0; text-align: right;"">{DateTime.UtcNow.AddHours(7):dd/MM/yyyy HH:mm:ss}</td></tr>
-                        </table>
-                        <div style=""background: #f0fdf4; border-left: 4px solid #16a34a; padding: 12px 16px; border-radius: 4px; font-size: 13px; color: #15803d; margin-bottom: 20px;"">
-                            Quyền vào phòng học trực tuyến (Jitsi Meet) đã được kích hoạt. Bạn có thể vào lớp đúng giờ trên Thời khóa biểu.
-                        </div>
-                        <hr style=""border: 0; border-top: 1px solid #e2e8f0; margin: 24px 0;"" />
-                        <p style=""font-size: 12px; color: #94a3b8; text-align: center; margin: 0;"">© OTSP - Hệ thống quản lý và kết nối gia sư trực tuyến.</p>
-                    </div>";
-
-                await _emailSender.SendNotificationEmailAsync(studentEmail, subject, bodyHtml, ct);
+                var paidTimeStr = DateTime.UtcNow.AddHours(7).ToString("dd/MM/yyyy HH:mm:ss");
+                var (subject, bodyHtml) = NotificationEmailTemplates.ForPaymentStudentReceipt(
+                    p.Id, studentName, className, subjectName, tutorName, amountStr, paidTimeStr);
+                if (_emailQueue != null)
+                {
+                    _emailQueue.Enqueue(new EmailQueueItemDto(studentEmail, subject, bodyHtml));
+                }
+                else if (_emailSender != null)
+                {
+                    await _emailSender.SendNotificationEmailAsync(studentEmail, subject, bodyHtml, ct);
+                }
             }
 
-            // 4. Gửi Email thông báo cho Gia sư
-            if (!string.IsNullOrEmpty(tutorEmail) && _emailSender != null)
+            // 4. Gửi Email thông báo cho Gia sư qua hàng đợi nền
+            if (!string.IsNullOrEmpty(tutorEmail) && (_emailQueue != null || _emailSender != null))
             {
-                var subject = $"[OTSP] Học viên {studentName} đã nộp học phí lớp {className}";
-                var bodyHtml = $@"
-                    <div style=""font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px; color: #1e293b;"">
-                        <h3 style=""color: #2563eb; margin-top: 0;"">Thông báo thu học phí mới</h3>
-                        <p>Kính gửi thầy/cô <strong>{tutorName}</strong>,</p>
-                        <p>Học viên <strong>{studentName}</strong> vừa thanh toán thành công số tiền <strong>{amountStr}</strong> học phí cho lớp <strong>{className}</strong>.</p>
-                        <p>Hệ thống đã tự động cấp quyền vào phòng học trực tuyến cho học viên. Thầy/cô có thể kiểm tra danh sách học viên và bảng kê doanh thu tại mục Quản lý gia sư.</p>
-                        <hr style=""border: 0; border-top: 1px solid #e2e8f0; margin: 16px 0;"" />
-                        <p style=""font-size: 12px; color: #94a3b8;"">© Nền tảng OTSP</p>
-                    </div>";
-
-                await _emailSender.SendNotificationEmailAsync(tutorEmail, subject, bodyHtml, ct);
+                var (subject, bodyHtml) = NotificationEmailTemplates.ForPaymentTutorNotice(
+                    tutorName, studentName, amountStr, className);
+                if (_emailQueue != null)
+                {
+                    _emailQueue.Enqueue(new EmailQueueItemDto(tutorEmail, subject, bodyHtml));
+                }
+                else if (_emailSender != null)
+                {
+                    await _emailSender.SendNotificationEmailAsync(tutorEmail, subject, bodyHtml, ct);
+                }
             }
         }
         catch (Exception ex)

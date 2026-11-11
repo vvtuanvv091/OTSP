@@ -1,4 +1,5 @@
 using System.Threading.Channels;
+using Backend_Project_OTSP.Dtos.Chat;
 using Backend_Project_OTSP.Services.Chat;
 
 namespace Backend_Project_OTSP.Services.Chat;

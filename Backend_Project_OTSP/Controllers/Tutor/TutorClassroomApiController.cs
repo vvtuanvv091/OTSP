@@ -474,35 +474,3 @@ public class TutorClassroomApiController : ControllerBase
         }
     }
 }
-
-public class CreateClassroomRequest
-{
-    public string Name { get; set; } = string.Empty;
-    public string? Description { get; set; }
-    public decimal Fee { get; set; }
-    public int MaxStudents { get; set; } = 10;
-    public int SessionsPerWeek { get; set; } = 2;
-    public double HoursPerSession { get; set; } = 2.0;
-    public DateOnly? StartDate { get; set; }
-    public string? CoverImageUrl { get; set; }
-    public int SubjectId { get; set; }
-    public int GradeLevelId { get; set; }
-    public ClassroomType Type { get; set; } = ClassroomType.Group;
-    public string? WeeklySchedulesJson { get; set; }
-}
-
-public class UpdateClassroomRequest
-{
-    public string? Name { get; set; }
-    public string? Description { get; set; }
-    public decimal? Fee { get; set; }
-    public int? MaxStudents { get; set; }
-    public int? SessionsPerWeek { get; set; }
-    public double? HoursPerSession { get; set; }
-    public DateOnly? StartDate { get; set; }
-    public string? CoverImageUrl { get; set; }
-    public bool RemoveCoverImage { get; set; }
-    public int? SubjectId { get; set; }
-    public int? GradeLevelId { get; set; }
-    public string? WeeklySchedulesJson { get; set; }
-}

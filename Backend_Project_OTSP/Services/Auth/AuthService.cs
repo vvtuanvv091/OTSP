@@ -3,8 +3,10 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Backend_Project_OTSP.Data;
 using Backend_Project_OTSP.Dtos.Auth;
+using Backend_Project_OTSP.Dtos.Common.Notification;
 using Backend_Project_OTSP.Models;
 using Backend_Project_OTSP.Services.Common;
+using Backend_Project_OTSP.Services.Notifications;
 using static Backend_Project_OTSP.Models.Enums;
 using Backend_Project_OTSP.Services.Auth;
 
@@ -25,6 +27,7 @@ public class AuthService : IAuthService
     private readonly ILogger<AuthService> _logger;
     private readonly GoogleIdTokenValidator _googleIdTokenValidator;
     private readonly IHttpContextAccessor? _httpContextAccessor;
+    private readonly IEmailQueue? _emailQueue;
 
     public AuthService(
         UserManager<ApplicationUser> userManager,
@@ -36,7 +39,8 @@ public class AuthService : IAuthService
         IConfiguration configuration,
         GoogleIdTokenValidator googleIdTokenValidator,
         ILogger<AuthService> logger,
-        IHttpContextAccessor? httpContextAccessor = null)
+        IHttpContextAccessor? httpContextAccessor = null,
+        IEmailQueue? emailQueue = null)
     {
         _userManager = userManager;
         _signInManager = signInManager;
@@ -48,6 +52,7 @@ public class AuthService : IAuthService
         _googleIdTokenValidator = googleIdTokenValidator;
         _logger = logger;
         _httpContextAccessor = httpContextAccessor;
+        _emailQueue = emailQueue;
     }
 
     private async Task RecordAuthAuditAsync(string userId, string action, string detail)
@@ -441,7 +446,15 @@ public class AuthService : IAuthService
         {
             var baseUrl = _configuration["App:FrontendUrl"]?.TrimEnd('/') ?? "http://localhost:5173";
             var resetUrl = $"{baseUrl}/reset-password?email={Uri.EscapeDataString(user.Email!)}&token={Uri.EscapeDataString(token)}";
-            await _emailSender.SendPasswordResetEmailAsync(user.Email!, token, resetUrl);
+            if (_emailQueue != null)
+            {
+                var (subject, body) = NotificationEmailTemplates.ForPasswordReset(user.Email!, token, resetUrl);
+                _emailQueue.Enqueue(new EmailQueueItemDto(user.Email!, subject, body));
+            }
+            else
+            {
+                await _emailSender.SendPasswordResetEmailAsync(user.Email!, token, resetUrl);
+            }
         }
         catch (Exception ex)
         {

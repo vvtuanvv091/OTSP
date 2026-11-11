@@ -12,3 +12,15 @@ public class TutorSubjectDto
     public string GradeLevelName { get; set; } = string.Empty;
     public decimal HourlyFee { get; set; }
 }
+
+public class AddTutorSubjectRequest
+{
+    public int SubjectId { get; set; }
+    public int GradeLevelId { get; set; }
+    public decimal HourlyFee { get; set; }
+}
+
+public class EditTutorSubjectRequest
+{
+    public decimal HourlyFee { get; set; }
+}

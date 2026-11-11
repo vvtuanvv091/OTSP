@@ -38,3 +38,13 @@ public class TutorActiveClassroomOptionDto
     public int MaxStudents { get; set; }
     public string? ScheduleSummary { get; set; }
 }
+
+public class UploadDocumentRequest
+{
+    public string Title { get; set; } = string.Empty;
+    public string? Description { get; set; }
+    public int SubjectId { get; set; }
+    public int GradeLevelId { get; set; }
+    public DocumentScope Scope { get; set; } = DocumentScope.Public;
+    public int? ClassroomId { get; set; }
+}

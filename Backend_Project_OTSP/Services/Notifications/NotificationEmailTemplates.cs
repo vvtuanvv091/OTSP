@@ -1,7 +1,11 @@
+using System.Net;
+
 namespace Backend_Project_OTSP.Services.Notifications;
 
 public static class NotificationEmailTemplates
 {
+    private static string Enc(string? text) => WebUtility.HtmlEncode(text ?? string.Empty);
+
     public static string Wrap(
         string title,
         string contentHtml,
@@ -9,34 +13,13 @@ public static class NotificationEmailTemplates
         string? buttonUrl = null,
         string? footerNote = null)
     {
-        var buttonHtml = (!string.IsNullOrWhiteSpace(buttonText) && !string.IsNullOrWhiteSpace(buttonUrl))
-            ? $@"
-                <div style='margin: 28px 0; text-align: center;'>
-                    <a href='{buttonUrl}' style='background-color: #dc2626; color: #ffffff; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 15px; display: inline-block; box-shadow: 0 2px 4px rgba(220, 38, 38, 0.2);'>
-                        {buttonText}
-                    </a>
-                </div>"
+        var btn = (!string.IsNullOrWhiteSpace(buttonText) && !string.IsNullOrWhiteSpace(buttonUrl))
+            ? $"<p style='margin:20px 0;text-align:center'><a href='{Enc(buttonUrl)}' style='background:#dc2626;color:#fff;padding:10px 22px;text-decoration:none;border-radius:6px;font-weight:600;display:inline-block'>{Enc(buttonText)}</a></p>"
             : "";
 
-        var footerText = footerNote ?? "Thông báo tự động từ Hệ thống kết nối Gia sư và Học viên online OTSP.";
+        var note = Enc(footerNote ?? "Thông báo tự động từ Hệ thống Gia sư trực tuyến OTSP.");
 
-        return $@"
-            <div style='background-color: #f8fafc; padding: 32px 12px; font-family: -apple-system, BlinkMacSystemFont, ""Segoe UI"", Roboto, Helvetica, Arial, sans-serif; color: #1e293b; line-height: 1.6;'>
-                <div style='max-width: 580px; margin: 0 auto; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);'>
-                    <div style='background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%); padding: 24px; text-align: center;'>
-                        <h1 style='color: #ffffff; margin: 0; font-size: 20px; font-weight: 700; letter-spacing: 0.5px;'>OTSP · Nền tảng Gia sư Online</h1>
-                    </div>
-                    <div style='padding: 28px 24px;'>
-                        <h2 style='color: #0f172a; margin-top: 0; margin-bottom: 16px; font-size: 18px; font-weight: 600;'>{title}</h2>
-                        {contentHtml}
-                        {buttonHtml}
-                    </div>
-                    <div style='background-color: #f1f5f9; padding: 16px 24px; border-top: 1px solid #e2e8f0; font-size: 12px; color: #64748b; text-align: center;'>
-                        <p style='margin: 0 0 6px 0;'>{footerText}</p>
-                        <p style='margin: 0; color: #94a3b8;'>© {DateTime.UtcNow.Year} OTSP Platform. Mọi quyền được bảo lưu.</p>
-                    </div>
-                </div>
-            </div>";
+        return $"<div style='font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:20px;border:1px solid #e2e8f0;border-radius:8px;color:#1e293b;line-height:1.55'><h3 style='color:#dc2626;margin:0 0 12px;padding-bottom:10px;border-bottom:2px solid #dc2626'>{Enc(title)}</h3>{contentHtml}{btn}<hr style='border:0;border-top:1px solid #e2e8f0;margin:18px 0 10px'/><p style='font-size:12px;color:#64748b;margin:0;text-align:center'>{note}</p></div>";
     }
 
     public static (string Subject, string Body) ForNewBooking(
@@ -47,19 +30,13 @@ public static class NotificationEmailTemplates
         string? message,
         string actionUrl = "https://otsp-giasu.vercel.app/tutor/connection-requests")
     {
-        var subject = $"[OTSP] Bạn có yêu cầu kết nối học mới từ học viên {studentName}";
-        var noteHtml = string.IsNullOrWhiteSpace(message)
+        var subject = $"[OTSP] Yêu cầu kết nối mới từ {studentName}";
+        var note = string.IsNullOrWhiteSpace(message)
             ? ""
-            : $"<blockquote style='background: #f8fafc; border-left: 4px solid #dc2626; padding: 12px 16px; margin: 16px 0; font-style: italic; color: #475569;'>Lời nhắn của học viên: \"{message.Trim()}\"</blockquote>";
+            : $"<p style='background:#f8fafc;border-left:3px solid #dc2626;padding:8px 12px;margin:12px 0'>\"{Enc(message.Trim())}\"</p>";
 
-        var content = $@"
-            <p>Xin chào <strong>{tutorName}</strong>,</p>
-            <p>Học viên <strong>{studentName}</strong> vừa gửi cho bạn một yêu cầu <strong>{actionLabel}</strong> môn <strong>{subjectName}</strong> trên nền tảng OTSP.</p>
-            {noteHtml}
-            <p>Vui lòng đăng nhập vào hệ thống để xem chi tiết thông tin và phản hồi học viên sớm nhất có thể.</p>";
-
-        var body = Wrap("Yêu cầu kết nối học tập mới", content, "Xem và phản hồi yêu cầu", actionUrl);
-        return (subject, body);
+        var content = $"<p>Xin chào <strong>{Enc(tutorName)}</strong>,</p><p>Học viên <strong>{Enc(studentName)}</strong> vừa gửi yêu cầu <strong>{Enc(actionLabel)}</strong> môn <strong>{Enc(subjectName)}</strong>.</p>{note}<p>Vui lòng đăng nhập để xem chi tiết và phản hồi sớm.</p>";
+        return (subject, Wrap("Yêu cầu kết nối học tập mới", content, "Xem & phản hồi", actionUrl));
     }
 
     public static (string Subject, string Body) ForBookingAccepted(
@@ -69,17 +46,12 @@ public static class NotificationEmailTemplates
         bool isTrial,
         string actionUrl)
     {
-        var subject = $"[OTSP] Gia sư {tutorName} đã chấp nhận yêu cầu học môn {subjectName}!";
-        var typeDesc = isTrial ? "buổi học thử" : "vào lớp học chính thức";
-        var btnText = isTrial ? "Xem lịch học thử" : "Xem lớp học & thời khóa biểu";
+        var subject = $"[OTSP] Gia sư {tutorName} đã chấp nhận yêu cầu môn {subjectName}";
+        var typeDesc = isTrial ? "buổi học thử" : "lớp học chính thức";
+        var btnText = isTrial ? "Xem lịch học thử" : "Xem lớp học";
 
-        var content = $@"
-            <p>Xin chào <strong>{studentName}</strong>,</p>
-            <p>Tuyệt vời! Gia sư <strong>{tutorName}</strong> đã đồng ý nhận yêu cầu <strong>{typeDesc}</strong> môn <strong>{subjectName}</strong> của bạn.</p>
-            <p>Lịch học và thông tin lớp học đã được tự động cập nhật vào tài khoản của bạn trên nền tảng OTSP.</p>";
-
-        var body = Wrap("Yêu cầu học đã được chấp nhận! 🎉", content, btnText, actionUrl);
-        return (subject, body);
+        var content = $"<p>Xin chào <strong>{Enc(studentName)}</strong>,</p><p>Gia sư <strong>{Enc(tutorName)}</strong> đã đồng ý yêu cầu <strong>{typeDesc}</strong> môn <strong>{Enc(subjectName)}</strong> của bạn.</p><p>Thông tin lớp và lịch học đã được cập nhật vào tài khoản OTSP.</p>";
+        return (subject, Wrap("Yêu cầu học đã được chấp nhận", content, btnText, actionUrl));
     }
 
     public static (string Subject, string Body) ForBookingRejected(
@@ -89,33 +61,22 @@ public static class NotificationEmailTemplates
         string? reason,
         string actionUrl = "https://otsp-giasu.vercel.app/tutors")
     {
-        var subject = $"[OTSP] Gia sư {tutorName} đã phản hồi về yêu cầu học môn {subjectName}";
-        var reasonBlock = string.IsNullOrWhiteSpace(reason)
+        var subject = $"[OTSP] Phản hồi yêu cầu học môn {subjectName}";
+        var reasonHtml = string.IsNullOrWhiteSpace(reason)
             ? ""
-            : $"<blockquote style='background: #fef2f2; border-left: 4px solid #dc2626; padding: 12px 16px; margin: 16px 0; color: #991b1b;'><strong>Lý do từ gia sư:</strong> {reason.Trim()}</blockquote>";
+            : $"<p style='background:#fef2f2;border-left:3px solid #dc2626;padding:8px 12px;margin:12px 0'><strong>Lý do:</strong> {Enc(reason.Trim())}</p>";
 
-        var content = $@"
-            <p>Xin chào <strong>{studentName}</strong>,</p>
-            <p>Gia sư <strong>{tutorName}</strong> hiện tại chưa thể sắp xếp nhận yêu cầu học môn <strong>{subjectName}</strong> của bạn.</p>
-            {reasonBlock}
-            <p>Đừng lo lắng, nền tảng OTSP vẫn còn rất nhiều gia sư giỏi và tận tâm khác đang sẵn sàng đồng hành cùng bạn!</p>";
-
-        var body = Wrap("Phản hồi yêu cầu học tập", content, "Tìm gia sư khác ngay", actionUrl);
-        return (subject, body);
+        var content = $"<p>Xin chào <strong>{Enc(studentName)}</strong>,</p><p>Gia sư <strong>{Enc(tutorName)}</strong> chưa thể nhận yêu cầu môn <strong>{Enc(subjectName)}</strong> của bạn lúc này.</p>{reasonHtml}<p>Bạn có thể chọn gia sư phù hợp khác trên OTSP.</p>";
+        return (subject, Wrap("Phản hồi yêu cầu kết nối", content, "Tìm gia sư khác", actionUrl));
     }
 
     public static (string Subject, string Body) ForTutorApproved(
         string tutorName,
         string actionUrl = "https://otsp-giasu.vercel.app/tutor/classrooms")
     {
-        var subject = "[OTSP] Chúc mừng! Hồ sơ gia sư của bạn đã được phê duyệt thành công 🎉";
-        var content = $@"
-            <p>Xin chào <strong>{tutorName}</strong>,</p>
-            <p>Ban quản trị OTSP vui mừng thông báo: <strong>Hồ sơ đăng ký gia sư</strong> của bạn đã được thẩm định và phê duyệt chính thức thành công!</p>
-            <p>Từ bây giờ, hồ sơ của bạn đã xuất hiện trên danh sách Gia sư OTSP. Bạn có thể bắt đầu tạo lớp học, xếp lịch rảnh và sẵn sàng tiếp nhận các yêu cầu kết nối từ học viên.</p>";
-
-        var body = Wrap("Hồ sơ gia sư đã được duyệt! 🎉", content, "Quản lý lớp học ngay", actionUrl);
-        return (subject, body);
+        var subject = "[OTSP] Hồ sơ gia sư của bạn đã được phê duyệt";
+        var content = $"<p>Xin chào <strong>{Enc(tutorName)}</strong>,</p><p>Hồ sơ gia sư của bạn đã được phê duyệt. Bạn có thể tạo lớp học, xếp lịch rảnh và tiếp nhận học viên ngay.</p>";
+        return (subject, Wrap("Hồ sơ gia sư đã được duyệt", content, "Quản lý lớp học", actionUrl));
     }
 
     public static (string Subject, string Body) ForTutorRejected(
@@ -123,18 +84,26 @@ public static class NotificationEmailTemplates
         string? reason,
         string actionUrl = "https://otsp-giasu.vercel.app/tutor/profile")
     {
-        var subject = "[OTSP] Thông báo kết quả thẩm định hồ sơ gia sư";
-        var reasonText = string.IsNullOrWhiteSpace(reason) ? "Thông tin hồ sơ hoặc giấy tờ chưa đáp ứng quy định." : reason.Trim();
-        var content = $@"
-            <p>Xin chào <strong>{tutorName}</strong>,</p>
-            <p>Rất tiếc, hồ sơ gia sư của bạn hiện chưa đáp ứng đầy đủ tiêu chuẩn xác thực trên nền tảng OTSP.</p>
-            <blockquote style='background: #fef2f2; border-left: 4px solid #dc2626; padding: 12px 16px; margin: 16px 0; color: #991b1b;'>
-                <strong>Lý do từ ban quản trị:</strong> {reasonText}
-            </blockquote>
-            <p>Bạn vui lòng đăng nhập vào hệ thống để cập nhật lại thông tin cá nhân, ảnh CCCD hoặc bằng cấp/chứng chỉ theo yêu cầu.</p>";
+        var subject = "[OTSP] Thông báo thẩm định hồ sơ gia sư";
+        var reasonText = string.IsNullOrWhiteSpace(reason) ? "Hồ sơ chưa đáp ứng đầy đủ thông tin." : reason.Trim();
+        var content = $"<p>Xin chào <strong>{Enc(tutorName)}</strong>,</p><p>Hồ sơ gia sư của bạn chưa được duyệt.</p><p style='background:#fef2f2;border-left:3px solid #dc2626;padding:8px 12px;margin:12px 0'><strong>Lý do:</strong> {Enc(reasonText)}</p><p>Vui lòng cập nhật lại hồ sơ hoặc bằng cấp để kiểm duyệt lại.</p>";
+        return (subject, Wrap("Kết quả thẩm định hồ sơ", content, "Cập nhật hồ sơ", actionUrl));
+    }
 
-        var body = Wrap("Kết quả thẩm định hồ sơ gia sư", content, "Cập nhật lại hồ sơ", actionUrl);
-        return (subject, body);
+    public static (string Subject, string Body) ForComplaintCreated(
+        int complaintId,
+        string senderName,
+        string? senderEmail,
+        string timeStr,
+        string content,
+        string? evidenceUrl)
+    {
+        var subject = $"[OTSP - Khiếu nại mới #{complaintId}] Từ {senderName}";
+        var evHtml = string.IsNullOrWhiteSpace(evidenceUrl)
+            ? ""
+            : $"<p><strong>Ảnh minh chứng:</strong> <a href='{Enc(evidenceUrl)}'>Xem ảnh</a></p>";
+        var bodyHtml = $"<p><strong>Mã:</strong> #{complaintId} | <strong>Người gửi:</strong> {Enc(senderName)} ({Enc(senderEmail ?? "—")})</p><p><strong>Thời gian:</strong> {Enc(timeStr)}</p><p style='background:#f8fafc;border-left:3px solid #dc2626;padding:8px 12px;white-space:pre-wrap'>{Enc(content.Trim())}</p>{evHtml}";
+        return (subject, Wrap($"Khiếu nại mới #{complaintId}", bodyHtml));
     }
 
     public static (string Subject, string Body) ForComplaintUpdated(
@@ -145,20 +114,72 @@ public static class NotificationEmailTemplates
         string? resolution,
         string actionUrl = "https://otsp-giasu.vercel.app/complaints")
     {
-        var subject = $"[OTSP] Cập nhật kết quả xử lý khiếu nại #{complaintId}";
-        var resolutionBlock = string.IsNullOrWhiteSpace(resolution)
+        var subject = $"[OTSP] Cập nhật khiếu nại #{complaintId}";
+        var resHtml = string.IsNullOrWhiteSpace(resolution)
             ? ""
-            : $"<blockquote style='background: #f8fafc; border-left: 4px solid #dc2626; padding: 12px 16px; margin: 16px 0; color: #1e293b;'><strong>Kết quả từ ban quản trị:</strong> {resolution.Trim()}</blockquote>";
+            : $"<p style='background:#f8fafc;border-left:3px solid #dc2626;padding:8px 12px;margin:12px 0'><strong>Kết quả:</strong> {Enc(resolution.Trim())}</p>";
 
-        var content = $@"
-            <p>Xin chào <strong>{senderName}</strong>,</p>
-            <p>Ban quản trị OTSP đã xử lý và cập nhật trạng thái cho khiếu nại <strong>#{complaintId}</strong> của bạn: <strong>{statusText.ToUpperInvariant()}</strong>.</p>
-            <p><strong>Nội dung khiếu nại:</strong> {contentSnippet}</p>
-            {resolutionBlock}
-            <p>Nếu bạn có bất kỳ thắc mắc nào thêm hoặc cần hỗ trợ chuyên sâu, vui lòng truy cập mục khiếu nại hoặc liên hệ đường dây hỗ trợ của OTSP.</p>";
+        var content = $"<p>Xin chào <strong>{Enc(senderName)}</strong>,</p><p>Khiếu nại <strong>#{complaintId}</strong> của bạn đã chuyển sang trạng thái: <strong>{Enc(statusText)}</strong>.</p><p><strong>Nội dung:</strong> {Enc(contentSnippet)}</p>{resHtml}";
+        return (subject, Wrap($"Phản hồi khiếu nại #{complaintId}", content, "Xem khiếu nại", actionUrl));
+    }
 
-        var body = Wrap("Phản hồi khiếu nại - OTSP", content, "Xem lịch sử khiếu nại", actionUrl);
-        return (subject, body);
+    public static (string Subject, string Body) ForContactSubmitted(
+        string fullName,
+        string contactInfo,
+        string topic,
+        string timeStr,
+        string message)
+    {
+        var subject = $"[OTSP - Liên hệ mới] {topic} từ {fullName}";
+        var bodyHtml = $"<p><strong>Họ tên:</strong> {Enc(fullName)} | <strong>Liên hệ:</strong> {Enc(contactInfo)}</p><p><strong>Chủ đề:</strong> {Enc(topic)} | <strong>Thời gian:</strong> {Enc(timeStr)}</p><p style='background:#f8fafc;border-left:3px solid #dc2626;padding:8px 12px;white-space:pre-wrap'>{Enc(message)}</p>";
+        return (subject, Wrap("Yêu cầu liên hệ mới", bodyHtml));
+    }
+
+    public static (string Subject, string Body) ForPaymentStudentReceipt(
+        int paymentId,
+        string studentName,
+        string className,
+        string subjectName,
+        string tutorName,
+        string amountStr,
+        string paidTimeStr)
+    {
+        var subject = $"[OTSP] Biên lai thanh toán - {className}";
+        var content = $"<p>Xin chào <strong>{Enc(studentName)}</strong>,</p><p>Bạn đã thanh toán thành công học phí với thông tin:</p><ul style='padding-left:18px'><li>Mã đơn: <strong>OTSP{paymentId:D6}</strong></li><li>Lớp: <strong>{Enc(className)}</strong> ({Enc(subjectName)})</li><li>Gia sư: <strong>{Enc(tutorName)}</strong></li><li>Số tiền: <strong style='color:#16a34a'>{Enc(amountStr)}</strong></li><li>Thời gian: {Enc(paidTimeStr)}</li></ul><p>Quyền vào phòng học trực tuyến đã được kích hoạt.</p>";
+        return (subject, Wrap("Biên lai thanh toán thành công", content));
+    }
+
+    public static (string Subject, string Body) ForPaymentTutorNotice(
+        string tutorName,
+        string studentName,
+        string amountStr,
+        string className)
+    {
+        var subject = $"[OTSP] Học viên {studentName} đã nộp học phí lớp {className}";
+        var content = $"<p>Kính gửi <strong>{Enc(tutorName)}</strong>,</p><p>Học viên <strong>{Enc(studentName)}</strong> vừa thanh toán <strong>{Enc(amountStr)}</strong> cho lớp <strong>{Enc(className)}</strong>.</p><p>Hệ thống đã tự động cấp quyền vào phòng học cho học viên.</p>";
+        return (subject, Wrap("Thông báo thu học phí mới", content));
+    }
+
+    public static (string Subject, string Body) ForSessionCancelled(
+        string studentName,
+        string tutorName,
+        string className,
+        string timeStr,
+        string reason)
+    {
+        var subject = $"[OTSP] Thông báo hủy buổi học lớp {className}";
+        var content = $"<p>Xin chào <strong>{Enc(studentName)}</strong>,</p><p>Gia sư <strong>{Enc(tutorName)}</strong> đã hủy buổi học lớp <strong>{Enc(className)}</strong> lúc <strong>{Enc(timeStr)}</strong>.</p><p><strong>Lý do:</strong> {Enc(reason)}</p><p>Vui lòng theo dõi Thời khóa biểu để cập nhật lịch bù.</p>";
+        return (subject, Wrap("Thông báo hủy buổi học", content));
+    }
+
+    public static (string Subject, string Body) ForPasswordReset(
+        string toEmail,
+        string resetToken,
+        string resetUrl)
+    {
+        var subject = "[OTSP] Hướng dẫn đặt lại mật khẩu";
+        var content = $"<p>Xin chào,</p><p>Bạn đã yêu cầu đặt lại mật khẩu cho email <strong>{Enc(toEmail)}</strong>.</p><p style='background:#f1f5f9;padding:10px;border-radius:6px;text-align:center;font-weight:bold;letter-spacing:1.5px;color:#dc2626'>{Enc(resetToken)}</p>";
+        return (subject, Wrap("Đặt lại mật khẩu OTSP", content, "Đặt lại mật khẩu", resetUrl, "Nếu bạn không thực hiện yêu cầu này, hãy bỏ qua email."));
     }
 
     public static (string Subject, string Body) ForChatMessage(
@@ -167,18 +188,8 @@ public static class NotificationEmailTemplates
         string contentSnippet,
         string actionUrl = "https://otsp-giasu.vercel.app/chat")
     {
-        var subject = $"[OTSP] Bạn có tin nhắn mới từ {senderName}";
-        var content = $@"
-            <p>Xin chào <strong>{receiverName}</strong>,</p>
-            <p>Bạn vừa nhận được tin nhắn mới từ <strong>{senderName}</strong> trên nền tảng OTSP:</p>
-            <blockquote style='background: #f8fafc; border-left: 4px solid #dc2626; padding: 12px 16px; margin: 16px 0; font-style: italic; color: #475569;'>
-                ""{contentSnippet}""
-            </blockquote>
-            <p>Vui lòng đăng nhập vào hệ thống để tiếp tục trao đổi.</p>";
-
-        var footerNote = "Để tránh làm phiền, hệ thống chỉ gửi tối đa 1 email mỗi 30 phút cho mỗi cuộc trò chuyện.";
-        var body = Wrap("Tin nhắn mới - OTSP", content, "Vào trò chuyện ngay", actionUrl, footerNote);
-        return (subject, body);
+        var subject = $"[OTSP] Tin nhắn mới từ {senderName}";
+        var content = $"<p>Xin chào <strong>{Enc(receiverName)}</strong>,</p><p><strong>{Enc(senderName)}</strong> vừa nhắn cho bạn:</p><p style='background:#f8fafc;border-left:3px solid #dc2626;padding:8px 12px;font-style:italic'>\"{Enc(contentSnippet)}\"</p>";
+        return (subject, Wrap("Tin nhắn mới trên OTSP", content, "Mở trò chuyện", actionUrl, "Hệ thống chỉ gửi tối đa 1 email mỗi 30 phút cho mỗi cuộc trò chuyện."));
     }
 }
-

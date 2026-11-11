@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Backend_Project_OTSP.Data;
 using Backend_Project_OTSP.Dtos;
+using Backend_Project_OTSP.Dtos.Tutor;
 using Backend_Project_OTSP.Models;
 using Backend_Project_OTSP.Services;
 using static Backend_Project_OTSP.Models.Enums;
@@ -150,10 +151,5 @@ public class TutorAvailabilityApiController : ControllerBase
     }
 
     private static string ToSlotKey(DayOfWeek day, int startHour) => $"{(int)day}:{startHour}";
-}
-
-public class SaveAvailabilityRequest
-{
-    public string[]? SelectedSlotKeys { get; set; }
 }
 

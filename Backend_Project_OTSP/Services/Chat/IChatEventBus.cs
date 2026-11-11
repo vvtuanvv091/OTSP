@@ -1,3 +1,5 @@
+using Backend_Project_OTSP.Dtos.Chat;
+
 namespace Backend_Project_OTSP.Services.Chat;
 
 public interface IChatEventBus

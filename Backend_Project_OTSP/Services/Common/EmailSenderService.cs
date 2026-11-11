@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Mail;
 using Backend_Project_OTSP.Services.Common;
+using Backend_Project_OTSP.Services.Notifications;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
@@ -19,27 +20,7 @@ public class EmailSenderService : IEmailSenderService
 
     public async Task<bool> SendPasswordResetEmailAsync(string toEmail, string resetToken, string resetUrl, CancellationToken ct = default)
     {
-        var subject = "[OTSP] Hướng dẫn đặt lại mật khẩu tài khoản";
-        var body = $@"
-            <div style=""font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px; color: #1e293b;"">
-                <div style=""text-align: center; margin-bottom: 24px;"">
-                    <h2 style=""color: #dc2626; margin: 0;"">OTSP - Nền tảng kết nối Gia sư</h2>
-                </div>
-                <p>Xin chào,</p>
-                <p>Bạn đã gửi yêu cầu đặt lại mật khẩu cho tài khoản liên kết với email <strong>{toEmail}</strong> trên hệ thống OTSP.</p>
-                <p>Mã xác thực của bạn là:</p>
-                <div style=""background-color: #f1f5f9; padding: 12px; border-radius: 6px; font-size: 18px; font-weight: bold; letter-spacing: 2px; text-align: center; color: #dc2626; margin: 16px 0;"">
-                    {resetToken}
-                </div>
-                <p>Hoặc bạn có thể bấm vào liên kết dưới đây để trực tiếp tạo mật khẩu mới:</p>
-                <div style=""text-align: center; margin: 24px 0;"">
-                    <a href=""{resetUrl}"" style=""background-color: #dc2626; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;"">Đặt lại mật khẩu</a>
-                </div>
-                <p style=""font-size: 13px; color: #64748b;"">Nếu bạn không yêu cầu thay đổi mật khẩu, vui lòng bỏ qua email này hoặc liên hệ hỗ trợ OTSP để bảo vệ tài khoản.</p>
-                <hr style=""border: 0; border-top: 1px solid #e2e8f0; margin: 24px 0;"" />
-                <p style=""font-size: 12px; color: #94a3b8; text-align: center;"">© OTSP - Hệ thống kết nối Gia sư và Học viên online.</p>
-            </div>";
-
+        var (subject, body) = NotificationEmailTemplates.ForPasswordReset(toEmail, resetToken, resetUrl);
         return await SendEmailInternalAsync(toEmail, subject, body);
     }
 

@@ -4,6 +4,8 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Backend_Project_OTSP.Data;
+using Backend_Project_OTSP.Dtos.Common.Complaint;
+using Backend_Project_OTSP.Dtos.Common.Notification;
 using Backend_Project_OTSP.Models;
 using Backend_Project_OTSP.Services;
 using Backend_Project_OTSP.Services.Common;
@@ -41,6 +43,7 @@ public class ComplaintApiController : ControllerBase
         [FromForm] string content,
         [FromForm] string? targetUserId = null,
         IFormFile? file = null,
+        [FromServices] IEmailQueue? emailQueue = null,
         [FromServices] IEmailSenderService? emailSender = null,
         [FromServices] IConfiguration? configuration = null,
         CancellationToken cancellationToken = default)
@@ -105,26 +108,22 @@ public class ComplaintApiController : ControllerBase
             }
             await _db.SaveChangesAsync(cancellationToken);
 
-            // Gửi email thông báo khiếu nại tới email quản trị viên
-            if (emailSender != null)
+            // Gửi email thông báo khiếu nại tới email quản trị viên qua hàng đợi nền
+            if (emailQueue != null || emailSender != null)
             {
                 var adminEmail = configuration?["AdminNotification:Email"] ?? "tongngoctuan09@gmail.com";
-                var complaintSubject = $"[OTSP - Khiếu nại mới #{complaint.Id}] Từ {senderName}";
-                var complaintBody = $@"
-                    <div style=""font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px; color: #1e293b;"">
-                        <div style=""border-bottom: 2px solid #dc2626; padding-bottom: 12px; margin-bottom: 16px;"">
-                            <h2 style=""color: #dc2626; margin: 0;"">Có khiếu nại mới cần quản trị viên xử lý</h2>
-                        </div>
-                        <p><strong>Mã khiếu nại:</strong> #{complaint.Id}</p>
-                        <p><strong>Người gửi:</strong> {senderName} ({sender?.Email})</p>
-                        <p><strong>Thời gian gửi:</strong> {DateTime.UtcNow.AddHours(7):dd/MM/yyyy HH:mm:ss} (GMT+7)</p>
-                        <hr style=""border: 0; border-top: 1px solid #e2e8f0; margin: 16px 0;"" />
-                        <p><strong>Nội dung khiếu nại:</strong></p>
-                        <div style=""background-color: #f8fafc; border-left: 4px solid #dc2626; padding: 12px 16px; border-radius: 4px; white-space: pre-wrap;"">{content.Trim()}</div>
-                        {(evidenceUrl != null ? $"<p style='margin-top: 16px;'><strong>Hình ảnh minh chứng:</strong> <a href='{evidenceUrl}' target='_blank'>Xem ảnh đính kèm</a></p>" : "")}
-                    </div>";
+                var timeStr = DateTime.UtcNow.AddHours(7).ToString("dd/MM/yyyy HH:mm:ss") + " (GMT+7)";
+                var (complaintSubject, complaintBody) = NotificationEmailTemplates.ForComplaintCreated(
+                    complaint.Id, senderName, sender?.Email, timeStr, content, evidenceUrl);
 
-                await emailSender.SendNotificationEmailAsync(adminEmail, complaintSubject, complaintBody, cancellationToken);
+                if (emailQueue != null)
+                {
+                    emailQueue.Enqueue(new EmailQueueItemDto(adminEmail, complaintSubject, complaintBody));
+                }
+                else if (emailSender != null)
+                {
+                    await emailSender.SendNotificationEmailAsync(adminEmail, complaintSubject, complaintBody, cancellationToken);
+                }
             }
         }
 
@@ -293,12 +292,6 @@ public class ComplaintApiController : ControllerBase
                 totalAll = totalNew + totalProcessing + totalResolved + totalRejected
             }
         });
-    }
-
-    public class UpdateComplaintStatusRequest
-    {
-        public string Status { get; set; } = "";
-        public string? Resolution { get; set; }
     }
 
     /// <summary>

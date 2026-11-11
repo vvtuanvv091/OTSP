@@ -23,3 +23,8 @@ public class TutorAvailabilityDto
 
     public string TimeRange => $"{StartTime:HH\\:mm} - {EndTime:HH\\:mm}";
 }
+
+public class SaveAvailabilityRequest
+{
+    public string[]? SelectedSlotKeys { get; set; }
+}

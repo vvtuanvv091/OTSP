@@ -4,7 +4,9 @@ using Microsoft.EntityFrameworkCore;
 using Backend_Project_OTSP.Data;
 using Backend_Project_OTSP.Dtos;
 using Backend_Project_OTSP.Dtos.Admin;
+using Backend_Project_OTSP.Dtos.Common.Notification;
 using Backend_Project_OTSP.Models;
+using Backend_Project_OTSP.Services.Notifications;
 using static Backend_Project_OTSP.Models.Enums;
 
 namespace Backend_Project_OTSP.Services.Admin;
@@ -16,12 +18,18 @@ public sealed class AdminOperationsService : IAdminOperationsService
     private readonly ApplicationDbContext _db;
     private readonly UserManager<ApplicationUser> _users;
     private readonly RoleManager<ApplicationRole> _roles;
+    private readonly INotificationDispatcher? _dispatcher;
 
-    public AdminOperationsService(ApplicationDbContext db, UserManager<ApplicationUser> users, RoleManager<ApplicationRole> roles)
+    public AdminOperationsService(
+        ApplicationDbContext db,
+        UserManager<ApplicationUser> users,
+        RoleManager<ApplicationRole> roles,
+        INotificationDispatcher? dispatcher = null)
     {
         _db = db;
         _users = users;
         _roles = roles;
+        _dispatcher = dispatcher;
     }
 
     public async Task<object> GetReviewsAsync(AdminOperationsQuery query, CancellationToken ct)
@@ -179,7 +187,7 @@ public sealed class AdminOperationsService : IAdminOperationsService
             return (false, "Trạng thái xử lý không hợp lệ.");
         if (request.Status is ComplaintStatus.Resolved or ComplaintStatus.Rejected && string.IsNullOrWhiteSpace(request.Resolution))
             return (false, "Nhập kết quả xử lý trước khi đóng khiếu nại.");
-        var item = await _db.Complaints.SingleOrDefaultAsync(x => x.Id == id, ct);
+        var item = await _db.Complaints.Include(x => x.Sender).SingleOrDefaultAsync(x => x.Id == id, ct);
         if (item == null) return (false, "Không tìm thấy khiếu nại.");
         item.Status = request.Status;
         item.Resolution = string.IsNullOrWhiteSpace(request.Resolution) ? null : request.Resolution.Trim();
@@ -191,16 +199,33 @@ public sealed class AdminOperationsService : IAdminOperationsService
             ComplaintStatus.Rejected => "đã bị từ chối",
             _ => "đã được cập nhật"
         };
-        _db.Notifications.Add(new Notification
-        {
-            UserId = item.SenderId,
-            Title = $"Khiếu nại #{item.Id} {statusText}",
-            Content = string.IsNullOrWhiteSpace(item.Resolution) ? $"Quản trị viên cập nhật khiếu nại của bạn thành trạng thái: {statusText}." : $"Kết quả xử lý khiếu nại: {item.Resolution}",
-            CreatedAt = DateTime.UtcNow,
-            IsRead = false
-        });
         AddAudit(adminUserId, ipAddress, $"AdminComplaint:{id}:{request.Status}");
-        await _db.SaveChangesAsync(ct);
+        if (_dispatcher != null)
+        {
+            await _db.SaveChangesAsync(ct);
+            var snippet = item.Content.Length > 80 ? item.Content[..80] + "..." : item.Content;
+            await _dispatcher.DispatchComplaintUpdatedAsync(new ComplaintUpdatedNotificationEvent(
+                SenderUserId: item.SenderId,
+                SenderEmail: item.Sender?.Email,
+                SenderName: item.Sender?.FullName ?? "bạn",
+                ComplaintId: item.Id,
+                StatusText: statusText,
+                ContentSnippet: snippet,
+                Resolution: item.Resolution
+            ), ct);
+        }
+        else
+        {
+            _db.Notifications.Add(new Notification
+            {
+                UserId = item.SenderId,
+                Title = $"Khiếu nại #{item.Id} {statusText}",
+                Content = string.IsNullOrWhiteSpace(item.Resolution) ? $"Quản trị viên cập nhật khiếu nại của bạn thành trạng thái: {statusText}." : $"Kết quả xử lý khiếu nại: {item.Resolution}",
+                CreatedAt = DateTime.UtcNow,
+                IsRead = false
+            });
+            await _db.SaveChangesAsync(ct);
+        }
         return (true, null);
     }
 

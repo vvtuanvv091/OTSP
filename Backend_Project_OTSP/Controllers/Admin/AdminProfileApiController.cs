@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Backend_Project_OTSP.Data;
+using Backend_Project_OTSP.Dtos.Admin;
 using Backend_Project_OTSP.Services;
 using Backend_Project_OTSP.Services.Common;
 
@@ -96,13 +97,4 @@ public sealed class AdminProfileApiController : ControllerBase
         _cache.Remove($"hdr_summary_{userId}");
         _cache.Remove($"hdr_user_{userId}");
     }
-}
-
-public sealed class UpdateAdminProfileRequest
-{
-    [Required, StringLength(150)]
-    public string? FullName { get; set; }
-
-    [StringLength(30)]
-    public string? PhoneNumber { get; set; }
 }

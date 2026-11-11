@@ -156,5 +156,3 @@ public class ClassSessionApiController : ControllerBase
     }
 }
 
-public record CancelClassSessionRequestDto(string? Reason);
-

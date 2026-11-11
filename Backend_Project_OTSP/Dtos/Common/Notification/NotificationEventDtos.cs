@@ -1,4 +1,10 @@
-namespace Backend_Project_OTSP.Services.Notifications;
+namespace Backend_Project_OTSP.Dtos.Common.Notification;
+
+public sealed record EmailQueueItemDto(
+    string ToEmail,
+    string Subject,
+    string BodyHtml
+);
 
 public sealed record BookingCreatedNotificationEvent(
     string TutorUserId,
@@ -60,4 +66,3 @@ public sealed record ChatMessageNotificationEvent(
     string SenderName,
     string Content
 );
-

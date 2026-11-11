@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Backend_Project_OTSP.Data;
+using Backend_Project_OTSP.Dtos.Tutor;
 using System.ComponentModel.DataAnnotations;
 using static Backend_Project_OTSP.Models.Enums;
 
@@ -280,18 +281,4 @@ public class TutorIncomeApiController : ControllerBase
         if (normalizedName.Contains("ocb")) return "OCB";
         return "MB";
     }
-}
-
-public sealed class TutorIncomeBankAccountRequest
-{
-    [Required]
-    public string? BankName { get; set; }
-
-    [Required]
-    public string? AccountNumber { get; set; }
-
-    [Required]
-    public string? AccountHolder { get; set; }
-
-    public string? CitizenId { get; set; }
 }

@@ -91,3 +91,5 @@ public sealed class ClassSessionStatusDto
     public int ActiveParticipantCount { get; init; }
 }
 
+public record CancelClassSessionRequestDto(string? Reason);
+

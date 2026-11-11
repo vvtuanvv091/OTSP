@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Backend_Project_OTSP.Data;
+using Backend_Project_OTSP.Dtos.Common.Notification;
 using Backend_Project_OTSP.Hubs;
 using Backend_Project_OTSP.Services.Common;
 using Backend_Project_OTSP.Services.Notifications;
@@ -62,7 +63,8 @@ public sealed class ChatNotificationWorker : BackgroundService
                 // 3. XỬ LÝ GỬI EMAIL THÔNG BÁO (Có Throttle chống spam)
                 // Nếu trong 30 phút qua đã gửi email thông báo từ người gửi này rồi, KHÔNG gửi thêm email nữa
                 var throttleKey = $"email_chat_throttle_{evt.SenderId}_{evt.ReceiverId}";
-                if (!cache.TryGetValue(throttleKey, out _) && emailSender != null)
+                var emailQueue = scope.ServiceProvider.GetService<IEmailQueue>();
+                if (!cache.TryGetValue(throttleKey, out _) && (emailQueue != null || emailSender != null))
                 {
                     var receiverUser = await db.Users
                         .AsNoTracking()
@@ -81,14 +83,20 @@ public sealed class ChatNotificationWorker : BackgroundService
                             contentSnippet: evt.Content,
                             actionUrl: "https://otsp-giasu.vercel.app/chat");
 
-                        try
+                        if (emailQueue != null)
                         {
-                            await emailSender.SendNotificationEmailAsync(receiverUser.Email, subject, body, stoppingToken);
-                            _logger.LogInformation("Đã gửi email thông báo tin nhắn (throttled 30p) tới {Email}", receiverUser.Email);
+                            emailQueue.Enqueue(new EmailQueueItemDto(receiverUser.Email, subject, body));
                         }
-                        catch (Exception ex)
+                        else if (emailSender != null)
                         {
-                            _logger.LogWarning(ex, "Không thể gửi email cho {Email}", receiverUser.Email);
+                            try
+                            {
+                                await emailSender.SendNotificationEmailAsync(receiverUser.Email, subject, body, stoppingToken);
+                            }
+                            catch (Exception ex)
+                            {
+                                _logger.LogWarning(ex, "Không thể gửi email cho {Email}", receiverUser.Email);
+                            }
                         }
                     }
                 }

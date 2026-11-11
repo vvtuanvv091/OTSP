@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.SignalR;
 using Backend_Project_OTSP.Data;
+using Backend_Project_OTSP.Dtos.Common.Notification;
 using Backend_Project_OTSP.Hubs;
 using Backend_Project_OTSP.Models;
 using Backend_Project_OTSP.Services.Common;
@@ -11,6 +12,7 @@ public class NotificationService : INotificationService, INotificationDispatcher
     private readonly ApplicationDbContext _db;
     private readonly IHubContext<ConnectionRequestHub> _connectionRequestHub;
     private readonly IHubContext<ChatHub> _chatHub;
+    private readonly IEmailQueue? _emailQueue;
     private readonly IEmailSenderService? _emailSender;
     private readonly ILogger<NotificationService> _logger;
 
@@ -19,12 +21,14 @@ public class NotificationService : INotificationService, INotificationDispatcher
         IHubContext<ConnectionRequestHub> connectionRequestHub,
         IHubContext<ChatHub> chatHub,
         ILogger<NotificationService> logger,
+        IEmailQueue? emailQueue = null,
         IEmailSenderService? emailSender = null)
     {
         _db = db;
         _connectionRequestHub = connectionRequestHub;
         _chatHub = chatHub;
         _logger = logger;
+        _emailQueue = emailQueue;
         _emailSender = emailSender;
     }
 
@@ -65,8 +69,15 @@ public class NotificationService : INotificationService, INotificationDispatcher
 
     public void EnqueueEmail(string toEmail, string subject, string bodyHtml)
     {
-        if (string.IsNullOrWhiteSpace(toEmail) || _emailSender == null) return;
+        if (string.IsNullOrWhiteSpace(toEmail)) return;
 
+        if (_emailQueue != null)
+        {
+            _emailQueue.Enqueue(new EmailQueueItemDto(toEmail, subject, bodyHtml));
+            return;
+        }
+
+        if (_emailSender == null) return;
         _ = Task.Run(async () =>
         {
             try

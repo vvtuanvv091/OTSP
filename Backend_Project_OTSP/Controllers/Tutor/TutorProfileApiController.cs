@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Backend_Project_OTSP.Data;
+using Backend_Project_OTSP.Dtos.Tutor;
 using Backend_Project_OTSP.Services;
 using Backend_Project_OTSP.Services.Common;
 
@@ -206,15 +207,5 @@ public class TutorProfileApiController : ControllerBase
             return BadRequest(new { success = false, message = ex.Message });
         }
     }
-}
-
-public class UpdateTutorProfileRequest
-{
-    public string? DisplayName { get; set; }
-    public string? Introduction { get; set; }
-    public string? CitizenIdNumber { get; set; }
-    public string? ResidenceAddress { get; set; }
-    public string? PhoneNumber { get; set; }
-    public decimal? HourlyFee { get; set; }
 }
 

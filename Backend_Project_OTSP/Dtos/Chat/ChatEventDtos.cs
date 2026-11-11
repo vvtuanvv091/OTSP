@@ -1,4 +1,4 @@
-namespace Backend_Project_OTSP.Services.Chat;
+namespace Backend_Project_OTSP.Dtos.Chat;
 
 public record ChatMessageCreatedEvent(
     int MessageId,
@@ -8,4 +8,3 @@ public record ChatMessageCreatedEvent(
     string Content,
     DateTime SentAtUtc
 );
-

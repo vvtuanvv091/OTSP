@@ -2,10 +2,12 @@ using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Backend_Project_OTSP.Data;
 using Backend_Project_OTSP.Dtos;
+using Backend_Project_OTSP.Dtos.Common.Notification;
 using Backend_Project_OTSP.Dtos.Sessions;
 using Backend_Project_OTSP.Hubs;
 using Backend_Project_OTSP.Models;
 using Backend_Project_OTSP.Services.Common;
+using Backend_Project_OTSP.Services.Notifications;
 using static Backend_Project_OTSP.Models.Enums;
 
 namespace Backend_Project_OTSP.Services.Sessions;
@@ -18,17 +20,20 @@ public sealed class ClassSessionService : IClassSessionService
     private readonly ApplicationDbContext _db;
     private readonly IHubContext<ConnectionRequestHub> _hubContext;
     private readonly ILogger<ClassSessionService> _logger;
+    private readonly IEmailQueue? _emailQueue;
     private readonly IEmailSenderService? _emailSender;
 
     public ClassSessionService(
         ApplicationDbContext db,
         IHubContext<ConnectionRequestHub> hubContext,
         ILogger<ClassSessionService> logger,
+        IEmailQueue? emailQueue = null,
         IEmailSenderService? emailSender = null)
     {
         _db = db;
         _hubContext = hubContext;
         _logger = logger;
+        _emailQueue = emailQueue;
         _emailSender = emailSender;
     }
 
@@ -502,20 +507,17 @@ public sealed class ClassSessionService : IClassSessionService
                         });
                     }
 
-                    if (!string.IsNullOrEmpty(st.Email) && _emailSender != null)
+                    if (!string.IsNullOrEmpty(st.Email) && (_emailQueue != null || _emailSender != null))
                     {
-                        var subject = $"[OTSP] Thông báo hủy buổi học lớp {className}";
-                        var bodyHtml = $@"
-                            <div style=""font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #fee2e2; border-radius: 8px; color: #1e293b;"">
-                                <h3 style=""color: #dc2626; margin-top: 0;"">Thông báo hủy buổi học</h3>
-                                <p>Xin chào <strong>{st.FullName}</strong>,</p>
-                                <p>Gia sư <strong>{tutorName}</strong> đã thông báo hủy buổi học của lớp <strong>{className}</strong> dự kiến diễn ra vào lúc <strong>{timeStr}</strong>.</p>
-                                <p><strong>Lý do:</strong> {reason}</p>
-                                <p>Lịch học bù sẽ được gia sư thống nhất và thông báo lại sau. Vui lòng theo dõi mục <a href=""/Student_Parent/StudentSchedule"">Thời khóa biểu</a> để cập nhật lịch mới nhất.</p>
-                                <hr style=""border: 0; border-top: 1px solid #fee2e2; margin: 20px 0;"" />
-                                <p style=""font-size: 12px; color: #94a3b8;"">© Nền tảng OTSP</p>
-                            </div>";
-                        await _emailSender.SendNotificationEmailAsync(st.Email, subject, bodyHtml, cancellationToken);
+                        var (subject, bodyHtml) = NotificationEmailTemplates.ForSessionCancelled(st.FullName ?? "bạn", tutorName, className, timeStr, reason);
+                        if (_emailQueue != null)
+                        {
+                            _emailQueue.Enqueue(new EmailQueueItemDto(st.Email, subject, bodyHtml));
+                        }
+                        else if (_emailSender != null)
+                        {
+                            await _emailSender.SendNotificationEmailAsync(st.Email, subject, bodyHtml, cancellationToken);
+                        }
                     }
                 }
                 await _db.SaveChangesAsync(cancellationToken);
