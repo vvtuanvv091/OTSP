@@ -208,6 +208,13 @@ namespace Backend_Project_OTSP.Data.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<string>("Category")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Detail")
+                        .HasColumnType("text");
+
                     b.Property<string>("IpAddress")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
@@ -215,8 +222,11 @@ namespace Backend_Project_OTSP.Data.Migrations
                     b.Property<DateTime>("Timestamp")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("UserAgent")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
                     b.Property<string>("UserId")
-                        .IsRequired()
                         .HasColumnType("text");
 
                     b.HasKey("Id");
@@ -669,6 +679,9 @@ namespace Backend_Project_OTSP.Data.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<int?>("ClassroomId")
+                        .HasColumnType("integer");
+
                     b.Property<string>("Content")
                         .IsRequired()
                         .HasColumnType("text");
@@ -697,6 +710,8 @@ namespace Backend_Project_OTSP.Data.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("ClassroomId");
 
                     b.HasIndex("ReceiverId");
 
@@ -920,12 +935,19 @@ namespace Backend_Project_OTSP.Data.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("AdminNote")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
                     b.Property<int>("ClassSessionId")
                         .HasColumnType("integer");
 
                     b.Property<string>("Comment")
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
+
+                    b.Property<bool>("IsHidden")
+                        .HasColumnType("boolean");
 
                     b.Property<DateTime>("ReviewedAt")
                         .HasColumnType("timestamp with time zone");
@@ -953,6 +975,10 @@ namespace Backend_Project_OTSP.Data.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("Category")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -965,6 +991,10 @@ namespace Backend_Project_OTSP.Data.Migrations
 
                     b.Property<int?>("ReviewedByAdminId")
                         .HasColumnType("integer");
+
+                    b.Property<string>("Severity")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
 
                     b.Property<int>("Status")
                         .HasColumnType("integer");
@@ -1134,6 +1164,22 @@ namespace Backend_Project_OTSP.Data.Migrations
                     b.Property<double>("AverageRating")
                         .HasColumnType("double precision");
 
+                    b.Property<string>("BankAccountHolder")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("BankAccountNumber")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("BankCitizenId")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("BankName")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
                     b.Property<decimal>("HourlyFee")
                         .HasPrecision(18)
                         .HasColumnType("numeric(18,0)");
@@ -1192,6 +1238,62 @@ namespace Backend_Project_OTSP.Data.Migrations
                         .IsUnique();
 
                     b.ToTable("TutorSubjects");
+                });
+
+            modelBuilder.Entity("Backend_Project_OTSP.Models.WebVisit", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("DeviceId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("FirstPath")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime>("FirstVisitedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("HitCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1);
+
+                    b.Property<string>("IpAddress")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTime>("LastVisitedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("UserAgent")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("UserId")
+                        .HasColumnType("text");
+
+                    b.Property<DateOnly>("VisitDate")
+                        .HasColumnType("date");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("VisitDate")
+                        .HasDatabaseName("IX_WebVisits_VisitDate");
+
+                    b.HasIndex("DeviceId", "VisitDate")
+                        .IsUnique()
+                        .HasDatabaseName("IX_WebVisits_DeviceId_VisitDate");
+
+                    b.ToTable("WebVisits");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>
@@ -1326,9 +1428,7 @@ namespace Backend_Project_OTSP.Data.Migrations
                 {
                     b.HasOne("Backend_Project_OTSP.Models.ApplicationUser", "User")
                         .WithMany("AuditLogs")
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .HasForeignKey("UserId");
 
                     b.Navigation("User");
                 });
@@ -1544,6 +1644,10 @@ namespace Backend_Project_OTSP.Data.Migrations
 
             modelBuilder.Entity("Backend_Project_OTSP.Models.Messager", b =>
                 {
+                    b.HasOne("Backend_Project_OTSP.Models.Classroom", "Classroom")
+                        .WithMany()
+                        .HasForeignKey("ClassroomId");
+
                     b.HasOne("Backend_Project_OTSP.Models.ApplicationUser", "Receiver")
                         .WithMany("ReceivedMessagers")
                         .HasForeignKey("ReceiverId")
@@ -1555,6 +1659,8 @@ namespace Backend_Project_OTSP.Data.Migrations
                         .HasForeignKey("SenderId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.Navigation("Classroom");
 
                     b.Navigation("Receiver");
 
@@ -1772,6 +1878,16 @@ namespace Backend_Project_OTSP.Data.Migrations
                     b.Navigation("Subject");
 
                     b.Navigation("Tutor");
+                });
+
+            modelBuilder.Entity("Backend_Project_OTSP.Models.WebVisit", b =>
+                {
+                    b.HasOne("Backend_Project_OTSP.Models.ApplicationUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>

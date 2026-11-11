@@ -31,8 +31,9 @@ public class TutorReviewApiController : ControllerBase
 
         if (tutor == null) return NotFound(new { message = "Không tìm thấy thông tin gia sư." });
 
+        pageSize = Math.Clamp(pageSize, 1, 100);
+
         var reviewsQuery = _db.Reviews.AsNoTracking()
-            .Include(r => r.Student).ThenInclude(s => s.User)
             .Where(r => r.ClassSession.Classroom.TutorId == tutor.Id)
             .OrderByDescending(r => r.ReviewedAt);
 
@@ -54,12 +55,20 @@ public class TutorReviewApiController : ControllerBase
             })
             .ToListAsync(cancellationToken);
 
-        var allScores = await _db.Reviews
+        var breakdown = await _db.Reviews
+            .AsNoTracking()
             .Where(r => r.ClassSession.Classroom.TutorId == tutor.Id)
-            .Select(r => r.Score)
+            .GroupBy(r => r.Score)
+            .Select(g => new { Score = g.Key, Count = g.Count() })
             .ToListAsync(cancellationToken);
 
-        double averageRating = allScores.Count > 0 ? Math.Round(allScores.Average(), 1) : (tutor.AverageRating > 0 ? Math.Round(tutor.AverageRating, 1) : 5.0);
+        var countByScore = breakdown.ToDictionary(x => x.Score, x => x.Count);
+        var scoreSum = breakdown.Sum(x => x.Score * x.Count);
+        var scoreTotal = breakdown.Sum(x => x.Count);
+
+        double averageRating = scoreTotal > 0
+            ? Math.Round(scoreSum / (double)scoreTotal, 1)
+            : (tutor.AverageRating > 0 ? Math.Round(tutor.AverageRating, 1) : 5.0);
 
         return Ok(new
         {
@@ -71,11 +80,11 @@ public class TutorReviewApiController : ControllerBase
             averageRating,
             ratingBreakdown = new
             {
-                score5 = allScores.Count(s => s == 5),
-                score4 = allScores.Count(s => s == 4),
-                score3 = allScores.Count(s => s == 3),
-                score2 = allScores.Count(s => s == 2),
-                score1 = allScores.Count(s => s == 1)
+                score5 = countByScore.GetValueOrDefault(5, 0),
+                score4 = countByScore.GetValueOrDefault(4, 0),
+                score3 = countByScore.GetValueOrDefault(3, 0),
+                score2 = countByScore.GetValueOrDefault(2, 0),
+                score1 = countByScore.GetValueOrDefault(1, 0)
             }
         });
     }

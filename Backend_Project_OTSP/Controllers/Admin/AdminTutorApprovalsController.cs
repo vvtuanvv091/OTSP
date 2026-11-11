@@ -72,8 +72,16 @@ public class AdminTutorApprovalsController : ControllerBase
 
         if (contentType == "redirect")
         {
+            if (!Uri.TryCreate(filePath, UriKind.Absolute, out var uri)
+                || !uri.Scheme.Equals("https", StringComparison.OrdinalIgnoreCase)
+                || !uri.Host.EndsWith(".cloudinary.com", StringComparison.OrdinalIgnoreCase))
+            {
+                return BadRequest(new { message = "Nguồn tệp chứng chỉ không hợp lệ." });
+            }
+
             var client = _httpClientFactory.CreateClient();
-            using var response = await client.GetAsync(filePath, cancellationToken);
+            client.Timeout = TimeSpan.FromSeconds(15);
+            using var response = await client.GetAsync(uri, cancellationToken);
             if (!response.IsSuccessStatusCode)
                 return NotFound(new { message = "Không tải được tệp từ Cloudinary." });
 

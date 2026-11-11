@@ -581,7 +581,7 @@ public class ConnectionRequestService : IConnectionRequestService
 
                 // Khóa bi quan (Pessimistic Row Lock) trên lớp học để ngăn chặn race condition khi 2 yêu cầu duyệt cùng lúc
                 await _db.Database.ExecuteSqlRawAsync(
-                    "SELECT id FROM \"Classrooms\" WHERE id = {0} FOR UPDATE",
+                    "SELECT \"Id\" FROM \"Classrooms\" WHERE \"Id\" = {0} FOR UPDATE",
                     new object[] { groupClass.Id },
                     cancellationToken);
 

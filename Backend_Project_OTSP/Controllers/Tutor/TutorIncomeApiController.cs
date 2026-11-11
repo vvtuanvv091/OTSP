@@ -17,12 +17,10 @@ public class TutorIncomeApiController : ControllerBase
 {
     private const int VietnamUtcOffsetHours = 7;
     private readonly ApplicationDbContext _db;
-    private readonly IConfiguration _configuration;
 
-    public TutorIncomeApiController(ApplicationDbContext db, IConfiguration configuration)
+    public TutorIncomeApiController(ApplicationDbContext db, IConfiguration? configuration = null)
     {
         _db = db;
-        _configuration = configuration;
     }
 
     [HttpGet]
@@ -153,16 +151,11 @@ public class TutorIncomeApiController : ControllerBase
             };
         });
 
-        var defaultBank = _configuration["VietQR:BankId"] == "970422" ? "MBBank" : "Vietcombank";
-        var defaultAccountNumber = _configuration["VietQR:AccountNo"] ?? "0984391940";
-        var defaultAccountHolder = _configuration["VietQR:AccountName"]
-            ?? tutor.FullName?.ToUpperInvariant()
-            ?? "TONG NGOC TUAN";
         var bankAccount = CreateBankAccount(
-            tutor.BankName ?? Request.Cookies["otsp_tutor_bank_name"] ?? defaultBank,
-            tutor.BankAccountNumber ?? Request.Cookies["otsp_tutor_bank_acc"] ?? defaultAccountNumber,
-            tutor.BankAccountHolder ?? Request.Cookies["otsp_tutor_bank_holder"] ?? defaultAccountHolder,
-            tutor.BankCitizenId ?? Request.Cookies["otsp_tutor_bank_cccd"] ?? tutor.CitizenId ?? "079*********");
+            tutor.BankName ?? string.Empty,
+            tutor.BankAccountNumber ?? string.Empty,
+            tutor.BankAccountHolder ?? string.Empty,
+            tutor.BankCitizenId ?? string.Empty);
 
         return Ok(new
         {
@@ -223,24 +216,6 @@ public class TutorIncomeApiController : ControllerBase
             await _db.SaveChangesAsync(ct);
         }
 
-        var cookieOptions = new CookieOptions
-        {
-            Expires = DateTimeOffset.UtcNow.AddYears(1),
-            IsEssential = true,
-            HttpOnly = true,
-            SameSite = SameSiteMode.Lax,
-            Secure = Request.IsHttps,
-            Path = "/"
-        };
-
-        Response.Cookies.Append("otsp_tutor_bank_name", canonicalBankName, cookieOptions);
-        Response.Cookies.Append("otsp_tutor_bank_acc", accountNumber, cookieOptions);
-        Response.Cookies.Append("otsp_tutor_bank_holder", accountHolder.ToUpperInvariant(), cookieOptions);
-        if (string.IsNullOrWhiteSpace(citizenId))
-            Response.Cookies.Delete("otsp_tutor_bank_cccd", cookieOptions);
-        else
-            Response.Cookies.Append("otsp_tutor_bank_cccd", citizenId, cookieOptions);
-
         return Ok(new
         {
             message = "Đã lưu thông tin tài khoản và tạo mã VietQR thành công.",
@@ -250,8 +225,11 @@ public class TutorIncomeApiController : ControllerBase
 
     private static object CreateBankAccount(string bankName, string accountNumber, string accountHolder, string citizenId)
     {
-        var bankCode = MapBankNameToCode(bankName);
-        var qrImageUrl = string.IsNullOrWhiteSpace(accountNumber)
+        var isUpdated = !string.IsNullOrWhiteSpace(bankName)
+            && !string.IsNullOrWhiteSpace(accountNumber)
+            && !string.IsNullOrWhiteSpace(accountHolder);
+        var bankCode = isUpdated ? MapBankNameToCode(bankName) : string.Empty;
+        var qrImageUrl = !isUpdated
             ? ""
             : $"https://img.vietqr.io/image/{bankCode}-{Uri.EscapeDataString(accountNumber)}-compact.png?accountName={Uri.EscapeDataString(accountHolder)}";
 
@@ -262,7 +240,7 @@ public class TutorIncomeApiController : ControllerBase
             accountHolder,
             citizenId,
             qrImageUrl,
-            isUpdated = true
+            isUpdated
         };
     }
 

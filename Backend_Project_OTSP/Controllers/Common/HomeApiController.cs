@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -34,7 +36,7 @@ public class HomeApiController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> GetHomeData()
+    public async Task<IActionResult> GetHomeData(CancellationToken cancellationToken = default)
     {
         var vm = await _cache.GetOrCreateAsync(HomeCacheKey, async entry =>
         {
@@ -51,11 +53,11 @@ public class HomeApiController : ControllerBase
 
             return new HomeViewModel
             {
-                StudentCount = await _db.StudentProfiles.CountAsync(),
-                TutorCount = await approvedTutors.CountAsync(),
-                SubjectCount = await _db.Subjects.CountAsync(),
+                StudentCount = await _db.StudentProfiles.CountAsync(cancellationToken),
+                TutorCount = await approvedTutors.CountAsync(cancellationToken),
+                SubjectCount = await _db.Subjects.CountAsync(cancellationToken),
                 CompletedSessionCount = await _db.ClassSessions
-                    .CountAsync(s => s.Status == SessionStatus.Done),
+                    .CountAsync(s => s.Status == SessionStatus.Done, cancellationToken),
                 Subjects = await LoadSubjectsAsync(),
                 Classes = await LoadClassesAsync(openClasses),
                 FeaturedTutors = await LoadTutorsAsync(approvedTutors)
@@ -285,38 +287,84 @@ public class HomeApiController : ControllerBase
         {
             var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
             var ip = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
-            var path = string.IsNullOrWhiteSpace(request?.Path) ? "/" : request.Path.Trim();
-            if (path.Length > 120) path = path[..120];
-
-            var throttleKey = $"visit:{userId ?? ip}:{path}";
-            if (_cache.TryGetValue(throttleKey, out _))
-            {
-                return Ok(new { recorded = false, throttled = true });
-            }
-
-            _cache.Set(throttleKey, true, TimeSpan.FromSeconds(5));
+            if (ip.Length > 100) ip = ip[..100];
 
             var ua = HttpContext.Request.Headers.UserAgent.ToString();
-            if (!string.IsNullOrEmpty(ua) && ua.Length > 480) ua = ua[..480];
+            if (ua.Length > 480) ua = ua[..480];
 
-            _db.AuditLogs.Add(new AuditLog
+            var path = string.IsNullOrWhiteSpace(request?.Path) ? "/" : request.Path.Trim();
+            if (path.Length > 200) path = path[..200];
+
+            var deviceId = NormalizeDeviceId(request?.DeviceId, ip, ua);
+            var nowUtc = DateTime.UtcNow;
+            var vnToday = DateOnly.FromDateTime(nowUtc.AddHours(7));
+
+            var visitCacheKey = $"webvisit:{vnToday:yyyyMMdd}:{deviceId}";
+            if (_cache.TryGetValue(visitCacheKey, out _))
             {
-                UserId = string.IsNullOrWhiteSpace(userId) ? null : userId,
-                Category = "WebVisit",
-                Action = $"Truy cập: {path}",
-                Detail = $"Lượt truy cập trang {path}",
-                IpAddress = ip,
-                UserAgent = ua,
-                Timestamp = DateTime.UtcNow
-            });
+                return Ok(new { recorded = false, alreadyCountedToday = true });
+            }
 
-            await _db.SaveChangesAsync(cancellationToken);
-            return Ok(new { recorded = true });
+            var existing = await _db.WebVisits
+                .SingleOrDefaultAsync(v => v.DeviceId == deviceId && v.VisitDate == vnToday, cancellationToken);
+
+            if (existing != null)
+            {
+                existing.LastVisitedAt = nowUtc;
+                existing.HitCount += 1;
+                if (string.IsNullOrWhiteSpace(existing.UserId) && !string.IsNullOrWhiteSpace(userId))
+                {
+                    existing.UserId = userId;
+                }
+                await _db.SaveChangesAsync(cancellationToken);
+                _cache.Set(visitCacheKey, true, TimeSpan.FromMinutes(15));
+                return Ok(new { recorded = false, alreadyCountedToday = true });
+            }
+
+            var visit = new WebVisit
+            {
+                DeviceId = deviceId,
+                VisitDate = vnToday,
+                FirstVisitedAt = nowUtc,
+                LastVisitedAt = nowUtc,
+                HitCount = 1,
+                FirstPath = path,
+                IpAddress = ip,
+                UserAgent = string.IsNullOrEmpty(ua) ? null : ua,
+                UserId = string.IsNullOrWhiteSpace(userId) ? null : userId
+            };
+
+            _db.WebVisits.Add(visit);
+            try
+            {
+                await _db.SaveChangesAsync(cancellationToken);
+                _cache.Set(visitCacheKey, true, TimeSpan.FromMinutes(15));
+                return Ok(new { recorded = true });
+            }
+            catch (DbUpdateException)
+            {
+                // Hai request song song từ cùng một thiết bị trong cùng ngày -> chỉ tính 1 lượt
+                _db.Entry(visit).State = EntityState.Detached;
+                _cache.Set(visitCacheKey, true, TimeSpan.FromMinutes(15));
+                return Ok(new { recorded = false, alreadyCountedToday = true });
+            }
         }
         catch
         {
             return Ok(new { recorded = false });
         }
+    }
+
+    private static string NormalizeDeviceId(string? rawDeviceId, string ip, string ua)
+    {
+        var trimmed = rawDeviceId?.Trim();
+        if (!string.IsNullOrWhiteSpace(trimmed) && trimmed.Length >= 8)
+        {
+            return trimmed.Length > 128 ? trimmed[..128] : trimmed;
+        }
+
+        var hashBytes = SHA256.HashData(Encoding.UTF8.GetBytes($"{ip}|{ua}"));
+        return "fp:" + Convert.ToHexString(hashBytes)[..32].ToLowerInvariant();
     }
 }
 

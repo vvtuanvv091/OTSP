@@ -25,15 +25,18 @@ public class TutorLearningDocumentApiController : ControllerBase
     private readonly ApplicationDbContext _db;
     private readonly IWebHostEnvironment _environment;
     private readonly IImageStorageService _imageStorage;
+    private readonly ILogger<TutorLearningDocumentApiController>? _logger;
 
     public TutorLearningDocumentApiController(
         ApplicationDbContext db,
         IWebHostEnvironment environment,
-        IImageStorageService imageStorage)
+        IImageStorageService imageStorage,
+        ILogger<TutorLearningDocumentApiController>? logger = null)
     {
         _db = db;
         _environment = environment;
         _imageStorage = imageStorage;
+        _logger = logger;
     }
 
     private string? CurrentUserId => User.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -49,6 +52,8 @@ public class TutorLearningDocumentApiController : ControllerBase
     {
         var userId = CurrentUserId;
         if (string.IsNullOrEmpty(userId)) return Unauthorized();
+
+        pageSize = Math.Clamp(pageSize, 1, 100);
 
         var query = _db.LearningDocuments
             .AsNoTracking()
@@ -212,9 +217,14 @@ public class TutorLearningDocumentApiController : ControllerBase
         {
             stored = await _imageStorage.UploadLearningDocumentAsync(file, cancellationToken);
         }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
         catch (Exception ex)
         {
-            return StatusCode(500, new { message = "Lỗi khi tải tệp lên đám mây: " + ex.Message });
+            _logger?.LogError(ex, "Lỗi upload tài liệu học tập cho gia sư {UserId}", userId);
+            return StatusCode(500, new { message = "Không thể tải tệp lên đám mây lúc này. Vui lòng thử lại sau." });
         }
 
         var doc = new LearningDocument
@@ -338,16 +348,20 @@ public class TutorLearningDocumentApiController : ControllerBase
 
         if (doc == null) return NotFound();
 
-        if (doc.FileUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
-            doc.FileUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+        if (!string.IsNullOrWhiteSpace(doc.FileUrl) &&
+            (doc.FileUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+             doc.FileUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase)))
         {
-            return Redirect(doc.FileUrl);
+            await _imageStorage.DeleteAsync(doc.FileUrl, cancellationToken);
         }
-
-        var fullPath = Path.Combine(GetUploadFolder(), doc.FileUrl);
-        if (System.IO.File.Exists(fullPath))
+        else if (!string.IsNullOrWhiteSpace(doc.FileUrl))
         {
-            try { System.IO.File.Delete(fullPath); } catch { }
+            var fullPath = StoragePathResolver.ResolveDocumentPath(_environment, doc.FileUrl);
+            if (fullPath != null && System.IO.File.Exists(fullPath))
+            {
+                try { System.IO.File.Delete(fullPath); }
+                catch (Exception ex) { _logger?.LogWarning(ex, "Không thể xóa file local {FilePath}", fullPath); }
+            }
         }
 
         _db.LearningDocuments.Remove(doc);

@@ -22,15 +22,18 @@ public class ComplaintApiController : ControllerBase
     private readonly ApplicationDbContext _db;
     private readonly IImageStorageService _imageService;
     private readonly UserManager<ApplicationUser> _userManager;
+    private readonly ILogger<ComplaintApiController>? _logger;
 
     public ComplaintApiController(
         ApplicationDbContext db,
         IImageStorageService imageService,
-        UserManager<ApplicationUser> userManager)
+        UserManager<ApplicationUser> userManager,
+        ILogger<ComplaintApiController>? logger = null)
     {
         _db = db;
         _imageService = imageService;
         _userManager = userManager;
+        _logger = logger;
     }
 
     private string? CurrentUserId => User.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -64,9 +67,14 @@ public class ComplaintApiController : ControllerBase
                 var stored = await _imageService.UploadChatImageAsync(file, cancellationToken);
                 evidenceUrl = stored.Url;
             }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
             catch (Exception ex)
             {
-                return BadRequest(new { message = "Lỗi khi tải ảnh minh chứng: " + ex.Message });
+                _logger?.LogWarning(ex, "Không thể tải ảnh minh chứng khiếu nại cho {SenderId}", senderId);
+                return BadRequest(new { message = "Không thể tải ảnh minh chứng lên lúc này. Vui lòng thử lại." });
             }
         }
 

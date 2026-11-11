@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Backend_Project_OTSP.Data;
 using Backend_Project_OTSP.Dtos;
 using Backend_Project_OTSP.Dtos.Admin;
@@ -14,11 +15,19 @@ public sealed class AdminLearningDocumentService : IAdminLearningDocumentService
 {
     private readonly ApplicationDbContext _db;
     private readonly IWebHostEnvironment _environment;
+    private readonly IImageStorageService? _imageStorage;
+    private readonly ILogger<AdminLearningDocumentService>? _logger;
 
-    public AdminLearningDocumentService(ApplicationDbContext db, IWebHostEnvironment environment)
+    public AdminLearningDocumentService(
+        ApplicationDbContext db,
+        IWebHostEnvironment environment,
+        IImageStorageService? imageStorage = null,
+        ILogger<AdminLearningDocumentService>? logger = null)
     {
         _db = db;
         _environment = environment;
+        _imageStorage = imageStorage;
+        _logger = logger;
     }
 
     public async Task<AdminLearningDocumentDashboardDto> GetDocumentsAsync(AdminLearningDocumentQuery query, CancellationToken cancellationToken = default)
@@ -179,6 +188,25 @@ public sealed class AdminLearningDocumentService : IAdminLearningDocumentService
     {
         var doc = await _db.LearningDocuments.FirstOrDefaultAsync(d => d.Id == documentId, cancellationToken);
         if (doc == null) return (false, true, "Không tìm thấy tài liệu.");
+
+        if (!string.IsNullOrWhiteSpace(doc.FileUrl) &&
+            (doc.FileUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+             doc.FileUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase)))
+        {
+            if (_imageStorage != null)
+            {
+                await _imageStorage.DeleteAsync(doc.FileUrl, cancellationToken);
+            }
+        }
+        else if (!string.IsNullOrWhiteSpace(doc.FileUrl))
+        {
+            var fullPath = StoragePathResolver.ResolveDocumentPath(_environment, doc.FileUrl);
+            if (fullPath != null && File.Exists(fullPath))
+            {
+                try { File.Delete(fullPath); }
+                catch (Exception ex) { _logger?.LogWarning(ex, "Không thể xóa file local {FilePath}", fullPath); }
+            }
+        }
 
         _db.LearningDocuments.Remove(doc);
         _db.AuditLogs.Add(new AuditLog

@@ -35,6 +35,11 @@ public interface IChatService
         string currentUserId,
         CancellationToken cancellationToken = default);
 
+    Task<bool> CanAccessClassroomChatAsync(
+        int classroomId,
+        string currentUserId,
+        CancellationToken cancellationToken = default);
+
     Task<ChatMessageDto?> SendMessageAsync(
         int requestId,
         string senderUserId,

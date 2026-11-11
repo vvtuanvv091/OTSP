@@ -560,5 +560,104 @@ public sealed class ClassSessionService : IClassSessionService
 
         return false;
     }
+
+    public Task EnsureWeeklySessionsForClassroomsAsync(
+        IReadOnlyCollection<int> classroomIds,
+        DateOnly rangeStartVn,
+        DateOnly rangeEndVn,
+        bool markNearbyInProgress = false,
+        CancellationToken cancellationToken = default)
+        => EnsureWeeklySessionsInternalAsync(_db, classroomIds, rangeStartVn, rangeEndVn, markNearbyInProgress, cancellationToken);
+
+    public static async Task EnsureWeeklySessionsInternalAsync(
+        ApplicationDbContext db,
+        IReadOnlyCollection<int> classroomIds,
+        DateOnly rangeStartVn,
+        DateOnly rangeEndVn,
+        bool markNearbyInProgress = false,
+        CancellationToken cancellationToken = default)
+    {
+        if (classroomIds == null || classroomIds.Count == 0 || rangeEndVn < rangeStartVn)
+            return;
+
+        var idList = classroomIds.Distinct().ToList();
+        var activeClassrooms = await db.Classrooms
+            .AsNoTracking()
+            .Include(c => c.WeeklySchedules)
+            .Where(c => idList.Contains(c.Id) && c.Status == ClassroomStatus.Active && c.WeeklySchedules.Any())
+            .ToListAsync(cancellationToken);
+
+        if (activeClassrooms.Count == 0)
+            return;
+
+        const int vnOffsetHours = 7;
+        var nowUtc = DateTime.UtcNow;
+        var todayVn = DateOnly.FromDateTime(nowUtc.AddHours(vnOffsetHours));
+        var effectiveStartVn = rangeStartVn < todayVn ? todayVn : rangeStartVn;
+        if (rangeEndVn < effectiveStartVn)
+            return;
+
+        var rangeStartUtc = DateTime.SpecifyKind(effectiveStartVn.ToDateTime(TimeOnly.MinValue).AddHours(-vnOffsetHours).AddMinutes(-30), DateTimeKind.Utc);
+        var rangeEndUtc = DateTime.SpecifyKind(rangeEndVn.AddDays(1).ToDateTime(TimeOnly.MinValue).AddHours(-vnOffsetHours).AddMinutes(30), DateTimeKind.Utc);
+
+        var targetIds = activeClassrooms.Select(c => c.Id).ToList();
+        var existingSessions = await db.ClassSessions
+            .AsNoTracking()
+            .Where(cs => targetIds.Contains(cs.ClassroomId) && cs.ScheduledAt >= rangeStartUtc && cs.ScheduledAt <= rangeEndUtc)
+            .Select(cs => new { cs.ClassroomId, cs.ScheduledAt })
+            .ToListAsync(cancellationToken);
+
+        var existingByClassroom = existingSessions
+            .GroupBy(x => x.ClassroomId)
+            .ToDictionary(g => g.Key, g => g.Select(x => x.ScheduledAt).ToList());
+
+        bool hasChanges = false;
+        foreach (var classroom in activeClassrooms)
+        {
+            if (!existingByClassroom.TryGetValue(classroom.Id, out var existingTimes))
+            {
+                existingTimes = [];
+                existingByClassroom[classroom.Id] = existingTimes;
+            }
+
+            for (var targetDate = effectiveStartVn; targetDate <= rangeEndVn; targetDate = targetDate.AddDays(1))
+            {
+                if (classroom.StartDate.HasValue && targetDate < classroom.StartDate.Value)
+                    continue;
+
+                foreach (var ws in classroom.WeeklySchedules)
+                {
+                    if (ws.DayOfWeek != targetDate.DayOfWeek)
+                        continue;
+
+                    var sessionVn = targetDate.ToDateTime(ws.StartTime);
+                    var sessionUtc = DateTime.SpecifyKind(sessionVn.AddHours(-vnOffsetHours), DateTimeKind.Utc);
+
+                    var alreadyExists = existingTimes.Any(t => Math.Abs((t - sessionUtc).TotalMinutes) <= 30);
+                    if (!alreadyExists)
+                    {
+                        var status = markNearbyInProgress && Math.Abs((sessionUtc - nowUtc).TotalHours) < 1.0
+                            ? SessionStatus.InProgress
+                            : SessionStatus.Scheduled;
+
+                        db.ClassSessions.Add(new ClassSession
+                        {
+                            ClassroomId = classroom.Id,
+                            ScheduledAt = sessionUtc,
+                            Status = status,
+                            VideoRoom = $"OTSP-Room-{classroom.Id}-{Guid.NewGuid():N}"[..26]
+                        });
+                        existingTimes.Add(sessionUtc);
+                        hasChanges = true;
+                    }
+                }
+            }
+        }
+
+        if (hasChanges)
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+    }
 }
 

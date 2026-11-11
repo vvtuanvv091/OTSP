@@ -1,7 +1,11 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Backend_Project_OTSP.Data;
 using Backend_Project_OTSP.Dtos.Auth;
 using Backend_Project_OTSP.Models;
@@ -17,16 +21,23 @@ public class AuthController : ControllerBase
     private readonly IAuthService _authService;
     private readonly IJwtService _jwtService;
     private readonly ApplicationDbContext _db;
+    private readonly IWebHostEnvironment? _environment;
 
-    public AuthController(IAuthService authService, IJwtService jwtService, ApplicationDbContext db)
+    public AuthController(
+        IAuthService authService,
+        IJwtService jwtService,
+        ApplicationDbContext db,
+        IWebHostEnvironment? environment = null)
     {
         _authService = authService;
         _jwtService = jwtService;
         _db = db;
+        _environment = environment;
     }
 
     [HttpPost("login")]
     [AllowAnonymous]
+    [EnableRateLimiting("Auth")]
     public async Task<IActionResult> Login([FromBody] LoginRequest request)
     {
         var (success, error, data) = await _authService.LoginAsync(request);
@@ -39,6 +50,7 @@ public class AuthController : ControllerBase
 
     [HttpPost("google-login")]
     [AllowAnonymous]
+    [EnableRateLimiting("Auth")]
     public async Task<IActionResult> GoogleLogin([FromBody] GoogleLoginRequest request)
     {
         var (success, error, data) = await _authService.GoogleLoginAsync(request);
@@ -51,6 +63,7 @@ public class AuthController : ControllerBase
 
     [HttpPost("register")]
     [AllowAnonymous]
+    [EnableRateLimiting("Auth")]
     public async Task<IActionResult> Register([FromBody] RegisterRequest request)
     {
         if (!ModelState.IsValid)
@@ -69,9 +82,10 @@ public class AuthController : ControllerBase
 
     [HttpPost("forgot-password")]
     [AllowAnonymous]
+    [EnableRateLimiting("Auth")]
     public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request)
     {
-        var (success, error, token) = await _authService.ForgotPasswordAsync(request);
+        var (success, error, _) = await _authService.ForgotPasswordAsync(request);
         if (!success)
         {
             return BadRequest(new { message = error });
@@ -79,13 +93,13 @@ public class AuthController : ControllerBase
 
         return Ok(new
         {
-            message = "Đã tạo mã đặt lại mật khẩu thành công.",
-            token
+            message = "Nếu địa chỉ email tồn tại trong hệ thống, liên kết và mã đặt lại mật khẩu đã được gửi qua email."
         });
     }
 
     [HttpPost("reset-password")]
     [AllowAnonymous]
+    [EnableRateLimiting("Auth")]
     public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request)
     {
         var (success, error) = await _authService.ResetPasswordAsync(request);
@@ -144,10 +158,18 @@ public class AuthController : ControllerBase
     }
 
 #if DEBUG
+    private bool IsDevelopmentEnvironment()
+    {
+        var env = _environment ?? HttpContext?.RequestServices.GetService<IWebHostEnvironment>();
+        return env != null && env.IsDevelopment();
+    }
+
     [HttpGet("debug-users")]
     [AllowAnonymous]
     public async Task<IActionResult> DebugUsers()
     {
+        if (!IsDevelopmentEnvironment()) return NotFound();
+
         var users = await _db.Users.Select(u => new
         {
             u.Id,
@@ -165,6 +187,8 @@ public class AuthController : ControllerBase
     [AllowAnonymous]
     public async Task<IActionResult> GetDevToken(string userId)
     {
+        if (!IsDevelopmentEnvironment()) return NotFound();
+
         var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == userId);
         if (user == null) return NotFound();
         var resp = await _jwtService.GenerateAuthResponseAsync(user, rememberMe: true);

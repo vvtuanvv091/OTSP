@@ -6,6 +6,7 @@ using Backend_Project_OTSP.Data;
 using Backend_Project_OTSP.Models;
 using static Backend_Project_OTSP.Models.Enums;
 using Backend_Project_OTSP.Dtos.StudentParent;
+using Backend_Project_OTSP.Services.Sessions;
 
 namespace Backend_Project_OTSP.Controllers.Api.Student;
 
@@ -18,10 +19,12 @@ public class StudentScheduleApiController : ControllerBase
     private const int EarlyJoinMinutes = 60;
     private const double MaxSessionOpenHours = 6;
     private readonly ApplicationDbContext _db;
+    private readonly IClassSessionService? _classSessionService;
 
-    public StudentScheduleApiController(ApplicationDbContext db)
+    public StudentScheduleApiController(ApplicationDbContext db, IClassSessionService? classSessionService = null)
     {
         _db = db;
+        _classSessionService = classSessionService;
     }
 
     private string? CurrentUserId => User.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -221,57 +224,25 @@ public class StudentScheduleApiController : ControllerBase
 
     private async Task EnsureStudentWeeklySessionsGeneratedAsync(int studentId, DateOnly monday, DateOnly todayVn, CancellationToken ct)
     {
-        var activeClassrooms = await _db.Classrooms
-            .Include(c => c.WeeklySchedules)
+        var classroomIds = await _db.Classrooms
+            .AsNoTracking()
             .Where(c => c.Status == ClassroomStatus.Active
                      && c.ClassroomStudents.Any(cs => cs.StudentId == studentId)
                      && c.WeeklySchedules.Any())
+            .Select(c => c.Id)
             .ToListAsync(ct);
 
-        if (!activeClassrooms.Any()) return;
-
-        bool hasChanges = false;
-        foreach (var classroom in activeClassrooms)
+        var startDate = monday < todayVn ? todayVn : monday;
+        var endDate = monday.AddDays(6);
+        if (_classSessionService != null)
         {
-            for (int i = 0; i < 7; i++)
-            {
-                var targetDate = monday.AddDays(i);
-                if (classroom.StartDate.HasValue && targetDate < classroom.StartDate.Value)
-                    continue;
-                if (targetDate < todayVn)
-                    continue;
-
-                var matchingSchedules = classroom.WeeklySchedules
-                    .Where(ws => ws.DayOfWeek == targetDate.DayOfWeek)
-                    .ToList();
-
-                foreach (var sched in matchingSchedules)
-                {
-                    var sessionVn = targetDate.ToDateTime(sched.StartTime);
-                    var sessionUtc = DateTime.SpecifyKind(sessionVn.AddHours(-VietnamUtcOffsetHours), DateTimeKind.Utc);
-                    var windowStart = sessionUtc.AddMinutes(-30);
-                    var windowEnd = sessionUtc.AddMinutes(30);
-
-                    var exists = await _db.ClassSessions.AnyAsync(
-                        cs => cs.ClassroomId == classroom.Id && cs.ScheduledAt >= windowStart && cs.ScheduledAt <= windowEnd,
-                        ct);
-
-                    if (!exists)
-                    {
-                        _db.ClassSessions.Add(new ClassSession
-                        {
-                            ClassroomId = classroom.Id,
-                            ScheduledAt = sessionUtc,
-                            Status = SessionStatus.Scheduled,
-                            VideoRoom = $"OTSP-Room-{classroom.Id}-{Guid.NewGuid():N}"[..26]
-                        });
-                        hasChanges = true;
-                    }
-                }
-            }
+            await _classSessionService.EnsureWeeklySessionsForClassroomsAsync(
+                classroomIds, startDate, endDate, markNearbyInProgress: false, cancellationToken: ct);
         }
-
-        if (hasChanges)
-            await _db.SaveChangesAsync(ct);
+        else
+        {
+            await ClassSessionService.EnsureWeeklySessionsInternalAsync(
+                _db, classroomIds, startDate, endDate, markNearbyInProgress: false, cancellationToken: ct);
+        }
     }
 }

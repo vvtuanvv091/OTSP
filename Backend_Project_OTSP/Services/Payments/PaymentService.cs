@@ -1,6 +1,8 @@
 using System;
+using System.Globalization;
 using System.Linq;
 using System.Net.Http;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
@@ -298,7 +300,7 @@ public class PaymentService : IPaymentService
                 if (response.IsSuccessStatusCode)
                 {
                     var json = await response.Content.ReadAsStringAsync(ct);
-                    if (json.Contains($"OTSP{paymentId}", StringComparison.OrdinalIgnoreCase))
+                    if (HasMatchingPaidTransaction(json, paymentId, payment.Amount))
                     {
                         // Xác nhận trong DB
                         var dbPayment = await _db.Payments
@@ -425,11 +427,18 @@ public class PaymentService : IPaymentService
             return false;
         }
 
-        // Chỉ nhận mã OTSP{id} - tránh false-match số điện thoại hoặc số ngẫu nhiên
-        var match = Regex.Match(payload.content, @"OTSP(\d+)", RegexOptions.IgnoreCase);
+        if (!string.IsNullOrWhiteSpace(payload.transferType)
+            && !payload.transferType.Equals("in", StringComparison.OrdinalIgnoreCase))
+        {
+            _logger.LogWarning("SePay webhook ignored non-incoming transfer type: {TransferType}", payload.transferType);
+            return false;
+        }
+
+        // Chỉ nhận đúng mã OTSP{id} (không dính chữ số phía sau)
+        var match = Regex.Match(payload.content, @"(?:^|[^A-Za-z0-9])OTSP(\d+)(?!\d)", RegexOptions.IgnoreCase);
         if (!match.Success || !int.TryParse(match.Groups[1].Value, out var paymentId))
         {
-            _logger.LogWarning("SePay webhook: Nội dung không chứa mã OTSP{{id}} hợp lệ. Content: {Content}", payload.content);
+            _logger.LogWarning("SePay webhook: Nội dung không chứa mã OTSP{{id}} hợp lệ.");
             return false;
         }
 
@@ -447,12 +456,13 @@ public class PaymentService : IPaymentService
 
         if (payment.Status == PaymentStatus.Success)
         {
+            _cache.Set($"payment_status_{payment.Id}", true, TimeSpan.FromMinutes(5));
             _logger.LogInformation("Payment id {PaymentId} already marked as Success", paymentId);
             return true;
         }
 
         // Kiểm tra số tiền chuyển khoản
-        if (payload.transferAmount < payment.Amount)
+        if (payload.transferAmount <= 0 || payload.transferAmount < payment.Amount)
         {
             _logger.LogWarning("Payment {PaymentId}: Transfer amount {Amount} < required {Required}",
                 paymentId, payload.transferAmount, payment.Amount);
@@ -474,9 +484,60 @@ public class PaymentService : IPaymentService
         }
 
         await _db.SaveChangesAsync(ct);
+        _cache.Set($"payment_status_{payment.Id}", true, TimeSpan.FromMinutes(5));
         await TriggerPaymentSuccessNotificationsAsync(payment, ct);
         _logger.LogInformation("Payment {PaymentId} marked as Success from SePay Webhook. Amount: {Amount}", paymentId, payload.transferAmount);
         return true;
+    }
+
+    private static bool HasMatchingPaidTransaction(string json, int paymentId, decimal requiredAmount)
+    {
+        if (string.IsNullOrWhiteSpace(json)) return false;
+
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            if (!doc.RootElement.TryGetProperty("transactions", out var transactions)
+                || transactions.ValueKind != JsonValueKind.Array)
+            {
+                return false;
+            }
+
+            var codePattern = $@"(?:^|[^A-Za-z0-9])OTSP{paymentId}(?!\d)";
+            foreach (var tx in transactions.EnumerateArray())
+            {
+                var content = tx.TryGetProperty("transaction_content", out var contentEl)
+                    ? contentEl.GetString()
+                    : null;
+                var reference = tx.TryGetProperty("reference_number", out var refEl)
+                    ? refEl.GetString()
+                    : null;
+
+                var hasCode = (!string.IsNullOrWhiteSpace(content) && Regex.IsMatch(content, codePattern, RegexOptions.IgnoreCase))
+                    || (!string.IsNullOrWhiteSpace(reference) && Regex.IsMatch(reference, codePattern, RegexOptions.IgnoreCase));
+                if (!hasCode) continue;
+
+                decimal amountIn = 0;
+                if (tx.TryGetProperty("amount_in", out var amountEl))
+                {
+                    if (amountEl.ValueKind == JsonValueKind.Number)
+                        amountEl.TryGetDecimal(out amountIn);
+                    else if (amountEl.ValueKind == JsonValueKind.String)
+                        decimal.TryParse(amountEl.GetString(), NumberStyles.Any, CultureInfo.InvariantCulture, out amountIn);
+                }
+
+                if (amountIn > 0 && amountIn >= requiredAmount)
+                {
+                    return true;
+                }
+            }
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+
+        return false;
     }
 
     private static StudentPaymentItemDto MapToItemDto(Payment p)

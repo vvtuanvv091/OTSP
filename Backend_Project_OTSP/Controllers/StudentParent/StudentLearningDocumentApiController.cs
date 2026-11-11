@@ -130,6 +130,21 @@ public class StudentLearningDocumentApiController : ControllerBase
 
         if (doc == null) return NotFound();
 
+        var canAccess = doc.Scope == DocumentScope.Public;
+        if (!canAccess && doc.Scope == DocumentScope.Classroom && doc.ClassroomId.HasValue)
+        {
+            canAccess = await _db.ClassroomStudents
+                .AsNoTracking()
+                .AnyAsync(cs => cs.ClassroomId == doc.ClassroomId.Value
+                             && cs.Student.UserId == userId
+                             && cs.Classroom.Status == ClassroomStatus.Active, cancellationToken);
+        }
+
+        if (!canAccess)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = "Bạn không có quyền tải tài liệu này." });
+        }
+
         if (doc.FileUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
             doc.FileUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
         {

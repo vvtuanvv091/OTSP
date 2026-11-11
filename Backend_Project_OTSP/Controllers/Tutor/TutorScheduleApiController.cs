@@ -26,17 +26,20 @@ public class TutorScheduleApiController : ControllerBase
     private readonly IHubContext<ConnectionRequestHub> _hubContext;
     private readonly ILogger<TutorScheduleApiController> _logger;
     private readonly IScheduleBlockService _blocks;
+    private readonly IClassSessionService? _classSessionService;
 
     public TutorScheduleApiController(
         ApplicationDbContext db,
         IHubContext<ConnectionRequestHub> hubContext,
         ILogger<TutorScheduleApiController> logger,
-        IScheduleBlockService blocks)
+        IScheduleBlockService blocks,
+        IClassSessionService? classSessionService = null)
     {
         _db = db;
         _hubContext = hubContext;
         _logger = logger;
         _blocks = blocks;
+        _classSessionService = classSessionService;
     }
 
     private string? CurrentUserId => User.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -199,11 +202,35 @@ public class TutorScheduleApiController : ControllerBase
         var tutorUserId = CurrentUserId;
         if (string.IsNullOrEmpty(tutorUserId)) return Unauthorized();
 
+        if (_classSessionService != null)
+        {
+            var (success, message) = await _classSessionService.CancelSessionAsync(
+                id,
+                tutorUserId,
+                "Gia sư hủy buổi học",
+                cancellationToken);
+
+            if (!success)
+            {
+                if (message.Contains("Không tìm thấy", StringComparison.OrdinalIgnoreCase)
+                    || message.Contains("không có quyền", StringComparison.OrdinalIgnoreCase))
+                {
+                    return NotFound(new { message });
+                }
+
+                return BadRequest(new { message });
+            }
+
+            return Ok(new { success = true, message });
+        }
+
         var session = await _db.ClassSessions
             .Include(s => s.Classroom)
             .FirstOrDefaultAsync(s => s.Id == id && s.Classroom.Tutor.UserId == tutorUserId, cancellationToken);
 
         if (session == null) return NotFound(new { message = "Không tìm thấy buổi học." });
+        if (session.Status == SessionStatus.Done)
+            return BadRequest(new { message = "Buổi học này đã hoàn thành, không thể hủy." });
 
         session.Status = SessionStatus.Cancelled;
         await _db.SaveChangesAsync(cancellationToken);
@@ -263,63 +290,21 @@ public class TutorScheduleApiController : ControllerBase
 
     private async Task EnsureWeeklySessionsGeneratedAsync(int tutorId, DateOnly monday, DateOnly sunday, CancellationToken ct)
     {
-        var activeClassrooms = await _db.Classrooms
-            .Include(c => c.WeeklySchedules)
-            .Where(c => c.TutorId == tutorId && c.Status == ClassroomStatus.Active)
+        var classroomIds = await _db.Classrooms
+            .AsNoTracking()
+            .Where(c => c.TutorId == tutorId && c.Status == ClassroomStatus.Active && c.WeeklySchedules.Any())
+            .Select(c => c.Id)
             .ToListAsync(ct);
 
-        bool hasChanges = false;
-        var todayVn = DateOnly.FromDateTime(DateTime.UtcNow.AddHours(VietnamUtcOffsetHours));
-        foreach (var classroom in activeClassrooms.Where(c => c.WeeklySchedules.Any()))
+        if (_classSessionService != null)
         {
-            for (int i = 0; i < 7; i++)
-            {
-                var targetDate = monday.AddDays(i);
-
-                // 1. Tuyệt đối KHÔNG sinh buổi học trước ngày bắt đầu lớp học (StartDate)
-                if (classroom.StartDate.HasValue && targetDate < classroom.StartDate.Value)
-                    continue;
-
-                // 2. Tuyệt đối KHÔNG tự động sinh các buổi học ảo trong quá khứ trước hôm nay
-                if (targetDate < todayVn)
-                    continue;
-
-                var matching = classroom.WeeklySchedules.Where(ws => ws.DayOfWeek == targetDate.DayOfWeek).ToList();
-
-                foreach (var ws in matching)
-                {
-                    var sessionVn = targetDate.ToDateTime(ws.StartTime);
-                    var sessionUtc = DateTime.SpecifyKind(sessionVn.AddHours(-VietnamUtcOffsetHours), DateTimeKind.Utc);
-                    var windowStart = sessionUtc.AddMinutes(-30);
-                    var windowEnd = sessionUtc.AddMinutes(30);
-
-                    var exists = await _db.ClassSessions.AnyAsync(s =>
-                        s.ClassroomId == classroom.Id && s.ScheduledAt >= windowStart && s.ScheduledAt <= windowEnd, ct);
-
-                    if (!exists)
-                    {
-                        // Buổi học tự động sinh mới PHẢI là Scheduled (hoặc InProgress nếu đang trong giờ học),
-                        // TUYỆT ĐỐI không được tự ý gán Done!
-                        var status = Math.Abs((sessionUtc - DateTime.UtcNow).TotalHours) < 1.0
-                            ? SessionStatus.InProgress
-                            : SessionStatus.Scheduled;
-
-                        _db.ClassSessions.Add(new ClassSession
-                        {
-                            ClassroomId = classroom.Id,
-                            ScheduledAt = sessionUtc,
-                            Status = status,
-                            VideoRoom = $"OTSP-Room-{classroom.Id}-{Guid.NewGuid():N}"[..26]
-                        });
-                        hasChanges = true;
-                    }
-                }
-            }
+            await _classSessionService.EnsureWeeklySessionsForClassroomsAsync(
+                classroomIds, monday, sunday, markNearbyInProgress: true, cancellationToken: ct);
         }
-
-        if (hasChanges)
+        else
         {
-            await _db.SaveChangesAsync(ct);
+            await ClassSessionService.EnsureWeeklySessionsInternalAsync(
+                _db, classroomIds, monday, sunday, markNearbyInProgress: true, cancellationToken: ct);
         }
     }
 

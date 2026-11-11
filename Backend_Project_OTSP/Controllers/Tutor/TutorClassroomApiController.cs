@@ -112,6 +112,8 @@ public class TutorClassroomApiController : ControllerBase
             query = query.Where(c => c.Status == status.Value);
         }
 
+        pageSize = Math.Clamp(pageSize, 1, 100);
+
         var totalItems = await query.CountAsync(cancellationToken);
         var totalPages = Math.Max(1, (int)Math.Ceiling(totalItems / (double)pageSize));
         page = Math.Clamp(page, 1, totalPages);
@@ -272,6 +274,9 @@ public class TutorClassroomApiController : ControllerBase
         if (string.IsNullOrWhiteSpace(request.Name) || request.Name.Length > 200)
             return BadRequest(new { message = "Tên lớp học phải từ 1 đến 200 ký tự." });
 
+        if (request.Fee < 0)
+            return BadRequest(new { message = "Học phí không được âm." });
+
         var validPair = await _db.TutorSubjects.AnyAsync(
             ts => ts.TutorId == tutorId.Value && ts.SubjectId == request.SubjectId && ts.GradeLevelId == request.GradeLevelId,
             cancellationToken);
@@ -292,9 +297,14 @@ public class TutorClassroomApiController : ControllerBase
                 coverImageUrl = stored.Url;
                 publicId = stored.PublicId;
             }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
             catch (Exception ex)
             {
-                return BadRequest(new { message = "Lỗi tải ảnh bìa: " + ex.Message });
+                _logger.LogWarning(ex, "Không thể tải ảnh bìa lớp học khi tạo lớp cho gia sư {TutorId}", tutorId.Value);
+                return BadRequest(new { message = "Không thể tải ảnh bìa lên lúc này. Vui lòng thử lại." });
             }
         }
 
@@ -356,7 +366,21 @@ public class TutorClassroomApiController : ControllerBase
 
         if (!string.IsNullOrWhiteSpace(request.Name)) classroom.NameClass = request.Name.Trim();
         if (request.Description != null) classroom.Description = request.Description.Trim();
-        if (request.Fee.HasValue && request.Fee.Value > 0) classroom.Fee = request.Fee.Value;
+        if (request.Fee.HasValue)
+        {
+            if (request.Fee.Value < 0)
+                return BadRequest(new { message = "Học phí không được âm." });
+
+            if (request.Fee.Value > 0 && request.Fee.Value != classroom.Fee)
+            {
+                var hasPaidPayments = await _db.Payments.AsNoTracking()
+                    .AnyAsync(p => p.ClassroomId == classroom.Id && p.Status == PaymentStatus.Success, cancellationToken);
+                if (hasPaidPayments)
+                    return BadRequest(new { message = "Không thể thay đổi học phí vì lớp học đã có giao dịch thanh toán thành công." });
+
+                classroom.Fee = request.Fee.Value;
+            }
+        }
         if (request.MaxStudents.HasValue && request.MaxStudents.Value > 0) classroom.MaxStudents = request.MaxStudents.Value;
         if (request.SessionsPerWeek.HasValue && request.SessionsPerWeek.Value > 0) classroom.SessionsPerWeek = request.SessionsPerWeek.Value;
         if (request.HoursPerSession.HasValue && request.HoursPerSession.Value > 0) classroom.HoursPerSession = request.HoursPerSession.Value;
@@ -365,14 +389,19 @@ public class TutorClassroomApiController : ControllerBase
         if (request.SubjectId.HasValue && request.GradeLevelId.HasValue &&
             (request.SubjectId.Value != classroom.SubjectId || request.GradeLevelId.Value != classroom.GradeLevelId))
         {
+            var hasLockedRelations = await _db.ClassroomStudents.AsNoTracking().AnyAsync(cs => cs.ClassroomId == classroom.Id, cancellationToken)
+                || await _db.ConnectionRequests.AsNoTracking().AnyAsync(cr => cr.ClassroomId == classroom.Id, cancellationToken);
+            if (hasLockedRelations)
+                return BadRequest(new { message = "Không thể thay đổi môn học hoặc cấp học khi lớp đã có học viên hoặc yêu cầu kết nối." });
+
             var validPair = await _db.TutorSubjects.AnyAsync(
                 ts => ts.TutorId == tutorId.Value && ts.SubjectId == request.SubjectId.Value && ts.GradeLevelId == request.GradeLevelId.Value,
                 cancellationToken);
-            if (validPair)
-            {
-                classroom.SubjectId = request.SubjectId.Value;
-                classroom.GradeLevelId = request.GradeLevelId.Value;
-            }
+            if (!validPair)
+                return BadRequest(new { message = "Môn học và cấp học không nằm trong danh sách đăng ký dạy của bạn." });
+
+            classroom.SubjectId = request.SubjectId.Value;
+            classroom.GradeLevelId = request.GradeLevelId.Value;
         }
 
         // Cover image handling
@@ -384,9 +413,14 @@ public class TutorClassroomApiController : ControllerBase
                 classroom.CoverImageUrl = stored.Url;
                 classroom.CoverImagePublicId = stored.PublicId;
             }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
             catch (Exception ex)
             {
-                return BadRequest(new { message = "Lỗi tải ảnh bìa: " + ex.Message });
+                _logger.LogWarning(ex, "Không thể tải ảnh bìa lớp học khi tạo lớp cho gia sư {TutorId}", tutorId.Value);
+                return BadRequest(new { message = "Không thể tải ảnh bìa lên lúc này. Vui lòng thử lại." });
             }
         }
         else if (request.RemoveCoverImage)

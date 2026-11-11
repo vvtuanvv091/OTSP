@@ -1,6 +1,8 @@
 using System.Security.Claims;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Hosting;
 using Moq;
 using Backend_Project_OTSP.Controllers.Auth;
 using Backend_Project_OTSP.Dtos.Auth;
@@ -127,13 +129,13 @@ public class AuthControllerTests
     }
 
     [Fact]
-    public async Task ForgotPassword_WhenValid_ReturnsOkWithToken()
+    public async Task ForgotPassword_WhenValid_ReturnsOkWithoutExposingToken()
     {
         // Arrange
         var request = new ForgotPasswordRequest { Email = "user@test.com" };
         _mockAuthService
             .Setup(s => s.ForgotPasswordAsync(request))
-            .ReturnsAsync((true, null, "reset-token-123"));
+            .ReturnsAsync((true, null, null));
 
         var controller = CreateController();
 
@@ -143,16 +145,17 @@ public class AuthControllerTests
         // Assert
         var okResult = Assert.IsType<OkObjectResult>(result);
         Assert.NotNull(okResult.Value);
+        Assert.Null(okResult.Value.GetType().GetProperty("token"));
     }
 
     [Fact]
     public async Task ForgotPassword_WhenFails_ReturnsBadRequest()
     {
         // Arrange
-        var request = new ForgotPasswordRequest { Email = "notfound@test.com" };
+        var request = new ForgotPasswordRequest { Email = "" };
         _mockAuthService
             .Setup(s => s.ForgotPasswordAsync(request))
-            .ReturnsAsync((false, "Không tìm thấy tài khoản với email này.", null));
+            .ReturnsAsync((false, "Vui lòng nhập địa chỉ email.", null));
 
         var controller = CreateController();
 
@@ -316,7 +319,10 @@ public class AuthControllerTests
             .Setup(j => j.GenerateAuthResponseAsync(It.Is<ApplicationUser>(u => u.Id == user.Id), true))
             .ReturnsAsync(expectedAuth);
 
-        var controller = new AuthController(_mockAuthService.Object, _mockJwtService.Object, db);
+        var mockEnv = new Mock<IWebHostEnvironment>();
+        mockEnv.Setup(e => e.EnvironmentName).Returns(Environments.Development);
+
+        var controller = new AuthController(_mockAuthService.Object, _mockJwtService.Object, db, mockEnv.Object);
 
         // Act
         var result = await controller.GetDevToken("dev-user-1");
@@ -328,11 +334,29 @@ public class AuthControllerTests
     }
 
     [Fact]
+    public async Task GetDevToken_WhenNotDevelopment_ReturnsNotFound()
+    {
+        var db = TestDbContextFactory.Create();
+        db.Users.Add(new ApplicationUser { Id = "dev-user-prod", Email = "dev@test.com", FullName = "Dev User Prod" });
+        await db.SaveChangesAsync();
+
+        var mockEnv = new Mock<IWebHostEnvironment>();
+        mockEnv.Setup(e => e.EnvironmentName).Returns(Environments.Production);
+
+        var controller = new AuthController(_mockAuthService.Object, _mockJwtService.Object, db, mockEnv.Object);
+        var result = await controller.GetDevToken("dev-user-prod");
+
+        Assert.IsType<NotFoundResult>(result);
+    }
+
+    [Fact]
     public async Task GetDevToken_WhenUserNotFound_ReturnsNotFound()
     {
         // Arrange
         var db = TestDbContextFactory.Create();
-        var controller = new AuthController(_mockAuthService.Object, _mockJwtService.Object, db);
+        var mockEnv = new Mock<IWebHostEnvironment>();
+        mockEnv.Setup(e => e.EnvironmentName).Returns(Environments.Development);
+        var controller = new AuthController(_mockAuthService.Object, _mockJwtService.Object, db, mockEnv.Object);
 
         // Act
         var result = await controller.GetDevToken("non-existent-user");

@@ -19,12 +19,18 @@ public sealed class AdminProfileApiController : ControllerBase
     private readonly ApplicationDbContext _db;
     private readonly IImageStorageService _imageStorage;
     private readonly IMemoryCache _cache;
+    private readonly ILogger<AdminProfileApiController>? _logger;
 
-    public AdminProfileApiController(ApplicationDbContext db, IImageStorageService imageStorage, IMemoryCache cache)
+    public AdminProfileApiController(
+        ApplicationDbContext db,
+        IImageStorageService imageStorage,
+        IMemoryCache cache,
+        ILogger<AdminProfileApiController>? logger = null)
     {
         _db = db;
         _imageStorage = imageStorage;
         _cache = cache;
+        _logger = logger;
     }
 
     private string? CurrentUserId => User.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -86,9 +92,14 @@ public sealed class AdminProfileApiController : ControllerBase
             InvalidateUserCache(userId);
             return Ok(new { success = true, avatarUrl = stored.Url, message = "Đã cập nhật ảnh đại diện." });
         }
-        catch (Exception exception)
+        catch (ArgumentException exception)
         {
             return BadRequest(new { message = exception.Message });
+        }
+        catch (Exception exception)
+        {
+            _logger?.LogWarning(exception, "Không thể cập nhật ảnh đại diện Admin {UserId}", userId);
+            return BadRequest(new { message = "Không thể tải ảnh đại diện lên lúc này. Vui lòng thử lại." });
         }
     }
 

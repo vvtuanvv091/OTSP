@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Backend_Project_OTSP.Dtos.Common;
 using Backend_Project_OTSP.Services.Common;
 using Backend_Project_OTSP.Dtos;
@@ -26,6 +27,7 @@ public class AiController : ControllerBase
     /// </summary>
     [HttpPost("agent/chat")]
     [AllowAnonymous]
+    [EnableRateLimiting("AiAgent")]
     public async Task<IActionResult> ChatWithAgent([FromBody] AgentChatRequestDto request, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(request.Message))
@@ -66,6 +68,7 @@ public class AiController : ControllerBase
     /// </summary>
     [HttpPost("feedback")]
     [AllowAnonymous]
+    [EnableRateLimiting("AiAgent")]
     public async Task<IActionResult> SubmitFeedback([FromBody] FeedbackRequestDto request, CancellationToken ct)
     {
         var success = await _aiService.SubmitFeedbackAsync(request, ct);
@@ -77,7 +80,7 @@ public class AiController : ControllerBase
     /// Accessible by authenticated Tutors and Admins.
     /// </summary>
     [HttpPost("tutor/verify-certificate")]
-    [Authorize]
+    [Authorize(Roles = "Tutor,Admin")]
     public async Task<IActionResult> VerifyCertificate([FromBody] VerifyCertificateRequestDto request, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(request.ImageUrl) && string.IsNullOrWhiteSpace(request.ImageBase64))

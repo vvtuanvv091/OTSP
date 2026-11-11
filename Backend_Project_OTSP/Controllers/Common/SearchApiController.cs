@@ -75,12 +75,37 @@ public class SearchApiController : ControllerBase
         try
         {
             var c = await _db.Classrooms.AsNoTracking()
-                .Include(x => x.Subject)
-                .Include(x => x.GradeLevel)
-                .Include(x => x.Tutor).ThenInclude(t => t.User)
-                .Include(x => x.ClassroomStudents)
-                .Include(x => x.WeeklySchedules)
-                .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+                .Where(x => x.Id == id)
+                .Select(x => new
+                {
+                    x.Id,
+                    x.NameClass,
+                    x.Description,
+                    x.CoverImageUrl,
+                    x.Fee,
+                    x.Type,
+                    x.MaxStudents,
+                    x.StartDate,
+                    x.SessionsPerWeek,
+                    x.HoursPerSession,
+                    x.SubjectId,
+                    SubjectName = x.Subject.Name,
+                    x.GradeLevelId,
+                    GradeName = x.GradeLevel.Name,
+                    x.TutorId,
+                    TutorUserId = x.Tutor.UserId,
+                    TutorFullName = x.Tutor.User.FullName,
+                    TutorAvatarUrl = x.Tutor.User.AvatarUrl,
+                    TutorRating = x.Tutor.AverageRating,
+                    TutorIntro = x.Tutor.Introduction,
+                    TutorHourlyFee = x.Tutor.HourlyFee,
+                    StudentCount = x.ClassroomStudents.Count,
+                    WeeklySchedules = x.WeeklySchedules
+                        .OrderBy(ws => ws.SessionIndex)
+                        .Select(ws => new { ws.DayOfWeek, ws.StartTime, ws.EndTime })
+                        .ToList()
+                })
+                .FirstOrDefaultAsync(cancellationToken);
 
             if (c == null)
             {
@@ -95,11 +120,14 @@ public class SearchApiController : ControllerBase
             if (!string.IsNullOrEmpty(userId))
             {
                 var student = await _db.StudentProfiles.AsNoTracking()
-                    .FirstOrDefaultAsync(s => s.UserId == userId, cancellationToken);
+                    .Where(s => s.UserId == userId)
+                    .Select(s => new { s.Id })
+                    .FirstOrDefaultAsync(cancellationToken);
 
                 if (student != null)
                 {
-                    isEnrolled = c.ClassroomStudents.Any(cs => cs.StudentId == student.Id);
+                    isEnrolled = await _db.ClassroomStudents.AsNoTracking()
+                        .AnyAsync(cs => cs.ClassroomId == id && cs.StudentId == student.Id, cancellationToken);
 
                     isPending = await _db.ConnectionRequests.AsNoTracking()
                         .AnyAsync(r => r.StudentId == student.Id && r.ClassroomId == id && r.Status == RequestStatus.Pending, cancellationToken);
@@ -121,7 +149,6 @@ public class SearchApiController : ControllerBase
             };
 
             var schedules = c.WeeklySchedules
-                .OrderBy(ws => ws.SessionIndex)
                 .Select(ws => new ClassroomScheduleItemDto
                 {
                     DayOfWeek = (int)ws.DayOfWeek,
@@ -138,24 +165,24 @@ public class SearchApiController : ControllerBase
                 coverImageUrl = c.CoverImageUrl,
                 fee = c.Fee,
                 type = c.Type.ToString(),
-                studentCount = c.ClassroomStudents.Count,
+                studentCount = c.StudentCount,
                 maxStudents = c.MaxStudents,
                 startDate = c.StartDate,
                 sessionsPerWeek = c.SessionsPerWeek,
                 hoursPerSession = c.HoursPerSession,
                 subjectId = c.SubjectId,
-                subjectName = c.Subject.Name,
+                subjectName = c.SubjectName,
                 gradeLevelId = c.GradeLevelId,
-                gradeName = c.GradeLevel.Name,
+                gradeName = c.GradeName,
                 tutor = new
                 {
                     id = c.TutorId,
-                    userId = c.Tutor.UserId,
-                    fullName = c.Tutor.User.FullName,
-                    avatarUrl = c.Tutor.User.AvatarUrl,
-                    rating = c.Tutor.AverageRating,
-                    introduction = c.Tutor.Introduction,
-                    hourlyFee = c.Tutor.HourlyFee
+                    userId = c.TutorUserId,
+                    fullName = c.TutorFullName,
+                    avatarUrl = c.TutorAvatarUrl,
+                    rating = c.TutorRating,
+                    introduction = c.TutorIntro,
+                    hourlyFee = c.TutorHourlyFee
                 },
                 weeklySchedules = schedules,
                 isEnrolled,

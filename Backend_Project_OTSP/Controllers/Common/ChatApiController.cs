@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Backend_Project_OTSP.Data;
 using Backend_Project_OTSP.Dtos.Chat;
 using Backend_Project_OTSP.Hubs;
@@ -21,17 +22,20 @@ public class ChatApiController : ControllerBase
     private readonly ApplicationDbContext _db;
     private readonly IHubContext<ChatHub> _hubContext;
     private readonly IImageStorageService _imageStorage;
+    private readonly ILogger<ChatApiController>? _logger;
 
     public ChatApiController(
         IChatService chatService,
         ApplicationDbContext db,
         IHubContext<ChatHub> hubContext,
-        IImageStorageService imageStorage)
+        IImageStorageService imageStorage,
+        ILogger<ChatApiController>? logger = null)
     {
         _chatService = chatService;
         _db = db;
         _hubContext = hubContext;
         _imageStorage = imageStorage;
+        _logger = logger;
     }
 
     private string? CurrentUserId => User.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -61,8 +65,15 @@ public class ChatApiController : ControllerBase
             }
         }
 
-        var messages = await _chatService.GetMessagesAsync(userId, contactId, limit, cancellationToken);
-        return Ok(messages);
+        try
+        {
+            var messages = await _chatService.GetMessagesAsync(userId, contactId, limit, cancellationToken);
+            return Ok(messages);
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = ex.Message });
+        }
     }
 
     [HttpPost("messages")]
@@ -86,24 +97,46 @@ public class ChatApiController : ControllerBase
             }
         }
 
-        var message = await _chatService.SendMessageToUserAsync(userId, contactUserId, request.Content.Trim(), cancellationToken);
+        ChatMessageDto message;
+        try
+        {
+            message = await _chatService.SendMessageToUserAsync(userId, contactUserId, request.Content.Trim(), cancellationToken);
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = ex.Message });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
 
         try
         {
-            var directRoom = ChatHub.GetDirectRoomName(userId, contactUserId);
+            if (message.ClassroomId.HasValue)
+            {
+                await _hubContext.Clients.Group($"classroom:{message.ClassroomId.Value}").SendAsync("ReceiveMessage", message, cancellationToken);
+            }
+            else
+            {
+                var directRoom = ChatHub.GetDirectRoomName(userId, contactUserId);
 
-            // Bắn tín hiệu qua SignalR bằng sự kiện chuẩn ReceiveMessage:
-            // 1. Kênh phòng trò chuyện trực tiếp của 2 người
-            await _hubContext.Clients.Group(directRoom).SendAsync("ReceiveMessage", message, cancellationToken);
+                // Bắn tín hiệu qua SignalR bằng sự kiện chuẩn ReceiveMessage:
+                // 1. Kênh phòng trò chuyện trực tiếp của 2 người
+                await _hubContext.Clients.Group(directRoom).SendAsync("ReceiveMessage", message, cancellationToken);
 
-            // 2. Kênh cá nhân của người nhận (nếu chưa join directRoom)
-            await _hubContext.Clients.Group($"user:{contactUserId}").SendAsync("ReceiveMessage", message, cancellationToken);
-            await _hubContext.Clients.User(contactUserId).SendAsync("ReceiveMessage", message, cancellationToken);
+                // 2. Kênh cá nhân của người nhận (nếu chưa join directRoom)
+                await _hubContext.Clients.Group($"user:{contactUserId}").SendAsync("ReceiveMessage", message, cancellationToken);
+                await _hubContext.Clients.User(contactUserId).SendAsync("ReceiveMessage", message, cancellationToken);
 
-            // 3. Kênh cá nhân của người gửi (để đồng bộ các tab khác)
-            await _hubContext.Clients.Group($"user:{userId}").SendAsync("ReceiveMessage", message, cancellationToken);
+                // 3. Kênh cá nhân của người gửi (để đồng bộ các tab khác)
+                await _hubContext.Clients.Group($"user:{userId}").SendAsync("ReceiveMessage", message, cancellationToken);
+            }
         }
-        catch { }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Không thể phát SignalR ReceiveMessage từ {SenderId} đến {ContactId}", userId, contactUserId);
+        }
 
         return Ok(message);
     }
@@ -218,9 +251,18 @@ public class ChatApiController : ControllerBase
             var stored = await _imageStorage.UploadChatImageAsync(file, cancellationToken);
             return Ok(new { url = stored.Url, publicId = stored.PublicId });
         }
-        catch (Exception ex)
+        catch (ArgumentException ex)
         {
             return BadRequest(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Lỗi tải tệp đính kèm chat cho user {UserId}", CurrentUserId);
+            return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Không thể tải tệp đính kèm lên lúc này." });
         }
     }
 }

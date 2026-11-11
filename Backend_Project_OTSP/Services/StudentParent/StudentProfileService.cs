@@ -6,6 +6,7 @@ using Backend_Project_OTSP.Services.Common;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Logging;
 
 namespace Backend_Project_OTSP.Services.StudentParent;
 
@@ -14,15 +15,18 @@ public class StudentProfileService : IStudentProfileService
     private readonly ApplicationDbContext _db;
     private readonly IImageStorageService _imageStorage;
     private readonly IMemoryCache _cache;
+    private readonly ILogger<StudentProfileService>? _logger;
 
     public StudentProfileService(
         ApplicationDbContext db,
         IImageStorageService imageStorage,
-        IMemoryCache cache)
+        IMemoryCache cache,
+        ILogger<StudentProfileService>? logger = null)
     {
         _db = db;
         _imageStorage = imageStorage;
         _cache = cache;
+        _logger = logger;
     }
 
     public async Task<StudentProfileDetailsDto?> GetProfileAsync(string userId, CancellationToken cancellationToken = default)
@@ -167,9 +171,14 @@ public class StudentProfileService : IStudentProfileService
 
             return (true, stored.Url, null);
         }
-        catch (Exception ex)
+        catch (ArgumentException ex)
         {
             return (false, null, ex.Message);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Không thể tải ảnh đại diện học viên {UserId}", userId);
+            return (false, null, "Không thể tải ảnh đại diện lên lúc này. Vui lòng thử lại sau.");
         }
     }
 

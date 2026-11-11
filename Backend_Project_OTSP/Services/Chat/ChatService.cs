@@ -179,11 +179,18 @@ namespace Backend_Project_OTSP.Services.Chat
                     .Distinct()
                     .ToListAsync(cancellationToken);
 
-                var tutorUserIdsSet = (await _db.TutorProfiles.AsNoTracking().Select(t => t.UserId).ToListAsync(cancellationToken)).ToHashSet();
-                var adminUserIdsSet = (await (from ur in _db.UserRoles
-                                              join r in _db.Roles on ur.RoleId equals r.Id
-                                              where r.NormalizedName == "ADMIN"
-                                              select ur.UserId).ToListAsync(cancellationToken)).ToHashSet();
+                var tutorUserIdsSet = pastPartnerIds.Count == 0
+                    ? new HashSet<string>()
+                    : (await _db.TutorProfiles.AsNoTracking()
+                        .Where(t => pastPartnerIds.Contains(t.UserId))
+                        .Select(t => t.UserId)
+                        .ToListAsync(cancellationToken)).ToHashSet();
+                var adminUserIdsSet = pastPartnerIds.Count == 0
+                    ? new HashSet<string>()
+                    : (await (from ur in _db.UserRoles
+                              join r in _db.Roles on ur.RoleId equals r.Id
+                              where (r.NormalizedName == "ADMIN" || r.Name == "Admin") && pastPartnerIds.Contains(ur.UserId)
+                              select ur.UserId).ToListAsync(cancellationToken)).ToHashSet();
 
                 foreach (var pastId in pastPartnerIds)
                 {
@@ -310,6 +317,11 @@ namespace Backend_Project_OTSP.Services.Chat
             // Hỗ trợ truy vấn tin nhắn trong kênh Chat Nhóm Lớp Học (Group Classroom)
             if (contactUserId.StartsWith("class_") && int.TryParse(contactUserId[6..], out var classroomId))
             {
+                if (!await CanAccessClassroomChatAsync(classroomId, currentUserId, cancellationToken))
+                {
+                    throw new UnauthorizedAccessException("Bạn không phải thành viên của lớp học này.");
+                }
+
                 var rawClassMessages = await _db.Messagers
                     .AsNoTracking()
                     .Where(m => m.ClassroomId == classroomId)
@@ -353,8 +365,9 @@ namespace Backend_Project_OTSP.Services.Chat
 
             var rawMessages = await _db.Messagers
                 .AsNoTracking()
-                .Where(m => (m.SenderId == currentUserId && m.ReceiverId == contactUserId)
-                         || (m.SenderId == contactUserId && m.ReceiverId == currentUserId))
+                .Where(m => !m.ClassroomId.HasValue
+                         && ((m.SenderId == currentUserId && m.ReceiverId == contactUserId)
+                          || (m.SenderId == contactUserId && m.ReceiverId == currentUserId)))
                 .OrderByDescending(m => m.SentAt)
                 .ThenByDescending(m => m.Id)
                 .Take(limit)
@@ -417,14 +430,9 @@ namespace Backend_Project_OTSP.Services.Chat
 
                 var isTutor = classroom.Tutor.UserId == senderUserId;
                 var isStudent = classroom.ClassroomStudents.Any(cs => cs.Student.UserId == senderUserId);
-                if (!isTutor && !isStudent)
+                if (!isTutor && !isStudent && !await IsAdminUserAsync(senderUserId, cancellationToken))
                 {
-                    var isAdmin = await (from ur in _db.UserRoles
-                                         join r in _db.Roles on ur.RoleId equals r.Id
-                                         where ur.UserId == senderUserId && (r.NormalizedName == "ADMIN" || r.Name == "Admin")
-                                         select ur.UserId).AnyAsync(cancellationToken);
-                    if (!isAdmin)
-                        throw new InvalidOperationException("Bạn không phải thành viên của lớp học này để gửi tin nhắn nhóm.");
+                    throw new UnauthorizedAccessException("Bạn không phải thành viên của lớp học này để gửi tin nhắn nhóm.");
                 }
 
                 var sender = await _db.Users
@@ -550,6 +558,34 @@ namespace Backend_Project_OTSP.Services.Chat
                 IsOwn = true,
                 CanEdit = true
             };
+        }
+
+        private async Task<bool> IsAdminUserAsync(string userId, CancellationToken cancellationToken)
+        {
+            return await (from ur in _db.UserRoles
+                          join r in _db.Roles on ur.RoleId equals r.Id
+                          where ur.UserId == userId && (r.NormalizedName == "ADMIN" || r.Name == "Admin")
+                          select ur.UserId).AnyAsync(cancellationToken);
+        }
+
+        public async Task<bool> CanAccessClassroomChatAsync(
+            int classroomId,
+            string currentUserId,
+            CancellationToken cancellationToken = default)
+        {
+            if (classroomId <= 0 || string.IsNullOrWhiteSpace(currentUserId))
+                return false;
+
+            var isMember = await _db.Classrooms
+                .AsNoTracking()
+                .AnyAsync(c => c.Id == classroomId &&
+                              (c.Tutor.UserId == currentUserId ||
+                               c.ClassroomStudents.Any(cs => cs.Student.UserId == currentUserId)),
+                    cancellationToken);
+
+            if (isMember) return true;
+
+            return await IsAdminUserAsync(currentUserId, cancellationToken);
         }
 
         public async Task<bool> CanUsersChatAsync(

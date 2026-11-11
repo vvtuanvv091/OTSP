@@ -694,7 +694,6 @@ export default function AdminOperationsPage() {
           <label className="admin-select">
             <select value={status} onChange={(event) => setStatusSafely(event.target.value)}>
               <option value="all">Tất cả danh mục thao tác</option>
-              <option value="WebVisit">Truy cập trang web</option>
               <option value="AiUsage">Sử dụng AI Wein</option>
               <option value="Auth">Đăng nhập &amp; Xác thực</option>
               <option value="Payment">Thanh toán &amp; Quyết toán</option>

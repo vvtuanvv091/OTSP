@@ -73,7 +73,12 @@ public sealed class ChatHub : Hub
         if (string.IsNullOrWhiteSpace(userId) || classroomId <= 0)
             return;
 
-        await Groups.AddToGroupAsync(Context.ConnectionId, $"classroom:{classroomId}");
+        if (!await _chatService.CanAccessClassroomChatAsync(classroomId, userId, Context.ConnectionAborted))
+        {
+            throw new HubException("Bạn không phải thành viên của lớp học này.");
+        }
+
+        await Groups.AddToGroupAsync(Context.ConnectionId, $"classroom:{classroomId}", Context.ConnectionAborted);
     }
 
     public async Task SendMessageToUser(string receiverUserId, string content)

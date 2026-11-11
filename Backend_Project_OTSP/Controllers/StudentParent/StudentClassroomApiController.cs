@@ -46,12 +46,17 @@ public class StudentClassroomApiController : ControllerBase
         page = Math.Max(1, page);
         pageSize = Math.Clamp(pageSize, 1, 50);
 
-        var activeCount = await _db.ClassroomStudents
-            .CountAsync(cs => cs.Student.UserId == userId && cs.Classroom.Status == ClassroomStatus.Active, cancellationToken);
-        var completedCount = await _db.ClassroomStudents
-            .CountAsync(cs => cs.Student.UserId == userId && cs.Classroom.Status == ClassroomStatus.Completed, cancellationToken);
-        var cancelledCount = await _db.ClassroomStudents
-            .CountAsync(cs => cs.Student.UserId == userId && cs.Classroom.Status == ClassroomStatus.Cancelled, cancellationToken);
+        var statusCounts = await _db.ClassroomStudents
+            .AsNoTracking()
+            .Where(cs => cs.Student.UserId == userId)
+            .GroupBy(cs => cs.Classroom.Status)
+            .Select(g => new { Status = g.Key, Count = g.Count() })
+            .ToListAsync(cancellationToken);
+
+        var countByStatus = statusCounts.ToDictionary(x => x.Status, x => x.Count);
+        var activeCount = countByStatus.GetValueOrDefault(ClassroomStatus.Active, 0);
+        var completedCount = countByStatus.GetValueOrDefault(ClassroomStatus.Completed, 0);
+        var cancelledCount = countByStatus.GetValueOrDefault(ClassroomStatus.Cancelled, 0);
 
         var enrollmentsQuery = _db.ClassroomStudents
             .AsNoTracking()
@@ -78,7 +83,15 @@ public class StudentClassroomApiController : ControllerBase
             {
                 cs.ClassroomId,
                 cs.JoinedAt,
-                Classroom = cs.Classroom,
+                Classroom = new
+                {
+                    cs.Classroom.NameClass,
+                    cs.Classroom.Type,
+                    cs.Classroom.Status,
+                    cs.Classroom.Fee,
+                    cs.Classroom.SessionsPerWeek,
+                    cs.Classroom.HoursPerSession
+                },
                 SubjectName = cs.Classroom.Subject.Name,
                 GradeLevelName = cs.Classroom.GradeLevel.Name,
                 TutorUserId = cs.Classroom.Tutor.UserId,

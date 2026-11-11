@@ -143,9 +143,10 @@ public class TutorStudentApiController : ControllerBase
             studentsList = studentsList.Where(s => !s.IsTrial).ToList();
         }
 
-        page = Math.Max(1, page);
+        pageSize = Math.Clamp(pageSize, 1, 100);
         var totalItems = studentsList.Count;
-        var totalPages = (int)Math.Ceiling(totalItems / (double)pageSize);
+        var totalPages = Math.Max(1, (int)Math.Ceiling(totalItems / (double)pageSize));
+        page = Math.Clamp(page, 1, totalPages);
         var pagedList = studentsList
             .Skip((page - 1) * pageSize)
             .Take(pageSize)

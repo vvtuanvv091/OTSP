@@ -206,6 +206,8 @@ public sealed class CloudinaryImageStorageService : IImageStorageService
         if (ext is not (".pdf" or ".jpg" or ".jpeg" or ".png" or ".webp"))
             throw new ArgumentException("Chỉ chấp nhận tệp PDF, JPG, PNG hoặc WEBP.", nameof(file));
 
+        ValidateFileSignature(file, ext);
+
         if (IsCloudinaryConfigured())
         {
             try
@@ -254,7 +256,7 @@ public sealed class CloudinaryImageStorageService : IImageStorageService
             }
         }
 
-        throw  new InvalidCastException("Không thể tải tệp lên lúc này, vui lòng thử lại sau.");
+        throw new InvalidOperationException("Không thể tải tệp lên lúc này, vui lòng thử lại sau.");
     }
 
     public async Task<StoredImage> UploadLearningDocumentAsync(IFormFile file, CancellationToken cancellationToken)
@@ -270,6 +272,8 @@ public sealed class CloudinaryImageStorageService : IImageStorageService
 
         if (!allowedDocExts.Contains(ext))
             throw new ArgumentException($"Định dạng tệp '{ext}' không được hỗ trợ. Vui lòng tải lên tài liệu học tập (.pdf, .doc, .docx, .xls, .xlsx, .ppt, .pptx).", nameof(file));
+
+        ValidateFileSignature(file, ext);
 
         if (IsCloudinaryConfigured())
         {
@@ -325,24 +329,96 @@ public sealed class CloudinaryImageStorageService : IImageStorageService
 
     public async Task DeleteAsync(string publicId, CancellationToken cancellationToken)
     {
-        if (IsCloudinaryConfigured())
-        {
-            try
-            {
-                var result = await CreateClient().DestroyAsync(new DeletionParams(publicId)
-                {
-                    ResourceType = ResourceType.Image,
-                    Invalidate = true
-                });
+        if (string.IsNullOrWhiteSpace(publicId) || !IsCloudinaryConfigured())
+            return;
 
-                if (result.Error is not null)
-                    _logger.LogWarning("Cloudinary could not delete image {PublicId}: {Error}", publicId, result.Error.Message);
-            }
-            catch (Exception ex)
+        if (!TryResolveDestroyTarget(publicId, out var resolvedPublicId, out var resourceType))
+            return;
+
+        try
+        {
+            var result = await CreateClient().DestroyAsync(new DeletionParams(resolvedPublicId)
             {
-                _logger.LogWarning(ex, "Error deleting image {PublicId} from Cloudinary", publicId);
-            }
+                ResourceType = resourceType,
+                Invalidate = true
+            });
+
+            if (result.Error is not null)
+                _logger.LogWarning("Cloudinary could not delete asset {PublicId} ({ResourceType}): {Error}", resolvedPublicId, resourceType, result.Error.Message);
         }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Error deleting asset {PublicId} from Cloudinary", resolvedPublicId);
+        }
+    }
+
+    private static bool TryResolveDestroyTarget(string input, out string publicId, out ResourceType resourceType)
+    {
+        publicId = input.Trim();
+        resourceType = ResourceType.Image;
+
+        if (Uri.TryCreate(publicId, UriKind.Absolute, out var uri))
+        {
+            if (!uri.Host.EndsWith(".cloudinary.com", StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            var rawMarker = "/raw/upload/";
+            var imgMarker = "/image/upload/";
+            var path = uri.AbsolutePath;
+
+            if (path.Contains(rawMarker, StringComparison.OrdinalIgnoreCase))
+            {
+                resourceType = ResourceType.Raw;
+                publicId = ExtractAfterUploadMarker(path, rawMarker, stripExtension: false);
+                return !string.IsNullOrWhiteSpace(publicId);
+            }
+
+            if (path.Contains(imgMarker, StringComparison.OrdinalIgnoreCase))
+            {
+                resourceType = ResourceType.Image;
+                publicId = ExtractAfterUploadMarker(path, imgMarker, stripExtension: true);
+                return !string.IsNullOrWhiteSpace(publicId);
+            }
+
+            return false;
+        }
+
+        var ext = Path.GetExtension(publicId)?.ToLowerInvariant() ?? string.Empty;
+        if (ext is ".pdf" or ".doc" or ".docx" or ".xls" or ".xlsx" or ".ppt" or ".pptx" or ".txt" or ".zip" or ".rar")
+        {
+            resourceType = ResourceType.Raw;
+        }
+
+        return true;
+    }
+
+    private static string ExtractAfterUploadMarker(string path, string marker, bool stripExtension)
+    {
+        var idx = path.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
+        if (idx < 0) return string.Empty;
+
+        var remainder = path[(idx + marker.Length)..].TrimStart('/');
+        var segments = remainder.Split('/', StringSplitOptions.RemoveEmptyEntries).ToList();
+
+        // Skip Cloudinary transformation segments or version segments (v123456)
+        while (segments.Count > 1 && !(segments[0].Length > 1 && segments[0][0] == 'v' && segments[0][1..].All(char.IsDigit)) && segments[0].Contains(','))
+        {
+            segments.RemoveAt(0);
+        }
+        if (segments.Count > 1 && segments[0].Length > 1 && segments[0][0] == 'v' && segments[0][1..].All(char.IsDigit))
+        {
+            segments.RemoveAt(0);
+        }
+
+        var joined = string.Join('/', segments);
+        if (!stripExtension) return Uri.UnescapeDataString(joined);
+
+        var lastDot = joined.LastIndexOf('.');
+        var lastSlash = joined.LastIndexOf('/');
+        if (lastDot > lastSlash)
+            joined = joined[..lastDot];
+
+        return Uri.UnescapeDataString(joined);
     }
 
     private static void ValidateImageFile(IFormFile file, long maxBytes)
@@ -353,9 +429,46 @@ public sealed class CloudinaryImageStorageService : IImageStorageService
         if (file.Length > maxBytes)
             throw new ArgumentException($"Dung lượng ảnh vượt quá giới hạn ({maxBytes / (1024 * 1024)} MB).", nameof(file));
 
-        var ext = Path.GetExtension(file.FileName);
+        var ext = Path.GetExtension(file.FileName)?.ToLowerInvariant();
         if (string.IsNullOrEmpty(ext) || !AllowedExtensions.Contains(ext))
             throw new ArgumentException("Định dạng ảnh không được hỗ trợ. Vui lòng chọn .jpg, .jpeg, .png hoặc .webp.", nameof(file));
+
+        ValidateFileSignature(file, ext);
+    }
+
+    private static void ValidateFileSignature(IFormFile file, string ext)
+    {
+        Span<byte> header = stackalloc byte[16];
+        int bytesRead;
+        using (var stream = file.OpenReadStream())
+        {
+            bytesRead = stream.Read(header);
+        }
+
+        if (bytesRead == 0)
+            throw new ArgumentException("Tệp rỗng hoặc không đọc được nội dung.", nameof(file));
+
+        var h = header[..bytesRead];
+        bool valid = ext switch
+        {
+            ".jpg" or ".jpeg" => bytesRead >= 3 && h[0] == 0xFF && h[1] == 0xD8 && h[2] == 0xFF,
+            ".png" => bytesRead >= 8 && h[0] == 0x89 && h[1] == 0x50 && h[2] == 0x4E && h[3] == 0x47
+                                     && h[4] == 0x0D && h[5] == 0x0A && h[6] == 0x1A && h[7] == 0x0A,
+            ".webp" => bytesRead >= 12 && h[0] == 'R' && h[1] == 'I' && h[2] == 'F' && h[3] == 'F'
+                                      && h[8] == 'W' && h[9] == 'E' && h[10] == 'B' && h[11] == 'P',
+            ".gif" => bytesRead >= 6 && h[0] == 'G' && h[1] == 'I' && h[2] == 'F' && h[3] == '8'
+                                     && (h[4] == '7' || h[4] == '9') && h[5] == 'a',
+            ".pdf" => bytesRead >= 5 && h[0] == '%' && h[1] == 'P' && h[2] == 'D' && h[3] == 'F' && h[4] == '-',
+            ".docx" or ".xlsx" or ".pptx" or ".zip" => bytesRead >= 4 && h[0] == 0x50 && h[1] == 0x4B && (h[2] == 0x03 || h[2] == 0x05 || h[2] == 0x07),
+            ".doc" or ".xls" or ".ppt" => bytesRead >= 8 && h[0] == 0xD0 && h[1] == 0xCF && h[2] == 0x11 && h[3] == 0xE0
+                                                         && h[4] == 0xA1 && h[5] == 0xB1 && h[6] == 0x1A && h[7] == 0xE1,
+            ".rar" => bytesRead >= 6 && h[0] == 0x52 && h[1] == 0x61 && h[2] == 0x72 && h[3] == 0x21 && h[4] == 0x1A && h[5] == 0x07,
+            ".txt" => !h.Contains((byte)0x00),
+            _ => true
+        };
+
+        if (!valid)
+            throw new ArgumentException($"Nội dung tệp không khớp với định dạng '{ext}'. Vui lòng kiểm tra lại tệp.", nameof(file));
     }
 
     private bool IsCloudinaryConfigured()

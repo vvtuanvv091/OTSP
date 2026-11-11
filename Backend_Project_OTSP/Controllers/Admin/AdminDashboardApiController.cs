@@ -202,7 +202,39 @@ public class AdminDashboardApiController : ControllerBase
             .ToListAsync(ct);
 
         // 9. Thống kê theo ngày trong 7 ngày gần nhất: Truy vấn dữ liệu thực tế 100% từ Database
+        // Số thiết bị truy cập web duy nhất mỗi ngày lấy từ bảng riêng WebVisits (tách khỏi AuditLogs)
+        var vnToday = DateOnly.FromDateTime(vnNow);
+        var sevenDaysAgoDate = vnToday.AddDays(-6);
+        var webVisitsByDate = await _db.WebVisits.AsNoTracking()
+            .Where(v => v.VisitDate >= sevenDaysAgoDate && v.VisitDate <= vnToday)
+            .GroupBy(v => v.VisitDate)
+            .Select(g => new { date = g.Key, count = g.Count() })
+            .ToDictionaryAsync(x => x.date, x => x.count, ct);
+
+        var rangeStartUtc = DateTime.SpecifyKind(todayUtc.AddDays(-6), DateTimeKind.Utc);
+        var rangeEndUtc = DateTime.SpecifyKind(todayUtc.AddDays(1), DateTimeKind.Utc);
+
+        var baseRevenueBeforeRange = await _db.Payments.AsNoTracking()
+            .Where(p => p.Status == PaymentStatus.Success && p.PaidAt.HasValue && p.PaidAt.Value < rangeStartUtc)
+            .SumAsync(p => (decimal?)p.Amount, ct) ?? 0m;
+
+        var successPaymentsInRange = await _db.Payments.AsNoTracking()
+            .Where(p => p.Status == PaymentStatus.Success && p.PaidAt.HasValue && p.PaidAt.Value >= rangeStartUtc && p.PaidAt.Value < rangeEndUtc)
+            .Select(p => new { PaidAt = p.PaidAt!.Value, p.Amount })
+            .ToListAsync(ct);
+
+        var unassignedSuccessRevenue = await _db.Payments.AsNoTracking()
+            .Where(p => p.Status == PaymentStatus.Success && p.PaidAt == null)
+            .SumAsync(p => (decimal?)p.Amount, ct) ?? 0m;
+
+        var studentFirstJoinedDates = await _db.ClassroomStudents.AsNoTracking()
+            .Where(cs => cs.JoinedAt < rangeEndUtc)
+            .GroupBy(cs => cs.StudentId)
+            .Select(g => g.Min(cs => cs.JoinedAt))
+            .ToListAsync(ct);
+
         var dailyMetrics = new List<object>();
+        decimal runningCumulativeRev = baseRevenueBeforeRange;
         for (int i = 6; i >= 0; i--)
         {
             var dayStart = DateTime.SpecifyKind(todayUtc.AddDays(-i), DateTimeKind.Utc);
@@ -213,38 +245,29 @@ public class AdminDashboardApiController : ControllerBase
             var dayUnlinkedCount = unlinkedStudySessions.Count(x => x.CreatedAt >= dayStart && x.CreatedAt < dayEnd);
             var qCount = dayAiLogs.Count + dayUnlinkedCount;
 
-            // Số lượt thao tác / truy cập thực tế trong ngày từ AuditLogs
-            var vCount = await _db.AuditLogs.AsNoTracking()
-                .CountAsync(x => x.Timestamp >= dayStart && x.Timestamp < dayEnd, ct);
+            var vnDay = dayStart.AddHours(7);
+            var vnDate = DateOnly.FromDateTime(vnDay);
+            var vCount = webVisitsByDate.GetValueOrDefault(vnDate, 0);
 
             var tokens = dayAiLogs.Sum(x => x.Tokens) + (dayUnlinkedCount * 1420);
 
             // Doanh thu thanh toán thành công phát sinh đúng trong ngày từ bảng Payments
-            var dayRev = await _db.Payments.AsNoTracking()
-                .Where(p => p.Status == PaymentStatus.Success && p.PaidAt.HasValue && p.PaidAt.Value >= dayStart && p.PaidAt.Value < dayEnd)
-                .SumAsync(p => (decimal?)p.Amount, ct) ?? 0m;
+            var dayRev = successPaymentsInRange
+                .Where(p => p.PaidAt >= dayStart && p.PaidAt < dayEnd)
+                .Sum(p => p.Amount);
 
-            // Doanh thu lũy kế thành công tính đến hết ngày đó từ bảng Payments
-            var cumulativeRev = await _db.Payments.AsNoTracking()
-                .Where(p => p.Status == PaymentStatus.Success && p.PaidAt.HasValue && p.PaidAt.Value < dayEnd)
-                .SumAsync(p => (decimal?)p.Amount, ct) ?? 0m;
+            runningCumulativeRev += dayRev;
+            var cumulativeRev = runningCumulativeRev;
 
             // Nếu trong CSDL có thanh toán Success nhưng PaidAt là null thì cộng dồn vào thời điểm hiện tại
             if (i == 0)
             {
-                var unassignedSuccess = await _db.Payments.AsNoTracking()
-                    .Where(p => p.Status == PaymentStatus.Success && p.PaidAt == null)
-                    .SumAsync(p => (decimal?)p.Amount, ct) ?? 0m;
-                dayRev += unassignedSuccess;
-                cumulativeRev += unassignedSuccess;
+                dayRev += unassignedSuccessRevenue;
+                cumulativeRev += unassignedSuccessRevenue;
             }
 
             // Số học viên trong lớp thực tế tính đến ngày đó từ ClassroomStudents
-            var dayStudents = await _db.ClassroomStudents.AsNoTracking()
-                .Where(cs => cs.JoinedAt < dayEnd)
-                .Select(cs => cs.StudentId)
-                .Distinct()
-                .CountAsync(ct);
+            var dayStudents = studentFirstJoinedDates.Count(joinedAt => joinedAt < dayEnd);
 
             // Nếu ngày gia nhập chưa phân bổ thì lấy tổng số học viên thực tế từ StudentProfiles
             if (dayStudents == 0 && totalStudents > 0)
@@ -252,7 +275,6 @@ public class AdminDashboardApiController : ControllerBase
                 dayStudents = totalStudents;
             }
 
-            var vnDay = dayStart.AddHours(7);
             dailyMetrics.Add(new
             {
                 date = vnDay.ToString("dd/MM"),

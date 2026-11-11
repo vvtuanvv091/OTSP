@@ -18,15 +18,18 @@ public class TutorProfileApiController : ControllerBase
     private readonly ApplicationDbContext _db;
     private readonly IMemoryCache _cache;
     private readonly IImageStorageService _imageStorage;
+    private readonly ILogger<TutorProfileApiController>? _logger;
 
     public TutorProfileApiController(
         ApplicationDbContext db,
         IMemoryCache cache,
-        IImageStorageService imageStorage)
+        IImageStorageService imageStorage,
+        ILogger<TutorProfileApiController>? logger = null)
     {
         _db = db;
         _cache = cache;
         _imageStorage = imageStorage;
+        _logger = logger;
     }
 
     private string? GetCurrentUserId() => User.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -202,9 +205,14 @@ public class TutorProfileApiController : ControllerBase
 
             return Ok(new { success = true, avatarUrl = stored.Url, message = "Cập nhật ảnh đại diện thành công!" });
         }
-        catch (Exception ex)
+        catch (ArgumentException ex)
         {
             return BadRequest(new { success = false, message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Không thể cập nhật ảnh đại diện gia sư {UserId}", userId);
+            return BadRequest(new { success = false, message = "Không thể tải ảnh đại diện lên lúc này. Vui lòng thử lại." });
         }
     }
 }

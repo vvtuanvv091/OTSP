@@ -1,9 +1,12 @@
 using System.Text;
+using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.AspNetCore.Localization;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
@@ -111,7 +114,7 @@ builder.Services.AddAuthentication(options =>
 })
 .AddJwtBearer(options =>
 {
-    options.RequireHttpsMetadata = false;
+    options.RequireHttpsMetadata = !builder.Environment.IsDevelopment();
     options.SaveToken = true;
     options.TokenValidationParameters = new TokenValidationParameters
     {
@@ -191,16 +194,120 @@ builder.Services.AddMemoryCache();
 builder.Services.AddDistributedMemoryCache();
 
 
-// ===== 5. CORS (Cho phép React gọi API từ bất kỳ port localhost nào) =====
+// ===== 5. CORS & Rate Limiting =====
+var configuredOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
+var configuredCsv = builder.Configuration["Cors:AllowedOriginsCsv"];
+var frontendUrl = builder.Configuration["App:FrontendUrl"];
+
+var allowedOriginSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+foreach (var origin in configuredOrigins)
+{
+    if (!string.IsNullOrWhiteSpace(origin)) allowedOriginSet.Add(origin.Trim().TrimEnd('/'));
+}
+if (!string.IsNullOrWhiteSpace(configuredCsv))
+{
+    foreach (var origin in configuredCsv.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+    {
+        allowedOriginSet.Add(origin.TrimEnd('/'));
+    }
+}
+if (!string.IsNullOrWhiteSpace(frontendUrl))
+{
+    allowedOriginSet.Add(frontendUrl.Trim().TrimEnd('/'));
+}
+
+var isDevelopmentEnv = builder.Environment.IsDevelopment();
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll", policy =>
     {
-        policy.SetIsOriginAllowed(_ => true)
+        policy.SetIsOriginAllowed(origin =>
+              {
+                  if (string.IsNullOrWhiteSpace(origin)) return false;
+                  var normalized = origin.TrimEnd('/');
+                  if (allowedOriginSet.Contains(normalized)) return true;
+
+                  if (!Uri.TryCreate(normalized, UriKind.Absolute, out var uri)) return false;
+                  if (uri.Host.Equals("localhost", StringComparison.OrdinalIgnoreCase)
+                      || uri.Host.Equals("127.0.0.1", StringComparison.OrdinalIgnoreCase))
+                  {
+                      return true;
+                  }
+
+                  if (isDevelopmentEnv &&
+                      (uri.Host.EndsWith(".ngrok-free.dev", StringComparison.OrdinalIgnoreCase)
+                       || uri.Host.EndsWith(".ngrok-free.app", StringComparison.OrdinalIgnoreCase)
+                       || uri.Host.EndsWith(".ngrok.io", StringComparison.OrdinalIgnoreCase)))
+                  {
+                      return true;
+                  }
+
+                  // Cho phép Vercel preview/production domain nếu chưa khóa Cors:AllowedOrigins cụ thể
+                  if (allowedOriginSet.Count == 0
+                      && uri.Scheme.Equals("https", StringComparison.OrdinalIgnoreCase)
+                      && uri.Host.EndsWith(".vercel.app", StringComparison.OrdinalIgnoreCase))
+                  {
+                      return true;
+                  }
+
+                  return false;
+              })
               .AllowAnyMethod()
               .AllowAnyHeader()
               .AllowCredentials();
     });
+});
+
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.OnRejected = async (context, token) =>
+    {
+        if (context.HttpContext.Response.HasStarted) return;
+        context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+        context.HttpContext.Response.ContentType = "application/json; charset=utf-8";
+        await context.HttpContext.Response.WriteAsJsonAsync(new
+        {
+            success = false,
+            message = "Bạn thao tác quá nhanh. Vui lòng chờ một lát rồi thử lại."
+        }, token);
+    };
+
+    static string ResolveClientKey(HttpContext http) =>
+        http.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+
+    options.AddPolicy("Auth", http =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            $"auth:{ResolveClientKey(http)}",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 10,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+                AutoReplenishment = true
+            }));
+
+    options.AddPolicy("AiAgent", http =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            $"ai:{ResolveClientKey(http)}",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 20,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+                AutoReplenishment = true
+            }));
+
+    options.AddPolicy("Webhook", http =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            $"webhook:{ResolveClientKey(http)}",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 60,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 2,
+                AutoReplenishment = true
+            }));
 });
 
 //6 đăng ký service hoạt động
@@ -235,6 +342,10 @@ builder.Services.AddSingleton<IUserPresenceService, UserPresenceService>();
 builder.Services.AddScoped<IPaymentService, PaymentService>();
 builder.Services.AddSingleton<VietQrService>();
 builder.Services.AddHttpClient();
+builder.Services.AddHttpClient("Gemini", client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(25);
+});
 builder.Services.AddHttpClient<IAiService, AiService>();
 builder.Services.AddHttpContextAccessor();
 
@@ -254,6 +365,22 @@ using (var scope = app.Services.CreateScope())
             ALTER TABLE ""AuditLogs"" ADD COLUMN IF NOT EXISTS ""Category"" character varying(100) NULL;
             ALTER TABLE ""AuditLogs"" ADD COLUMN IF NOT EXISTS ""Detail"" text NULL;
             ALTER TABLE ""AuditLogs"" ADD COLUMN IF NOT EXISTS ""UserAgent"" character varying(500) NULL;
+
+            CREATE TABLE IF NOT EXISTS ""WebVisits"" (
+                ""Id"" integer GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+                ""DeviceId"" character varying(128) NOT NULL,
+                ""VisitDate"" date NOT NULL,
+                ""FirstVisitedAt"" timestamp with time zone NOT NULL,
+                ""LastVisitedAt"" timestamp with time zone NOT NULL,
+                ""HitCount"" integer NOT NULL DEFAULT 1,
+                ""FirstPath"" character varying(200) NULL,
+                ""IpAddress"" character varying(100) NULL,
+                ""UserAgent"" character varying(500) NULL,
+                ""UserId"" text NULL
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS ""IX_WebVisits_DeviceId_VisitDate"" ON ""WebVisits"" (""DeviceId"", ""VisitDate"");
+            CREATE INDEX IF NOT EXISTS ""IX_WebVisits_UserId"" ON ""WebVisits"" (""UserId"");
+            CREATE INDEX IF NOT EXISTS ""IX_WebVisits_VisitDate"" ON ""WebVisits"" (""VisitDate"");
         ");
     }
     catch { }
@@ -264,6 +391,28 @@ using (var scope = app.Services.CreateScope())
 }
 
 // 8===== Pipeline xử lý request =====
+app.UseExceptionHandler(exceptionApp =>
+{
+    exceptionApp.Run(async context =>
+    {
+        var feature = context.Features.Get<IExceptionHandlerFeature>();
+        if (feature?.Error != null)
+        {
+            var logger = context.RequestServices.GetRequiredService<ILogger<Program>>();
+            logger.LogError(feature.Error, "Unhandled exception on {Method} {Path}", context.Request.Method, context.Request.Path);
+        }
+
+        if (context.Response.HasStarted) return;
+        context.Response.StatusCode = StatusCodes.Status500InternalServerError;
+        context.Response.ContentType = "application/json; charset=utf-8";
+        await context.Response.WriteAsJsonAsync(new
+        {
+            success = false,
+            message = "Đã xảy ra lỗi hệ thống. Vui lòng thử lại sau."
+        });
+    });
+});
+
 if (app.Environment.IsDevelopment())
 {
     app.UseMigrationsEndPoint();
@@ -281,6 +430,7 @@ if (!app.Environment.IsDevelopment())
 app.UseStaticFiles();
 
 app.UseCors("AllowAll");
+app.UseRateLimiter();
 
 app.UseRouting();
 

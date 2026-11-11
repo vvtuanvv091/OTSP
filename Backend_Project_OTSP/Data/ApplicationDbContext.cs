@@ -45,6 +45,7 @@ namespace Backend_Project_OTSP.Data
         public DbSet<Messager> Messagers => Set<Messager>();
         public DbSet<ClassroomWeeklySchedule> ClassroomWeeklySchedules => Set<ClassroomWeeklySchedule>();
         public DbSet<NewsArticle> NewsArticles => Set<NewsArticle>();
+        public DbSet<WebVisit> WebVisits => Set<WebVisit>();
         protected override void OnModelCreating(ModelBuilder b)
         {
             // Bắt buộc: để Identity tạo bảng tài khoản, vai trò, claims...
@@ -174,6 +175,21 @@ namespace Backend_Project_OTSP.Data
             b.Entity<Classroom>()
                 .HasOne(x => x.GradeLevel).WithMany(g => g.Classrooms)
                 .HasForeignKey(x => x.GradeLevelId).OnDelete(DeleteBehavior.Restrict);
+
+            // ===== 10. Theo dõi lượt truy cập web theo từng thiết bị mỗi ngày (tách khỏi AuditLogs) =====
+            b.Entity<WebVisit>()
+                .HasIndex(x => new { x.DeviceId, x.VisitDate })
+                .IsUnique()
+                .HasDatabaseName("IX_WebVisits_DeviceId_VisitDate");
+            b.Entity<WebVisit>()
+                .HasIndex(x => x.VisitDate)
+                .HasDatabaseName("IX_WebVisits_VisitDate");
+            b.Entity<WebVisit>()
+                .Property(x => x.HitCount)
+                .HasDefaultValue(1);
+            b.Entity<WebVisit>()
+                .HasOne(x => x.User).WithMany()
+                .HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.SetNull);
         }
 
     }

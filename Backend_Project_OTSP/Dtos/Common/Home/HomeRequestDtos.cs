@@ -3,6 +3,7 @@ namespace Backend_Project_OTSP.Dtos.Common.Home;
 public class VisitTrackRequest
 {
     public string? Path { get; set; }
+    public string? DeviceId { get; set; }
 }
 
 public class ContactFormRequest

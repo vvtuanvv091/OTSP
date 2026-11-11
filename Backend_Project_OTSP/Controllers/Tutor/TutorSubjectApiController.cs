@@ -51,6 +51,8 @@ public class TutorSubjectApiController : ControllerBase
             ? query.OrderBy(p => p.GradeLevelName).ThenBy(p => p.SubjectName)
             : query.OrderBy(p => p.SubjectName).ThenBy(p => p.GradeLevelName);
 
+        pageSize = Math.Clamp(pageSize, 1, 100);
+
         var totalItems = await orderedQuery.CountAsync(cancellationToken);
         var totalPages = Math.Max(1, (int)Math.Ceiling(totalItems / (double)pageSize));
         page = Math.Clamp(page, 1, totalPages);

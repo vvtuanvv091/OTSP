@@ -75,7 +75,10 @@ public class AuthService : IAuthService
             });
             await _db.SaveChangesAsync();
         }
-        catch { }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Không thể ghi Auth AuditLog cho user {UserId}", userId);
+        }
     }
 
     public async Task<(bool Success, string? ErrorMessage, AuthResponse? Data)> LoginAsync(LoginRequest request)
@@ -98,7 +101,11 @@ public class AuthService : IAuthService
             return (false, "Tài khoản của bạn đã bị khóa. Vui lòng liên hệ quản trị viên.", null);
         }
 
-        var checkPassword = await _signInManager.CheckPasswordSignInAsync(user, request.Password, lockoutOnFailure: false);
+        var checkPassword = await _signInManager.CheckPasswordSignInAsync(user, request.Password, lockoutOnFailure: true);
+        if (checkPassword.IsLockedOut)
+        {
+            return (false, "Tài khoản tạm thời bị khóa do đăng nhập sai quá nhiều lần. Vui lòng thử lại sau ít phút.", null);
+        }
         if (!checkPassword.Succeeded)
         {
             return (false, "Email hoặc mật khẩu không chính xác.", null);
@@ -435,12 +442,12 @@ public class AuthService : IAuthService
         var user = await _userManager.FindByEmailAsync(request.Email.Trim());
         if (user == null)
         {
-            // Tránh user enumeration nếu muốn, hoặc báo không tìm thấy
-            return (false, "Không tìm thấy tài khoản với email này.", null);
+            // Trả kết quả đồng nhất để tránh rò rỉ email tồn tại (user enumeration)
+            return (true, null, null);
         }
 
         var token = await _userManager.GeneratePasswordResetTokenAsync(user);
-        _logger.LogInformation("Password reset token for user {Email}: {Token}", user.Email, token);
+        _logger.LogInformation("Password reset requested for user {UserId}", user.Id);
 
         try
         {
@@ -458,10 +465,10 @@ public class AuthService : IAuthService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Lỗi khi gửi email đặt lại mật khẩu cho {Email}", user.Email);
+            _logger.LogError(ex, "Lỗi khi gửi email đặt lại mật khẩu cho user {UserId}", user.Id);
         }
 
-        return (true, null, token);
+        return (true, null, null);
     }
 
     public async Task<(bool Success, string? ErrorMessage)> ResetPasswordAsync(ResetPasswordRequest request)

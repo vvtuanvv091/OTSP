@@ -16,8 +16,10 @@ public class AiService : IAiService
     private readonly IConfiguration _config;
     private readonly ILogger<AiService> _logger;
     private readonly IHttpContextAccessor? _httpContextAccessor;
+    private readonly IHttpClientFactory? _httpClientFactory;
     private readonly string _baseUrl;
     private readonly string _apiKey;
+    private static readonly HttpClient SharedGeminiFallbackClient = new() { Timeout = TimeSpan.FromSeconds(25) };
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -29,13 +31,15 @@ public class AiService : IAiService
         ApplicationDbContext db,
         IConfiguration config,
         ILogger<AiService> logger,
-        IHttpContextAccessor? httpContextAccessor = null)
+        IHttpContextAccessor? httpContextAccessor = null,
+        IHttpClientFactory? httpClientFactory = null)
     {
         _http = http;
         _db = db;
         _config = config;
         _logger = logger;
         _httpContextAccessor = httpContextAccessor;
+        _httpClientFactory = httpClientFactory;
 
         _baseUrl = _config["AiService:BaseUrl"] ?? "http://localhost:8000";
         _apiKey = _config["AiService:InternalApiKey"] ?? "Qxzyo3UdQQ2RtWxJAFGOhhCIDwIbGSWTzsC-ShRA324";
@@ -587,25 +591,27 @@ Nhiệm vụ:
                 }
             };
 
-            using var directHttp = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
+            var directHttp = _httpClientFactory?.CreateClient("Gemini") ?? SharedGeminiFallbackClient;
             var json = JsonSerializer.Serialize(payload);
 
-            var url = $"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={apiKey}";
+            var url = $"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent";
             using var reqMsg = new HttpRequestMessage(HttpMethod.Post, url)
             {
                 Content = new StringContent(json, Encoding.UTF8, "application/json")
             };
+            reqMsg.Headers.TryAddWithoutValidation("x-goog-api-key", apiKey);
 
             var res = await directHttp.SendAsync(reqMsg, ct);
 
             // Nếu model 3.5 gặp lỗi, thử tiếp fallback qua gemini-2.5-flash
             if (!res.IsSuccessStatusCode && model != "gemini-2.5-flash")
             {
-                var retryUrl = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={apiKey}";
+                var retryUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
                 using var retryMsg = new HttpRequestMessage(HttpMethod.Post, retryUrl)
                 {
                     Content = new StringContent(json, Encoding.UTF8, "application/json")
                 };
+                retryMsg.Headers.TryAddWithoutValidation("x-goog-api-key", apiKey);
                 res = await directHttp.SendAsync(retryMsg, ct);
             }
 
@@ -711,13 +717,14 @@ Nhiệm vụ: Giải bài tập cho học sinh theo phương pháp sư phạm m�
                 generationConfig = new { maxOutputTokens = 1500, temperature = 0.5 }
             };
 
-            var url = $"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={apiKey}";
-            using var directHttp = new HttpClient { Timeout = TimeSpan.FromSeconds(20) };
+            var url = $"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent";
+            var directHttp = _httpClientFactory?.CreateClient("Gemini") ?? SharedGeminiFallbackClient;
             var json = JsonSerializer.Serialize(payload);
             using var reqMsg = new HttpRequestMessage(HttpMethod.Post, url)
             {
                 Content = new StringContent(json, Encoding.UTF8, "application/json")
             };
+            reqMsg.Headers.TryAddWithoutValidation("x-goog-api-key", apiKey);
 
             var res = await directHttp.SendAsync(reqMsg, ct);
             if (res.IsSuccessStatusCode)

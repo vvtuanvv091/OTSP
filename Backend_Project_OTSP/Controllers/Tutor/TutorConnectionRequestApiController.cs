@@ -47,6 +47,8 @@ public class TutorConnectionRequestApiController : ControllerBase
             query = query.Where(r => r.Status == status.Value);
         }
 
+        pageSize = Math.Clamp(pageSize, 1, 100);
+
         var totalItems = await query.CountAsync(cancellationToken);
         var totalPages = Math.Max(1, (int)Math.Ceiling(totalItems / (double)pageSize));
         page = Math.Clamp(page, 1, totalPages);

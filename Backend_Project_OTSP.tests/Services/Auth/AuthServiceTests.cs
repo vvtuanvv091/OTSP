@@ -140,7 +140,7 @@ public class AuthServiceTests
 
         _mockUserManager.Setup(u => u.FindByEmailAsync("user@test.com")).ReturnsAsync(user);
         _mockSignInManager
-            .Setup(s => s.CheckPasswordSignInAsync(user, "WrongPass", false))
+            .Setup(s => s.CheckPasswordSignInAsync(user, "WrongPass", true))
             .ReturnsAsync(SignInResult.Failed);
 
         var service = CreateService(db);
@@ -152,6 +152,30 @@ public class AuthServiceTests
         // Assert
         Assert.False(success);
         Assert.Equal("Email hoặc mật khẩu không chính xác.", error);
+        Assert.Null(data);
+    }
+
+    [Fact]
+    public async Task LoginAsync_WhenAccountLockedOut_ReturnsLockedOutError()
+    {
+        var db = TestDbContextFactory.Create();
+        var user = new ApplicationUser
+        {
+            Id = "user-lockout",
+            Email = "lockout@test.com",
+            Status = AccountStatus.Active
+        };
+
+        _mockUserManager.Setup(u => u.FindByEmailAsync("lockout@test.com")).ReturnsAsync(user);
+        _mockSignInManager
+            .Setup(s => s.CheckPasswordSignInAsync(user, "WrongPass", true))
+            .ReturnsAsync(SignInResult.LockedOut);
+
+        var service = CreateService(db);
+        var (success, error, data) = await service.LoginAsync(new LoginRequest { Email = "lockout@test.com", Password = "WrongPass" });
+
+        Assert.False(success);
+        Assert.Contains("nhiều lần", error);
         Assert.Null(data);
     }
 
@@ -169,7 +193,7 @@ public class AuthServiceTests
 
         _mockUserManager.Setup(u => u.FindByEmailAsync("user@test.com")).ReturnsAsync(user);
         _mockSignInManager
-            .Setup(s => s.CheckPasswordSignInAsync(user, "CorrectPass123!", false))
+            .Setup(s => s.CheckPasswordSignInAsync(user, "CorrectPass123!", true))
             .ReturnsAsync(SignInResult.Success);
 
         var authResponse = new AuthResponse
@@ -444,7 +468,7 @@ public class AuthServiceTests
     // ==================== FORGOT & RESET PASSWORD ====================
 
     [Fact]
-    public async Task ForgotPasswordAsync_WhenUserNotFound_ReturnsFalse()
+    public async Task ForgotPasswordAsync_WhenUserNotFound_ReturnsUniformSuccessWithoutToken()
     {
         // Arrange
         var db = TestDbContextFactory.Create();
@@ -457,13 +481,14 @@ public class AuthServiceTests
         var (success, error, token) = await service.ForgotPasswordAsync(request);
 
         // Assert
-        Assert.False(success);
-        Assert.Contains("Không tìm thấy", error);
+        Assert.True(success);
+        Assert.Null(error);
         Assert.Null(token);
+        _mockEmailSender.Verify(e => e.SendPasswordResetEmailAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()), Times.Never);
     }
 
     [Fact]
-    public async Task ForgotPasswordAsync_WhenUserExists_ReturnsTokenAndSendsEmail()
+    public async Task ForgotPasswordAsync_WhenUserExists_SendsEmailWithoutReturningToken()
     {
         // Arrange
         var db = TestDbContextFactory.Create();
@@ -480,7 +505,7 @@ public class AuthServiceTests
         // Assert
         Assert.True(success);
         Assert.Null(error);
-        Assert.Equal("generated-token-xyz", token);
+        Assert.Null(token);
         _mockEmailSender.Verify(e => e.SendPasswordResetEmailAsync("found@test.com", "generated-token-xyz", It.IsAny<string>()), Times.Once);
     }
 

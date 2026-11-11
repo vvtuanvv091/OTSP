@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import adminApi from '../../api/adminApi';
 import adminOperationsApi from '../../api/adminOperationsApi';
+import { ensureVisitTracked } from '../../utils/visitTracker';
 import '../../styles/admin-pages.css';
 
 export default function AdminDashboardPage() {
@@ -38,6 +39,8 @@ export default function AdminDashboardPage() {
     else setLoading(true);
 
     try {
+      await ensureVisitTracked(window.location.pathname || '/admin/dashboard');
+
       // 1. Thử gọi API chuyên biệt Admin Dashboard từ Backend .NET
       try {
         const directStatsRes = await adminApi.getDashboardStats();
@@ -842,7 +845,7 @@ export default function AdminDashboardPage() {
           </div>
           <div className="mt-3 pt-2 border-top d-flex justify-content-between small text-secondary" style={{ fontSize: 11.5 }}>
             <span>~{Number(stats.tokensToday || 0).toLocaleString('vi-VN')} tokens</span>
-            <span>{stats.visitsToday} lượt truy cập</span>
+            <span title="Mỗi thiết bị truy cập web trong ngày tính 1 lượt">{stats.visitsToday} thiết bị</span>
           </div>
         </div>
 
@@ -1039,7 +1042,7 @@ export default function AdminDashboardPage() {
                 </div>
                 <div className="chart-summary-chip">
                   <span className="text-secondary" style={{ fontSize: 11 }}>Truy cập web:</span>
-                  <strong className="text-body fw-bold">{chartData.totalWeekVisits.toLocaleString('vi-VN')} lượt</strong>
+                  <strong className="text-body fw-bold">{chartData.totalWeekVisits.toLocaleString('vi-VN')} thiết bị</strong>
                 </div>
                 <div className="chart-summary-chip ms-auto">
                   <span className="badge bg-success-subtle text-success border border-success-subtle d-flex align-items-center gap-1" style={{ fontSize: 10.5 }}>
@@ -1465,9 +1468,9 @@ export default function AdminDashboardPage() {
                             <div className="d-flex align-items-center justify-content-between">
                               <span className="d-flex align-items-center gap-1.5 text-secondary">
                                 <i className="bi bi-activity text-secondary" style={{ fontSize: 11 }}></i>
-                                Lượt truy cập:
+                                Thiết bị truy cập:
                               </span>
-                              <strong className="text-body">{chartData.items[hoveredIdx].visits} lượt</strong>
+                              <strong className="text-body">{chartData.items[hoveredIdx].visits} thiết bị</strong>
                             </div>
                           </div>
                         </div>
@@ -1555,7 +1558,7 @@ export default function AdminDashboardPage() {
                                   background: isHovered ? '#0ea5e9' : '#0284c7',
                                   boxShadow: isHovered ? '0 0 8px rgba(14, 165, 233, 0.5)' : 'none'
                                 }}
-                                title={`${dm.date}: ${dm.visits} truy cập`}
+                                title={`${dm.date}: ${dm.visits} thiết bị truy cập`}
                               ></div>
                               <div
                                 className="daily-bar-fill"
@@ -1578,7 +1581,7 @@ export default function AdminDashboardPage() {
                       })}
                     </div>
                     <div className="d-flex justify-content-center gap-3 mt-2 text-secondary" style={{ fontSize: 11 }}>
-                      <span className="d-flex align-items-center gap-1"><span style={{ width: 8, height: 8, background: '#0284c7', borderRadius: 2 }}></span> Truy cập web</span>
+                      <span className="d-flex align-items-center gap-1"><span style={{ width: 8, height: 8, background: '#0284c7', borderRadius: 2 }}></span> Thiết bị truy cập</span>
                       <span className="d-flex align-items-center gap-1"><span style={{ width: 8, height: 8, background: '#06b6d4', borderRadius: 2 }}></span> Hỏi AI Wein</span>
                     </div>
                   </div>
@@ -1590,7 +1593,7 @@ export default function AdminDashboardPage() {
                           <strong>{dm.date}</strong> <span className="text-secondary">({dm.dayName})</span>
                         </div>
                         <div className="d-flex gap-2">
-                          <span className="badge bg-primary-subtle text-primary border">{dm.visits} lượt</span>
+                          <span className="badge bg-primary-subtle text-primary border">{dm.visits} thiết bị</span>
                           <span className="badge bg-info-subtle text-info border">~{Number(dm.tokens || 0).toLocaleString('vi-VN')} token</span>
                         </div>
                       </div>
