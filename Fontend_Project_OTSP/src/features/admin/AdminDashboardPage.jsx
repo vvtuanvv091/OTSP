@@ -590,6 +590,11 @@ export default function AdminDashboardPage() {
           transition: height 0.4s ease;
         }
 
+        .table-responsive {
+          overflow-x: auto;
+          -webkit-overflow-scrolling: touch;
+        }
+
         /* 8. Modern Table */
         .modern-diagram-table {
           width: 100%;
@@ -630,6 +635,105 @@ export default function AdminDashboardPage() {
         @keyframes spin {
           from { transform: rotate(0deg); }
           to { transform: rotate(360deg); }
+        }
+
+        /* ============================================================
+           MOBILE RESPONSIVE & ADAPTIVE STYLING (IMPECCABLE CRAFT)
+           ============================================================ */
+        @media (max-width: 991.98px) {
+          .dash-kpi-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+          }
+          .admin-exec-header {
+            padding: 14px 16px;
+          }
+          .chart-svg-wrap {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+          }
+        }
+
+        @media (max-width: 767.98px) {
+          .dash-kpi-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+          }
+          .dash-kpi-box {
+            padding: 12px 14px;
+            border-radius: 12px;
+          }
+          .dash-kpi-val {
+            font-size: 19px;
+          }
+          .dash-kpi-icon {
+            width: 34px;
+            height: 34px;
+            font-size: 16px;
+          }
+          .diagram-card {
+            padding: 14px 16px;
+            border-radius: 14px;
+          }
+          .flow-architecture-stage {
+            padding: 14px 12px;
+          }
+          .flow-connector-line {
+            transform: rotate(90deg);
+            margin: 6px 0;
+          }
+          .pipeline-track {
+            grid-template-columns: 1fr;
+            gap: 10px;
+          }
+          .chart-filter-pill {
+            font-size: 10.5px;
+            padding: 3px 8px;
+          }
+          .daily-bars-container {
+            height: 120px;
+            gap: 4px;
+          }
+          .daily-bar-fill {
+            width: 10px;
+          }
+          .modern-diagram-table-wrap {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            margin: 0 -8px;
+            padding: 0 8px;
+          }
+          .modern-diagram-table th,
+          .modern-diagram-table td {
+            padding: 8px 10px;
+            font-size: 11.5px;
+            white-space: nowrap;
+          }
+        }
+
+        @media (max-width: 479.98px) {
+          .dash-kpi-grid {
+            grid-template-columns: 1fr;
+            gap: 8px;
+          }
+          .dash-kpi-box {
+            padding: 12px;
+          }
+          .admin-exec-header h5 {
+            font-size: 17px;
+          }
+          .admin-exec-header small {
+            font-size: 11.5px;
+          }
+          .diagram-header-badge {
+            width: 28px;
+            height: 28px;
+            font-size: 14px;
+          }
+          .chart-summary-chip {
+            font-size: 10.5px;
+            padding: 2px 6px;
+          }
         }
       `}</style>
 

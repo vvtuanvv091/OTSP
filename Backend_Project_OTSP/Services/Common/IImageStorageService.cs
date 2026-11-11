@@ -10,6 +10,7 @@ public interface IImageStorageService
     Task<StoredImage> UploadAvatarAsync(IFormFile file, CancellationToken cancellationToken);
     Task<StoredImage> UploadChatImageAsync(IFormFile file, CancellationToken cancellationToken);
     Task<StoredImage> UploadQualificationAsync(IFormFile file, CancellationToken cancellationToken);
+    Task<StoredImage> UploadLearningDocumentAsync(IFormFile file, CancellationToken cancellationToken);
     Task DeleteAsync(string publicId, CancellationToken cancellationToken);
 }
 

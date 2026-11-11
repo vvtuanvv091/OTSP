@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Backend_Project_OTSP.Data;
+using Backend_Project_OTSP.Services.Common;
 using static Backend_Project_OTSP.Models.Enums;
 using Backend_Project_OTSP.Dtos.StudentParent;
 
@@ -135,8 +136,8 @@ public class StudentLearningDocumentApiController : ControllerBase
             return Redirect(doc.FileUrl);
         }
 
-        var fullPath = Path.Combine(GetUploadFolder(), doc.FileUrl);
-        if (!System.IO.File.Exists(fullPath)) return NotFound(new { message = "Tệp không tồn tại." });
+        var fullPath = StoragePathResolver.ResolveDocumentPath(_environment, doc.FileUrl);
+        if (fullPath == null) return NotFound(new { message = "Tệp không tồn tại." });
 
         var contentType = Path.GetExtension(doc.FileUrl).ToLowerInvariant() switch
         {

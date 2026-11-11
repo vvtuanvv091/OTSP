@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Backend_Project_OTSP.Data;
 using Backend_Project_OTSP.Dtos;
 using Backend_Project_OTSP.Models;
+using Backend_Project_OTSP.Services.Common;
 using static Backend_Project_OTSP.Models.Enums;
 using Backend_Project_OTSP.Dtos.Tutor;
 
@@ -23,16 +24,21 @@ public class TutorLearningDocumentApiController : ControllerBase
 
     private readonly ApplicationDbContext _db;
     private readonly IWebHostEnvironment _environment;
+    private readonly IImageStorageService _imageStorage;
 
-    public TutorLearningDocumentApiController(ApplicationDbContext db, IWebHostEnvironment environment)
+    public TutorLearningDocumentApiController(
+        ApplicationDbContext db,
+        IWebHostEnvironment environment,
+        IImageStorageService imageStorage)
     {
         _db = db;
         _environment = environment;
+        _imageStorage = imageStorage;
     }
 
     private string? CurrentUserId => User.FindFirstValue(ClaimTypes.NameIdentifier);
 
-    private string GetUploadFolder() => Path.Combine(_environment.ContentRootPath, "App_Data", "tutor-learning-documents");
+    private string GetUploadFolder() => StoragePathResolver.GetDocumentFolder(_environment);
 
     [HttpGet]
     public async Task<IActionResult> GetDocuments(
@@ -200,11 +206,16 @@ public class TutorLearningDocumentApiController : ControllerBase
             return BadRequest(new { message = "Hãy chọn môn học và cấp học trong hồ sơ giảng dạy của bạn." });
         }
 
-        var uploadFolder = GetUploadFolder();
-        Directory.CreateDirectory(uploadFolder);
-
-        var storedFileName = $"{Guid.NewGuid():N}{ext}";
-        var fullPath = Path.Combine(uploadFolder, storedFileName);
+        // Tải tài liệu lên đám mây Cloudinary để đảm bảo dữ liệu vĩnh viễn trên Server Render / Docker
+        StoredImage stored;
+        try
+        {
+            stored = await _imageStorage.UploadLearningDocumentAsync(file, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = "Lỗi khi tải tệp lên đám mây: " + ex.Message });
+        }
 
         var doc = new LearningDocument
         {
@@ -215,55 +226,42 @@ public class TutorLearningDocumentApiController : ControllerBase
             GradeLevelId = request.GradeLevelId,
             Scope = scope,
             ClassroomId = request.ClassroomId,
-            FileUrl = storedFileName,
+            FileUrl = stored.Url,
             Status = scope == DocumentScope.Public ? VerificationStatus.Pending : VerificationStatus.Approved,
             UploadedAt = DateTime.UtcNow
         };
 
-        try
+        _db.LearningDocuments.Add(doc);
+        await _db.SaveChangesAsync(cancellationToken);
+
+        // Tự động gửi thông báo cho học viên trong lớp khi gia sư tải tài liệu
+        if (doc.ClassroomId.HasValue)
         {
-            using (var stream = new FileStream(fullPath, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+            var classroomStudents = await _db.ClassroomStudents
+                .AsNoTracking()
+                .Where(cs => cs.ClassroomId == doc.ClassroomId.Value)
+                .Include(cs => cs.Student)
+                .ToListAsync(cancellationToken);
+
+            foreach (var cs in classroomStudents)
             {
-                await file.CopyToAsync(stream, cancellationToken);
-            }
-
-            _db.LearningDocuments.Add(doc);
-            await _db.SaveChangesAsync(cancellationToken);
-
-            // Tự động gửi thông báo cho học viên trong lớp khi gia sư tải tài liệu
-            if (doc.ClassroomId.HasValue)
-            {
-                var classroomStudents = await _db.ClassroomStudents
-                    .AsNoTracking()
-                    .Where(cs => cs.ClassroomId == doc.ClassroomId.Value)
-                    .Include(cs => cs.Student)
-                    .ToListAsync(cancellationToken);
-
-                foreach (var cs in classroomStudents)
+                if (string.IsNullOrEmpty(cs.Student?.UserId)) continue;
+                _db.Notifications.Add(new Notification
                 {
-                    if (string.IsNullOrEmpty(cs.Student?.UserId)) continue;
-                    _db.Notifications.Add(new Notification
-                    {
-                        UserId = cs.Student.UserId,
-                        Title = "Tài liệu học tập mới",
-                        Content = $"Gia sư vừa tải lên tài liệu mới: '{doc.Title}' cho lớp học của bạn. [url:/Student_Parent/StudentDocuments]",
-                        CreatedAt = DateTime.UtcNow,
-                        IsRead = false
-                    });
-                }
-                await _db.SaveChangesAsync(cancellationToken);
+                    UserId = cs.Student.UserId,
+                    Title = "Tài liệu học tập mới",
+                    Content = $"Gia sư vừa tải lên tài liệu mới: '{doc.Title}' cho lớp học của bạn. [url:/Student_Parent/StudentDocuments]",
+                    CreatedAt = DateTime.UtcNow,
+                    IsRead = false
+                });
             }
+            await _db.SaveChangesAsync(cancellationToken);
+        }
 
-            var message = scope == DocumentScope.Public
-                ? "Tài liệu đã tải lên và đang chờ quản trị viên duyệt trước khi công khai."
-                : "Đã tải tài liệu vào lớp học thành công.";
-            return Ok(new { success = true, message, documentId = doc.Id, status = doc.Status.ToString() });
-        }
-        catch (Exception ex)
-        {
-            if (System.IO.File.Exists(fullPath)) System.IO.File.Delete(fullPath);
-            return StatusCode(500, new { message = "Lỗi khi lưu tệp: " + ex.Message });
-        }
+        var message = scope == DocumentScope.Public
+            ? "Tài liệu đã tải lên và đang chờ quản trị viên duyệt trước khi công khai."
+            : "Đã tải tài liệu vào lớp học thành công.";
+        return Ok(new { success = true, message, documentId = doc.Id, status = doc.Status.ToString() });
     }
 
     [HttpPost("{id:int}/toggle-status")]
@@ -311,8 +309,8 @@ public class TutorLearningDocumentApiController : ControllerBase
             return Redirect(doc.FileUrl);
         }
 
-        var fullPath = Path.Combine(GetUploadFolder(), doc.FileUrl);
-        if (!System.IO.File.Exists(fullPath)) return NotFound(new { message = "Tệp không tồn tại." });
+        var fullPath = StoragePathResolver.ResolveDocumentPath(_environment, doc.FileUrl);
+        if (fullPath == null) return NotFound(new { message = "Tệp không tồn tại." });
 
         var contentType = Path.GetExtension(doc.FileUrl).ToLowerInvariant() switch
         {

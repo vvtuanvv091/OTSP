@@ -257,6 +257,72 @@ public sealed class CloudinaryImageStorageService : IImageStorageService
         throw  new InvalidCastException("Không thể tải tệp lên lúc này, vui lòng thử lại sau.");
     }
 
+    public async Task<StoredImage> UploadLearningDocumentAsync(IFormFile file, CancellationToken cancellationToken)
+    {
+        if (file is null || file.Length == 0 || file.Length > 25 * 1024 * 1024)
+            throw new ArgumentException("Vui lòng chọn tệp hợp lệ, tối đa 25 MB.", nameof(file));
+
+        var ext = Path.GetExtension(file.FileName)?.ToLowerInvariant() ?? string.Empty;
+        var allowedDocExts = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".txt", ".zip", ".rar", ".jpg", ".jpeg", ".png", ".webp"
+        };
+
+        if (!allowedDocExts.Contains(ext))
+            throw new ArgumentException($"Định dạng tệp '{ext}' không được hỗ trợ. Vui lòng tải lên tài liệu học tập (.pdf, .doc, .docx, .xls, .xlsx, .ppt, .pptx).", nameof(file));
+
+        if (IsCloudinaryConfigured())
+        {
+            try
+            {
+                var cloudinary = CreateClient();
+                await using var stream = file.OpenReadStream();
+
+                var isImage = ext is ".jpg" or ".jpeg" or ".png" or ".webp";
+                if (isImage)
+                {
+                    var imgResult = await cloudinary.UploadAsync(new ImageUploadParams
+                    {
+                        File = new FileDescription(file.FileName, stream),
+                        Folder = "otsp/learning-documents",
+                        PublicId = Guid.NewGuid().ToString("N"),
+                        Overwrite = false,
+                        UseFilename = false,
+                        UniqueFilename = false
+                    }, cancellationToken);
+
+                    if (imgResult.Error is null && imgResult.SecureUrl is not null && !string.IsNullOrWhiteSpace(imgResult.PublicId))
+                    {
+                        return new StoredImage(imgResult.SecureUrl.ToString(), imgResult.PublicId);
+                    }
+                }
+                else
+                {
+                    var rawResult = await cloudinary.UploadAsync(new RawUploadParams
+                    {
+                        File = new FileDescription(file.FileName, stream),
+                        Folder = "otsp/learning-documents",
+                        PublicId = $"{Guid.NewGuid():N}{ext}",
+                        Overwrite = false,
+                        UseFilename = false,
+                        UniqueFilename = false
+                    }, "raw", cancellationToken);
+
+                    if (rawResult.Error is null && rawResult.SecureUrl is not null && !string.IsNullOrWhiteSpace(rawResult.PublicId))
+                    {
+                        return new StoredImage(rawResult.SecureUrl.ToString(), rawResult.PublicId);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Cloudinary upload learning document lỗi {Error}.", ex.Message);
+            }
+        }
+
+        throw new InvalidOperationException("Không thể tải tài liệu lên đám mây lúc này, vui lòng kiểm tra kết nối mạng và thử lại.");
+    }
+
     public async Task DeleteAsync(string publicId, CancellationToken cancellationToken)
     {
         if (IsCloudinaryConfigured())

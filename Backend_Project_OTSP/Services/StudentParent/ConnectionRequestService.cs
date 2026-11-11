@@ -9,6 +9,8 @@ using Backend_Project_OTSP.Models;
 using static Backend_Project_OTSP.Models.Enums;
 using Backend_Project_OTSP.Services.StudentParent;
 using Backend_Project_OTSP.Services.Tutor;
+using Backend_Project_OTSP.Services.Common;
+using Backend_Project_OTSP.Services.Notifications;
 
 namespace Backend_Project_OTSP.Services;
 
@@ -20,6 +22,7 @@ public class ConnectionRequestService : IConnectionRequestService
     private readonly IOpenGroupClassroomService _openGroupClassroomService;
     private readonly IAvailabilitySlotService _availabilitySlotService;
     private readonly IHubContext<ConnectionRequestHub> _hubContext;
+    private readonly INotificationDispatcher _dispatcher;
     private readonly ILogger<ConnectionRequestService> _logger;
 
     public ConnectionRequestService(
@@ -27,12 +30,14 @@ public class ConnectionRequestService : IConnectionRequestService
         IOpenGroupClassroomService openGroupClassroomService,
         IAvailabilitySlotService availabilitySlotService,
         IHubContext<ConnectionRequestHub> hubContext,
+        INotificationDispatcher dispatcher,
         ILogger<ConnectionRequestService> logger)
     {
         _db = db;
         _openGroupClassroomService = openGroupClassroomService;
         _availabilitySlotService = availabilitySlotService;
         _hubContext = hubContext;
+        _dispatcher = dispatcher;
         _logger = logger;
     }
 
@@ -483,16 +488,6 @@ public class ConnectionRequestService : IConnectionRequestService
                 ? "học thử 1 buổi"
                 : "vào học chính thức";
 
-        var notification = new Notification
-        {
-            UserId = tutor.UserId,
-            Title = "Yêu cầu kết nối mới",
-            Content = $"Học viên {studentName} vừa gửi cho bạn một yêu cầu {actionLabel} môn {subjectName}. [url:/Tutor/TutorConnectionRequest]",
-            CreatedAt = DateTime.UtcNow,
-            IsRead = false
-        };
-
-        _db.Notifications.Add(notification);
         try
         {
             await _db.SaveChangesAsync(cancellationToken);
@@ -509,25 +504,19 @@ public class ConnectionRequestService : IConnectionRequestService
             };
         }
 
-        // Phát realtime qua SignalR tới gia sư
-        try
-        {
-            await _hubContext.Clients.User(tutor.UserId).SendAsync(
-                "ConnectionRequestCreated",
-                new
-                {
-                    requestId = connectionRequest.Id,
-                    studentName = studentName,
-                    subjectName = subjectName,
-                    preferredType = dto.PreferredType.ToString(),
-                    isTrial = isTrialRequest
-                },
-                cancellationToken);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Lỗi gửi SignalR ConnectionRequestCreated tới gia sư {TutorUserId}", tutor.UserId);
-        }
+        // Điều phối thông báo đa kênh (In-App chuông, Realtime SignalR, Gmail SMTP) qua NotificationDispatcher
+        await _dispatcher.DispatchBookingCreatedAsync(new BookingCreatedNotificationEvent(
+            TutorUserId: tutor.UserId,
+            TutorEmail: tutor.User?.Email,
+            TutorName: tutor.User?.FullName ?? "thầy/cô",
+            StudentName: studentName,
+            SubjectName: subjectName,
+            ActionLabel: actionLabel,
+            Message: dto.Message,
+            RequestId: connectionRequest.Id,
+            PreferredType: dto.PreferredType.ToString(),
+            IsTrial: isTrialRequest
+        ), cancellationToken);
 
         return new ConnectionRequestOperationResult
         {
@@ -910,24 +899,17 @@ public class ConnectionRequestService : IConnectionRequestService
 
             await transaction.CommitAsync(cancellationToken);
 
-            // Gửi SignalR thông báo trạng thái tức thì cho học viên
-            try
-            {
-                await _hubContext.Clients.User(studentUserId).SendAsync(
-                    "ConnectionRequestStatusChanged",
-                    new
-                    {
-                        requestId = request.Id,
-                        status = RequestStatus.Accepted.ToString(),
-                        classroomId = finalClassroomId,
-                        isTrial = isTrial
-                    },
-                    cancellationToken);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Lỗi gửi SignalR ConnectionRequestStatusChanged tới học viên {StudentUserId}", studentUserId);
-            }
+            // Phân phối thông báo (In-App + SignalR + Gmail) qua Central Dispatcher
+            await _dispatcher.DispatchBookingAcceptedAsync(new BookingAcceptedNotificationEvent(
+                StudentUserId: studentUserId,
+                StudentEmail: request.Student?.User?.Email,
+                StudentName: studentName,
+                TutorName: tutorName,
+                SubjectName: subjectName,
+                RequestId: request.Id,
+                ClassroomId: finalClassroomId,
+                IsTrial: isTrial
+            ), cancellationToken);
 
             return new AcceptConnectionRequestResult
             {
@@ -977,32 +959,18 @@ public class ConnectionRequestService : IConnectionRequestService
 
         var reasonText = string.IsNullOrWhiteSpace(reason) ? "" : $" Lý do: {reason.Trim()}";
 
-        _db.Notifications.Add(new Notification
-        {
-            UserId = studentUserId,
-            Title = "Yêu cầu kết nối chưa được chấp nhận",
-            Content = $"Gia sư {tutorName} hiện chưa thể nhận yêu cầu môn {subjectName} của bạn.{reasonText} [url:/Student_Parent/Send_Details_Tutor/MyRequests]",
-            CreatedAt = DateTime.UtcNow,
-            IsRead = false
-        });
-
         await _db.SaveChangesAsync(cancellationToken);
 
-        try
-        {
-            await _hubContext.Clients.User(studentUserId).SendAsync(
-                "ConnectionRequestStatusChanged",
-                new
-                {
-                    requestId = request.Id,
-                    status = RequestStatus.Rejected.ToString()
-                },
-                cancellationToken);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Lỗi gửi SignalR ConnectionRequestStatusChanged (Rejected) tới học viên {StudentUserId}", studentUserId);
-        }
+        // Phân phối thông báo từ chối (In-App + SignalR + Gmail) qua Central Dispatcher
+        await _dispatcher.DispatchBookingRejectedAsync(new BookingRejectedNotificationEvent(
+            StudentUserId: studentUserId,
+            StudentEmail: request.Student?.User?.Email,
+            StudentName: request.Student?.User?.FullName ?? "Học viên",
+            TutorName: tutorName,
+            SubjectName: subjectName,
+            Reason: reason,
+            RequestId: request.Id
+        ), cancellationToken);
 
         return new RejectConnectionRequestResult
         {

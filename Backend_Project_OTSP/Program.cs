@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.AspNetCore.Localization;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.ResponseCompression;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.IdentityModel.Tokens;
@@ -23,6 +24,7 @@ using BACKEND_PROJECT_OTSP.Services.Admin;
 using Backend_Project_OTSP.Services.Sessions;
 using Backend_Project_OTSP.Services.Chat;
 using Backend_Project_OTSP.Services.Payments;
+using Backend_Project_OTSP.Services.Notifications;
 
 var builder = WebApplication.CreateBuilder(args);
 // Hỗ trợ tự động nhận diện PORT trên Render / Cloud PaaS
@@ -210,6 +212,8 @@ builder.Services.AddScoped<IAdminLearningDocumentService, AdminLearningDocumentS
 builder.Services.AddScoped<IAdminOperationsService, AdminOperationsService>();
 builder.Services.AddScoped<IStudentProfileService, StudentProfileService>();
 builder.Services.AddScoped<IEmailSenderService, EmailSenderService>();
+builder.Services.AddScoped<INotificationService, NotificationService>();
+builder.Services.AddScoped<INotificationDispatcher>(sp => (NotificationService)sp.GetRequiredService<INotificationService>());
 builder.Services.AddScoped<IJwtService, JwtService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddSingleton<GoogleIdTokenValidator>();
@@ -278,9 +282,16 @@ app.Use(async (context, next) =>
         if (context.Request.Path.StartsWithSegments("/api/auth/logout"))
         {
             presence.MarkOffline(userId);
+            try
+            {
+                var hubContext = context.RequestServices.GetRequiredService<Microsoft.AspNetCore.SignalR.IHubContext<Backend_Project_OTSP.Hubs.ChatHub>>();
+                await hubContext.Clients.All.SendAsync("UserPresenceChanged", userId, false);
+            }
+            catch { }
         }
         else if (!context.Request.Path.StartsWithSegments("/api/chat/conversations") &&
-                 !context.Request.Path.StartsWithSegments("/api/notifications/unread-count"))
+                 !context.Request.Path.StartsWithSegments("/api/notifications") &&
+                 !context.Request.Path.StartsWithSegments("/api/health"))
         {
             presence.TouchUserActivity(userId);
         }

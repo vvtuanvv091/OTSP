@@ -4,6 +4,7 @@ using Backend_Project_OTSP.Data;
 using Backend_Project_OTSP.Dtos;
 using Backend_Project_OTSP.Dtos.Admin;
 using Backend_Project_OTSP.Models;
+using Backend_Project_OTSP.Services.Common;
 using static Backend_Project_OTSP.Models.Enums;
 using BACKEND_PROJECT_OTSP.Services.Admin;
 
@@ -95,25 +96,25 @@ public sealed class AdminLearningDocumentService : IAdminLearningDocumentService
 
     public async Task<(string? FilePath, string? FileName, string? ContentType)> GetFileAsync(int documentId, CancellationToken cancellationToken = default)
     {
-        var storedName = await _db.LearningDocuments.AsNoTracking()
+        var doc = await _db.LearningDocuments.AsNoTracking()
             .Where(document => document.Id == documentId)
-            .Select(document => document.FileUrl)
+            .Select(document => new { document.FileUrl, document.Title })
             .SingleOrDefaultAsync(cancellationToken);
-        if (string.IsNullOrWhiteSpace(storedName))
+        if (doc == null || string.IsNullOrWhiteSpace(doc.FileUrl))
             return (null, null, null);
 
+        var storedName = doc.FileUrl;
         if (storedName.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
             storedName.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
         {
             return (storedName, Path.GetFileName(storedName), "url");
         }
 
-        if (Path.GetFileName(storedName) != storedName)
-            return (null, null, null);
+        var filePath = StoragePathResolver.ResolveDocumentPath(_environment, storedName);
+        if (filePath == null) return (null, null, null);
 
-        var filePath = Path.Combine(_environment.ContentRootPath, "App_Data", "tutor-learning-documents", storedName);
-        if (!File.Exists(filePath)) return (null, null, null);
-        var contentType = Path.GetExtension(storedName).ToLowerInvariant() switch
+        var ext = Path.GetExtension(storedName).ToLowerInvariant();
+        var contentType = ext switch
         {
             ".pdf" => "application/pdf",
             ".doc" => "application/msword",
@@ -124,7 +125,9 @@ public sealed class AdminLearningDocumentService : IAdminLearningDocumentService
             ".pptx" => "application/vnd.openxmlformats-officedocument.presentationml.presentation",
             _ => "application/octet-stream"
         };
-        return (filePath, storedName, contentType);
+
+        var safeDownloadName = $"{doc.Title}{ext}";
+        return (filePath, safeDownloadName, contentType);
     }
 
     public async Task<(bool Success, bool NotFound, string? ErrorMessage)> ReviewAsync(

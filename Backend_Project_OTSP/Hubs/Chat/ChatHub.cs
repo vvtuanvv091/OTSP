@@ -20,11 +20,15 @@ public sealed class ChatHub : Hub
 
     public override async Task OnConnectedAsync()
     {
-        var userId = Context.User?.FindFirstValue(ClaimTypes.NameIdentifier);
+        var userId = Context.UserIdentifier ?? Context.User?.FindFirstValue(ClaimTypes.NameIdentifier);
         if (!string.IsNullOrWhiteSpace(userId))
         {
-            _presenceService.OnConnected(userId, Context.ConnectionId);
+            var becameOnline = _presenceService.OnConnected(userId, Context.ConnectionId);
             await Groups.AddToGroupAsync(Context.ConnectionId, $"user:{userId}");
+            if (becameOnline)
+            {
+                await Clients.Others.SendAsync("UserPresenceChanged", userId, true);
+            }
         }
 
         await base.OnConnectedAsync();
@@ -32,14 +36,18 @@ public sealed class ChatHub : Hub
 
     public override async Task OnDisconnectedAsync(Exception? exception)
     {
-        var userId = Context.User?.FindFirstValue(ClaimTypes.NameIdentifier);
-        _presenceService.OnDisconnected(userId, Context.ConnectionId);
+        var userId = Context.UserIdentifier ?? Context.User?.FindFirstValue(ClaimTypes.NameIdentifier);
+        var becameOffline = _presenceService.OnDisconnected(userId, Context.ConnectionId, out var resolvedUserId);
+        if (becameOffline && !string.IsNullOrWhiteSpace(resolvedUserId))
+        {
+            await Clients.Others.SendAsync("UserPresenceChanged", resolvedUserId, false);
+        }
         await base.OnDisconnectedAsync(exception);
     }
 
     public void TouchActivity()
     {
-        var userId = Context.User?.FindFirstValue(ClaimTypes.NameIdentifier);
+        var userId = Context.UserIdentifier ?? Context.User?.FindFirstValue(ClaimTypes.NameIdentifier);
         if (!string.IsNullOrWhiteSpace(userId))
         {
             _presenceService.TouchUserActivity(userId);

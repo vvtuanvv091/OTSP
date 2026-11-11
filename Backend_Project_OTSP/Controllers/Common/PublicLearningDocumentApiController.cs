@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Backend_Project_OTSP.Data;
 using Backend_Project_OTSP.Dtos;
 using Backend_Project_OTSP.Dtos.Common;
+using Backend_Project_OTSP.Services.Common;
 using static Backend_Project_OTSP.Models.Enums;
 
 namespace Backend_Project_OTSP.Controllers.Api.Common;
@@ -137,13 +138,11 @@ public class PublicLearningDocumentApiController : ControllerBase
             return Redirect(document.FileUrl);
         }
 
-        var fileName = Path.GetFileName(document.FileUrl);
-        var folder = Path.Combine(_environment.ContentRootPath, "App_Data", "tutor-learning-documents");
-        var fullPath = Path.Combine(folder, fileName);
-
-        if (!System.IO.File.Exists(fullPath))
+        var fullPath = StoragePathResolver.ResolveDocumentPath(_environment, document.FileUrl);
+        if (fullPath == null)
             return NotFound(new { message = "Tệp tài liệu không tồn tại trên máy chủ." });
 
+        var fileName = Path.GetFileName(fullPath);
         var ext = Path.GetExtension(fileName);
         var contentType = GetContentType(ext);
         var safeDownloadName = MakeSafeFileName(document.Title) + ext;

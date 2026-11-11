@@ -54,17 +54,22 @@ public class AdminDashboardApiController : ControllerBase
 
         // 3. Tác tử AI Wein
         var totalAiSessions = await _db.AiStudySessions.AsNoTracking().CountAsync(ct);
-        var todayUtc = DateTime.UtcNow.Date;
+        var todayUtc = DateTime.SpecifyKind(DateTime.UtcNow.Date, DateTimeKind.Utc);
         var sessionsToday = await _db.AiStudySessions.AsNoTracking()
             .CountAsync(x => x.CreatedAt >= todayUtc, ct);
         var activeAiStudents = await _db.AiStudySessions.AsNoTracking()
             .Select(x => x.StudentId).Distinct().CountAsync(ct);
-        var aiRecentActivity = await _db.AiStudySessions.AsNoTracking()
-            .Where(x => x.CreatedAt >= todayUtc.AddDays(-13))
-            .GroupBy(x => x.CreatedAt.Date)
+
+        var fourteenDaysAgo = DateTime.SpecifyKind(todayUtc.AddDays(-13), DateTimeKind.Utc);
+        var rawAiTimestamps = await _db.AiStudySessions.AsNoTracking()
+            .Where(x => x.CreatedAt >= fourteenDaysAgo)
+            .Select(x => x.CreatedAt)
+            .ToListAsync(ct);
+        var aiRecentActivity = rawAiTimestamps
+            .GroupBy(d => d.Date)
             .Select(g => new { date = g.Key, count = g.Count() })
             .OrderBy(x => x.date)
-            .ToListAsync(ct);
+            .ToList();
 
         // 4. Việc cần giải quyết (Cảnh báo & Khiếu nại)
         var pendingComplaints = await _db.Complaints.AsNoTracking()
@@ -94,10 +99,7 @@ public class AdminDashboardApiController : ControllerBase
             .ToListAsync(ct);
 
         // 6. Top Gia sư nổi bật (Rating cao, nhiều học viên & lớp học)
-        var topTutors = await _db.TutorProfiles.AsNoTracking()
-            .Include(t => t.User)
-            .Include(t => t.TutorSubjects).ThenInclude(ts => ts.Subject)
-            .Include(t => t.Classrooms).ThenInclude(c => c.ClassroomStudents)
+        var topTutorsRaw = await _db.TutorProfiles.AsNoTracking()
             .Where(t => t.VerificationStatus == VerificationStatus.Approved)
             .OrderByDescending(t => t.AverageRating)
             .ThenByDescending(t => t.Classrooms.Count)
@@ -109,16 +111,26 @@ public class AdminDashboardApiController : ControllerBase
                 avatarUrl = t.User.AvatarUrl,
                 rating = t.AverageRating,
                 hourlyFee = t.HourlyFee,
-                subjects = string.Join(", ", t.TutorSubjects.Select(ts => ts.Subject.Name).Distinct()),
+                subjectsList = t.TutorSubjects.Select(ts => ts.Subject.Name).Distinct().ToList(),
                 totalClasses = t.Classrooms.Count,
                 totalStudents = t.Classrooms.SelectMany(c => c.ClassroomStudents).Count()
             })
             .ToListAsync(ct);
 
-        // 7. Top Sinh viên / Học viên nổi bật (Đo bằng mức độ học nhiều: số buổi hoàn thành & số lớp đăng ký)
-        var topStudents = await _db.StudentProfiles.AsNoTracking()
-            .Include(s => s.User)
-            .Include(s => s.ClassroomStudents).ThenInclude(cs => cs.Classroom).ThenInclude(c => c.ClassSessions)
+        var topTutors = topTutorsRaw.Select(t => new
+        {
+            t.tutorId,
+            t.fullName,
+            t.avatarUrl,
+            t.rating,
+            t.hourlyFee,
+            subjects = string.Join(", ", t.subjectsList),
+            t.totalClasses,
+            t.totalStudents
+        }).ToList();
+
+        // 7. Top Sinh viên / Học viên nổi bật
+        var topStudentsRaw = await _db.StudentProfiles.AsNoTracking()
             .OrderByDescending(s => s.ClassroomStudents.Count)
             .Take(5)
             .Select(s => new
@@ -127,14 +139,22 @@ public class AdminDashboardApiController : ControllerBase
                 fullName = s.User.FullName ?? "Học viên",
                 avatarUrl = s.User.AvatarUrl,
                 enrolledClasses = s.ClassroomStudents.Count,
-                completedSessions = s.ClassroomStudents
-                    .SelectMany(cs => cs.Classroom.ClassSessions)
-                    .Count(sess => sess.Status == SessionStatus.Done)
+                completedSessions = s.ClassroomStudents.Count(cs => cs.Classroom.ClassSessions.Any(sess => sess.Status == SessionStatus.Done))
             })
             .ToListAsync(ct);
 
+        var topStudents = topStudentsRaw.Select(s => new
+        {
+            s.studentId,
+            s.fullName,
+            s.avatarUrl,
+            s.enrolledClasses,
+            s.completedSessions
+        }).ToList();
+
         // 8. Tin nhắn / Thông báo gia sư gần nhất
         var recentTutorNotifications = await _db.Notifications.AsNoTracking()
+            .Include(n => n.User)
             .Where(n => _db.TutorProfiles.Any(tp => tp.UserId == n.UserId))
             .OrderByDescending(n => n.CreatedAt)
             .Take(5)
@@ -144,7 +164,7 @@ public class AdminDashboardApiController : ControllerBase
                 n.Title,
                 n.Content,
                 n.CreatedAt,
-                tutorName = _db.Users.Where(u => u.Id == n.UserId).Select(u => u.FullName).FirstOrDefault() ?? "Gia sư"
+                tutorName = n.User != null ? n.User.FullName : "Gia sư"
             })
             .ToListAsync(ct);
 
@@ -152,8 +172,8 @@ public class AdminDashboardApiController : ControllerBase
         var dailyMetrics = new List<object>();
         for (int i = 6; i >= 0; i--)
         {
-            var dayStart = todayUtc.AddDays(-i);
-            var dayEnd = dayStart.AddDays(1);
+            var dayStart = DateTime.SpecifyKind(todayUtc.AddDays(-i), DateTimeKind.Utc);
+            var dayEnd = DateTime.SpecifyKind(dayStart.AddDays(1), DateTimeKind.Utc);
 
             // Số lượt hỏi AI thực tế trong ngày từ AiStudySessions
             var qCount = await _db.AiStudySessions.AsNoTracking()

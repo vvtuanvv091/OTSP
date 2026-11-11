@@ -7,6 +7,7 @@ using Backend_Project_OTSP.Data;
 using Backend_Project_OTSP.Models;
 using Backend_Project_OTSP.Services;
 using Backend_Project_OTSP.Services.Common;
+using Backend_Project_OTSP.Services.Notifications;
 using static Backend_Project_OTSP.Models.Enums;
 
 namespace Backend_Project_OTSP.Controllers.Api.Common;
@@ -308,10 +309,11 @@ public class ComplaintApiController : ControllerBase
     public async Task<IActionResult> UpdateComplaintStatus(
         int id,
         [FromBody] UpdateComplaintStatusRequest request,
+        [FromServices] INotificationDispatcher? dispatcher = null,
         CancellationToken cancellationToken = default)
     {
         var adminUserId = CurrentUserId;
-        if (string.IsNullOrEmpty(adminUserId)) return Unauthorized();
+        if (string.IsNullOrWhiteSpace(adminUserId)) return Unauthorized();
 
         var complaint = await _db.Complaints
             .Include(c => c.Sender)
@@ -341,7 +343,6 @@ public class ComplaintApiController : ControllerBase
 
         await _db.SaveChangesAsync(cancellationToken);
 
-        // Gửi thông báo đến người gửi khiếu nại
         string statusText = newStatus switch
         {
             ComplaintStatus.Processing => "đang được xử lý",
@@ -350,18 +351,33 @@ public class ComplaintApiController : ControllerBase
             _ => "đã được cập nhật"
         };
 
-        _db.Notifications.Add(new Notification
+        if (dispatcher != null)
         {
-            UserId = complaint.SenderId,
-            Title = $"Khiếu nại #{complaint.Id} {statusText}",
-            Content = string.IsNullOrWhiteSpace(complaint.Resolution)
-                ? $"Quản trị viên đã cập nhật trạng thái khiếu nại của bạn thành: {statusText}."
-                : $"Kết quả giải quyết: {complaint.Resolution}",
-            CreatedAt = DateTime.UtcNow,
-            IsRead = false
-        });
-
-        await _db.SaveChangesAsync(cancellationToken);
+            var contentSnippet = complaint.Content.Length > 80 ? complaint.Content[..80] + "..." : complaint.Content;
+            await dispatcher.DispatchComplaintUpdatedAsync(new ComplaintUpdatedNotificationEvent(
+                SenderUserId: complaint.SenderId,
+                SenderEmail: complaint.Sender?.Email,
+                SenderName: complaint.Sender?.FullName ?? "bạn",
+                ComplaintId: complaint.Id,
+                StatusText: statusText,
+                ContentSnippet: contentSnippet,
+                Resolution: complaint.Resolution
+            ), cancellationToken);
+        }
+        else
+        {
+            _db.Notifications.Add(new Notification
+            {
+                UserId = complaint.SenderId,
+                Title = $"Khiếu nại #{complaint.Id} {statusText}",
+                Content = string.IsNullOrWhiteSpace(complaint.Resolution)
+                    ? $"Quản trị viên đã cập nhật trạng thái khiếu nại của bạn thành: {statusText}."
+                    : $"Kết quả giải quyết: {complaint.Resolution}",
+                CreatedAt = DateTime.UtcNow,
+                IsRead = false
+            });
+            await _db.SaveChangesAsync(cancellationToken);
+        }
 
         return Ok(new
         {

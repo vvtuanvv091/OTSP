@@ -4,6 +4,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Backend_Project_OTSP.Data;
 using Backend_Project_OTSP.Hubs;
+using Backend_Project_OTSP.Services.Common;
+using Backend_Project_OTSP.Services.Notifications;
 
 namespace Backend_Project_OTSP.Services.Chat;
 
@@ -43,7 +45,7 @@ public sealed class ChatNotificationWorker : BackgroundService
                 var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
                 var cache = scope.ServiceProvider.GetRequiredService<IMemoryCache>();
                 var chatHub = scope.ServiceProvider.GetRequiredService<IHubContext<ChatHub>>();
-                var emailSender = scope.ServiceProvider.GetService<IEmailSender>();
+                var emailSender = scope.ServiceProvider.GetService<IEmailSenderService>();
 
                 // 1. Thông báo tin nhắn đã được ghi nhận trong bảng Notifications tại ChatService để hiển thị tập trung tại mục Thông báo theo yêu cầu.
 
@@ -73,24 +75,15 @@ public sealed class ChatNotificationWorker : BackgroundService
                         // Đặt throttle 30 phút trong MemoryCache
                         cache.Set(throttleKey, true, EmailThrottleDuration);
 
-                        var subject = $"[OTSP] Bạn có tin nhắn mới từ {evt.SenderName}";
-                        var body = $@"
-                            <div style='font-family: Arial, sans-serif; padding: 24px; color: #333; max-width: 600px; border: 1px solid #eaedf1; border-radius: 12px;'>
-                                <h2 style='color: #DB303A; margin-top: 0;'>Tin nhắn mới - OTSP</h2>
-                                <p>Xin chào <strong>{receiverUser.FullName}</strong>,</p>
-                                <p>Bạn vừa nhận được tin nhắn mới từ <strong>{evt.SenderName}</strong> trên nền tảng OTSP:</p>
-                                <blockquote style='background: #f8fafc; border-left: 4px solid #DB303A; padding: 12px 16px; margin: 16px 0; font-style: italic; color: #475569;'>
-                                    ""{evt.Content}""
-                                </blockquote>
-                                <p>Vui lòng đăng nhập vào hệ thống để tiếp tục trao đổi.</p>
-                                <div style='margin-top: 24px; padding-top: 16px; border-top: 1px solid #eee; font-size: 12px; color: #888;'>
-                                    Thông báo tự động từ Nền tảng gia sư OTSP. Để tránh làm phiền, hệ thống chỉ gửi tối đa 1 email mỗi 30 phút cho mỗi cuộc trò chuyện.
-                                </div>
-                            </div>";
+                        var (subject, body) = NotificationEmailTemplates.ForChatMessage(
+                            receiverName: receiverUser.FullName ?? "bạn",
+                            senderName: evt.SenderName,
+                            contentSnippet: evt.Content,
+                            actionUrl: "https://otsp-giasu.vercel.app/chat");
 
                         try
                         {
-                            await emailSender.SendEmailAsync(receiverUser.Email, subject, body);
+                            await emailSender.SendNotificationEmailAsync(receiverUser.Email, subject, body, stoppingToken);
                             _logger.LogInformation("Đã gửi email thông báo tin nhắn (throttled 30p) tới {Email}", receiverUser.Email);
                         }
                         catch (Exception ex)

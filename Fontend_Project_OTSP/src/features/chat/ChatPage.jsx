@@ -306,6 +306,30 @@ export default function ChatPage() {
       ));
     });
 
+    // Lắng nghe cập nhật trạng thái Online / Offline tức thì qua SignalR (0 delay)
+    connection.on('UserPresenceChanged', (changedUserId, isOnline) => {
+      if (!changedUserId) return;
+      const targetId = String(changedUserId).trim().toLowerCase();
+      const statusBool = Boolean(isOnline);
+
+      setConversations((prev) =>
+        prev.map((c) => {
+          if (String(c.contactUserId || '').trim().toLowerCase() === targetId) {
+            return { ...c, isOnline: statusBool };
+          }
+          return c;
+        })
+      );
+
+      setSelectedContact((curr) => {
+        if (!curr) return curr;
+        if (String(curr.contactUserId || '').trim().toLowerCase() === targetId) {
+          return { ...curr, isOnline: statusBool };
+        }
+        return curr;
+      });
+    });
+
     connection
       .start()
       .then(() => {
@@ -340,8 +364,19 @@ export default function ChatPage() {
 
     const activityEvents = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'];
     activityEvents.forEach((evt) => window.addEventListener(evt, sendActivityHeartbeat, { passive: true }));
+
+    const handleUnload = () => {
+      if (hubConnectionRef.current && hubConnectionRef.current.state === 'Connected') {
+        hubConnectionRef.current.stop().catch(() => {});
+      }
+    };
+    window.addEventListener('beforeunload', handleUnload);
+    window.addEventListener('pagehide', handleUnload);
+
     return () => {
       activityEvents.forEach((evt) => window.removeEventListener(evt, sendActivityHeartbeat));
+      window.removeEventListener('beforeunload', handleUnload);
+      window.removeEventListener('pagehide', handleUnload);
     };
   }, []);
 
@@ -1055,12 +1090,14 @@ export default function ChatPage() {
                             contactName.charAt(0).toUpperCase()
                           )}
                         </div>
-                        {/* Chấm tròn trạng thái Online / Offline */}
-                        <span
-                          className={`position-absolute bottom-0 end-0 rounded-circle border border-white ${conv.isOnline ? 'bg-success' : 'bg-secondary'}`}
-                          style={{ width: 10, height: 10 }}
-                          title={conv.isOnline ? 'Đang hoạt động' : 'Không hoạt động'}
-                        />
+                        {/* Chấm tròn trạng thái Online / Offline cho liên hệ cá nhân */}
+                        {!(conv.isGroupClass || conv.contactUserId?.startsWith('class_')) && (
+                          <span
+                            className={`position-absolute bottom-0 end-0 rounded-circle border border-white ${conv.isOnline ? 'bg-success' : 'bg-secondary'}`}
+                            style={{ width: 10, height: 10 }}
+                            title={conv.isOnline ? 'Đang hoạt động' : 'Không hoạt động'}
+                          />
+                        )}
                       </div>
 
                       <div className="chat-conv-info flex-grow-1 min-w-0">
@@ -1150,7 +1187,11 @@ export default function ChatPage() {
                           </span>
                         )}
                       </div>
-                      {selectedContact.isOnline ? (
+                      {selectedContact.isGroupClass || selectedContact.contactUserId?.startsWith('class_') ? (
+                        <span className="chat-status-indicator small text-muted">
+                          <i className="bi bi-people-fill me-1"></i> {selectedContact.memberCount ? `${selectedContact.memberCount} thành viên` : 'Kênh trao đổi lớp học'}
+                        </span>
+                      ) : selectedContact.isOnline ? (
                         <span className="chat-status-indicator small text-success">
                           <span className="chat-online-dot text-success" aria-hidden="true">●</span> Đang hoạt động
                         </span>

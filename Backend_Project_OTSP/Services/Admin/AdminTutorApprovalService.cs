@@ -9,6 +9,7 @@ using Backend_Project_OTSP.Models;
 using Backend_Project_OTSP.Services.Common;
 using static Backend_Project_OTSP.Models.Enums;
 using Backend_Project_OTSP.Services.Admin;
+using Backend_Project_OTSP.Services.Notifications;
 
 namespace BACKEND_PROJECT_OTSP.Services.Admin;
 
@@ -17,15 +18,21 @@ public class AdminTutorApprovalService : IAdminTutorApprovalService
     private readonly ApplicationDbContext _db;
     private readonly IWebHostEnvironment _environment;
     private readonly IAiService _aiService;
+    private readonly IEmailSenderService? _emailSender;
+    private readonly INotificationDispatcher? _dispatcher;
 
     public AdminTutorApprovalService(
         ApplicationDbContext db,
         IWebHostEnvironment environment,
-        IAiService aiService)
+        IAiService aiService,
+        IEmailSenderService? emailSender = null,
+        INotificationDispatcher? dispatcher = null)
     {
         _db = db;
         _environment = environment;
         _aiService = aiService;
+        _emailSender = emailSender;
+        _dispatcher = dispatcher;
     }
 
     public async Task<List<TutorApprovalViewModel>> GetPendingTutorsAsync(CancellationToken cancellationToken = default)
@@ -214,16 +221,7 @@ public class AdminTutorApprovalService : IAdminTutorApprovalService
         }
 
         var safeFileName = Path.GetFileName(storedName);
-        var webRoot = _environment.WebRootPath ?? Path.Combine(_environment.ContentRootPath, "wwwroot");
-        var possiblePaths = new[]
-        {
-            Path.Combine(webRoot, "uploads", "qualifications", safeFileName),
-            Path.Combine(_environment.ContentRootPath, "App_Data", "qualifications", safeFileName),
-            Path.Combine(webRoot, "uploads", safeFileName),
-            Path.Combine(webRoot, storedName.TrimStart('/', '\\'))
-        };
-
-        var fullPath = possiblePaths.FirstOrDefault(System.IO.File.Exists);
+        var fullPath = StoragePathResolver.ResolveQualificationPath(_environment, storedName);
         if (fullPath == null)
             return (null, null, "Tệp không tồn tại trên hệ thống máy chủ.");
 
@@ -342,15 +340,6 @@ public class AdminTutorApprovalService : IAdminTutorApprovalService
             ProcessedAt = DateTime.UtcNow
         });
 
-        _db.Notifications.Add(new Notification
-        {
-            UserId = tutor.UserId,
-            Title = result == VerificationStatus.Approved ? "Hồ sơ gia sư đã được duyệt" : "Hồ sơ gia sư chưa được duyệt",
-            Content = result == VerificationStatus.Approved
-                ? "Hồ sơ của bạn đã được duyệt và có thể hiển thị trong danh sách tìm gia sư."
-                : $"Hồ sơ của bạn chưa được duyệt. Lý do: {reason}"
-        });
-
         _db.AuditLogs.Add(new AuditLog
         {
             UserId = adminUserId,
@@ -361,6 +350,18 @@ public class AdminTutorApprovalService : IAdminTutorApprovalService
         });
 
         await _db.SaveChangesAsync(cancellationToken);
+
+        // Phân phối thông báo (In-App + Gmail) qua Central Dispatcher
+        if (_dispatcher != null)
+        {
+            await _dispatcher.DispatchTutorApprovalAsync(new TutorApprovalNotificationEvent(
+                TutorUserId: tutor.UserId,
+                TutorEmail: tutor.User?.Email,
+                TutorName: tutor.User?.FullName ?? "thầy/cô",
+                IsApproved: result == VerificationStatus.Approved,
+                Reason: reason
+            ), cancellationToken);
+        }
 
         var msg = result == VerificationStatus.Approved
             ? $"Đã duyệt hồ sơ gia sư {tutor.User?.FullName} thành công."
@@ -392,17 +393,7 @@ public class AdminTutorApprovalService : IAdminTutorApprovalService
             }
             else
             {
-                var safeFileName = Path.GetFileName(qual.FileUrl);
-                var webRoot = _environment.WebRootPath ?? Path.Combine(_environment.ContentRootPath, "wwwroot");
-                var possiblePaths = new[]
-                {
-                    Path.Combine(webRoot, "uploads", "qualifications", safeFileName),
-                    Path.Combine(_environment.ContentRootPath, "App_Data", "qualifications", safeFileName),
-                    Path.Combine(webRoot, "uploads", safeFileName),
-                    Path.Combine(webRoot, qual.FileUrl.TrimStart('/', '\\'))
-                };
-
-                var fullPath = possiblePaths.FirstOrDefault(File.Exists);
+                var fullPath = StoragePathResolver.ResolveQualificationPath(_environment, qual.FileUrl);
                 if (fullPath != null)
                 {
                     var bytes = await File.ReadAllBytesAsync(fullPath, cancellationToken);

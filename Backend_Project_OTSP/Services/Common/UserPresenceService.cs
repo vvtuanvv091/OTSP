@@ -4,7 +4,8 @@ namespace Backend_Project_OTSP.Services.Common;
 
 public interface IUserPresenceService
 {
-    void OnConnected(string userId, string connectionId);
+    bool OnConnected(string userId, string connectionId);
+    bool OnDisconnected(string? userId, string connectionId, out string? resolvedUserId);
     void OnDisconnected(string? userId, string connectionId);
     void TouchUserActivity(string userId);
     void MarkOffline(string userId);
@@ -15,27 +16,48 @@ public sealed class UserPresenceService : IUserPresenceService
 {
     private static readonly TimeSpan ActivityTtl = TimeSpan.FromMinutes(3);
 
-    private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, byte>> _userConnections = new(StringComparer.Ordinal);
-    private readonly ConcurrentDictionary<string, DateTime> _lastSeenUtc = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, byte>> _userConnections = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, string> _connectionUserMap = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, DateTime> _lastSeenUtc = new(StringComparer.OrdinalIgnoreCase);
 
-    public void OnConnected(string userId, string connectionId)
+    public bool OnConnected(string userId, string connectionId)
     {
-        if (string.IsNullOrWhiteSpace(userId) || string.IsNullOrWhiteSpace(connectionId)) return;
-        var set = _userConnections.GetOrAdd(userId, _ => new ConcurrentDictionary<string, byte>(StringComparer.Ordinal));
+        if (string.IsNullOrWhiteSpace(userId) || string.IsNullOrWhiteSpace(connectionId)) return false;
+
+        _connectionUserMap[connectionId] = userId;
+        var set = _userConnections.GetOrAdd(userId, _ => new ConcurrentDictionary<string, byte>(StringComparer.OrdinalIgnoreCase));
+        var wasEmpty = set.IsEmpty;
         set[connectionId] = 1;
         _lastSeenUtc[userId] = DateTime.UtcNow;
+
+        return wasEmpty;
     }
 
-    public void OnDisconnected(string? userId, string connectionId)
+    public bool OnDisconnected(string? userId, string connectionId, out string? resolvedUserId)
     {
-        if (!string.IsNullOrWhiteSpace(userId) && _userConnections.TryGetValue(userId, out var set))
+        resolvedUserId = userId;
+        if (string.IsNullOrWhiteSpace(resolvedUserId))
+        {
+            _connectionUserMap.TryGetValue(connectionId, out resolvedUserId);
+        }
+        _connectionUserMap.TryRemove(connectionId, out _);
+
+        if (!string.IsNullOrWhiteSpace(resolvedUserId) && _userConnections.TryGetValue(resolvedUserId, out var set))
         {
             set.TryRemove(connectionId, out _);
             if (set.IsEmpty)
             {
-                _userConnections.TryRemove(userId, out _);
+                _userConnections.TryRemove(resolvedUserId, out _);
+                _lastSeenUtc.TryRemove(resolvedUserId, out _);
+                return true;
             }
         }
+        return false;
+    }
+
+    public void OnDisconnected(string? userId, string connectionId)
+    {
+        OnDisconnected(userId, connectionId, out _);
     }
 
     public void TouchUserActivity(string userId)
@@ -47,7 +69,13 @@ public sealed class UserPresenceService : IUserPresenceService
     public void MarkOffline(string userId)
     {
         if (string.IsNullOrWhiteSpace(userId)) return;
-        _userConnections.TryRemove(userId, out _);
+        if (_userConnections.TryRemove(userId, out var conns))
+        {
+            foreach (var connId in conns.Keys)
+            {
+                _connectionUserMap.TryRemove(connId, out _);
+            }
+        }
         _lastSeenUtc.TryRemove(userId, out _);
     }
 
