@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
 using Backend_Project_OTSP.Data;
 using Backend_Project_OTSP.Dtos;
@@ -17,20 +16,17 @@ namespace BACKEND_PROJECT_OTSP.Services.Admin;
 public class AdminTutorApprovalService : IAdminTutorApprovalService
 {
     private readonly ApplicationDbContext _db;
-    private readonly IWebHostEnvironment _environment;
     private readonly IAiService _aiService;
     private readonly IEmailSenderService? _emailSender;
     private readonly INotificationDispatcher? _dispatcher;
 
     public AdminTutorApprovalService(
         ApplicationDbContext db,
-        IWebHostEnvironment environment,
         IAiService aiService,
         IEmailSenderService? emailSender = null,
         INotificationDispatcher? dispatcher = null)
     {
         _db = db;
-        _environment = environment;
         _aiService = aiService;
         _emailSender = emailSender;
         _dispatcher = dispatcher;
@@ -221,21 +217,7 @@ public class AdminTutorApprovalService : IAdminTutorApprovalService
             return (storedName, "redirect", null);
         }
 
-        var safeFileName = Path.GetFileName(storedName);
-        var fullPath = StoragePathResolver.ResolveQualificationPath(_environment, storedName);
-        if (fullPath == null)
-            return (null, null, "Tệp không tồn tại trên hệ thống máy chủ.");
-
-        var contentType = Path.GetExtension(safeFileName).ToLowerInvariant() switch
-        {
-            ".pdf" => "application/pdf",
-            ".png" => "image/png",
-            ".webp" => "image/webp",
-            ".jpg" or ".jpeg" => "image/jpeg",
-            _ => "application/octet-stream"
-        };
-
-        return (fullPath, contentType, null);
+        return (null, null, "Không tìm thấy tệp chứng chỉ/bằng cấp trên Cloudinary.");
     }
 
     public async Task<(bool Success, string Message, string? ErrorMessage)> ApproveTutorAsync(
@@ -385,22 +367,11 @@ public class AdminTutorApprovalService : IAdminTutorApprovalService
         string? imageUrl = null;
         string? imageBase64 = null;
 
-        if (!string.IsNullOrWhiteSpace(qual.FileUrl))
+        if (!string.IsNullOrWhiteSpace(qual.FileUrl) &&
+            (qual.FileUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+             qual.FileUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase)))
         {
-            if (qual.FileUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
-                qual.FileUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
-            {
-                imageUrl = qual.FileUrl;
-            }
-            else
-            {
-                var fullPath = StoragePathResolver.ResolveQualificationPath(_environment, qual.FileUrl);
-                if (fullPath != null)
-                {
-                    var bytes = await File.ReadAllBytesAsync(fullPath, cancellationToken);
-                    imageBase64 = Convert.ToBase64String(bytes);
-                }
-            }
+            imageUrl = qual.FileUrl;
         }
 
         var req = new VerifyCertificateRequestDto

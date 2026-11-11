@@ -10,7 +10,6 @@ using Backend_Project_OTSP.Services.Common;
 using Backend_Project_OTSP.Services.Payments;
 using Backend_Project_OTSP.Services.Sessions;
 using Backend_Project_OTSP.tests.Helpers;
-using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Caching.Memory;
@@ -179,10 +178,7 @@ public class SecurityAndContractTests
         db.AddRange(tutorUser, studentUser, tutor, student, subject, grade, classroom, doc);
         await db.SaveChangesAsync();
 
-        var env = new Mock<IWebHostEnvironment>();
-        env.Setup(e => e.ContentRootPath).Returns(Path.GetTempPath());
-
-        var controller = new StudentLearningDocumentApiController(db, env.Object)
+        var controller = new StudentLearningDocumentApiController(db)
         {
             ControllerContext = new ControllerContext
             {

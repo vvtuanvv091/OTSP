@@ -23,25 +23,20 @@ public class TutorLearningDocumentApiController : ControllerBase
     };
 
     private readonly ApplicationDbContext _db;
-    private readonly IWebHostEnvironment _environment;
     private readonly IImageStorageService _imageStorage;
     private readonly ILogger<TutorLearningDocumentApiController>? _logger;
 
     public TutorLearningDocumentApiController(
         ApplicationDbContext db,
-        IWebHostEnvironment environment,
         IImageStorageService imageStorage,
         ILogger<TutorLearningDocumentApiController>? logger = null)
     {
         _db = db;
-        _environment = environment;
         _imageStorage = imageStorage;
         _logger = logger;
     }
 
     private string? CurrentUserId => User.FindFirstValue(ClaimTypes.NameIdentifier);
-
-    private string GetUploadFolder() => StoragePathResolver.GetDocumentFolder(_environment);
 
     [HttpGet]
     public async Task<IActionResult> GetDocuments(
@@ -313,28 +308,14 @@ public class TutorLearningDocumentApiController : ControllerBase
 
         if (doc == null) return NotFound();
 
-        if (doc.FileUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
-            doc.FileUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+        if (!string.IsNullOrWhiteSpace(doc.FileUrl) &&
+            (doc.FileUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+             doc.FileUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase)))
         {
             return Redirect(doc.FileUrl);
         }
 
-        var fullPath = StoragePathResolver.ResolveDocumentPath(_environment, doc.FileUrl);
-        if (fullPath == null) return NotFound(new { message = "Tệp không tồn tại." });
-
-        var contentType = Path.GetExtension(doc.FileUrl).ToLowerInvariant() switch
-        {
-            ".pdf" => "application/pdf",
-            ".docx" => "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            ".doc" => "application/msword",
-            ".pptx" => "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-            ".ppt" => "application/vnd.ms-powerpoint",
-            ".xlsx" => "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            ".xls" => "application/vnd.ms-excel",
-            _ => "application/octet-stream"
-        };
-
-        return PhysicalFile(fullPath, contentType, $"{doc.Title}{Path.GetExtension(doc.FileUrl)}");
+        return NotFound(new { message = "Tệp không tồn tại trên Cloudinary." });
     }
 
     [HttpDelete("{id:int}")]
@@ -353,15 +334,6 @@ public class TutorLearningDocumentApiController : ControllerBase
              doc.FileUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase)))
         {
             await _imageStorage.DeleteAsync(doc.FileUrl, cancellationToken);
-        }
-        else if (!string.IsNullOrWhiteSpace(doc.FileUrl))
-        {
-            var fullPath = StoragePathResolver.ResolveDocumentPath(_environment, doc.FileUrl);
-            if (fullPath != null && System.IO.File.Exists(fullPath))
-            {
-                try { System.IO.File.Delete(fullPath); }
-                catch (Exception ex) { _logger?.LogWarning(ex, "Không thể xóa file local {FilePath}", fullPath); }
-            }
         }
 
         _db.LearningDocuments.Remove(doc);

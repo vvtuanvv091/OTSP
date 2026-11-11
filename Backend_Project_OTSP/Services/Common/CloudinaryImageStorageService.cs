@@ -66,7 +66,7 @@ public sealed class CloudinaryImageStorageService : IImageStorageService
                 return new Cloudinary(new Account(cloudName, apiKey, apiSecret));
             }
 
-            _logger.LogInformation("Chưa cấu hình Cloudinary (CLOUDINARY_URL). Hệ thống sẽ tự động dùng bộ lưu trữ cục bộ (/wwwroot/uploads).");
+            _logger.LogInformation("Chưa cấu hình Cloudinary (CLOUDINARY_URL). Vui lòng cấu hình Cloudinary để tải lên ảnh và tài liệu.");
             return null;
         });
     }

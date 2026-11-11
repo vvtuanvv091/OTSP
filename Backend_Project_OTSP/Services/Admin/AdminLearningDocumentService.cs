@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Backend_Project_OTSP.Data;
@@ -14,18 +13,15 @@ namespace Backend_Project_OTSP.Services.Admin;
 public sealed class AdminLearningDocumentService : IAdminLearningDocumentService
 {
     private readonly ApplicationDbContext _db;
-    private readonly IWebHostEnvironment _environment;
     private readonly IImageStorageService? _imageStorage;
     private readonly ILogger<AdminLearningDocumentService>? _logger;
 
     public AdminLearningDocumentService(
         ApplicationDbContext db,
-        IWebHostEnvironment environment,
         IImageStorageService? imageStorage = null,
         ILogger<AdminLearningDocumentService>? logger = null)
     {
         _db = db;
-        _environment = environment;
         _imageStorage = imageStorage;
         _logger = logger;
     }
@@ -119,24 +115,7 @@ public sealed class AdminLearningDocumentService : IAdminLearningDocumentService
             return (storedName, Path.GetFileName(storedName), "url");
         }
 
-        var filePath = StoragePathResolver.ResolveDocumentPath(_environment, storedName);
-        if (filePath == null) return (null, null, null);
-
-        var ext = Path.GetExtension(storedName).ToLowerInvariant();
-        var contentType = ext switch
-        {
-            ".pdf" => "application/pdf",
-            ".doc" => "application/msword",
-            ".docx" => "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            ".xls" => "application/vnd.ms-excel",
-            ".xlsx" => "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            ".ppt" => "application/vnd.ms-powerpoint",
-            ".pptx" => "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-            _ => "application/octet-stream"
-        };
-
-        var safeDownloadName = $"{doc.Title}{ext}";
-        return (filePath, safeDownloadName, contentType);
+        return (null, null, null);
     }
 
     public async Task<(bool Success, bool NotFound, string? ErrorMessage)> ReviewAsync(
@@ -191,21 +170,10 @@ public sealed class AdminLearningDocumentService : IAdminLearningDocumentService
 
         if (!string.IsNullOrWhiteSpace(doc.FileUrl) &&
             (doc.FileUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
-             doc.FileUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase)))
+             doc.FileUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase)) &&
+            _imageStorage != null)
         {
-            if (_imageStorage != null)
-            {
-                await _imageStorage.DeleteAsync(doc.FileUrl, cancellationToken);
-            }
-        }
-        else if (!string.IsNullOrWhiteSpace(doc.FileUrl))
-        {
-            var fullPath = StoragePathResolver.ResolveDocumentPath(_environment, doc.FileUrl);
-            if (fullPath != null && File.Exists(fullPath))
-            {
-                try { File.Delete(fullPath); }
-                catch (Exception ex) { _logger?.LogWarning(ex, "Không thể xóa file local {FilePath}", fullPath); }
-            }
+            await _imageStorage.DeleteAsync(doc.FileUrl, cancellationToken);
         }
 
         _db.LearningDocuments.Remove(doc);

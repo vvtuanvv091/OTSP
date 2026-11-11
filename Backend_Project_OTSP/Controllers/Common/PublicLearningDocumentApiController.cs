@@ -16,12 +16,10 @@ public class PublicLearningDocumentApiController : ControllerBase
 {
     private const int PageSize = 8;
     private readonly ApplicationDbContext _dbContext;
-    private readonly IWebHostEnvironment _environment;
 
-    public PublicLearningDocumentApiController(ApplicationDbContext dbContext, IWebHostEnvironment environment)
+    public PublicLearningDocumentApiController(ApplicationDbContext dbContext)
     {
         _dbContext = dbContext;
-        _environment = environment;
     }
 
     [HttpGet]
@@ -138,36 +136,7 @@ public class PublicLearningDocumentApiController : ControllerBase
             return Redirect(document.FileUrl);
         }
 
-        var fullPath = StoragePathResolver.ResolveDocumentPath(_environment, document.FileUrl);
-        if (fullPath == null)
-            return NotFound(new { message = "Tệp tài liệu không tồn tại trên máy chủ." });
-
-        var fileName = Path.GetFileName(fullPath);
-        var ext = Path.GetExtension(fileName);
-        var contentType = GetContentType(ext);
-        var safeDownloadName = MakeSafeFileName(document.Title) + ext;
-
-        return PhysicalFile(fullPath, contentType, safeDownloadName);
+        return NotFound(new { message = "Tệp tài liệu không tồn tại trên Cloudinary." });
     }
-
-    private static string MakeSafeFileName(string value)
-    {
-        var invalidCharacters = Path.GetInvalidFileNameChars();
-        var safeName = new string(value.Select(c => invalidCharacters.Contains(c) ? '_' : c).ToArray()).Trim();
-        return string.IsNullOrWhiteSpace(safeName) ? "tai-lieu-on-tap" : safeName;
-    }
-
-    private static string GetContentType(string extension) => extension.ToLowerInvariant() switch
-    {
-        ".pdf" => "application/pdf",
-        ".doc" => "application/msword",
-        ".docx" => "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        ".xls" => "application/vnd.ms-excel",
-        ".xlsx" => "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        ".ppt" => "application/vnd.ms-powerpoint",
-        ".pptx" => "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-        ".zip" => "application/zip",
-        _ => "application/octet-stream"
-    };
 }
 
