@@ -59,7 +59,7 @@ public class TutorQualificationApiController : ControllerBase
                 q.Title,
                 q.FileUrl,
                 status = q.Status.ToString(),
-                canRemove = q.Status == VerificationStatus.Pending
+                canRemove = q.Status != VerificationStatus.Approved
             })
             .ToListAsync(cancellationToken);
 
@@ -147,9 +147,9 @@ public class TutorQualificationApiController : ControllerBase
 
         if (q == null) return NotFound();
 
-        if (q.Status != VerificationStatus.Pending)
+        if (q.Status == VerificationStatus.Approved)
         {
-            return BadRequest(new { message = "Chỉ có thể xóa bằng cấp đang trong trạng thái Chờ xác minh." });
+            return BadRequest(new { message = "Không thể xóa bằng cấp đã được duyệt." });
         }
 
         _db.Qualifications.Remove(q);

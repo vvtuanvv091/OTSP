@@ -197,7 +197,7 @@ public class AuthService : IAuthService
                 {
                     UserId = user.Id,
                     Introduction = "Gia sư mới gia nhập qua Google",
-                    HourlyFee = 150000,
+                    HourlyFee = 0,
                     TeachingFormat = TeachingFormat.Online,
                     VerificationStatus = VerificationStatus.Pending
                 });

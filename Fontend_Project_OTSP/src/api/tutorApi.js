@@ -9,6 +9,7 @@ export const tutorApi = {
   // Hồ sơ cá nhân & Bằng cấp, chứng chỉ
   getProfile: () => axiosClient.get('/tutor/profile'),
   updateProfile: (data) => axiosClient.put('/tutor/profile', data),
+  resubmitProfile: () => axiosClient.post('/tutor/profile/resubmit'),
   uploadAvatar: (file) => {
     const formData = new FormData();
     formData.append('avatarFile', file);

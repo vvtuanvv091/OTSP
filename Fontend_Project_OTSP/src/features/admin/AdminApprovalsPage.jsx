@@ -276,9 +276,9 @@ export default function AdminApprovalsPage() {
         <div className="admin-panel-heading">Hồ sơ cần xét duyệt <span className="admin-count">{data?.tutors?.total ?? 0}</span></div>
         <div className="admin-table-scroll">
           <table className="admin-table">
-            <thead><tr><th>Gia sư</th><th>Môn học / Cấp học</th><th>Bằng cấp / Chứng chỉ</th><th>Liên hệ</th><th>Học phí</th><th>Hình thức</th><th>Thao tác</th></tr></thead>
+            <thead><tr><th>Gia sư</th><th>Môn học / Cấp học</th><th>Bằng cấp / Chứng chỉ</th><th>Liên hệ</th><th>Hình thức</th><th>Thao tác</th></tr></thead>
             <tbody>
-              <AdminLoadingRows columns={7} loading={loading} hasItems={tutors.length > 0} emptyText="Hiện không có hồ sơ chờ duyệt phù hợp." />
+              <AdminLoadingRows columns={6} loading={loading} hasItems={tutors.length > 0} emptyText="Hiện không có hồ sơ chờ duyệt phù hợp." />
               {!loading && tutors.map((tutor) => (
                 <tr key={tutor.tutorId}>
                   <td><span className="admin-table-primary">{tutor.fullName}</span><span className="admin-table-secondary">{tutor.introduction || 'Chưa có giới thiệu'}</span></td>
@@ -340,7 +340,6 @@ export default function AdminApprovalsPage() {
                     ) : <span className="admin-table-secondary">Chưa có tài liệu</span>}
                   </td>
                   <td><span className="admin-table-primary">{tutor.email || 'Chưa có email'}</span><span className="admin-table-secondary">{tutor.phoneNumber || 'Chưa có số điện thoại'}</span></td>
-                  <td>{Number(tutor.hourlyFee || 0).toLocaleString('vi-VN')} đ/giờ</td>
                   <td className="admin-format">{tutor.teachingFormat === 'Hybrid' ? 'Kết hợp' : tutor.teachingFormat}</td>
                   <td><div className="admin-actions-inline">
                     <button className="admin-action is-approve" type="button" disabled={busyTutorId === tutor.tutorId} onClick={() => processTutor(tutor, true)}>{busyTutorId === tutor.tutorId ? 'Đang lưu…' : 'Duyệt'}</button>
@@ -507,7 +506,7 @@ export default function AdminApprovalsPage() {
         <h2>Hướng dẫn xét duyệt</h2>
         <div className="admin-guide-step"><b>Bước 1</b>Kiểm tra thông tin cá nhân</div>
         <div className="admin-guide-step"><b>Bước 2</b>Đối chiếu giấy tờ và bằng cấp</div>
-        <div className="admin-guide-step"><b>Bước 3</b>Xem môn học, cấp học và học phí</div>
+        <div className="admin-guide-step"><b>Bước 3</b>Xem môn học, cấp học và hình thức dạy</div>
       </section>
     </div>
   );

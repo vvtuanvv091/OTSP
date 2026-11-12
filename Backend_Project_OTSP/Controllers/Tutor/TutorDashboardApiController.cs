@@ -151,10 +151,21 @@ public class TutorDashboardApiController : ControllerBase
             };
         }).ToList();
 
+        var rejectionReason = tutor.VerificationStatus == VerificationStatus.Rejected
+            ? await _db.ProfileVerifications
+                .AsNoTracking()
+                .Where(v => v.TutorId == tutorId && v.Result == VerificationStatus.Rejected)
+                .OrderByDescending(v => v.ProcessedAt ?? DateTime.MinValue)
+                .ThenByDescending(v => v.Id)
+                .Select(v => v.Reason)
+                .FirstOrDefaultAsync(cancellationToken)
+            : null;
+
         return Ok(new
         {
             tutorId,
             verificationStatus = tutor.VerificationStatus.ToString(),
+            rejectionReason,
             todaySessionsCount = todaySessions + todayTrials,
             averageRating = tutor.AverageRating,
             activeClassrooms,

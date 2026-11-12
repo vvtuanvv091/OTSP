@@ -25,6 +25,7 @@ export default function TutorProfilePage() {
   const [allGradeLevels, setAllGradeLevels] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [resubmitting, setResubmitting] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [showQualUpload, setShowQualUpload] = useState(false);
   const [uploadingQual, setUploadingQual] = useState(false);
@@ -38,6 +39,9 @@ export default function TutorProfilePage() {
   const [displayName, setDisplayName] = useState('');
   const [citizenIdNumber, setCitizenIdNumber] = useState('');
   const [residenceAddress, setResidenceAddress] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [dateOfBirth, setDateOfBirth] = useState('');
+  const [address, setAddress] = useState('');
   const [introduction, setIntroduction] = useState('');
   const [selectedSubjectId, setSelectedSubjectId] = useState('');
   const [selectedGradeLevelId, setSelectedGradeLevelId] = useState('');
@@ -57,6 +61,9 @@ export default function TutorProfilePage() {
           setDisplayName(p.fullName || '');
           setCitizenIdNumber(p.citizenIdNumber || '');
           setResidenceAddress(p.residenceAddress || '');
+          setPhoneNumber(p.phoneNumber || '');
+          setDateOfBirth(p.dateOfBirth ? String(p.dateOfBirth).substring(0, 10) : '');
+          setAddress(p.address || '');
           setIntroduction(p.introduction || '');
           setTutorSubjects(res.data.subjects || []);
           setQualifications(res.data.qualifications || []);
@@ -99,6 +106,9 @@ export default function TutorProfilePage() {
         displayName,
         citizenIdNumber,
         residenceAddress,
+        phoneNumber,
+        dateOfBirth,
+        address,
         introduction,
         hourlyFee: profile?.hourlyFee,
       });
@@ -108,6 +118,9 @@ export default function TutorProfilePage() {
         fullName: displayName,
         citizenIdNumber,
         residenceAddress,
+        phoneNumber,
+        dateOfBirth,
+        address,
         introduction,
       }));
 
@@ -120,6 +133,77 @@ export default function TutorProfilePage() {
       setError(err.response?.data?.message || 'Có lỗi xảy ra khi cập nhật hồ sơ.');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleResubmitProfile = async () => {
+    setMessage('');
+    setError('');
+
+    const trimmedName = displayName.trim();
+    const trimmedCccd = citizenIdNumber.trim();
+    const trimmedResidence = residenceAddress.trim();
+
+    if (!trimmedName) {
+      const msg = 'Vui lòng nhập Họ và tên trước khi gửi xét duyệt lại.';
+      setError(msg);
+      toast.warning(msg);
+      return;
+    }
+
+    if (!/^[0-9]{12}$/.test(trimmedCccd)) {
+      const msg = 'Vui lòng nhập đúng Số CCCD (12 chữ số) trước khi gửi xét duyệt lại.';
+      setError(msg);
+      toast.warning(msg);
+      return;
+    }
+
+    if (!trimmedResidence) {
+      const msg = 'Vui lòng nhập Nơi ở hiện tại trước khi gửi xét duyệt lại.';
+      setError(msg);
+      toast.warning(msg);
+      return;
+    }
+
+    setResubmitting(true);
+    try {
+      await tutorApi.updateProfile({
+        displayName: trimmedName,
+        citizenIdNumber: trimmedCccd,
+        residenceAddress: trimmedResidence,
+        phoneNumber,
+        dateOfBirth,
+        address,
+        introduction,
+        hourlyFee: profile?.hourlyFee,
+      });
+
+      const res = await tutorApi.resubmitProfile();
+      const nextStatus = res.data?.verificationStatus || 'Pending';
+
+      setProfile((prev) => ({
+        ...prev,
+        fullName: trimmedName,
+        citizenIdNumber: trimmedCccd,
+        residenceAddress: trimmedResidence,
+        phoneNumber,
+        dateOfBirth,
+        address,
+        introduction,
+        verificationStatus: nextStatus,
+        rejectionReason: null,
+      }));
+      updateUser({ fullName: trimmedName, verificationStatus: nextStatus });
+
+      const successMsg = res.data?.message || 'Đã gửi lại hồ sơ xét duyệt thành công!';
+      toast.success(successMsg);
+      setMessage(successMsg);
+    } catch (err) {
+      const errMsg = err.response?.data?.message || 'Không thể gửi lại hồ sơ xét duyệt. Vui lòng thử lại.';
+      setError(errMsg);
+      toast.error(errMsg);
+    } finally {
+      setResubmitting(false);
     }
   };
 
@@ -295,18 +379,37 @@ export default function TutorProfilePage() {
         )}
 
         {!isApproved && (
-          <div className={`alert ${isRejected ? 'alert-danger' : 'alert-warning'} border rounded-3 p-3 mb-4 d-flex align-items-center gap-3 shadow-sm`}>
-            <i className={`bi ${statusIcon} fs-2 flex-shrink-0`}></i>
-            <div>
-              <div className="fw-bold fs-6">
-                {isRejected ? 'Hồ sơ của bạn đã bị từ chối phê duyệt.' : 'Hồ sơ gia sư của bạn đang chờ Quản trị viên xét duyệt!'}
-              </div>
-              <div className="small text-muted mt-1">
-                {isRejected
-                  ? 'Vui lòng kiểm tra lại tính chính xác của Số CCCD, Bằng cấp/Chứng chỉ và cập nhật lại thông tin để gửi yêu cầu xét duyệt lại.'
-                  : 'Gia sư mới đăng ký cần được Quản trị viên đối soát CCCD và Bằng cấp/Chứng chỉ hợp lệ trước khi kích hoạt hiển thị công khai trên hệ thống.'}
+          <div className={`alert ${isRejected ? 'alert-danger' : 'alert-warning'} border rounded-3 p-3 mb-4 d-flex flex-wrap align-items-center justify-content-between gap-3 shadow-sm`}>
+            <div className="d-flex align-items-start gap-3 flex-grow-1 min-w-0">
+              <i className={`bi ${statusIcon} fs-2 flex-shrink-0`}></i>
+              <div>
+                <div className="fw-bold fs-6">
+                  {isRejected ? 'Hồ sơ của bạn đã bị từ chối phê duyệt.' : 'Hồ sơ gia sư của bạn đang chờ Quản trị viên xét duyệt!'}
+                </div>
+                {isRejected && profile?.rejectionReason && (
+                  <div className="small mt-1 fw-semibold">
+                    Lý do từ chối: {profile.rejectionReason}
+                  </div>
+                )}
+                <div className="small text-muted mt-1">
+                  {isRejected
+                    ? 'Vui lòng kiểm tra lại Số CCCD, Nơi ở hiện tại và Bằng cấp/Chứng chỉ, sau đó bấm “Gửi xét duyệt lại” để chuyển hồ sơ lên Quản trị viên.'
+                    : 'Gia sư mới đăng ký cần được Quản trị viên đối soát CCCD và Bằng cấp/Chứng chỉ hợp lệ trước khi kích hoạt hiển thị công khai trên hệ thống.'}
+                </div>
               </div>
             </div>
+            {isRejected && (
+              <button
+                type="button"
+                className="btn btn-danger fw-semibold px-3 py-2 text-nowrap shadow-sm"
+                style={{ backgroundColor: '#DB303A', borderColor: '#DB303A' }}
+                disabled={resubmitting || saving}
+                onClick={handleResubmitProfile}
+              >
+                <i className="bi bi-send-check me-2"></i>
+                {resubmitting ? 'Đang gửi...' : 'Gửi xét duyệt lại'}
+              </button>
+            )}
           </div>
         )}
 
@@ -417,25 +520,51 @@ export default function TutorProfilePage() {
                   </div>
                   <div className="col-md-6">
                     <label htmlFor="Email" className="form-label">Email</label>
-                    <input id="Email" className="form-control" value={profile?.email || ''} readOnly />
+                    <input
+                      id="Email"
+                      className="form-control"
+                      value={profile?.email || ''}
+                      readOnly
+                      disabled
+                      style={{ backgroundColor: 'var(--bs-tertiary-bg, #f8f9fa)', cursor: 'not-allowed' }}
+                      title="Email đăng nhập không thể chỉnh sửa"
+                    />
                   </div>
                   <div className="col-md-6">
                     <label htmlFor="PhoneNumber" className="form-label">Số điện thoại</label>
-                    <input id="PhoneNumber" className="form-control" value={profile?.phoneNumber || ''} readOnly />
+                    <input
+                      id="PhoneNumber"
+                      name="phoneNumber"
+                      type="tel"
+                      className="form-control"
+                      placeholder="Nhập số điện thoại"
+                      maxLength={20}
+                      value={phoneNumber}
+                      onChange={(e) => setPhoneNumber(e.target.value)}
+                    />
                   </div>
                   <div className="col-md-6">
                     <label htmlFor="DateOfBirth" className="form-label">Ngày sinh</label>
                     <input
                       id="DateOfBirth"
+                      name="dateOfBirth"
                       type="date"
                       className="form-control"
-                      value={profile?.dateOfBirth ? profile.dateOfBirth.substring(0, 10) : ''}
-                      readOnly
+                      value={dateOfBirth}
+                      onChange={(e) => setDateOfBirth(e.target.value)}
                     />
                   </div>
                   <div className="col-12">
                     <label htmlFor="Address" className="form-label">Địa chỉ</label>
-                    <input id="Address" className="form-control" value={profile?.address || ''} readOnly />
+                    <input
+                      id="Address"
+                      name="address"
+                      className="form-control"
+                      placeholder="Ví dụ: Quận 1, TP.HCM"
+                      maxLength={300}
+                      value={address}
+                      onChange={(e) => setAddress(e.target.value)}
+                    />
                   </div>
                 </div>
                 </section>
@@ -546,9 +675,12 @@ export default function TutorProfilePage() {
                   className="form-control"
                   value={new Intl.NumberFormat('vi-VN').format(profile?.hourlyFee || 0)}
                   readOnly
+                  disabled
+                  style={{ backgroundColor: 'var(--bs-tertiary-bg, #f8f9fa)', cursor: 'not-allowed' }}
                 />
                 <span className="input-group-text">VNĐ/giờ</span>
               </div>
+              <div className="form-text">Tự động cập nhật theo mức học phí thấp nhất ở mục Môn học giảng dạy.</div>
               </section>
             </CollapsibleProfileSection>
 
@@ -611,7 +743,7 @@ export default function TutorProfilePage() {
               <div id="qualList">
                 {qualifications.map((q) => {
                   const statusText = q.status === 'Approved' ? 'Đã duyệt' : q.status === 'Rejected' ? 'Bị từ chối' : 'Chờ xác minh';
-                  const canRemove = q.status === 'Pending';
+                  const canRemove = q.canRemove ?? q.status !== 'Approved';
                   return (
                     <div key={q.id} className="qual-item">
                       <div className="d-flex align-items-center gap-3">

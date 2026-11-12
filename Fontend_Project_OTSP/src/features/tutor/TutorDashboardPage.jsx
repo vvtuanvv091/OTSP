@@ -83,12 +83,15 @@ export default function TutorDashboardPage() {
           <i className="bi bi-x-octagon-fill fs-2 text-danger flex-shrink-0"></i>
           <div className="flex-grow-1 min-w-0">
             <div className="fw-bold fs-6 text-dark">Hồ sơ gia sư của bạn đã bị từ chối xét duyệt.</div>
-            <div className="small text-secondary mt-0.5">
-              Vui lòng kiểm tra lại thông tin và chứng chỉ hợp lệ để cập nhật lại hồ sơ gửi Admin phê duyệt lại.
+            {stats?.rejectionReason && (
+              <div className="small fw-semibold text-danger mt-1">Lý do từ chối: {stats.rejectionReason}</div>
+            )}
+            <div className="small text-secondary mt-1">
+              Vui lòng kiểm tra lại thông tin và chứng chỉ hợp lệ, sau đó vào trang hồ sơ để cập nhật và bấm “Gửi xét duyệt lại”.
             </div>
           </div>
           <Link to="/tutor/profile" className="btn btn-sm btn-danger text-white fw-semibold px-3 py-1.5 shadow-sm text-nowrap">
-            Cập nhật hồ sơ
+            Cập nhật &amp; gửi duyệt lại
           </Link>
         </div>
       )}
