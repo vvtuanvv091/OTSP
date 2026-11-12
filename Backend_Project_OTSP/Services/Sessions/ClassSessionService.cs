@@ -405,7 +405,12 @@ public sealed class ClassSessionService : IClassSessionService
             return (false, "Không tìm thấy buổi học.");
 
         if (session.Classroom.Tutor.UserId != tutorUserId)
-            return (false, "Bạn không có quyền thao tác trên buổi học này.");
+        {
+            var isAdmin = await _db.UserRoles
+                .AnyAsync(ur => ur.UserId == tutorUserId && _db.Roles.Any(r => r.Id == ur.RoleId && r.Name == "Admin"), cancellationToken);
+            if (!isAdmin)
+                return (false, "Bạn không có quyền thao tác trên buổi học này.");
+        }
 
         if (session.Status == SessionStatus.Done)
             return (false, "Buổi học này đã hoàn thành, không thể hủy.");

@@ -8,6 +8,7 @@ using Backend_Project_OTSP.Dtos.Tutor;
 using Backend_Project_OTSP.Hubs;
 using Backend_Project_OTSP.Models;
 using Backend_Project_OTSP.Services;
+using Backend_Project_OTSP.Services.Admin;
 using Backend_Project_OTSP.Services.Common;
 using Backend_Project_OTSP.Services.Notifications;
 using Backend_Project_OTSP.Services.Sessions;
@@ -17,6 +18,8 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -687,5 +690,191 @@ public class LifecycleAndNotificationTests
         var createdMakeup = db.ClassSessions.Single(s => s.ClassroomId == 12 && s.Id != 501);
         Assert.True(createdMakeup.IsMakeup);
         Assert.Equal(2.0, createdMakeup.DurationHours);
+    }
+
+    [Fact]
+    public async Task RoleSwitch_BlocksDirtyAccounts_WithOngoingOrHistoricalRecords()
+    {
+        var db = TestDbContextFactory.Create();
+        var adminUser = new ApplicationUser { Id = "adm-rs", Email = "adm@otsp.vn", FullName = "Admin", Status = AccountStatus.Active };
+        var dirtyStudentUser = new ApplicationUser { Id = "st-dirty", Email = "sdirty@otsp.vn", FullName = "Dirty Student", Status = AccountStatus.Active };
+        var dirtyTutorUser = new ApplicationUser { Id = "tu-dirty", Email = "tdirty@otsp.vn", FullName = "Dirty Tutor", Status = AccountStatus.Active };
+        var subject = new Subject { Id = 1, Code = "TOAN", Name = "Toán" };
+        var grade = new GradeLevel { Id = 1, Code = "THPT", Name = "THPT" };
+
+        var studentProfile = new StudentProfile { Id = 10, UserId = dirtyStudentUser.Id, User = dirtyStudentUser };
+        var tutorProfile = new TutorProfile { Id = 20, UserId = dirtyTutorUser.Id, User = dirtyTutorUser, VerificationStatus = VerificationStatus.Approved };
+        var classroom = new Classroom
+        {
+            Id = 30,
+            NameClass = "Toán 12",
+            TutorId = 20,
+            Tutor = tutorProfile,
+            SubjectId = 1,
+            GradeLevelId = 1,
+            Status = ClassroomStatus.Active
+        };
+        var member = new ClassroomStudent { ClassroomId = 30, StudentId = 10, Classroom = classroom, Student = studentProfile };
+
+        db.AddRange(adminUser, dirtyStudentUser, dirtyTutorUser, subject, grade, studentProfile, tutorProfile, classroom, member);
+        await db.SaveChangesAsync();
+
+        var userRoles = new Dictionary<string, IList<string>>
+        {
+            [adminUser.Id] = new List<string> { "Admin" },
+            [dirtyStudentUser.Id] = new List<string> { "Student_Parent" },
+            [dirtyTutorUser.Id] = new List<string> { "Tutor" }
+        };
+
+        var userMgr = IdentityMockHelper.MockUserManager();
+        userMgr.Setup(m => m.FindByIdAsync(It.IsAny<string>()))
+            .ReturnsAsync((string id) => db.Users.FirstOrDefault(u => u.Id == id));
+        userMgr.Setup(m => m.GetRolesAsync(It.IsAny<ApplicationUser>()))
+            .ReturnsAsync((ApplicationUser u) => userRoles[u.Id]);
+
+        var service = new AdminOperationsService(db, userMgr.Object, IdentityMockHelper.MockRoleManager().Object);
+
+        var studentAttempt = await service.ChangeRoleAsync(dirtyStudentUser.Id, "Admin", adminUser.Id, "127.0.0.1", CancellationToken.None);
+        Assert.False(studentAttempt.Success);
+        Assert.Contains("lớp học", studentAttempt.Error, StringComparison.OrdinalIgnoreCase);
+        Assert.Single(db.StudentProfiles.Where(x => x.UserId == dirtyStudentUser.Id));
+
+        var tutorAttempt = await service.ChangeRoleAsync(dirtyTutorUser.Id, "Admin", adminUser.Id, "127.0.0.1", CancellationToken.None);
+        Assert.False(tutorAttempt.Success);
+        Assert.Contains("lớp học", tutorAttempt.Error, StringComparison.OrdinalIgnoreCase);
+        Assert.Single(db.TutorProfiles.Where(x => x.UserId == dirtyTutorUser.Id));
+    }
+
+    [Fact]
+    public async Task RoleSwitch_CleanAccounts_DeletesOldProfilesAndChildData_AndRotatesStamp()
+    {
+        var db = TestDbContextFactory.Create();
+        var cache = new MemoryCache(new MemoryCacheOptions());
+        cache.Set("home_index_viewmodel", new object());
+
+        var adminUser = new ApplicationUser { Id = "adm-c", Email = "adm@otsp.vn", FullName = "Admin", Status = AccountStatus.Active };
+        var cleanStudentUser = new ApplicationUser { Id = "st-clean", Email = "sclean@otsp.vn", FullName = "Clean Student", SecurityStamp = "old-s-stamp", Status = AccountStatus.Active };
+        var cleanTutorUser = new ApplicationUser { Id = "tu-clean", Email = "tclean@otsp.vn", FullName = "Clean Tutor", SecurityStamp = "old-t-stamp", Status = AccountStatus.Active };
+        var subject = new Subject { Id = 1, Code = "TOAN", Name = "Toán" };
+        var grade = new GradeLevel { Id = 1, Code = "THPT", Name = "THPT" };
+
+        var stProfile = new StudentProfile { Id = 100, UserId = cleanStudentUser.Id, User = cleanStudentUser };
+        var guardian = new Guardian { Id = 1, StudentProfileId = 100, StudentProfile = stProfile, FullName = "Phụ huynh A", ContactInfo = "0900000001" };
+        var aiSession = new AiStudySession { Id = 1, StudentId = 100, Student = stProfile, Question = "Test", Suggestion = "Ok" };
+
+        var tuProfile = new TutorProfile { Id = 200, UserId = cleanTutorUser.Id, User = cleanTutorUser, VerificationStatus = VerificationStatus.Approved };
+        var tuSub = new TutorSubject { Id = 1, TutorId = 200, SubjectId = 1, GradeLevelId = 1 };
+        var tuAvail = new TutorAvailability { Id = 1, TutorId = 200, DayOfWeek = DayOfWeek.Monday, StartTime = new TimeOnly(8, 0), EndTime = new TimeOnly(10, 0) };
+        var tuQual = new Qualification { Id = 1, TutorId = 200, Title = "Bằng ĐH", FileUrl = "https://example.com/cert.pdf", Status = VerificationStatus.Approved };
+        var tuVerif = new ProfileVerification { Id = 1, TutorId = 200, Result = VerificationStatus.Approved };
+
+        db.AddRange(adminUser, cleanStudentUser, cleanTutorUser, subject, grade, stProfile, guardian, aiSession, tuProfile, tuSub, tuAvail, tuQual, tuVerif);
+        await db.SaveChangesAsync();
+
+        var userRoles = new Dictionary<string, IList<string>>
+        {
+            [adminUser.Id] = new List<string> { "Admin" },
+            [cleanStudentUser.Id] = new List<string> { "Student_Parent" },
+            [cleanTutorUser.Id] = new List<string> { "Tutor" }
+        };
+
+        var userMgr = IdentityMockHelper.MockUserManager();
+        userMgr.Setup(m => m.FindByIdAsync(It.IsAny<string>()))
+            .ReturnsAsync((string id) => db.Users.FirstOrDefault(u => u.Id == id));
+        userMgr.Setup(m => m.GetRolesAsync(It.IsAny<ApplicationUser>()))
+            .ReturnsAsync((ApplicationUser u) => userRoles[u.Id]);
+        userMgr.Setup(m => m.RemoveFromRolesAsync(It.IsAny<ApplicationUser>(), It.IsAny<IEnumerable<string>>()))
+            .ReturnsAsync((ApplicationUser u, IEnumerable<string> r) =>
+            {
+                userRoles[u.Id] = userRoles[u.Id].Except(r).ToList();
+                return IdentityResult.Success;
+            });
+        userMgr.Setup(m => m.AddToRoleAsync(It.IsAny<ApplicationUser>(), It.IsAny<string>()))
+            .ReturnsAsync((ApplicationUser u, string r) =>
+            {
+                userRoles[u.Id].Add(r);
+                return IdentityResult.Success;
+            });
+        userMgr.Setup(m => m.UpdateSecurityStampAsync(It.IsAny<ApplicationUser>()))
+            .ReturnsAsync((ApplicationUser u) =>
+            {
+                u.SecurityStamp = Guid.NewGuid().ToString("N");
+                return IdentityResult.Success;
+            });
+
+        var service = new AdminOperationsService(db, userMgr.Object, IdentityMockHelper.MockRoleManager().Object, cache: cache);
+
+        // 1. Clean Student -> Tutor deletes StudentProfile + Guardians + AiStudySessions and creates Pending TutorProfile
+        var stSwitch = await service.ChangeRoleAsync(cleanStudentUser.Id, "Tutor", adminUser.Id, "127.0.0.1", CancellationToken.None);
+        Assert.True(stSwitch.Success, stSwitch.Error);
+        Assert.False(cache.TryGetValue("home_index_viewmodel", out _));
+        Assert.Equal("Tutor", Assert.Single(userRoles[cleanStudentUser.Id]));
+        Assert.NotEqual("old-s-stamp", cleanStudentUser.SecurityStamp);
+        Assert.Empty(db.StudentProfiles.Where(x => x.UserId == cleanStudentUser.Id));
+        Assert.Empty(db.Guardians.Where(x => x.StudentProfileId == 100));
+        Assert.Empty(db.AiStudySessions.Where(x => x.StudentId == 100));
+        var newTuProfile = Assert.Single(db.TutorProfiles.Where(x => x.UserId == cleanStudentUser.Id));
+        Assert.Equal(VerificationStatus.Pending, newTuProfile.VerificationStatus);
+
+        // 2. Clean Tutor -> Admin deletes TutorProfile + TutorSubjects + TutorAvailabilities + Qualifications + ProfileVerifications
+        var tuSwitch = await service.ChangeRoleAsync(cleanTutorUser.Id, "Admin", adminUser.Id, "127.0.0.1", CancellationToken.None);
+        Assert.True(tuSwitch.Success, tuSwitch.Error);
+        Assert.Equal("Admin", Assert.Single(userRoles[cleanTutorUser.Id]));
+        Assert.NotEqual("old-t-stamp", cleanTutorUser.SecurityStamp);
+        Assert.Empty(db.TutorProfiles.Where(x => x.UserId == cleanTutorUser.Id));
+        Assert.Empty(db.TutorSubjects.Where(x => x.TutorId == 200));
+        Assert.Empty(db.TutorAvailabilities.Where(x => x.TutorId == 200));
+        Assert.Empty(db.Qualifications.Where(x => x.TutorId == 200));
+        Assert.Empty(db.ProfileVerifications.Where(x => x.TutorId == 200));
+        Assert.Single(db.AdminProfiles.Where(x => x.UserId == cleanTutorUser.Id));
+    }
+
+    [Fact]
+    public async Task SearchAndBootstrapSeed_EnforceRoleConsistency_AndSeedEmptyDatabaseSafely()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddDbContext<ApplicationDbContext>(opt => opt.UseInMemoryDatabase(Guid.NewGuid().ToString()));
+        services.AddIdentityCore<ApplicationUser>()
+            .AddRoles<ApplicationRole>()
+            .AddEntityFrameworkStores<ApplicationDbContext>()
+            .AddDefaultTokenProviders();
+
+        await using var sp = services.BuildServiceProvider();
+        using (var scope = sp.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            db.Database.EnsureCreated();
+
+            // Production-style bootstrap on wiped empty DB seeds Roles, Subjects, GradeLevels, Admin & default News
+            await DbSeeder.SeedBootstrapAsync(scope.ServiceProvider, syncDefaultAdminPasswords: false);
+
+            Assert.True(await db.Roles.AnyAsync(r => r.Name == "Admin"));
+            Assert.True(await db.Roles.AnyAsync(r => r.Name == "Tutor"));
+            Assert.True(await db.Roles.AnyAsync(r => r.Name == "Student_Parent"));
+            Assert.NotEmpty(db.Subjects);
+            Assert.NotEmpty(db.GradeLevels);
+            Assert.NotEmpty(db.AdminProfiles);
+            Assert.NotEmpty(db.NewsArticles);
+
+            // Stale Approved TutorProfile belonging to an Admin user must be excluded from SearchService
+            var adminRole = await db.Roles.SingleAsync(r => r.Name == "Admin");
+            var tutorRole = await db.Roles.SingleAsync(r => r.Name == "Tutor");
+            var realTutorUser = new ApplicationUser { Id = "u-real-t", Email = "real@otsp.vn", UserName = "real@otsp.vn", FullName = "Real Tutor", Status = AccountStatus.Active };
+            var staleAdminUser = new ApplicationUser { Id = "u-stale-a", Email = "stale@otsp.vn", UserName = "stale@otsp.vn", FullName = "Stale Admin", Status = AccountStatus.Active };
+            db.Users.AddRange(realTutorUser, staleAdminUser);
+            db.UserRoles.AddRange(
+                new IdentityUserRole<string> { UserId = realTutorUser.Id, RoleId = tutorRole.Id },
+                new IdentityUserRole<string> { UserId = staleAdminUser.Id, RoleId = adminRole.Id });
+            db.TutorProfiles.AddRange(
+                new TutorProfile { Id = 11, UserId = realTutorUser.Id, VerificationStatus = VerificationStatus.Approved, HourlyFee = 150000 },
+                new TutorProfile { Id = 12, UserId = staleAdminUser.Id, VerificationStatus = VerificationStatus.Approved, HourlyFee = 150000 });
+            await db.SaveChangesAsync();
+
+            var searchSvc = new SearchService(db, new MemoryCache(new MemoryCacheOptions()));
+            var result = await searchSvc.SearchTutorsAsync(new Backend_Project_OTSP.Dtos.SearchQuery());
+            var tutorCard = Assert.Single(result.Items);
+            Assert.Equal("Real Tutor", tutorCard.FullName);
+        }
     }
 }

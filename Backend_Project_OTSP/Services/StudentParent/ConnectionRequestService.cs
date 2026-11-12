@@ -219,9 +219,14 @@ public class ConnectionRequestService : IConnectionRequestService
         if (dto.TutorId <= 0)
             return new ConnectionRequestOperationResult { Success = false, Message = "Gia sư không hợp lệ." };
 
+        var enforceRole = await _db.Roles.AsNoTracking().AnyAsync(cancellationToken);
+
         var student = await _db.StudentProfiles
             .Include(s => s.User)
-            .FirstOrDefaultAsync(s => s.UserId == studentUserId, cancellationToken);
+            .FirstOrDefaultAsync(s => s.UserId == studentUserId
+                                   && (!enforceRole || _db.UserRoles.Any(ur =>
+                                       ur.UserId == s.UserId && _db.Roles.Any(r => r.Id == ur.RoleId && r.Name == "Student_Parent"))),
+                cancellationToken);
 
         if (student == null)
             return new ConnectionRequestOperationResult { Success = false, Message = "Không tìm thấy hồ sơ học viên." };
@@ -231,7 +236,10 @@ public class ConnectionRequestService : IConnectionRequestService
             .Include(t => t.TutorSubjects)
             .FirstOrDefaultAsync(t => t.Id == dto.TutorId
                                    && t.VerificationStatus == VerificationStatus.Approved
-                                   && t.User.Status == AccountStatus.Active, cancellationToken);
+                                   && t.User.Status == AccountStatus.Active
+                                   && (!enforceRole || _db.UserRoles.Any(ur =>
+                                       ur.UserId == t.UserId && _db.Roles.Any(r => r.Id == ur.RoleId && r.Name == "Tutor"))),
+                cancellationToken);
 
         if (tutor == null)
             return new ConnectionRequestOperationResult { Success = false, Message = "Gia sư không tồn tại hoặc tài khoản hiện bị khóa." };

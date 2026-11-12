@@ -66,7 +66,7 @@ public class AiService : IAiService
 
     public async Task<AgentChatResponseDto> ChatWithAgentAsync(AgentChatRequestDto request, string? currentUserId, CancellationToken ct = default)
     {
-        // 1. Enrich context if user is authenticated
+        // 1. Enrich context if user is authenticated (lấy đúng vai trò hiện tại từ UserRoles)
         if (!string.IsNullOrWhiteSpace(currentUserId))
         {
             var user = await _db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == currentUserId, ct);
@@ -74,33 +74,57 @@ public class AiService : IAiService
             {
                 request.SystemContext["userName"] = user.FullName;
 
-                // If user is Student, find upcoming sessions
-                var student = await _db.StudentProfiles.AsNoTracking().FirstOrDefaultAsync(s => s.UserId == currentUserId, ct);
-                if (student != null)
+                var roleNames = await _db.UserRoles.AsNoTracking()
+                    .Where(ur => ur.UserId == currentUserId)
+                    .Join(_db.Roles.AsNoTracking(), ur => ur.RoleId, r => r.Id, (_, r) => r.Name!)
+                    .ToListAsync(ct);
+
+                var isAdmin = roleNames.Contains("Admin");
+                var isTutor = roleNames.Contains("Tutor");
+                var isStudent = roleNames.Contains("Student_Parent");
+
+                if (isAdmin)
                 {
-                    request.UserId = student.Id;
-                    request.UserRole = "Student";
-
-                    var upcoming = await (from cs in _db.ClassSessions.AsNoTracking()
-                                          join c in _db.Classrooms.AsNoTracking() on cs.ClassroomId equals c.Id
-                                          join csStudent in _db.ClassroomStudents.AsNoTracking() on c.Id equals csStudent.ClassroomId
-                                          join tp in _db.TutorProfiles.AsNoTracking() on c.TutorId equals tp.Id
-                                          join tutorUser in _db.Users.AsNoTracking() on tp.UserId equals tutorUser.Id
-                                          join s in _db.Subjects.AsNoTracking() on c.SubjectId equals s.Id
-                                          where csStudent.StudentId == student.Id && cs.ScheduledAt >= DateTime.UtcNow.AddHours(-1)
-                                          orderby cs.ScheduledAt
-                                          select new
-                                          {
-                                              subject = s.Name,
-                                              date = cs.ScheduledAt.ToLocalTime().ToString("dd/MM/yyyy"),
-                                              time = cs.ScheduledAt.ToLocalTime().ToString("HH:mm"),
-                                              tutorName = tutorUser.FullName,
-                                              roomCode = cs.VideoRoom ?? $"OTSP-Room-{cs.Id}"
-                                          }).Take(3).ToListAsync(ct);
-
-                    request.SystemContext["upcomingSessions"] = upcoming;
+                    request.UserRole = "Admin";
                 }
-                else
+                else if (isStudent || roleNames.Count == 0)
+                {
+                    var student = await _db.StudentProfiles.AsNoTracking().FirstOrDefaultAsync(s => s.UserId == currentUserId, ct);
+                    if (student != null)
+                    {
+                        request.UserId = student.Id;
+                        request.UserRole = "Student";
+
+                        var upcoming = await (from cs in _db.ClassSessions.AsNoTracking()
+                                              join c in _db.Classrooms.AsNoTracking() on cs.ClassroomId equals c.Id
+                                              join csStudent in _db.ClassroomStudents.AsNoTracking() on c.Id equals csStudent.ClassroomId
+                                              join tp in _db.TutorProfiles.AsNoTracking() on c.TutorId equals tp.Id
+                                              join tutorUser in _db.Users.AsNoTracking() on tp.UserId equals tutorUser.Id
+                                              join s in _db.Subjects.AsNoTracking() on c.SubjectId equals s.Id
+                                              where csStudent.StudentId == student.Id && cs.ScheduledAt >= DateTime.UtcNow.AddHours(-1)
+                                              orderby cs.ScheduledAt
+                                              select new
+                                              {
+                                                  subject = s.Name,
+                                                  date = cs.ScheduledAt.ToLocalTime().ToString("dd/MM/yyyy"),
+                                                  time = cs.ScheduledAt.ToLocalTime().ToString("HH:mm"),
+                                                  tutorName = tutorUser.FullName,
+                                                  roomCode = cs.VideoRoom ?? $"OTSP-Room-{cs.Id}"
+                                              }).Take(3).ToListAsync(ct);
+
+                        request.SystemContext["upcomingSessions"] = upcoming;
+                    }
+                    else if (roleNames.Count == 0)
+                    {
+                        var tutor = await _db.TutorProfiles.AsNoTracking().FirstOrDefaultAsync(t => t.UserId == currentUserId, ct);
+                        if (tutor != null)
+                        {
+                            request.UserId = tutor.Id;
+                            request.UserRole = "Tutor";
+                        }
+                    }
+                }
+                else if (isTutor)
                 {
                     var tutor = await _db.TutorProfiles.AsNoTracking().FirstOrDefaultAsync(t => t.UserId == currentUserId, ct);
                     if (tutor != null)
@@ -418,7 +442,13 @@ public class AiService : IAiService
             try
             {
                 // 1. Thống kê tổng quan hệ thống để AI hiểu đúng quy mô thực tế của OTSP
-                var totalTutors = await _db.TutorProfiles.CountAsync(t => t.VerificationStatus == VerificationStatus.Approved, ct);
+                var enforceRole = await _db.Roles.AsNoTracking().AnyAsync(ct);
+                var activeTutorProfiles = _db.TutorProfiles.AsNoTracking()
+                    .Where(t => t.User.Status == AccountStatus.Active
+                             && (!enforceRole || _db.UserRoles.Any(ur =>
+                                 ur.UserId == t.UserId && _db.Roles.Any(r => r.Id == ur.RoleId && r.Name == "Tutor"))));
+
+                var totalTutors = await activeTutorProfiles.CountAsync(t => t.VerificationStatus == VerificationStatus.Approved, ct);
                 var totalClasses = await _db.Classrooms.CountAsync(c => c.Status == ClassroomStatus.Active, ct);
 
                 liveContextBuilder.AppendLine("\n[Dữ liệu hệ thống OTSP thời gian thực]:");
@@ -427,11 +457,9 @@ public class AiService : IAiService
 
                 // 2. Tải toàn bộ danh sách gia sư trên hệ thống (CHỈ LẤY CÁC TRƯỜNG CÔNG KHAI - BẢO MẬT TUYỆT ĐỐI)
                 // Lưu ý: Tuyệt đối không lấy Password, CCCD, Email, Phone, BankAccount để đảm bảo an toàn.
-                var rawTutors = await _db.TutorProfiles
-                    .AsNoTracking()
+                var rawTutors = await activeTutorProfiles
                     .Include(t => t.User)
                     .Include(t => t.TutorSubjects).ThenInclude(ts => ts.Subject)
-                    .Where(t => t.User.Status == AccountStatus.Active)
                     .Select(t => new
                     {
                         t.Id,

@@ -42,15 +42,21 @@ public class HomeApiController : ControllerBase
         {
             entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(10);
 
+            var enforceRole = await _db.Roles.AsNoTracking().AnyAsync(cancellationToken);
+
             var approvedTutors = _db.TutorProfiles.AsNoTracking()
                 .Where(t => t.VerificationStatus == VerificationStatus.Approved
-                         && t.User.Status == AccountStatus.Active);
+                         && t.User.Status == AccountStatus.Active
+                         && (!enforceRole || _db.UserRoles.Any(ur =>
+                             ur.UserId == t.UserId && _db.Roles.Any(r => r.Id == ur.RoleId && r.Name == "Tutor"))));
 
             var todayVn = Backend_Project_OTSP.Services.Common.ClassroomLifecycleHelper.GetVietnamToday();
             var openClasses = _db.Classrooms.AsNoTracking()
                 .Where(c => c.Status == ClassroomStatus.Active
                          && c.Tutor.VerificationStatus == VerificationStatus.Approved
                          && c.Tutor.User.Status == AccountStatus.Active
+                         && (!enforceRole || _db.UserRoles.Any(ur =>
+                             ur.UserId == c.Tutor.UserId && _db.Roles.Any(r => r.Id == ur.RoleId && r.Name == "Tutor")))
                          && (c.Type != ClassroomType.Group
                              || (c.ClassroomStudents.Count < c.MaxStudents
                                  && !c.ClassSessions.Any(s => s.Status == SessionStatus.Done || s.Status == SessionStatus.InProgress)
@@ -60,12 +66,15 @@ public class HomeApiController : ControllerBase
 
             return new HomeViewModel
             {
-                StudentCount = await _db.StudentProfiles.CountAsync(cancellationToken),
+                StudentCount = await _db.StudentProfiles.CountAsync(s =>
+                    !enforceRole || _db.UserRoles.Any(ur =>
+                        ur.UserId == s.UserId && _db.Roles.Any(r => r.Id == ur.RoleId && r.Name == "Student_Parent")),
+                    cancellationToken),
                 TutorCount = await approvedTutors.CountAsync(cancellationToken),
                 SubjectCount = await _db.Subjects.CountAsync(cancellationToken),
                 CompletedSessionCount = await _db.ClassSessions
                     .CountAsync(s => s.Status == SessionStatus.Done, cancellationToken),
-                Subjects = await LoadSubjectsAsync(),
+                Subjects = await LoadSubjectsAsync(enforceRole),
                 Classes = await LoadClassesAsync(openClasses),
                 FeaturedTutors = await LoadTutorsAsync(approvedTutors)
             };
@@ -74,11 +83,13 @@ public class HomeApiController : ControllerBase
         return Ok(vm ?? new HomeViewModel());
     }
 
-    private async Task<List<SubjectCardDto>> LoadSubjectsAsync()
+    private async Task<List<SubjectCardDto>> LoadSubjectsAsync(bool enforceRole)
     {
         var rows = await _db.TutorSubjects.AsNoTracking()
             .Where(ts => ts.Tutor.VerificationStatus == VerificationStatus.Approved
-                      && ts.Tutor.User.Status == AccountStatus.Active)
+                      && ts.Tutor.User.Status == AccountStatus.Active
+                      && (!enforceRole || _db.UserRoles.Any(ur =>
+                          ur.UserId == ts.Tutor.UserId && _db.Roles.Any(r => r.Id == ur.RoleId && r.Name == "Tutor"))))
             .Select(ts => new
             {
                 ts.SubjectId,

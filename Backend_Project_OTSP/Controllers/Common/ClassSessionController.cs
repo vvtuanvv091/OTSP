@@ -10,7 +10,7 @@ namespace Backend_Project_OTSP.Controllers.Api;
 [ApiController]
 [Route("api/class-session")]
 [Route("api/sessions")]
-[Authorize(Roles = "Student_Parent,Tutor")]
+[Authorize]
 public class ClassSessionApiController : ControllerBase
 {
     private readonly IClassSessionService _classSessionService;
@@ -28,6 +28,7 @@ public class ClassSessionApiController : ControllerBase
     /// API tham gia buổi học và ghi nhận điểm danh vào phòng
     /// </summary>
     [HttpPost("{id:int}/join")]
+    [Authorize(Roles = "Student_Parent,Tutor")]
     public async Task<IActionResult> Join(int id, CancellationToken cancellationToken)
     {
         var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -56,6 +57,7 @@ public class ClassSessionApiController : ControllerBase
     /// API ghi nhận khi người dùng rời phòng học trực tuyến (hỗ trợ cả beacon / fetch keepalive khi đóng tab)
     /// </summary>
     [HttpPost("{id:int}/leave")]
+    [Authorize(Roles = "Student_Parent,Tutor")]
     [IgnoreAntiforgeryToken]
     public async Task<IActionResult> Leave(int id, CancellationToken cancellationToken)
     {
@@ -136,6 +138,7 @@ public class ClassSessionApiController : ControllerBase
     /// API kiểm tra trạng thái và thông tin phòng học
     /// </summary>
     [HttpGet("{id:int}/info")]
+    [Authorize(Roles = "Student_Parent,Tutor,Admin")]
     public async Task<IActionResult> GetInfo(int id, CancellationToken cancellationToken)
     {
         var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -150,6 +153,7 @@ public class ClassSessionApiController : ControllerBase
     }
 
     [HttpGet("{id:int}/room")]
+    [Authorize(Roles = "Student_Parent,Tutor,Admin")]
     public async Task<IActionResult> GetRoom(int id, CancellationToken cancellationToken)
     {
         return await GetInfo(id, cancellationToken);

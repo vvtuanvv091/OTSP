@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
+using Backend_Project_OTSP.Controllers.Common;
 using Backend_Project_OTSP.Data;
 using Backend_Project_OTSP.Dtos;
 using Backend_Project_OTSP.Dtos.Admin;
@@ -15,24 +17,33 @@ public sealed class AdminDirectoryService : IAdminDirectoryService
     private readonly ApplicationDbContext _db;
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly IUserPresenceService _presenceService;
+    private readonly IMemoryCache? _cache;
 
     public AdminDirectoryService(
         ApplicationDbContext db,
         UserManager<ApplicationUser> userManager,
-        IUserPresenceService presenceService)
+        IUserPresenceService presenceService,
+        IMemoryCache? cache = null)
     {
         _db = db;
         _userManager = userManager;
         _presenceService = presenceService;
+        _cache = cache;
     }
 
     public async Task<AdminStudentDirectoryDto> GetStudentsAsync(AdminStudentQuery query, CancellationToken cancellationToken = default)
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var adultCutoff = today.AddYears(-18);
+        var enforceRole = await _db.Roles.AsNoTracking().AnyAsync(cancellationToken);
+
+        var studentProfiles = _db.StudentProfiles.AsNoTracking()
+            .Where(student => !enforceRole || _db.UserRoles.Any(ur =>
+                ur.UserId == student.UserId &&
+                _db.Roles.Any(r => r.Id == ur.RoleId && r.Name == "Student_Parent")));
 
         // Aggregate by account state so all dashboard totals are returned in one SQL query.
-        var groupedStats = await _db.StudentProfiles.AsNoTracking()
+        var groupedStats = await studentProfiles
             .GroupBy(student => student.User.Status)
             .Select(group => new
             {
@@ -52,7 +63,7 @@ public sealed class AdminDirectoryService : IAdminDirectoryService
             Locked = groupedStats.Where(row => row.Status == AccountStatus.Locked).Sum(row => row.Total)
         };
 
-        var students = _db.StudentProfiles.AsNoTracking().AsQueryable();
+        var students = studentProfiles.AsQueryable();
         if (query.Status.HasValue)
             students = students.Where(student => student.User.Status == query.Status.Value);
 
@@ -124,8 +135,12 @@ public sealed class AdminDirectoryService : IAdminDirectoryService
 
     public async Task<AdminTutorDirectoryDto> GetTutorsAsync(AdminTutorQuery query, CancellationToken cancellationToken = default)
     {
+        var enforceRole = await _db.Roles.AsNoTracking().AnyAsync(cancellationToken);
         var approvedTutors = _db.TutorProfiles.AsNoTracking()
-            .Where(tutor => tutor.VerificationStatus == VerificationStatus.Approved);
+            .Where(tutor => tutor.VerificationStatus == VerificationStatus.Approved
+                         && (!enforceRole || _db.UserRoles.Any(ur =>
+                             ur.UserId == tutor.UserId &&
+                             _db.Roles.Any(r => r.Id == ur.RoleId && r.Name == "Tutor"))));
 
         // Counts are grouped by format and account state to avoid loading tutors into memory.
         var groupedStats = await approvedTutors
@@ -144,7 +159,11 @@ public sealed class AdminDirectoryService : IAdminDirectoryService
         };
 
         var subjects = await _db.Subjects.AsNoTracking()
-            .Where(subject => subject.TutorSubjects.Any(link => link.Tutor.VerificationStatus == VerificationStatus.Approved))
+            .Where(subject => subject.TutorSubjects.Any(link =>
+                link.Tutor.VerificationStatus == VerificationStatus.Approved &&
+                (!enforceRole || _db.UserRoles.Any(ur =>
+                    ur.UserId == link.Tutor.UserId &&
+                    _db.Roles.Any(r => r.Id == ur.RoleId && r.Name == "Tutor")))))
             .OrderBy(subject => subject.Name)
             .Select(subject => new AdminSubjectOptionDto { Id = subject.Id, Name = subject.Name })
             .ToListAsync(cancellationToken);
@@ -255,6 +274,12 @@ public sealed class AdminDirectoryService : IAdminDirectoryService
         if (!updateResult.Succeeded)
             return (false, string.Join("; ", updateResult.Errors.Select(error => error.Description)));
 
+        if (locked)
+        {
+            var stampTask = _userManager.UpdateSecurityStampAsync(user);
+            if (stampTask != null) await stampTask;
+        }
+
         _db.AuditLogs.Add(new AuditLog
         {
             UserId = adminUserId,
@@ -262,6 +287,7 @@ public sealed class AdminDirectoryService : IAdminDirectoryService
             Action = $"Admin{(locked ? "Lock" : "Unlock")}{(isStudent ? "Student" : "Tutor")}:{userId}"
         });
         await _db.SaveChangesAsync(cancellationToken);
+        _cache?.Remove(HomeApiController.HomeCacheKey);
         return (true, null);
     }
 

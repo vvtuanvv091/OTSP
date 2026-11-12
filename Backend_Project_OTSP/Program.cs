@@ -130,6 +130,55 @@ builder.Services.AddAuthentication(options =>
     // Hỗ trợ truyền Token cho SignalR Hub qua query string (?access_token=...)
     options.Events = new JwtBearerEvents
     {
+        OnTokenValidated = async context =>
+        {
+            var userId = context.Principal?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrWhiteSpace(userId))
+            {
+                context.HttpContext.Items["AuthFailureMessage"] = "Phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại.";
+                context.Fail("Phiên đăng nhập không hợp lệ.");
+                return;
+            }
+
+            var db = context.HttpContext.RequestServices.GetRequiredService<ApplicationDbContext>();
+            var userState = await db.Users.AsNoTracking()
+                .Where(u => u.Id == userId)
+                .Select(u => new { u.Status, u.SecurityStamp })
+                .FirstOrDefaultAsync(context.HttpContext.RequestAborted);
+
+            if (userState == null || userState.Status != Enums.AccountStatus.Active)
+            {
+                context.HttpContext.Items["AuthFailureMessage"] = "Tài khoản không tồn tại hoặc đã bị khóa.";
+                context.Fail("Tài khoản không tồn tại hoặc đã bị khóa.");
+                return;
+            }
+
+            var tokenStamp = context.Principal?.FindFirst("security_stamp")?.Value;
+            if (!string.IsNullOrEmpty(userState.SecurityStamp) &&
+                !string.Equals(tokenStamp, userState.SecurityStamp, StringComparison.Ordinal))
+            {
+                context.HttpContext.Items["AuthFailureMessage"] = "Quyền truy cập hoặc phiên đăng nhập đã thay đổi. Vui lòng đăng nhập lại.";
+                context.Fail("Security stamp mismatch.");
+                return;
+            }
+
+            var tokenRoles = context.Principal?
+                .FindAll(System.Security.Claims.ClaimTypes.Role)
+                .Select(c => c.Value)
+                .ToHashSet(StringComparer.Ordinal) ?? new HashSet<string>(StringComparer.Ordinal);
+
+            var currentRoles = await db.UserRoles.AsNoTracking()
+                .Where(ur => ur.UserId == userId)
+                .Join(db.Roles.AsNoTracking(), ur => ur.RoleId, r => r.Id, (_, r) => r.Name!)
+                .ToListAsync(context.HttpContext.RequestAborted);
+
+            if (currentRoles.Count > 0 && !tokenRoles.SetEquals(currentRoles))
+            {
+                context.HttpContext.Items["AuthFailureMessage"] = "Vai trò tài khoản đã được cập nhật. Vui lòng đăng nhập lại.";
+                context.Fail("Role mismatch.");
+            }
+        },
+
         OnMessageReceived = context =>
         {
             var accessToken = context.Request.Query["access_token"];
@@ -148,6 +197,9 @@ builder.Services.AddAuthentication(options =>
             if (context.Response.HasStarted) return;
 
             var expired = context.AuthenticateFailure is SecurityTokenExpiredException;
+            var reasonMessage = context.HttpContext.Items.TryGetValue("AuthFailureMessage", out var customMsgObj)
+                ? customMsgObj as string
+                : null;
             context.Response.StatusCode = StatusCodes.Status401Unauthorized;
             context.Response.ContentType = "application/json; charset=utf-8";
             await context.Response.WriteAsJsonAsync(new
@@ -156,7 +208,9 @@ builder.Services.AddAuthentication(options =>
                 code = expired ? "TOKEN_EXPIRED" : "UNAUTHORIZED",
                 message = expired
                     ? "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại."
-                    : "Bạn cần đăng nhập để thực hiện thao tác này."
+                    : (!string.IsNullOrWhiteSpace(reasonMessage)
+                        ? reasonMessage
+                        : "Bạn cần đăng nhập để thực hiện thao tác này.")
             });
         },
 
@@ -384,10 +438,7 @@ using (var scope = app.Services.CreateScope())
         ");
     }
     catch { }
-    if (app.Environment.IsDevelopment())
-    {
-        await DbSeeder.SeedAsync(scope.ServiceProvider);
-    }
+    await DbSeeder.SeedBootstrapAsync(scope.ServiceProvider, syncDefaultAdminPasswords: app.Environment.IsDevelopment());
 }
 
 // 8===== Pipeline xử lý request =====

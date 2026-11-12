@@ -13,31 +13,43 @@ namespace Backend_Project_OTSP.Data
     {
         public static async Task SeedAsync(IServiceProvider services, bool? forceBulk = null)
         {
-        var logger = services.GetRequiredService<ILoggerFactory>().CreateLogger("DbSeeder");
-        var db = services.GetRequiredService<ApplicationDbContext>();
-        var userManager = services.GetRequiredService<UserManager<ApplicationUser>>();
-        var roleManager = services.GetRequiredService<RoleManager<ApplicationRole>>();
+            await SeedBootstrapAsync(services, syncDefaultAdminPasswords: true);
+        }
 
-        await SeedCoreDataAsync(db, userManager, roleManager, logger);
-        await SeedDefaultNewsArticlesAsync(db, logger);
-            
+        /// <summary>
+        /// Khởi tạo tối thiểu dữ liệu gốc (Roles, Danh mục cơ bản, Admin mặc định nếu chưa có Admin nào, Tin tức mẫu khi rỗng).
+        /// An toàn khi chạy ở mọi môi trường sau khi reset DB mà không ghi đè dữ liệu hoặc mật khẩu hiện có trên Production.
+        /// </summary>
+        public static async Task SeedBootstrapAsync(IServiceProvider services, bool syncDefaultAdminPasswords = false)
+        {
+            var logger = services.GetRequiredService<ILoggerFactory>().CreateLogger("DbSeeder");
+            var db = services.GetRequiredService<ApplicationDbContext>();
+            var userManager = services.GetRequiredService<UserManager<ApplicationUser>>();
+            var roleManager = services.GetRequiredService<RoleManager<ApplicationRole>>();
+
+            await SeedCoreDataAsync(db, userManager, roleManager, logger, syncDefaultAdminPasswords);
+            await SeedDefaultNewsArticlesAsync(db, logger, onlyWhenEmpty: !syncDefaultAdminPasswords);
         }
         private static async Task SeedCoreDataAsync(ApplicationDbContext db,
             UserManager<ApplicationUser> userManager,
             RoleManager<ApplicationRole> roleManager,
-            ILogger logger)
+            ILogger logger,
+            bool syncDefaultAdminPasswords = true)
         {
             // 0. Auto-migrate schema cho Neon Postgres nếu thiếu cột ClassroomId trong Messagers
-            try
+            if (db.Database.IsRelational())
             {
-                await db.Database.ExecuteSqlRawAsync(@"
-                    ALTER TABLE ""Messagers"" ADD COLUMN IF NOT EXISTS ""ClassroomId"" integer NULL;
-                    CREATE INDEX IF NOT EXISTS ""IX_Messagers_ClassroomId"" ON ""Messagers"" (""ClassroomId"");
-                ");
-            }
-            catch (Exception ex)
-            {
-                logger.LogWarning(ex, "[DbSeeder] Auto-migration Messagers.ClassroomId notice: {Message}", ex.Message);
+                try
+                {
+                    await db.Database.ExecuteSqlRawAsync(@"
+                        ALTER TABLE ""Messagers"" ADD COLUMN IF NOT EXISTS ""ClassroomId"" integer NULL;
+                        CREATE INDEX IF NOT EXISTS ""IX_Messagers_ClassroomId"" ON ""Messagers"" (""ClassroomId"");
+                    ");
+                }
+                catch (Exception ex)
+                {
+                    logger.LogWarning(ex, "[DbSeeder] Auto-migration Messagers.ClassroomId notice: {Message}", ex.Message);
+                }
             }
 
             //1 lấy danh sách role
@@ -51,20 +63,23 @@ namespace Backend_Project_OTSP.Data
             {
                 await roleManager.CreateAsync(new ApplicationRole { Name = ten });
             }
-            // 2. Danh mục môn học cơ bản
+            // 2. Danh mục môn học cơ bản (Production chỉ seed khi bảng rỗng để không hồi sinh mục Admin đã xóa)
             var monHoc = new[]
             {
                 (Code: "TOAN", Name: "Toán"),
                 (Code: "TIENGANH", Name: "Tiếng Anh")
             };
-            var subjectCodes = monHoc.Select(m => m.Code).ToArray();
-            var existingSubjectCodes = await db.Subjects
-                .Where(s => subjectCodes.Contains(s.Code))
-                .Select(s => s.Code)
-                .ToListAsync();
-            foreach (var m in monHoc.Where(m => !existingSubjectCodes.Contains(m.Code)))
+            if (syncDefaultAdminPasswords || !await db.Subjects.AnyAsync())
             {
-                db.Subjects.Add(new Subject { Code = m.Code, Name = m.Name });
+                var subjectCodes = monHoc.Select(m => m.Code).ToArray();
+                var existingSubjectCodes = await db.Subjects
+                    .Where(s => subjectCodes.Contains(s.Code))
+                    .Select(s => s.Code)
+                    .ToListAsync();
+                foreach (var m in monHoc.Where(m => !existingSubjectCodes.Contains(m.Code)))
+                {
+                    db.Subjects.Add(new Subject { Code = m.Code, Name = m.Name });
+                }
             }
             // 3. Danh mục cấp học cơ bản
             var capHoc = new[]
@@ -73,16 +88,24 @@ namespace Backend_Project_OTSP.Data
                 (Code: "THCS", Name: "Trung học cơ sở"),
                 (Code: "THPT", Name: "Trung học phổ thông")
             };
-            var gradeLevelCodes = capHoc.Select(c => c.Code).ToArray();
-            var existingGradeLevelCodes = await db.GradeLevels
-                .Where(g => gradeLevelCodes.Contains(g.Code))
-                .Select(g => g.Code)
-                .ToListAsync();
-            foreach (var c in capHoc.Where(c => !existingGradeLevelCodes.Contains(c.Code)))
+            if (syncDefaultAdminPasswords || !await db.GradeLevels.AnyAsync())
             {
-                db.GradeLevels.Add(new GradeLevel { Code = c.Code, Name = c.Name });
+                var gradeLevelCodes = capHoc.Select(c => c.Code).ToArray();
+                var existingGradeLevelCodes = await db.GradeLevels
+                    .Where(g => gradeLevelCodes.Contains(g.Code))
+                    .Select(g => g.Code)
+                    .ToListAsync();
+                foreach (var c in capHoc.Where(c => !existingGradeLevelCodes.Contains(c.Code)))
+                {
+                    db.GradeLevels.Add(new GradeLevel { Code = c.Code, Name = c.Name });
+                }
             }
             await db.SaveChangesAsync();
+
+            if (!syncDefaultAdminPasswords && (await userManager.GetUsersInRoleAsync("Admin")).Count > 0)
+            {
+                return;
+            }
             var adminAccounts = new[]
             {
                 new { Email = "admin@otsp.com", Password = "Ngoctuan123@", FullName = "Quản trị viên OTSP", Rank = "Quản trị cấp cao" },
@@ -139,7 +162,7 @@ namespace Backend_Project_OTSP.Data
                     if (!await userManager.IsInRoleAsync(admin, "Admin"))
                         await userManager.AddToRoleAsync(admin, "Admin");
 
-                    if (!await userManager.CheckPasswordAsync(admin, adm.Password))
+                    if (syncDefaultAdminPasswords && !await userManager.CheckPasswordAsync(admin, adm.Password))
                     {
                         var resetToken = await userManager.GeneratePasswordResetTokenAsync(admin);
                         var resetResult = await userManager.ResetPasswordAsync(admin, resetToken, adm.Password);
@@ -159,8 +182,9 @@ namespace Backend_Project_OTSP.Data
             }
 
         }
-        private static async Task SeedDefaultNewsArticlesAsync(ApplicationDbContext db, ILogger logger)
+        private static async Task SeedDefaultNewsArticlesAsync(ApplicationDbContext db, ILogger logger, bool onlyWhenEmpty = false)
         {
+            if (onlyWhenEmpty && await db.NewsArticles.AnyAsync()) return;
             var admin = await db.AdminProfiles.FirstOrDefaultAsync();
             if (admin == null) return;
 

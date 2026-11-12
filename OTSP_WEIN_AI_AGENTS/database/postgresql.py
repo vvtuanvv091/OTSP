@@ -41,6 +41,12 @@ def fetch_all_tutors_from_db() -> list[dict]:
                 LEFT JOIN "GradeLevels" gl ON ts."GradeLevelId" = gl."Id"
                 WHERE u."Status" = 0
                   AND tp."VerificationStatus" = 1
+                  AND EXISTS (
+                      SELECT 1
+                      FROM "UserRoles" ur
+                      JOIN "Roles" r ON r."Id" = ur."RoleId"
+                      WHERE ur."UserId" = u."Id" AND r."Name" = 'Tutor'
+                  )
                 GROUP BY tp."Id", u."FullName", tp."HourlyFee", tp."AverageRating", tp."TeachingFormat", u."AvatarUrl"
                 ORDER BY tp."AverageRating" DESC, tp."HourlyFee" ASC;
             """)
@@ -95,6 +101,12 @@ def fetch_all_classrooms_from_db() -> list[dict]:
                   AND c."Type" = 1
                   AND tp."VerificationStatus" = 1
                   AND u."Status" = 0
+                  AND EXISTS (
+                      SELECT 1
+                      FROM "UserRoles" ur
+                      JOIN "Roles" r ON r."Id" = ur."RoleId"
+                      WHERE ur."UserId" = u."Id" AND r."Name" = 'Tutor'
+                  )
                   AND NOT EXISTS (
                       SELECT 1
                       FROM "ClassSessions" ss

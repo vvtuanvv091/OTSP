@@ -181,10 +181,32 @@ export default function AdminOperationsPage() {
   };
 
   const changeRole = async (account, role) => {
+    if (!role || role === account.role) return;
+    const fromLabel = roleLabels[account.role] || account.role;
+    const toLabel = roleLabels[role] || role;
+    const ok = await confirm({
+      title: 'Xác nhận chuyển vai trò tài khoản',
+      message: `Chuyển tài khoản “${account.fullName}” (${account.email}) từ ${fromLabel} sang ${toLabel}? Chỉ tài khoản sạch (chưa có lớp học, yêu cầu kết nối, thanh toán, đánh giá, tài liệu hoặc khiếu nại) mới được chuyển; hồ sơ vai trò cũ sẽ bị xóa sạch và phiên đăng nhập cũ sẽ bị đăng xuất.`,
+      confirmText: 'Chuyển vai trò',
+      cancelText: 'Hủy',
+      variant: role === 'Admin' ? 'danger' : 'warning',
+    });
+    if (!ok) return;
+
     setBusyId(account.id); clearFeedback();
-    try { await adminOperationsApi.changeAccountRole(account.id, role); setMessage('Đã cập nhật vai trò.'); const result = await adminOperationsApi.getAccounts({ search: query, page, pageSize: PAGE_SIZE }); setData(result.data); }
-    catch (requestError) { setError(errorText(requestError, 'Không thể đổi vai trò.')); }
-    finally { setBusyId(null); }
+    try {
+      await adminOperationsApi.changeAccountRole(account.id, role);
+      setMessage(`Đã chuyển vai trò thành ${toLabel} và dọn sạch hồ sơ vai trò cũ.`);
+      toast.success(`Đã chuyển vai trò sang ${toLabel}.`);
+      const result = await adminOperationsApi.getAccounts({ search: query, page, pageSize: PAGE_SIZE });
+      setData(result.data);
+    } catch (requestError) {
+      const msg = errorText(requestError, 'Không thể đổi vai trò.');
+      setError(msg);
+      toast.error(msg);
+    } finally {
+      setBusyId(null);
+    }
   };
 
   const toggleAccount = async (account) => {
@@ -687,6 +709,12 @@ export default function AdminOperationsPage() {
         <form className="admin-panel admin-operation-form" onSubmit={createAccount}><div className="admin-panel-heading">Tạo tài khoản mới</div><div className="admin-operation-form-body admin-account-form"><label>Họ tên<input required value={accountForm.fullName} onChange={(event) => setAccountForm({ ...accountForm, fullName: event.target.value })} placeholder="Nhập họ tên…" /></label><label>Email<input required type="email" value={accountForm.email} onChange={(event) => setAccountForm({ ...accountForm, email: event.target.value })} placeholder="Nhập địa chỉ email…" /></label><label>Vai trò<select value={accountForm.role} onChange={(event) => setAccountForm({ ...accountForm, role: event.target.value })}>{(data?.availableRoles || ['Student_Parent', 'Tutor', 'Admin']).map((role) => <option key={role} value={role}>{roleLabels[role] || role}</option>)}</select></label><button type="submit" className="admin-action is-approve" disabled={busyId === 'account'}>＋ Tạo tài khoản</button><small>Mật khẩu tạm thời được tạo tự động và chỉ hiển thị một lần.</small></div></form>
         {renderSearch('Tìm họ tên hoặc email…', <label className="admin-select"><select value={status} onChange={(event) => setStatusSafely(event.target.value)}><option value="all">Tất cả trạng thái</option><option value="Active">Đang hoạt động</option><option value="Locked">Đã khóa</option></select></label>)}
         <section className="admin-panel"><div className="admin-panel-heading">Tài khoản trên hệ thống <span className="admin-count">{pageData?.total ?? 0}</span></div><div className="admin-table-scroll"><table className="admin-table"><thead><tr><th>Họ tên</th><th>Email</th><th>Vai trò</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>{renderRows(5, items.length, 'Không tìm thấy tài khoản.')}{!loading && items.map((item) => <tr key={item.id}><td>{item.fullName}</td><td>{item.email}</td><td><select className="admin-inline-select" value={item.role} disabled={busyId === item.id} onChange={(event) => changeRole(item, event.target.value)}>{(data?.availableRoles || []).map((role) => <option key={role} value={role}>{roleLabels[role] || role}</option>)}</select></td><td><span className={`admin-status ${item.status === 'Active' ? 'is-active' : 'is-locked'}`}>{item.status === 'Active' ? 'Đang hoạt động' : 'Đã khóa'}</span></td><td><button type="button" className="admin-action" disabled={busyId === item.id || item.role === 'Admin'} onClick={() => toggleAccount(item)}>{item.status === 'Locked' ? 'Mở khóa' : 'Khóa'}</button>{item.role === 'Admin' && <span className="admin-table-secondary">Bảo vệ quyền quản trị</span>}</td></tr>)}</tbody></table></div>{pagination}</section>
+        <aside className="admin-note">
+          <i className="bi bi-info-circle" />
+          <div>
+            <strong>Quy tắc chuyển vai trò:</strong> Hệ thống chỉ cho phép đổi vai trò đối với tài khoản sạch (chưa phát sinh lớp học, yêu cầu kết nối, thanh toán, đánh giá, tài liệu hoặc khiếu nại), đồng thời tự động xóa sạch hồ sơ vai trò cũ và vô hiệu hóa phiên đăng nhập trước đó. Tài khoản đã có lịch sử học/dạy vui lòng dùng mục <em>Tạo tài khoản mới</em>.
+          </div>
+        </aside>
       </>}
 
       {mode === 'audit-logs' && <>

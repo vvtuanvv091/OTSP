@@ -25,15 +25,25 @@ public class AdminDashboardApiController : ControllerBase
     [HttpGet("stats")]
     public async Task<IActionResult> GetStats(CancellationToken ct)
     {
-        // 1. Chỉ số tổng quan người dùng và lớp học
-        var totalStudents = await _db.StudentProfiles.AsNoTracking().CountAsync(ct);
-        var totalTutors = await _db.TutorProfiles.AsNoTracking().CountAsync(ct);
-        var approvedTutors = await _db.TutorProfiles.AsNoTracking()
+        // 1. Chỉ số tổng quan người dùng và lớp học (chỉ tính tài khoản đúng vai trò hiện tại)
+        var enforceRole = await _db.Roles.AsNoTracking().AnyAsync(ct);
+        var studentQuery = _db.StudentProfiles.AsNoTracking()
+            .Where(s => !enforceRole || _db.UserRoles.Any(ur =>
+                ur.UserId == s.UserId && _db.Roles.Any(r => r.Id == ur.RoleId && r.Name == "Student_Parent")));
+        var tutorQuery = _db.TutorProfiles.AsNoTracking()
+            .Where(t => !enforceRole || _db.UserRoles.Any(ur =>
+                ur.UserId == t.UserId && _db.Roles.Any(r => r.Id == ur.RoleId && r.Name == "Tutor")));
+
+        var totalStudents = await studentQuery.CountAsync(ct);
+        var totalTutors = await tutorQuery.CountAsync(ct);
+        var approvedTutors = await tutorQuery
             .CountAsync(t => t.VerificationStatus == VerificationStatus.Approved, ct);
-        var pendingTutors = await _db.TutorProfiles.AsNoTracking()
+        var pendingTutors = await tutorQuery
             .CountAsync(t => t.VerificationStatus == VerificationStatus.Pending, ct);
         var pendingQualifications = await _db.Qualifications.AsNoTracking()
-            .CountAsync(q => q.Status == VerificationStatus.Pending, ct);
+            .CountAsync(q => q.Status == VerificationStatus.Pending
+                          && (!enforceRole || _db.UserRoles.Any(ur =>
+                              ur.UserId == q.Tutor.UserId && _db.Roles.Any(r => r.Id == ur.RoleId && r.Name == "Tutor"))), ct);
 
         var totalClassrooms = await _db.Classrooms.AsNoTracking().CountAsync(ct);
         var activeClassrooms = await _db.Classrooms.AsNoTracking()
@@ -132,7 +142,7 @@ public class AdminDashboardApiController : ControllerBase
             .ToListAsync(ct);
 
         // 6. Top Gia sư nổi bật (Rating cao, nhiều học viên & lớp học)
-        var topTutorsRaw = await _db.TutorProfiles.AsNoTracking()
+        var topTutorsRaw = await tutorQuery
             .Where(t => t.VerificationStatus == VerificationStatus.Approved)
             .OrderByDescending(t => t.AverageRating)
             .ThenByDescending(t => t.Classrooms.Count)
@@ -163,7 +173,7 @@ public class AdminDashboardApiController : ControllerBase
         }).ToList();
 
         // 7. Top Sinh viên / Học viên nổi bật
-        var topStudentsRaw = await _db.StudentProfiles.AsNoTracking()
+        var topStudentsRaw = await studentQuery
             .OrderByDescending(s => s.ClassroomStudents.Count)
             .Take(5)
             .Select(s => new
@@ -188,7 +198,7 @@ public class AdminDashboardApiController : ControllerBase
         // 8. Tin nhắn / Thông báo gia sư gần nhất
         var recentTutorNotifications = await _db.Notifications.AsNoTracking()
             .Include(n => n.User)
-            .Where(n => _db.TutorProfiles.Any(tp => tp.UserId == n.UserId))
+            .Where(n => tutorQuery.Any(tp => tp.UserId == n.UserId))
             .OrderByDescending(n => n.CreatedAt)
             .Take(5)
             .Select(n => new
@@ -291,7 +301,7 @@ public class AdminDashboardApiController : ControllerBase
         }
 
         // 10. Phân bổ hình thức dạy (Online / Offline / Hybrid)
-        var teachingFormats = await _db.TutorProfiles.AsNoTracking()
+        var teachingFormats = await tutorQuery
             .GroupBy(t => t.TeachingFormat)
             .Select(g => new { format = g.Key.ToString(), count = g.Count() })
             .ToListAsync(ct);

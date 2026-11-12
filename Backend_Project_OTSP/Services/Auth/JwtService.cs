@@ -57,6 +57,7 @@ public class JwtService : IJwtService
             new(ClaimTypes.NameIdentifier, user.Id),
             new(ClaimTypes.Email, user.Email ?? string.Empty),
             new(ClaimTypes.Name, user.FullName ?? user.UserName ?? string.Empty),
+            new("security_stamp", user.SecurityStamp ?? string.Empty),
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
         };
 

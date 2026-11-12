@@ -69,10 +69,14 @@ public class SearchService : ISearchService
         var (page, size, skip) = Paging(q);
         var kw = Keyword(q);
 
-        // Chỉ gia sư đã duyệt và tài khoản đang hoạt động
+        var enforceRole = await _db.Roles.AsNoTracking().AnyAsync();
+
+        // Chỉ gia sư đã duyệt, tài khoản đang hoạt động và đang mang vai trò Tutor
         var query = _db.TutorProfiles.AsNoTracking()
             .Where(t => t.VerificationStatus == VerificationStatus.Approved
-                     && t.User.Status == AccountStatus.Active);
+                     && t.User.Status == AccountStatus.Active
+                     && (!enforceRole || _db.UserRoles.Any(ur =>
+                         ur.UserId == t.UserId && _db.Roles.Any(r => r.Id == ur.RoleId && r.Name == "Tutor"))));
 
         if (kw is not null)
             query = query.Where(t => EF.Functions.ILike(t.User.FullName!, kw)
@@ -146,11 +150,14 @@ public class SearchService : ISearchService
         var (page, size, skip) = Paging(q);
         var kw = Keyword(q);
         var todayVn = Backend_Project_OTSP.Services.Common.ClassroomLifecycleHelper.GetVietnamToday();
+        var enforceRole = await _db.Roles.AsNoTracking().AnyAsync();
 
         var query = _db.Classrooms.AsNoTracking()
             .Where(c => c.Status == ClassroomStatus.Active
                      && c.Tutor.VerificationStatus == VerificationStatus.Approved
                      && c.Tutor.User.Status == AccountStatus.Active
+                     && (!enforceRole || _db.UserRoles.Any(ur =>
+                         ur.UserId == c.Tutor.UserId && _db.Roles.Any(r => r.Id == ur.RoleId && r.Name == "Tutor")))
                      && (c.Type != ClassroomType.Group
                          || (c.ClassroomStudents.Count < c.MaxStudents
                              && !c.ClassSessions.Any(s => s.Status == SessionStatus.Done || s.Status == SessionStatus.InProgress)
