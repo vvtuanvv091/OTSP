@@ -1,4 +1,5 @@
 import { API_BASE_URL } from '../api/config';
+import { getStoredToken } from './authStorage';
 
 const DEVICE_ID_STORAGE_KEY = 'otsp_device_id';
 let inFlightVisitPromise = null;
@@ -42,10 +43,7 @@ export function trackDeviceVisit(path = '/') {
 
   trackedVnDate = todayKey;
   const deviceId = getOrCreateDeviceId();
-  const token =
-    localStorage.getItem('token') ||
-    sessionStorage.getItem('token') ||
-    localStorage.getItem('otsp_token');
+  const token = getStoredToken();
 
   const headers = { 'Content-Type': 'application/json' };
   if (token) headers.Authorization = `Bearer ${token}`;

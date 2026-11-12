@@ -472,7 +472,7 @@ public sealed class AdminOperationsService : IAdminOperationsService
         if (Enum.TryParse<AccountStatus>(query.Status, true, out var status)) users = users.Where(x => x.Status == status);
         var total = await users.CountAsync(ct);
         var pageNumber = Math.Max(1, query.Page); var pageSize = Math.Clamp(query.PageSize, 1, 100);
-        var rows = await users.OrderBy(x => x.FullName).ThenBy(x => x.Id).Skip((pageNumber - 1) * pageSize).Take(pageSize)
+        var rows = await users.OrderByDescending(x => x.CreatedAt).ThenBy(x => x.FullName).ThenBy(x => x.Id).Skip((pageNumber - 1) * pageSize).Take(pageSize)
             .Select(x => new { x.Id, x.FullName, x.Email, status = x.Status.ToString(), x.CreatedAt }).ToListAsync(ct);
         var userIds = rows.Select(x => x.Id).ToArray();
         var memberships = await (from membership in _db.UserRoles.AsNoTracking()

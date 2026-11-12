@@ -6,6 +6,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { useConfirm } from '../../context/ConfirmDialogContext';
 import chatApi from '../../api/chatApi';
+import { getStoredToken } from '../../utils/authStorage';
 
 // Hàm helper hợp nhất và chuẩn hóa tin nhắn chống trùng lặp / race condition khi 2 người gửi cùng lúc
 function upsertChatMessage(prevList, incoming, currentUserId) {
@@ -222,12 +223,12 @@ export default function ChatPage() {
   // 3. Kết nối Hub chat thời gian thực qua SignalR
   useEffect(() => {
     let isMounted = true;
-    const token = localStorage.getItem('token') || sessionStorage.getItem('token') || localStorage.getItem('otsp_token');
+    const token = getStoredToken();
     if (!token) return undefined;
 
     const connection = new HubConnectionBuilder()
       .withUrl(hubUrl('/hubs/chat'), {
-        accessTokenFactory: () => localStorage.getItem('token') || sessionStorage.getItem('token') || localStorage.getItem('otsp_token') || '',
+        accessTokenFactory: () => getStoredToken(),
       })
       .withAutomaticReconnect()
       .configureLogging(LogLevel.Warning)

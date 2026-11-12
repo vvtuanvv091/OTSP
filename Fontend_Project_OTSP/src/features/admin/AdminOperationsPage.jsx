@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import adminOperationsApi from '../../api/adminOperationsApi';
 import { resolveAssetUrl } from '../../api/config';
@@ -7,6 +7,8 @@ import { useConfirm } from '../../context/ConfirmDialogContext';
 import { AdminFeedback, AdminLoadingRows, AdminPageHeader, AdminPagination, AdminStats } from './AdminPageShared';
 
 const PAGE_SIZE = 10;
+const AUTO_REFRESH_MODES = new Set(['accounts', 'audit-logs']);
+const AUTO_REFRESH_INTERVAL_MS = 15000;
 const roleLabels = { Student_Parent: 'Học viên / Phụ huynh', Tutor: 'Gia sư', Admin: 'Admin' };
 const complaintLabels = { New: 'Mới', Processing: 'Đang xử lý', Resolved: 'Đã giải quyết', Rejected: 'Từ chối' };
 const alertLabels = { New: 'Chưa xử lý', Reviewed: 'Đã xem xét', Dismissed: 'Đã bỏ qua' };
@@ -22,6 +24,22 @@ const pageConfig = {
   alerts: ['Cảnh báo bất thường', 'Rà soát tín hiệu đánh giá bất thường trước khi đưa ra quyết định xử lý.', 'alerts'],
   ai: ['Tính năng AI', 'Theo dõi mức sử dụng trợ lý học tập AI; trang này không hiển thị nội dung câu hỏi riêng tư.', 'ai-usage'],
 };
+
+function requestOperationsData(mode, params, period, config) {
+  if (mode === 'reconciliation') return adminOperationsApi.getReconciliation(period);
+  if (mode === 'ai') return adminOperationsApi.getAiUsage();
+  const fetchers = {
+    reviews: adminOperationsApi.getReviews,
+    messages: adminOperationsApi.getReportedConversations,
+    complaints: adminOperationsApi.getComplaints,
+    news: adminOperationsApi.getNews,
+    payments: adminOperationsApi.getPayments,
+    accounts: adminOperationsApi.getAccounts,
+    'audit-logs': adminOperationsApi.getAuditLogs,
+    alerts: adminOperationsApi.getAlerts,
+  };
+  return fetchers[mode]?.(params, config);
+}
 
 const money = (value) => `${Number(value || 0).toLocaleString('vi-VN')} đ`;
 const date = (value) => value ? new Date(value).toLocaleDateString('vi-VN') : '—';
@@ -50,6 +68,9 @@ export default function AdminOperationsPage() {
   const [page, setPage] = useState(1);
   const [period, setPeriod] = useState(() => new Date().toISOString().slice(0, 7));
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshTick, setRefreshTick] = useState(0);
+  const silentRefreshRef = useRef(false);
   const [busyId, setBusyId] = useState(null);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
@@ -69,6 +90,7 @@ export default function AdminOperationsPage() {
     setStatus('all');
     setPage(1);
     setData(null);
+    setRefreshing(false);
     setError('');
     setMessage('');
     setSelectedPayout(null);
@@ -84,46 +106,68 @@ export default function AdminOperationsPage() {
 
   useEffect(() => {
     let active = true;
+    const isSilent = silentRefreshRef.current;
+    silentRefreshRef.current = false;
+
     async function loadOperations() {
       const params = { search: query, page, pageSize: PAGE_SIZE };
       if (status !== 'all') params.status = status;
-      setLoading(true);
-      setError('');
-      let request;
-      if (mode === 'reconciliation') request = adminOperationsApi.getReconciliation(period);
-      else if (mode === 'ai') request = adminOperationsApi.getAiUsage();
-      else {
-        const fetchers = {
-          reviews: adminOperationsApi.getReviews,
-          messages: adminOperationsApi.getReportedConversations,
-          complaints: adminOperationsApi.getComplaints,
-          news: adminOperationsApi.getNews,
-          payments: adminOperationsApi.getPayments,
-          accounts: adminOperationsApi.getAccounts,
-          'audit-logs': adminOperationsApi.getAuditLogs,
-          alerts: adminOperationsApi.getAlerts,
-        };
-        request = fetchers[mode]?.(params);
+      if (!isSilent) {
+        setLoading(true);
+        setError('');
       }
+      const config = refreshTick > 0 ? { skipDedup: true } : undefined;
+      const request = requestOperationsData(mode, params, period, config);
       if (!request) {
         if (active) {
           setError('Không tìm thấy trang quản trị.');
           setLoading(false);
+          setRefreshing(false);
         }
         return;
       }
       try {
         const response = await request;
-        if (active) setData(response.data);
+        if (active) {
+          setData(response.data);
+          setError('');
+        }
       } catch (requestError) {
-        if (active) setError(errorText(requestError, 'Không tải được dữ liệu quản trị.'));
+        if (active && !isSilent) setError(errorText(requestError, 'Không tải được dữ liệu quản trị.'));
       } finally {
-        if (active) setLoading(false);
+        if (active) {
+          setLoading(false);
+          setRefreshing(false);
+        }
       }
     }
     loadOperations();
     return () => { active = false; };
-  }, [mode, query, status, page, period]);
+  }, [mode, query, status, page, period, refreshTick]);
+
+  // Tự động cập nhật danh sách tài khoản và nhật ký thao tác khi quay lại tab hoặc định kỳ mỗi 15 giây
+  useEffect(() => {
+    if (!AUTO_REFRESH_MODES.has(mode)) return undefined;
+    const triggerSilentRefresh = () => {
+      if (document.visibilityState === 'hidden') return;
+      silentRefreshRef.current = true;
+      setRefreshTick((tick) => tick + 1);
+    };
+    window.addEventListener('focus', triggerSilentRefresh);
+    document.addEventListener('visibilitychange', triggerSilentRefresh);
+    const intervalId = window.setInterval(triggerSilentRefresh, AUTO_REFRESH_INTERVAL_MS);
+    return () => {
+      window.removeEventListener('focus', triggerSilentRefresh);
+      document.removeEventListener('visibilitychange', triggerSilentRefresh);
+      window.clearInterval(intervalId);
+    };
+  }, [mode]);
+
+  const handleManualRefresh = useCallback(() => {
+    silentRefreshRef.current = false;
+    setRefreshing(true);
+    setRefreshTick((tick) => tick + 1);
+  }, []);
 
   const clearFeedback = () => { setError(''); setMessage(''); };
   const setStatusSafely = (value) => { setStatus(value); setPage(1); };
@@ -169,13 +213,21 @@ export default function AdminOperationsPage() {
     finally { setBusyId(null); }
   };
 
+  const reloadAccounts = useCallback(async () => {
+    const result = await adminOperationsApi.getAccounts(
+      { search: query, page, pageSize: PAGE_SIZE, ...(status !== 'all' ? { status } : {}) },
+      { skipDedup: true }
+    );
+    setData(result.data);
+  }, [query, page, status]);
+
   const createAccount = async (event) => {
     event.preventDefault(); clearFeedback(); setBusyId('account');
     try {
       const response = await adminOperationsApi.createAccount(accountForm);
       toast.info(`Tài khoản đã được tạo. Mật khẩu tạm thời: ${response.data.temporaryPassword}`, 'Tạo tài khoản');
       setAccountForm({ fullName: '', email: '', role: 'Student_Parent' }); setMessage('Đã tạo tài khoản.');
-      const result = await adminOperationsApi.getAccounts({ search: query, page, pageSize: PAGE_SIZE }); setData(result.data);
+      await reloadAccounts();
     } catch (requestError) { setError(errorText(requestError, 'Không thể tạo tài khoản.')); }
     finally { setBusyId(null); }
   };
@@ -198,8 +250,7 @@ export default function AdminOperationsPage() {
       await adminOperationsApi.changeAccountRole(account.id, role);
       setMessage(`Đã chuyển vai trò thành ${toLabel} và dọn sạch hồ sơ vai trò cũ.`);
       toast.success(`Đã chuyển vai trò sang ${toLabel}.`);
-      const result = await adminOperationsApi.getAccounts({ search: query, page, pageSize: PAGE_SIZE });
-      setData(result.data);
+      await reloadAccounts();
     } catch (requestError) {
       const msg = errorText(requestError, 'Không thể đổi vai trò.');
       setError(msg);
@@ -211,7 +262,11 @@ export default function AdminOperationsPage() {
 
   const toggleAccount = async (account) => {
     setBusyId(account.id); clearFeedback();
-    try { await adminOperationsApi.setAccountStatus(account.id, account.status !== 'Locked'); setMessage('Đã cập nhật trạng thái tài khoản.'); const result = await adminOperationsApi.getAccounts({ search: query, page, pageSize: PAGE_SIZE }); setData(result.data); }
+    try {
+      await adminOperationsApi.setAccountStatus(account.id, account.status !== 'Locked');
+      setMessage('Đã cập nhật trạng thái tài khoản.');
+      await reloadAccounts();
+    }
     catch (requestError) { setError(errorText(requestError, 'Không thể cập nhật tài khoản.')); }
     finally { setBusyId(null); }
   };
@@ -321,7 +376,7 @@ export default function AdminOperationsPage() {
     return data?.[keys[mode]] || null;
   }, [data, mode]);
   const items = pageData?.items || [];
-  const statsArray = useMemo(() => (Array.isArray(data?.stats) ? data.stats : []), [data?.stats]);
+  const statsArray = useMemo(() => (Array.isArray(data?.stats) ? data.stats : []), [data]);
   const findStatCount = (statusKey) => statsArray.find((item) => item.status === statusKey)?.count || 0;
   const pagination = <AdminPagination page={pageData?.page || page} totalPages={pageData?.totalPages} total={pageData?.total || 0} pageSize={PAGE_SIZE} onChange={setPage} />;
 
@@ -708,7 +763,7 @@ export default function AdminOperationsPage() {
       {mode === 'accounts' && <>
         <form className="admin-panel admin-operation-form" onSubmit={createAccount}><div className="admin-panel-heading">Tạo tài khoản mới</div><div className="admin-operation-form-body admin-account-form"><label>Họ tên<input required value={accountForm.fullName} onChange={(event) => setAccountForm({ ...accountForm, fullName: event.target.value })} placeholder="Nhập họ tên…" /></label><label>Email<input required type="email" value={accountForm.email} onChange={(event) => setAccountForm({ ...accountForm, email: event.target.value })} placeholder="Nhập địa chỉ email…" /></label><label>Vai trò<select value={accountForm.role} onChange={(event) => setAccountForm({ ...accountForm, role: event.target.value })}>{(data?.availableRoles || ['Student_Parent', 'Tutor', 'Admin']).map((role) => <option key={role} value={role}>{roleLabels[role] || role}</option>)}</select></label><button type="submit" className="admin-action is-approve" disabled={busyId === 'account'}>＋ Tạo tài khoản</button><small>Mật khẩu tạm thời được tạo tự động và chỉ hiển thị một lần.</small></div></form>
         {renderSearch('Tìm họ tên hoặc email…', <label className="admin-select"><select value={status} onChange={(event) => setStatusSafely(event.target.value)}><option value="all">Tất cả trạng thái</option><option value="Active">Đang hoạt động</option><option value="Locked">Đã khóa</option></select></label>)}
-        <section className="admin-panel"><div className="admin-panel-heading">Tài khoản trên hệ thống <span className="admin-count">{pageData?.total ?? 0}</span></div><div className="admin-table-scroll"><table className="admin-table"><thead><tr><th>Họ tên</th><th>Email</th><th>Vai trò</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>{renderRows(5, items.length, 'Không tìm thấy tài khoản.')}{!loading && items.map((item) => <tr key={item.id}><td>{item.fullName}</td><td>{item.email}</td><td><select className="admin-inline-select" value={item.role} disabled={busyId === item.id} onChange={(event) => changeRole(item, event.target.value)}>{(data?.availableRoles || []).map((role) => <option key={role} value={role}>{roleLabels[role] || role}</option>)}</select></td><td><span className={`admin-status ${item.status === 'Active' ? 'is-active' : 'is-locked'}`}>{item.status === 'Active' ? 'Đang hoạt động' : 'Đã khóa'}</span></td><td><button type="button" className="admin-action" disabled={busyId === item.id || item.role === 'Admin'} onClick={() => toggleAccount(item)}>{item.status === 'Locked' ? 'Mở khóa' : 'Khóa'}</button>{item.role === 'Admin' && <span className="admin-table-secondary">Bảo vệ quyền quản trị</span>}</td></tr>)}</tbody></table></div>{pagination}</section>
+        <section className="admin-panel"><div className="admin-panel-heading"><span>Tài khoản trên hệ thống <span className="admin-count">{pageData?.total ?? 0}</span></span><button type="button" className="admin-action ms-auto" onClick={handleManualRefresh} disabled={loading || refreshing}><i className="bi bi-arrow-clockwise" aria-hidden="true" />{refreshing ? 'Đang làm mới…' : 'Làm mới'}</button></div><div className="admin-table-scroll"><table className="admin-table"><thead><tr><th>Họ tên</th><th>Email</th><th>Vai trò</th><th>Trạng thái</th><th>Ngày tạo</th><th>Thao tác</th></tr></thead><tbody>{renderRows(6, items.length, 'Không tìm thấy tài khoản.')}{!loading && items.map((item) => <tr key={item.id}><td>{item.fullName}</td><td>{item.email}</td><td><select className="admin-inline-select" value={item.role} disabled={busyId === item.id} onChange={(event) => changeRole(item, event.target.value)}>{(data?.availableRoles || []).map((role) => <option key={role} value={role}>{roleLabels[role] || role}</option>)}</select></td><td><span className={`admin-status ${item.status === 'Active' ? 'is-active' : 'is-locked'}`}>{item.status === 'Active' ? 'Đang hoạt động' : 'Đã khóa'}</span></td><td>{dateTime(item.createdAt)}</td><td><button type="button" className="admin-action" disabled={busyId === item.id || item.role === 'Admin'} onClick={() => toggleAccount(item)}>{item.status === 'Locked' ? 'Mở khóa' : 'Khóa'}</button>{item.role === 'Admin' && <span className="admin-table-secondary">Bảo vệ quyền quản trị</span>}</td></tr>)}</tbody></table></div>{pagination}</section>
         <aside className="admin-note">
           <i className="bi bi-info-circle" />
           <div>
@@ -733,7 +788,11 @@ export default function AdminOperationsPage() {
         ))}
         <section className="admin-panel">
           <div className="admin-panel-heading">
-            Nhật ký kiểm toán &amp; Hoạt động người dùng <span className="admin-count">{pageData?.total ?? 0}</span>
+            <span>Nhật ký kiểm toán &amp; Hoạt động người dùng <span className="admin-count">{pageData?.total ?? 0}</span></span>
+            <button type="button" className="admin-action ms-auto" onClick={handleManualRefresh} disabled={loading || refreshing}>
+              <i className="bi bi-arrow-clockwise" aria-hidden="true" />
+              {refreshing ? 'Đang làm mới…' : 'Làm mới'}
+            </button>
           </div>
           <div className="admin-table-scroll">
             <table className="admin-table admin-wide-table">
@@ -763,7 +822,7 @@ export default function AdminOperationsPage() {
                         color: '#fff',
                         fontSize: 11
                       }}>
-                        {item.userRole || (item.adminEmail?.includes('admin') ? 'Admin' : 'User')}
+                        {roleLabels[item.userRole] || item.userRole || (item.adminEmail?.includes('admin') ? 'Admin' : 'Thành viên')}
                       </span>
                     </td>
                     <td>

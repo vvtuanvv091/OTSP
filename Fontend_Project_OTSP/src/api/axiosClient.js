@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { API_BASE_URL } from './config';
+import { clearAuthStorage, getStoredToken } from '../utils/authStorage';
 
 const axiosClient = axios.create({
   baseURL: API_BASE_URL,
@@ -10,9 +11,7 @@ const axiosClient = axios.create({
 
 axiosClient.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('token')
-      || sessionStorage.getItem('token')
-      || localStorage.getItem('otsp_token');
+    const token = getStoredToken();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -126,12 +125,7 @@ axiosClient.interceptors.response.use(
     if (error.response?.status === 401) {
       if (!window.location.pathname.includes('/login') && !window.location.pathname.includes('/register')) {
         sessionStorage.setItem('otsp_auth_notice', 'Phiên đăng nhập đã hết hạn hoặc không còn hợp lệ. Vui lòng đăng nhập lại.');
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        sessionStorage.removeItem('token');
-        sessionStorage.removeItem('user');
-        localStorage.removeItem('otsp_token');
-        localStorage.removeItem('otsp_user');
+        clearAuthStorage();
         window.dispatchEvent(new Event('otsp:unauthorized'));
       }
     }

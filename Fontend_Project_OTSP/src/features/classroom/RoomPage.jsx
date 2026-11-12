@@ -7,6 +7,7 @@ import studentApi from '../../api/studentApi';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { useConfirm } from '../../context/ConfirmDialogContext';
+import { getStoredToken } from '../../utils/authStorage';
 
 /**
  * Trang điều khiển phòng học trực tuyến.
@@ -168,7 +169,7 @@ export default function RoomPage() {
 
   // 4. SignalR: nhận thông báo buổi học kết thúc theo thời gian thực
   useEffect(() => {
-    const token = localStorage.getItem('token') || sessionStorage.getItem('token') || localStorage.getItem('otsp_token');
+    const token = getStoredToken();
     if (!token) return undefined;
 
     const connection = new signalR.HubConnectionBuilder()
@@ -215,7 +216,7 @@ export default function RoomPage() {
   useEffect(() => {
     if (!session) return undefined;
     const sendLeave = () => {
-      const token = localStorage.getItem('token') || sessionStorage.getItem('token') || localStorage.getItem('otsp_token');
+      const token = getStoredToken();
       if (!token) return;
       try {
         fetch(`${API_BASE_URL}/sessions/${sessionId}/leave`, {

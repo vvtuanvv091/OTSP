@@ -62,6 +62,8 @@ public class AuthService : IAuthService
             var http = _httpContextAccessor?.HttpContext;
             var ua = http?.Request.Headers.UserAgent.ToString();
             if (!string.IsNullOrEmpty(ua) && ua.Length > 480) ua = ua[..480];
+            var ip = http?.Connection.RemoteIpAddress?.ToString();
+            if (!string.IsNullOrEmpty(ip) && ip.Length > 480) ip = ip[..480];
 
             _db.AuditLogs.Add(new AuditLog
             {
@@ -69,7 +71,7 @@ public class AuthService : IAuthService
                 Category = "Auth",
                 Action = action,
                 Detail = detail,
-                IpAddress = http?.Connection.RemoteIpAddress?.ToString(),
+                IpAddress = ip,
                 UserAgent = ua,
                 Timestamp = DateTime.UtcNow
             });
@@ -77,6 +79,7 @@ public class AuthService : IAuthService
         }
         catch (Exception ex)
         {
+            _db.ChangeTracker.Clear();
             _logger.LogWarning(ex, "Không thể ghi Auth AuditLog cho user {UserId}", userId);
         }
     }
@@ -233,6 +236,7 @@ public class AuthService : IAuthService
             }
             catch (Exception notifEx)
             {
+                _db.ChangeTracker.Clear();
                 _logger.LogWarning(notifEx, "Không thể tạo thông báo Admin khi đăng ký Google cho {Email}", email);
             }
 
@@ -417,6 +421,7 @@ public class AuthService : IAuthService
             }
             catch (Exception notifEx)
             {
+                _db.ChangeTracker.Clear();
                 _logger.LogWarning(notifEx, "Không thể gửi thông báo Admin sau khi đăng ký");
             }
         }

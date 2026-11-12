@@ -77,7 +77,7 @@ public class JwtService : IJwtService
         }
 
         var jwtKey = _configuration["Jwt:Key"] ?? "OTSP_Super_Secret_Key_For_Jwt_Token_2026_AtLeast32BytesLong!";
-        var issuer = _configuration["Jwt:Issuer"] ?? "BACKEND_PROJECT_OTSP";
+        var issuer = _configuration["Jwt:Issuer"] ?? "Backend_Project_OTSP";
         var audience = _configuration["Jwt:Audience"] ?? "OTSP_React_App";
 
         // Ghi nhớ đăng nhập: 30 ngày nếu chọn ghi nhớ, ngược lại 24 giờ (hoặc config)

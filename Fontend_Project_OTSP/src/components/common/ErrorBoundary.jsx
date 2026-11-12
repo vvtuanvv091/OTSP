@@ -116,7 +116,7 @@ export default class ErrorBoundary extends React.Component {
               </button>
             </div>
 
-            {process.env.NODE_ENV !== 'production' && this.state.error && (
+            {import.meta.env.DEV && this.state.error && (
               <details className="mt-4 text-start p-3 bg-light rounded-3 border small text-danger overflow-auto" style={{ maxHeight: 150 }}>
                 <summary className="fw-bold text-secondary cursor-pointer">Chi tiết lỗi kỹ thuật</summary>
                 <pre className="mt-2 mb-0" style={{ fontSize: 11 }}>{this.state.error?.toString()}</pre>

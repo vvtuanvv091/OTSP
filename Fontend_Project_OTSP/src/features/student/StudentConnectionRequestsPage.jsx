@@ -5,15 +5,10 @@ import * as signalR from '@microsoft/signalr';
 import studentApi from '../../api/studentApi';
 import { useConfirm } from '../../context/ConfirmDialogContext';
 import { useToast } from '../../context/ToastContext';
+import { getStoredToken } from '../../utils/authStorage';
 
 const formatMoney = (val) =>
   new Intl.NumberFormat('vi-VN').format(val || 0);
-
-const getStoredToken = () =>
-  localStorage.getItem('token') ||
-  sessionStorage.getItem('token') ||
-  localStorage.getItem('otsp_token') ||
-  '';
 
 export default function StudentConnectionRequestsPage() {
   const confirm = useConfirm();

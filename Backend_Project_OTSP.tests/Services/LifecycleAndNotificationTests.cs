@@ -551,11 +551,13 @@ public class LifecycleAndNotificationTests
             Status = SessionStatus.Done,
             IsMakeup = false
         };
+        var daysUntilSunday = ((int)DayOfWeek.Sunday - (int)startDate.DayOfWeek + 7) % 7;
+        var makeupDateVn = startDate.AddDays(daysUntilSunday);
         var makeupSession = new ClassSession
         {
             Id = 402,
             ClassroomId = 10,
-            ScheduledAt = DateTime.UtcNow.AddDays(2),
+            ScheduledAt = ClassroomLifecycleHelper.VietnamDateTimeToUtc(makeupDateVn, new TimeOnly(9, 0)),
             DurationHours = 2.0,
             Status = SessionStatus.Scheduled,
             IsMakeup = true
@@ -834,6 +836,7 @@ public class LifecycleAndNotificationTests
     {
         var services = new ServiceCollection();
         services.AddLogging();
+        services.AddDataProtection();
         services.AddDbContext<ApplicationDbContext>(opt => opt.UseInMemoryDatabase(Guid.NewGuid().ToString()));
         services.AddIdentityCore<ApplicationUser>()
             .AddRoles<ApplicationRole>()
