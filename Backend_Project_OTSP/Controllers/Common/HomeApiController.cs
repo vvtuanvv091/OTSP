@@ -46,10 +46,17 @@ public class HomeApiController : ControllerBase
                 .Where(t => t.VerificationStatus == VerificationStatus.Approved
                          && t.User.Status == AccountStatus.Active);
 
+            var todayVn = Backend_Project_OTSP.Services.Common.ClassroomLifecycleHelper.GetVietnamToday();
             var openClasses = _db.Classrooms.AsNoTracking()
                 .Where(c => c.Status == ClassroomStatus.Active
                          && c.Tutor.VerificationStatus == VerificationStatus.Approved
-                         && c.Tutor.User.Status == AccountStatus.Active);
+                         && c.Tutor.User.Status == AccountStatus.Active
+                         && (c.Type != ClassroomType.Group
+                             || (c.ClassroomStudents.Count < c.MaxStudents
+                                 && !c.ClassSessions.Any(s => s.Status == SessionStatus.Done || s.Status == SessionStatus.InProgress)
+                                 && (c.RegistrationDeadline.HasValue
+                                     ? c.RegistrationDeadline.Value >= todayVn && (!c.StartDate.HasValue || c.StartDate.Value >= todayVn)
+                                     : (!c.StartDate.HasValue || c.StartDate.Value > todayVn)))));
 
             return new HomeViewModel
             {
@@ -137,6 +144,10 @@ public class HomeApiController : ControllerBase
                 Type = c.Type,
                 StudentCount = c.ClassroomStudents.Count(),
                 MaxStudents = c.MaxStudents,
+                StartDate = c.StartDate,
+                RegistrationDeadline = c.RegistrationDeadline,
+                EndDate = c.EndDate,
+                TotalSessions = c.TotalSessions,
                 TutorId = c.TutorId,
                 TutorUserId = c.Tutor.UserId,
                 TutorName = c.Tutor.User.FullName,
@@ -232,7 +243,7 @@ public class HomeApiController : ControllerBase
             return BadRequest(new { success = false, message = "Vui lòng điền đầy đủ họ tên, thông tin liên hệ và nội dung." });
         }
 
-        var adminEmail = configuration["AdminNotification:Email"] ?? "tongngoctuan09@gmail.com";
+        var adminEmails = await AdminNotificationHelper.ResolveAdminRecipientEmailsAsync(_db, configuration, cancellationToken);
         var topic = string.IsNullOrWhiteSpace(request.Topic) ? "Hỗ trợ chung" : request.Topic.Trim();
         var (subject, bodyHtml) = NotificationEmailTemplates.ForContactSubmitted(
             request.FullName.Trim(),
@@ -241,13 +252,10 @@ public class HomeApiController : ControllerBase
             DateTime.UtcNow.AddHours(7).ToString("dd/MM/yyyy HH:mm:ss") + " (GMT+7)",
             request.Message.Trim());
 
-        if (emailQueue != null)
+        if (adminEmails.Count > 0)
         {
-            emailQueue.Enqueue(new EmailQueueItemDto(adminEmail, subject, bodyHtml));
-        }
-        else if (emailSender != null)
-        {
-            await emailSender.SendNotificationEmailAsync(adminEmail, subject, bodyHtml, cancellationToken);
+            await AdminNotificationHelper.DispatchEmailToManyAsync(
+                adminEmails, subject, bodyHtml, emailQueue, emailSender, cancellationToken);
         }
 
         // Lưu thông báo vào database cho Admin

@@ -22,14 +22,44 @@ function getNotificationTarget(notification, roleBase) {
 
   const isAdmin = roleBase === '/admin';
   const portalBase = roleBase || '/student';
+  if (normalizedPath.startsWith('/room/') || normalizedPath.includes('/room/')) {
+    const roomIdx = normalizedPath.indexOf('/room/');
+    const roomPath = path.slice(roomIdx);
+    return `${roomPath}${suffix}`;
+  }
   if (normalizedPath.includes('/chat')) return roleBase ? `${roleBase}/chat${suffix}` : `/chat${suffix}`;
-  if (normalizedPath.includes('connectionrequest') || normalizedPath.includes('send_details_tutor')) {
+  if (
+    normalizedPath.includes('connectionrequest') ||
+    normalizedPath.includes('connection-request') ||
+    normalizedPath.includes('send_details_tutor')
+  ) {
     return isAdmin ? '/admin/connection-requests' : `${portalBase}/connection-requests`;
   }
-  if (normalizedPath.includes('classroom') || normalizedPath.includes('studentschedule')) {
+  if (normalizedPath.includes('complaint')) {
+    return isAdmin ? '/admin/complaints' : `${portalBase}/complaints`;
+  }
+  if (normalizedPath.includes('studentschedule') || normalizedPath.includes('/schedule')) {
+    return isAdmin ? '/admin/classrooms' : `${portalBase}/schedule${suffix}`;
+  }
+  if (normalizedPath.includes('studentparent_payment') || normalizedPath.includes('/payments')) {
+    if (normalizedPath.startsWith('/student/payments/') && roleBase !== '/tutor' && !isAdmin) {
+      return `${path}${suffix}`;
+    }
+    return isAdmin ? '/admin/payments' : roleBase === '/tutor' ? '/tutor/income' : `/student/payments${suffix}`;
+  }
+  if (normalizedPath.includes('/income') || normalizedPath.includes('tutorincome')) {
+    return isAdmin ? '/admin/reconciliation' : '/tutor/income';
+  }
+  if (normalizedPath.includes('tutor-approvals')) {
+    return '/admin/tutor-approvals';
+  }
+  if (normalizedPath.includes('availability')) {
+    return isAdmin ? '/admin/tutors' : roleBase === '/tutor' ? '/tutor/availability' : `${portalBase}/classrooms`;
+  }
+  if (normalizedPath.includes('classroom')) {
     return isAdmin ? '/admin/classrooms' : `${portalBase}/classrooms`;
   }
-  if (normalizedPath.includes('learningdocument')) {
+  if (normalizedPath.includes('learningdocument') || normalizedPath.includes('/documents')) {
     return isAdmin ? '/admin/learning-documents' : `${portalBase}/documents`;
   }
   if (normalizedPath.includes('profile')) {

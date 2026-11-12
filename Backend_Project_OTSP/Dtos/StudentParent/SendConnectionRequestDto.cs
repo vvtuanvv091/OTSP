@@ -34,6 +34,16 @@ public class SendConnectionRequestDto
     [Display(Name = "Danh sách các khung giờ học đề xuất (1 kèm 1)")]
     public List<DateTime> ProposedTrialSlotsUtc { get; set; } = new();
 
+    [Range(1, 52, ErrorMessage = "Thời lượng khóa học phải từ 1 đến 52 tuần.")]
+    [Display(Name = "Số tuần đăng ký (1 kèm 1 chính thức)")]
+    public int? DurationWeeks { get; set; }
+
+    [Display(Name = "Ngày bắt đầu dự kiến")]
+    public DateOnly? StartDate { get; set; }
+
+    [Display(Name = "Ngày kết thúc dự kiến")]
+    public DateOnly? EndDate { get; set; }
+
     [MaxLength(1000, ErrorMessage = "Lời nhắn gửi gia sư không được vượt quá 1000 ký tự.")]
     [Display(Name = "Lời nhắn / Mục tiêu học tập")]
     public string? Message { get; set; }

@@ -74,6 +74,11 @@ export default function TutorClassroomsPage() {
   };
 
   const formatPrice = (val) => new Intl.NumberFormat('vi-VN').format(val || 0);
+  const formatShortDate = (val) => {
+    if (!val) return 'Chưa đặt';
+    const [y, m, d] = String(val).slice(0, 10).split('-');
+    return y && m && d ? `${d}/${m}/${y}` : String(val);
+  };
 
   return (
     <>
@@ -230,6 +235,7 @@ export default function TutorClassroomsPage() {
                 }
 
                 const cleanSchedule = c.formattedSchedule || c.scheduleSummary || 'Chưa xếp lịch';
+                const hasLifecycleDates = Boolean(c.startDate || c.endDate || c.registrationDeadline);
 
                 return (
                   <div key={c.id} className="col" style={{ maxWidth: classrooms.length === 1 ? 460 : undefined }}>
@@ -286,26 +292,42 @@ export default function TutorClassroomsPage() {
                         </div>
 
                         {/* Middle Box: Lịch học + Sĩ số */}
-                        <div className="p-2.5 rounded-3 mt-3 d-flex align-items-center justify-content-between" style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0' }}>
-                          <div className="d-flex align-items-center gap-2 min-w-0" style={{ flex: '1 1 55%' }}>
-                            <i className="bi bi-calendar3 fs-4 text-secondary flex-shrink-0"></i>
-                            <div className="min-w-0">
-                              <div className="text-muted" style={{ fontSize: '0.72rem', lineHeight: 1.1 }}>Lịch học</div>
-                              <div className="fw-bold text-dark text-truncate" style={{ fontSize: '0.825rem' }} title={cleanSchedule}>
-                                {cleanSchedule}
+                        <div className="p-2 rounded-3 mt-3" style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0' }}>
+                          <div className="d-flex align-items-center justify-content-between gap-2">
+                            <div className="d-flex align-items-center gap-2 min-w-0" style={{ flex: '1 1 55%' }}>
+                              <i className="bi bi-calendar3 fs-4 text-secondary flex-shrink-0"></i>
+                              <div className="min-w-0">
+                                <div className="text-muted" style={{ fontSize: '0.72rem', lineHeight: 1.1 }}>Lịch học</div>
+                                <div className="fw-bold text-dark text-truncate" style={{ fontSize: '0.825rem' }} title={cleanSchedule}>
+                                  {cleanSchedule}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="d-flex align-items-center gap-2 flex-shrink-0" style={{ flex: '1 1 45%', justifyContent: 'flex-end' }}>
+                              <i className="bi bi-people fs-4 text-secondary flex-shrink-0"></i>
+                              <div>
+                                <div className="text-muted" style={{ fontSize: '0.72rem', lineHeight: 1.1 }}>Sĩ số</div>
+                                <div className="fw-bold text-dark" style={{ fontSize: '0.825rem', fontVariantNumeric: 'tabular-nums' }}>
+                                  {c.studentCount}/{isGroup ? (c.maxStudents || 5) : 1} học viên
+                                </div>
                               </div>
                             </div>
                           </div>
 
-                          <div className="d-flex align-items-center gap-2 flex-shrink-0" style={{ flex: '1 1 45%', justifyContent: 'flex-end' }}>
-                            <i className="bi bi-people fs-4 text-secondary flex-shrink-0"></i>
-                            <div>
-                              <div className="text-muted" style={{ fontSize: '0.72rem', lineHeight: 1.1 }}>Sĩ số</div>
-                              <div className="fw-bold text-dark" style={{ fontSize: '0.825rem' }}>
-                                {c.studentCount}/{isGroup ? (c.maxStudents || 5) : 1} học viên
-                              </div>
+                          {hasLifecycleDates && (
+                            <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 mt-2 pt-2 border-top small text-secondary" style={{ fontSize: '0.76rem', fontVariantNumeric: 'tabular-nums' }}>
+                              <span>
+                                <i className="bi bi-calendar-range me-1 text-danger"></i>
+                                {formatShortDate(c.startDate)} → {formatShortDate(c.endDate)}
+                              </span>
+                              {isGroup && c.registrationDeadline && (
+                                <span className="text-dark fw-medium">
+                                  Hạn ĐK: {formatShortDate(c.registrationDeadline)}
+                                </span>
+                              )}
                             </div>
-                          </div>
+                          )}
                         </div>
 
                         {/* Tiến độ giảng dạy */}

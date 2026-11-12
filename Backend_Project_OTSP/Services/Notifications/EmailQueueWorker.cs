@@ -58,7 +58,16 @@ public sealed class EmailQueueWorker : BackgroundService
                 var emailSender = scope.ServiceProvider.GetService<IEmailSenderService>();
                 if (emailSender == null) continue;
 
-                await emailSender.SendNotificationEmailAsync(item.ToEmail, item.Subject, item.BodyHtml, stoppingToken);
+                var sent = await emailSender.SendNotificationEmailAsync(item.ToEmail, item.Subject, item.BodyHtml, stoppingToken);
+                if (!sent)
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(2), stoppingToken);
+                    var retried = await emailSender.SendNotificationEmailAsync(item.ToEmail, item.Subject, item.BodyHtml, stoppingToken);
+                    if (!retried)
+                    {
+                        _logger.LogWarning("Không thể gửi email tới {ToEmail} sau khi thử lại - Tiêu đề: {Subject}", item.ToEmail, item.Subject);
+                    }
+                }
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {

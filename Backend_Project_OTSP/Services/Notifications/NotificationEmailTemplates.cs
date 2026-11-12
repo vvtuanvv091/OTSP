@@ -192,4 +192,39 @@ public static class NotificationEmailTemplates
         var content = $"<p>Xin chào <strong>{Enc(receiverName)}</strong>,</p><p><strong>{Enc(senderName)}</strong> vừa nhắn cho bạn:</p><p style='background:#f8fafc;border-left:3px solid #dc2626;padding:8px 12px;font-style:italic'>\"{Enc(contentSnippet)}\"</p>";
         return (subject, Wrap("Tin nhắn mới trên OTSP", content, "Mở trò chuyện", actionUrl, "Hệ thống chỉ gửi tối đa 1 email mỗi 30 phút cho mỗi cuộc trò chuyện."));
     }
+
+    public static (string Subject, string Body) ForClassroomScheduleUpdated(
+        string studentName,
+        string tutorName,
+        string className,
+        string scheduleSummary,
+        string actionUrl)
+    {
+        var subject = $"[OTSP] Cập nhật lịch học lớp {className}";
+        var content = $"<p>Xin chào <strong>{Enc(studentName)}</strong>,</p><p>Gia sư <strong>{Enc(tutorName)}</strong> vừa cập nhật lịch học định kỳ cho lớp <strong>{Enc(className)}</strong>.</p><p><strong>Lịch học mới:</strong> {Enc(scheduleSummary)}</p><p>Các buổi học chưa diễn ra trong tương lai đã được sắp xếp lại theo lịch mới. Vui lòng kiểm tra Thời khóa biểu để cập nhật.</p>";
+        return (subject, Wrap("Cập nhật lịch học lớp học", content, "Xem thời khóa biểu", actionUrl));
+    }
+
+    public static (string Subject, string Body) ForClassroomCancelledByAdmin(
+        string recipientName,
+        string className,
+        string reason,
+        string actionUrl)
+    {
+        var subject = $"[OTSP] Thông báo đóng lớp {className}";
+        var content = $"<p>Xin chào <strong>{Enc(recipientName)}</strong>,</p><p>Lớp học <strong>{Enc(className)}</strong> đã được quản trị viên đóng trên hệ thống OTSP.</p><p><strong>Lý do:</strong> {Enc(reason)}</p>";
+        return (subject, Wrap("Lớp học đã được đóng", content, "Xem danh sách lớp", actionUrl));
+    }
+
+    public static (string Subject, string Body) ForSessionCancelledByAdmin(
+        string recipientName,
+        string className,
+        string timeStr,
+        string reason,
+        string actionUrl)
+    {
+        var subject = $"[OTSP] Thông báo hủy buổi học lớp {className}";
+        var content = $"<p>Xin chào <strong>{Enc(recipientName)}</strong>,</p><p>Buổi học lớp <strong>{Enc(className)}</strong> dự kiến lúc <strong>{Enc(timeStr)}</strong> đã được quản trị viên hủy.</p><p><strong>Lý do:</strong> {Enc(reason)}</p>";
+        return (subject, Wrap("Buổi học đã được hủy", content, "Xem lịch học", actionUrl));
+    }
 }

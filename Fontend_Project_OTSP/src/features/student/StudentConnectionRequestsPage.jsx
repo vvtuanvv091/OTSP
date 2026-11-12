@@ -24,6 +24,7 @@ export default function StudentConnectionRequestsPage() {
   const [statusFilter, setStatusFilter] = useState(''); // '' (All), 'Pending', 'Accepted', 'Rejected'
   const [realtimeNotice, setRealtimeNotice] = useState('');
   const [actionMsg, setActionMsg] = useState({ type: '', text: '' });
+  const [reloadTick, setReloadTick] = useState(0);
 
   useEffect(() => {
     let active = true;
@@ -52,7 +53,7 @@ export default function StudentConnectionRequestsPage() {
     return () => {
       active = false;
     };
-  }, [statusFilter]);
+  }, [statusFilter, reloadTick]);
 
   // Lắng nghe sự kiện cập nhật thời gian thực qua SignalR
   useEffect(() => {
@@ -85,6 +86,13 @@ export default function StudentConnectionRequestsPage() {
             ? 'Đã từ chối'
             : update.status;
         setRealtimeNotice(`Gia sư vừa cập nhật phản hồi yêu cầu #${update.requestId}: ${statusLabel}`);
+        setReloadTick((n) => n + 1);
+      });
+
+      hubConnection.on('TrialScheduleConfirmed', (update) => {
+        if (!active || !update) return;
+        setRealtimeNotice('Gia sư vừa xếp lịch học cho lớp của bạn. Danh sách đã được cập nhật.');
+        setReloadTick((n) => n + 1);
       });
 
       hubConnection

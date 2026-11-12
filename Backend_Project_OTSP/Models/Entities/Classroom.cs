@@ -20,6 +20,9 @@ namespace Backend_Project_OTSP.Models
         [MaxLength(1000)]
         public string? Description { get; set; }  
         public DateOnly? StartDate { get; set; }
+        public DateOnly? RegistrationDeadline { get; set; }
+        public DateOnly? EndDate { get; set; }
+        public int? TotalSessions { get; set; }
         // Trạng thái: Active, Completed, Cancelled
         public ClassroomStatus Status { get; set; } = ClassroomStatus.Active;
         // Loại lớp học: OneToOne (1-1) hoặc Group (nhóm)

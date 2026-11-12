@@ -287,9 +287,9 @@ export default function StudentClassroomsPage() {
           const classId = cls.classroomId || cls.id;
           const expanded = isExpanded(classId);
           const sessions = cls.sessions || [];
-          const totalSessions = cls.totalSessionsCount || sessions.length;
+          const totalSessions = cls.expectedTotalSessions || cls.totalSessionsCount || sessions.length;
           const doneCount = sessions.filter(
-            (s) => s.status === 'Done' || s.status === 1 || s.isCompleted
+            (s) => s.status === 'Done' || s.status === 1
           ).length;
           const hasLive = sessions.some(
             (s) => (s.status === 'InProgress' || s.status === 3) && s.canJoin
@@ -324,6 +324,25 @@ export default function StudentClassroomsPage() {
                       <span><i className="bi bi-person-badge text-danger me-1"></i>Gia sư: <strong>{cls.tutorName}</strong></span>
                       <span>•</span>
                       <span><i className="bi bi-book text-primary me-1"></i>Môn: <strong>{cls.subjectName}</strong></span>
+                      {(cls.startDate || cls.endDate) && (
+                        <>
+                          <span>•</span>
+                          <span style={{ fontVariantNumeric: 'tabular-nums' }}>
+                            <i className="bi bi-calendar-range text-danger me-1"></i>
+                            {cls.startDate ? String(cls.startDate).slice(0, 10).split('-').reverse().join('/') : '—'}
+                            {' → '}
+                            {cls.endDate ? String(cls.endDate).slice(0, 10).split('-').reverse().join('/') : '—'}
+                          </span>
+                        </>
+                      )}
+                      {cls.registrationDeadline && (cls.type === 1 || cls.type === 'Group') && (
+                        <>
+                          <span>•</span>
+                          <span style={{ fontVariantNumeric: 'tabular-nums' }}>
+                            Hạn ĐK: <strong>{String(cls.registrationDeadline).slice(0, 10).split('-').reverse().join('/')}</strong>
+                          </span>
+                        </>
+                      )}
                     </div>
                   </div>
 
@@ -464,7 +483,7 @@ export default function StudentClassroomsPage() {
                       const timeDisplay = formatSessionTime(s.scheduledAtVn || s.scheduledAt);
                       const isCancelled = s.status === 'Cancelled' || s.status === 2;
                       const isLive = s.status === 'InProgress' || s.status === 3;
-                      const isDone = !isCancelled && (s.status === 'Done' || s.status === 1 || s.isCompleted);
+                      const isDone = !isCancelled && (s.status === 'Done' || s.status === 1);
 
                       return (
                         <div

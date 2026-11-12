@@ -90,7 +90,11 @@ public class StudentClassroomApiController : ControllerBase
                     cs.Classroom.Status,
                     cs.Classroom.Fee,
                     cs.Classroom.SessionsPerWeek,
-                    cs.Classroom.HoursPerSession
+                    cs.Classroom.HoursPerSession,
+                    cs.Classroom.StartDate,
+                    cs.Classroom.RegistrationDeadline,
+                    cs.Classroom.EndDate,
+                    cs.Classroom.TotalSessions
                 },
                 SubjectName = cs.Classroom.Subject.Name,
                 GradeLevelName = cs.Classroom.GradeLevel.Name,
@@ -106,6 +110,8 @@ public class StudentClassroomApiController : ControllerBase
                         s.ScheduledAt,
                         s.Status,
                         s.VideoRoom,
+                        s.DurationHours,
+                        s.IsMakeup,
                         Review = s.Reviews.Where(r => r.StudentId == studentId).Select(r => new { r.Score, r.Comment }).FirstOrDefault()
                     })
                     .ToList()
@@ -141,8 +147,7 @@ public class StudentClassroomApiController : ControllerBase
         var items = new List<StudentClassroomItemDto>();
         foreach (var e in enrollments)
         {
-            var rawHours = e.Classroom.HoursPerSession;
-            var safeHours = rawHours >= 10.0 ? rawHours / 10.0 : (rawHours > 0 ? rawHours : 2.0);
+            var safeHours = Backend_Project_OTSP.Services.Common.ClassroomLifecycleHelper.NormalizeHoursPerSession(e.Classroom.HoursPerSession);
 
             var summary = e.WeeklySchedules.Count > 0
                 ? string.Join(", ", e.WeeklySchedules.Select(ws => $"{dayShortNames[ws.DayOfWeek]} ({ws.StartTime:HH:mm}-{ws.EndTime:HH:mm})"))
@@ -150,24 +155,32 @@ public class StudentClassroomApiController : ControllerBase
 
             var hasPaid = paidClassroomIds.Contains(e.ClassroomId);
             pendingPaymentsByClassroom.TryGetValue(e.ClassroomId, out var pendingPayment);
-            var nextSession = e.Sessions
-                .Where(s => s.Status == SessionStatus.Scheduled && s.ScheduledAt >= nowUtc)
+
+            var visibleSessions = e.Classroom.Type == ClassroomType.Group
+                ? e.Sessions.Where(s => s.ScheduledAt >= e.JoinedAt).ToList()
+                : e.Sessions;
+
+            var nextSession = visibleSessions
+                .Where(s => (s.Status == SessionStatus.Scheduled || s.Status == SessionStatus.InProgress) && s.ScheduledAt >= nowUtc.AddHours(-2))
                 .OrderBy(s => s.ScheduledAt)
                 .FirstOrDefault();
 
             var sessionDtos = new List<StudentClassroomSessionDto>();
             int sessionIndex = 1;
-            foreach (var s in e.Sessions)
+            int doneCount = 0;
+            foreach (var s in visibleSessions)
             {
-                var sVn = s.ScheduledAt.AddHours(VietnamUtcOffsetHours);
-                var endVn = sVn.AddHours(safeHours);
-                var isCompleted = s.Status == SessionStatus.Done ||
-                                  (s.Status != SessionStatus.Cancelled && nowVn > endVn);
-                // Học viên CHỈ CÓ THỂ vào lớp khi Gia sư đã vào lớp / mở lớp (Status == InProgress) và đang trong khung giờ học
-                var isActuallyLive = s.Status == SessionStatus.InProgress && nowVn >= sVn.AddMinutes(-60) && nowVn <= endVn.AddHours(2);
-                var canJoin = s.Status != SessionStatus.Cancelled && !isCompleted && isActuallyLive;
+                var dur = Backend_Project_OTSP.Services.Common.ClassroomLifecycleHelper.NormalizeHoursPerSession(
+                    s.DurationHours.HasValue && s.DurationHours.Value > 0 ? s.DurationHours.Value : safeHours);
+                var sVn = Backend_Project_OTSP.Services.Common.ClassroomLifecycleHelper.ToVietnamTime(s.ScheduledAt);
+                var endVn = sVn.AddHours(dur);
+                var isCompleted = s.Status == SessionStatus.Done;
+                if (isCompleted) doneCount++;
 
-                // Nếu buổi học còn cách xa giờ học mà bị InProgress do gia sư test sớm, học viên vẫn xem là Scheduled
+                var isLive = s.Status == SessionStatus.InProgress
+                    && Backend_Project_OTSP.Services.Common.ClassroomLifecycleHelper.IsWithinJoinWindow(s.ScheduledAt, s.Status, dur, nowUtc);
+                var canJoin = s.Status != SessionStatus.Cancelled && !isCompleted && isLive;
+
                 var effectiveStatus = (s.Status == SessionStatus.InProgress && nowVn < sVn.AddMinutes(-60))
                     ? SessionStatus.Scheduled
                     : s.Status;
@@ -176,17 +189,28 @@ public class StudentClassroomApiController : ControllerBase
                 {
                     SessionId = s.Id,
                     Index = sessionIndex++,
-                    ScheduledAtUtc = s.ScheduledAt,
+                    ScheduledAtUtc = DateTime.SpecifyKind(s.ScheduledAt, DateTimeKind.Utc),
                     ScheduledAtVn = sVn,
                     Status = effectiveStatus,
                     VideoRoom = s.VideoRoom,
+                    DurationHours = dur,
+                    TimeRangeLabel = $"{sVn:HH:mm} - {endVn:HH:mm}",
+                    IsMakeup = s.IsMakeup || (s.VideoRoom != null && s.VideoRoom.Contains("MAKEUP")),
                     CanJoin = canJoin,
+                    IsFuture = s.ScheduledAt > nowUtc,
                     HasReviewed = s.Review != null,
                     ReviewScore = s.Review?.Score,
                     ReviewComment = s.Review?.Comment,
                     IsCompleted = isCompleted
                 });
             }
+
+            var expectedTotal = Backend_Project_OTSP.Services.Common.ClassroomLifecycleHelper.CalculateExpectedTotalSessions(
+                e.Classroom.StartDate,
+                e.Classroom.EndDate,
+                e.Classroom.TotalSessions,
+                e.Classroom.SessionsPerWeek,
+                e.WeeklySchedules);
 
             items.Add(new StudentClassroomItemDto
             {
@@ -204,9 +228,14 @@ public class StudentClassroomApiController : ControllerBase
                 HoursPerSession = safeHours,
                 WeeklyScheduleSummary = summary,
                 JoinedAt = e.JoinedAt,
-                TotalSessionsCount = e.Sessions.Count,
+                StartDate = e.Classroom.StartDate,
+                RegistrationDeadline = e.Classroom.RegistrationDeadline,
+                EndDate = e.Classroom.EndDate,
+                TotalSessionsCount = visibleSessions.Count(s => s.Status != SessionStatus.Cancelled),
+                ExpectedTotalSessions = Math.Max(expectedTotal, visibleSessions.Count(s => s.Status != SessionStatus.Cancelled)),
+                CompletedSessionsCount = doneCount,
                 NextSessionId = nextSession?.Id,
-                NextSessionScheduledAtVn = nextSession?.ScheduledAt.AddHours(VietnamUtcOffsetHours),
+                NextSessionScheduledAtVn = nextSession != null ? Backend_Project_OTSP.Services.Common.ClassroomLifecycleHelper.ToVietnamTime(nextSession.ScheduledAt) : null,
                 HasPaid = hasPaid,
                 PendingPaymentId = pendingPayment?.Id,
                 Sessions = sessionDtos
@@ -244,19 +273,25 @@ public class StudentClassroomApiController : ControllerBase
             .Include(s => s.Classroom).ThenInclude(c => c.ClassroomStudents)
             .FirstOrDefaultAsync(s => s.Id == sessionId, cancellationToken);
 
-        if (session == null || !session.Classroom.ClassroomStudents.Any(cs => cs.StudentId == student.Id))
+        var enrollment = session?.Classroom.ClassroomStudents.FirstOrDefault(cs => cs.StudentId == student.Id);
+        if (session == null || enrollment == null)
         {
             return Forbid();
         }
 
-        if (session.Status == SessionStatus.Cancelled)
+        if (session.Classroom.Type == ClassroomType.Group && session.ScheduledAt < enrollment.JoinedAt)
         {
-            return BadRequest(new { message = "Buổi học này đã bị hủy, không thể gửi đánh giá." });
+            return BadRequest(new { message = "Bạn không thể đánh giá buổi học diễn ra trước thời điểm tham gia lớp." });
         }
 
-        if (session.Status == SessionStatus.Scheduled && session.ScheduledAt > DateTime.UtcNow)
+        if (session.Status != SessionStatus.Done)
         {
-            return BadRequest(new { message = "Buổi học chưa diễn ra, vui lòng gửi đánh giá sau khi hoàn thành buổi học." });
+            return BadRequest(new
+            {
+                message = session.Status == SessionStatus.Cancelled
+                    ? "Buổi học này đã bị hủy, không thể gửi đánh giá."
+                    : "Chỉ có thể gửi đánh giá sau khi buổi học đã hoàn thành."
+            });
         }
 
         var existing = await _db.Reviews

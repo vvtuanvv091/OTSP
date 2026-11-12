@@ -3,6 +3,7 @@ using Backend_Project_OTSP.Data;
 using Backend_Project_OTSP.Dtos;
 using static Backend_Project_OTSP.Models.Enums;
 using Backend_Project_OTSP.Dtos.Tutor;
+using Backend_Project_OTSP.Services.Common;
 
 namespace Backend_Project_OTSP.Services.Tutor;
 
@@ -43,9 +44,19 @@ public sealed class OpenGroupClassroomService : IOpenGroupClassroomService
                 GradeLevelName = classroom.GradeLevel.Name,
                 classroom.SessionsPerWeek,
                 classroom.HoursPerSession,
+                classroom.StartDate,
+                classroom.RegistrationDeadline,
+                classroom.EndDate,
+                classroom.TotalSessions,
                 WeeklySchedules = classroom.WeeklySchedules
                     .OrderBy(w => w.SessionIndex)
-                    .Select(w => new { w.SessionIndex, w.DayOfWeek, w.StartTime, w.EndTime })
+                    .Select(w => new Models.ClassroomWeeklySchedule
+                    {
+                        SessionIndex = w.SessionIndex,
+                        DayOfWeek = w.DayOfWeek,
+                        StartTime = w.StartTime,
+                        EndTime = w.EndTime
+                    }).ToList()
             })
             .ToListAsync(cancellationToken);
 
@@ -55,7 +66,10 @@ public sealed class OpenGroupClassroomService : IOpenGroupClassroomService
                 $"Buổi {w.SessionIndex}: {ToVnDay(w.DayOfWeek)} ({w.StartTime:HH\\:mm} – {w.EndTime:HH\\:mm})"
             ).ToList();
 
-            var safeHours = classroom.HoursPerSession >= 10.0 ? classroom.HoursPerSession / 10.0 : (classroom.HoursPerSession > 0 ? classroom.HoursPerSession : 2.0);
+            var safeHours = ClassroomLifecycleHelper.NormalizeHoursPerSession(classroom.HoursPerSession);
+            var expectedTotal = ClassroomLifecycleHelper.CalculateExpectedTotalSessions(
+                classroom.StartDate, classroom.EndDate, classroom.TotalSessions, classroom.SessionsPerWeek, classroom.WeeklySchedules);
+
             var summary = scheduleItems.Count > 0
                 ? $"{classroom.SessionsPerWeek} buổi/tuần ({string.Join(", ", classroom.WeeklySchedules.Select(w => $"{ToShortVnDay(w.DayOfWeek)} {w.StartTime:HH\\:mm}"))} · {safeHours:0.#}h/buổi)"
                 : $"{classroom.SessionsPerWeek} buổi/tuần ({safeHours:0.#}h/buổi)";
@@ -76,6 +90,10 @@ public sealed class OpenGroupClassroomService : IOpenGroupClassroomService
                 GradeLevelName = classroom.GradeLevelName,
                 SessionsPerWeek = classroom.SessionsPerWeek,
                 HoursPerSession = safeHours,
+                StartDate = classroom.StartDate,
+                RegistrationDeadline = classroom.RegistrationDeadline,
+                EndDate = classroom.EndDate,
+                TotalSessions = expectedTotal,
                 ScheduleSummary = summary,
                 WeeklyScheduleItems = scheduleItems
             };
@@ -122,13 +140,21 @@ public sealed class OpenGroupClassroomService : IOpenGroupClassroomService
 
     private IQueryable<Backend_Project_OTSP.Models.Classroom> OpenClassroomQuery(int tutorId)
     {
-        var todayVn = DateOnly.FromDateTime(DateTime.UtcNow.AddHours(7));
+        var nowUtc = DateTime.UtcNow;
+        var todayVn = ClassroomLifecycleHelper.GetVietnamToday(nowUtc);
         return _db.Classrooms
             .AsNoTracking()
             .Where(classroom => classroom.TutorId == tutorId
                 && classroom.Type == ClassroomType.Group
                 && classroom.Status == ClassroomStatus.Active
                 && classroom.ClassroomStudents.Count < classroom.MaxStudents
-                && (!classroom.StartDate.HasValue || classroom.StartDate.Value > todayVn));
+                && (!classroom.RegistrationDeadline.HasValue || classroom.RegistrationDeadline.Value >= todayVn)
+                && (!classroom.StartDate.HasValue
+                    || classroom.StartDate.Value > todayVn
+                    || (classroom.RegistrationDeadline.HasValue && classroom.RegistrationDeadline.Value == classroom.StartDate.Value && classroom.StartDate.Value >= todayVn))
+                && !classroom.ClassSessions.Any(s =>
+                    s.Status == SessionStatus.Done
+                    || s.Status == SessionStatus.InProgress
+                    || (s.Status == SessionStatus.Scheduled && s.ScheduledAt <= nowUtc)));
     }
 }

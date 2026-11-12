@@ -133,42 +133,75 @@ public class ConnectionRequestService : IConnectionRequestService
             }
         }
 
-        var todayVn = DateOnly.FromDateTime(DateTime.UtcNow.AddHours(7));
-        var groupClassrooms = await _db.Classrooms.AsNoTracking()
+        var todayVn = ClassroomLifecycleHelper.GetVietnamToday();
+        var rawGroupClassrooms = await _db.Classrooms.AsNoTracking()
             .Where(c => c.TutorId == tutorId
                      && c.Type == ClassroomType.Group
                      && c.Status == ClassroomStatus.Active)
             .OrderBy(c => c.NameClass)
-            .Select(c => new GroupBookingEligibilityDto
+            .Select(c => new
+            {
+                Classroom = c,
+                SubjectName = c.Subject.Name,
+                GradeLevelName = c.GradeLevel.Name,
+                StudentCount = c.ClassroomStudents.Count,
+                IsEnrolled = c.ClassroomStudents.Any(cs => cs.StudentId == student.Id),
+                HasPendingRequest = c.ConnectionRequests.Any(cr =>
+                    cr.StudentId == student.Id && cr.Status == RequestStatus.Pending),
+                HasStartedOrCompletedSession = c.ClassSessions.Any(s =>
+                    s.Status == SessionStatus.Done || s.Status == SessionStatus.InProgress),
+                WeeklySchedules = c.WeeklySchedules.OrderBy(w => w.SessionIndex).ToList()
+            })
+            .ToListAsync(cancellationToken);
+
+        var groupClassrooms = rawGroupClassrooms.Select(item =>
+        {
+            var c = item.Classroom;
+            var isOpen = ClassroomLifecycleHelper.IsGroupEnrollmentOpen(c, todayVn, item.HasStartedOrCompletedSession);
+            var canJoin = !item.IsEnrolled
+                          && !item.HasPendingRequest
+                          && item.StudentCount < c.MaxStudents
+                          && isOpen;
+
+            string? reason = item.IsEnrolled
+                ? "Bạn đã tham gia lớp này."
+                : item.HasPendingRequest
+                    ? "Yêu cầu tham gia lớp này đang chờ gia sư xác nhận."
+                    : item.StudentCount >= c.MaxStudents
+                        ? "Lớp đã hết chỗ."
+                        : item.HasStartedOrCompletedSession
+                            ? "Lớp học đã bắt đầu học và đóng nhận học viên mới."
+                            : c.RegistrationDeadline.HasValue && todayVn > c.RegistrationDeadline.Value
+                                ? $"Lớp đã hết hạn đăng ký vào ngày {c.RegistrationDeadline.Value:dd/MM/yyyy}."
+                                : !isOpen
+                                    ? "Lớp học đã khai giảng và đóng tuyển sinh đợt này."
+                                    : null;
+
+            var expectedTotal = ClassroomLifecycleHelper.CalculateExpectedTotalSessions(
+                c.StartDate, c.EndDate, c.TotalSessions, c.SessionsPerWeek, item.WeeklySchedules);
+
+            return new GroupBookingEligibilityDto
             {
                 ClassroomId = c.Id,
                 SubjectId = c.SubjectId,
                 GradeLevelId = c.GradeLevelId,
                 ClassroomName = c.NameClass,
-                SubjectName = c.Subject.Name,
-                GradeLevelName = c.GradeLevel.Name,
+                SubjectName = item.SubjectName,
+                GradeLevelName = item.GradeLevelName,
                 Fee = c.Fee,
-                StudentCount = c.ClassroomStudents.Count,
+                StudentCount = item.StudentCount,
                 MaxStudents = c.MaxStudents,
-                AvailableSeats = c.MaxStudents - c.ClassroomStudents.Count,
-                IsEnrolled = c.ClassroomStudents.Any(cs => cs.StudentId == student.Id),
-                HasPendingRequest = c.ConnectionRequests.Any(cr =>
-                    cr.StudentId == student.Id && cr.Status == RequestStatus.Pending),
-                CanJoin = !c.ClassroomStudents.Any(cs => cs.StudentId == student.Id)
-                    && !c.ConnectionRequests.Any(cr => cr.StudentId == student.Id && cr.Status == RequestStatus.Pending)
-                    && c.ClassroomStudents.Count < c.MaxStudents
-                    && (!c.StartDate.HasValue || c.StartDate.Value > todayVn),
-                Reason = c.ClassroomStudents.Any(cs => cs.StudentId == student.Id)
-                    ? "Bạn đã tham gia lớp này."
-                    : c.ConnectionRequests.Any(cr => cr.StudentId == student.Id && cr.Status == RequestStatus.Pending)
-                        ? "Yêu cầu tham gia lớp này đang chờ gia sư xác nhận."
-                        : c.ClassroomStudents.Count >= c.MaxStudents
-                            ? "Lớp đã hết chỗ."
-                            : (c.StartDate.HasValue && c.StartDate.Value <= todayVn)
-                                ? "Lớp học đã khai giảng và đóng tuyển sinh đợt này."
-                                : null
-            })
-            .ToListAsync(cancellationToken);
+                AvailableSeats = Math.Max(0, c.MaxStudents - item.StudentCount),
+                IsEnrolled = item.IsEnrolled,
+                HasPendingRequest = item.HasPendingRequest,
+                CanJoin = canJoin,
+                Reason = reason,
+                StartDate = c.StartDate,
+                RegistrationDeadline = c.RegistrationDeadline,
+                EndDate = c.EndDate,
+                TotalSessions = expectedTotal
+            };
+        }).ToList();
 
         return new BookingEligibilityVm
         {
@@ -204,6 +237,11 @@ public class ConnectionRequestService : IConnectionRequestService
             return new ConnectionRequestOperationResult { Success = false, Message = "Gia sư không tồn tại hoặc tài khoản hiện bị khóa." };
 
         // Xử lý theo loại lớp (Nhóm hay 1-1)
+        var todayVnDate = ClassroomLifecycleHelper.GetVietnamToday();
+        var durationWeeks = 4;
+        DateOnly? requestedStartDate = dto.StartDate;
+        DateOnly? requestedEndDate = dto.EndDate;
+
         if (dto.PreferredType == ClassroomType.Group)
         {
             if (!dto.ClassroomId.HasValue || dto.ClassroomId.Value <= 0)
@@ -211,6 +249,8 @@ public class ConnectionRequestService : IConnectionRequestService
 
             var groupClassroom = await _db.Classrooms
                 .AsNoTracking()
+                .Include(c => c.WeeklySchedules)
+                .Include(c => c.ClassSessions)
                 .FirstOrDefaultAsync(c => c.Id == dto.ClassroomId.Value && c.TutorId == tutor.Id, cancellationToken);
 
             if (groupClassroom == null)
@@ -218,15 +258,16 @@ public class ConnectionRequestService : IConnectionRequestService
                 return new ConnectionRequestOperationResult { Success = false, Message = "Lớp nhóm đã chọn không tồn tại hoặc không thuộc gia sư này." };
             }
 
-            // [Phương án 1]: Nếu lớp nhóm đã qua ngày khai giảng (StartDate <= Today), đóng tuyển sinh
-            var todayVnDate = DateOnly.FromDateTime(DateTime.UtcNow.AddHours(7));
-            if (groupClassroom.StartDate.HasValue && groupClassroom.StartDate.Value <= todayVnDate)
+            var hasStartedSession = groupClassroom.ClassSessions.Any(s =>
+                s.Status == SessionStatus.Done || s.Status == SessionStatus.InProgress);
+            if (!ClassroomLifecycleHelper.IsGroupEnrollmentOpen(groupClassroom, todayVnDate, hasStartedSession))
             {
-                return new ConnectionRequestOperationResult
-                {
-                    Success = false,
-                    Message = $"Lớp học nhóm này đã bắt đầu từ ngày {groupClassroom.StartDate.Value:dd/MM/yyyy} và đã đóng tuyển sinh đợt hiện tại. Vui lòng liên hệ gia sư để đăng ký đợt kế tiếp."
-                };
+                var closedMsg = groupClassroom.RegistrationDeadline.HasValue && todayVnDate > groupClassroom.RegistrationDeadline.Value
+                    ? $"Lớp học nhóm này đã hết hạn đăng ký vào ngày {groupClassroom.RegistrationDeadline.Value:dd/MM/yyyy}."
+                    : hasStartedSession
+                        ? "Lớp học nhóm này đã bắt đầu học nên đã đóng nhận học viên mới."
+                        : "Lớp học nhóm này đã qua ngày khai giảng và đóng tuyển sinh đợt hiện tại.";
+                return new ConnectionRequestOperationResult { Success = false, Message = closedMsg };
             }
 
             // Kiểm tra xem học viên đã là thành viên đang học trong lớp nhóm này chưa
@@ -272,10 +313,66 @@ public class ConnectionRequestService : IConnectionRequestService
 
             if (!isOpen)
                 return new ConnectionRequestOperationResult { Success = false, Message = "Lớp nhóm đã chọn không còn nhận học viên, đã đủ sĩ số hoặc không khớp môn học." };
+
+            if (groupClassroom.WeeklySchedules.Any())
+            {
+                var groupSlots = groupClassroom.WeeklySchedules
+                    .Select(w => new ScheduleConflictHelper.ScheduleSlotCandidate(w.DayOfWeek, w.StartTime, w.EndTime))
+                    .ToList();
+                var studentConflict = await ScheduleConflictHelper.FindStudentScheduleConflictAsync(
+                    _db,
+                    groupClassroom.Id,
+                    groupClassroom.StartDate ?? todayVnDate,
+                    groupClassroom.EndDate,
+                    groupSlots,
+                    new[] { student.Id },
+                    Array.Empty<(DateTime, double)>(),
+                    cancellationToken);
+                if (studentConflict != null)
+                    return new ConnectionRequestOperationResult { Success = false, Message = studentConflict };
+            }
         }
         else if (dto.PreferredType != ClassroomType.OneToOne)
         {
             return new ConnectionRequestOperationResult { Success = false, Message = "Hình thức học không hợp lệ." };
+        }
+        else if (!dto.IsTrial)
+        {
+            if (requestedStartDate.HasValue && requestedStartDate.Value < todayVnDate)
+            {
+                return new ConnectionRequestOperationResult
+                {
+                    Success = false,
+                    Message = "Ngày bắt đầu dự kiến không được nằm trong quá khứ."
+                };
+            }
+
+            if (requestedStartDate.HasValue && requestedEndDate.HasValue)
+            {
+                if (requestedEndDate.Value < requestedStartDate.Value)
+                {
+                    return new ConnectionRequestOperationResult
+                    {
+                        Success = false,
+                        Message = "Ngày kết thúc không được trước ngày bắt đầu."
+                    };
+                }
+
+                durationWeeks = Math.Clamp(
+                    (int)Math.Ceiling((requestedEndDate.Value.DayNumber - requestedStartDate.Value.DayNumber + 1) / 7.0),
+                    1,
+                    52);
+            }
+            else
+            {
+                durationWeeks = dto.DurationWeeks.HasValue
+                    ? Math.Clamp(dto.DurationWeeks.Value, 1, 52)
+                    : 4;
+                if (requestedStartDate.HasValue && !requestedEndDate.HasValue)
+                {
+                    requestedEndDate = requestedStartDate.Value.AddDays(durationWeeks * 7 - 1);
+                }
+            }
         }
 
         // Kiểm tra môn học và cấp học có khớp với gia sư dạy không
@@ -386,36 +483,24 @@ public class ConnectionRequestService : IConnectionRequestService
                         Message = "Một hoặc nhiều khung giờ đã chọn không còn rảnh hoặc trùng lịch học của bạn. Vui lòng tải lại lịch và chọn khung giờ khác."
                     };
                 }
-            }
-
-            // Kiểm tra tránh trùng lịch với các lớp học chính thức đang có của gia sư
-            if (selectedSlots.Count > 0)
-            {
-                var activeClassroomWeeklySchedules = await _db.ClassroomWeeklySchedules
-                    .AsNoTracking()
-                    .Where(w => w.Classroom.TutorId == tutor.Id
-                             && w.Classroom.Status == ClassroomStatus.Active)
-                    .ToListAsync(cancellationToken);
 
                 foreach (var slotUtc in selectedSlots)
                 {
-                    var slotVn = slotUtc.AddHours(VietnamUtcOffsetHours);
-                    var slotDay = slotVn.DayOfWeek;
-                    var slotStartTime = TimeOnly.FromTimeSpan(slotVn.TimeOfDay);
-                    var slotEndTime = slotStartTime.AddHours(2);
-
-                    var conflictSchedule = activeClassroomWeeklySchedules.FirstOrDefault(w =>
-                        w.DayOfWeek == slotDay
-                        && slotStartTime < w.EndTime
-                        && w.StartTime < slotEndTime);
-
-                    if (conflictSchedule != null)
+                    var conflict = await ScheduleConflictHelper.FindSingleSessionConflictAsync(
+                        _db,
+                        tutor.Id,
+                        null,
+                        null,
+                        slotUtc,
+                        2.0,
+                        new[] { student.Id },
+                        cancellationToken);
+                    if (conflict != null)
                     {
-                        var dayVn = ToVnDay(slotDay);
                         return new ConnectionRequestOperationResult
                         {
                             Success = false,
-                            Message = $"Khung giờ {dayVn} {slotStartTime:HH\\:mm} – {slotEndTime:HH\\:mm} đã có lịch học lớp chính thức. Vui lòng chọn khung giờ khác."
+                            Message = conflict
                         };
                     }
                 }
@@ -430,7 +515,7 @@ public class ConnectionRequestService : IConnectionRequestService
             ? "[Mục đích: Tham gia lớp nhóm]"
             : isTrialRequest
                 ? "[Mục đích: Đăng ký học thử 1 buổi]"
-                : "[Mục đích: Vào học chính thức luôn]";
+                : $"[Mục đích: Vào học chính thức luôn | Thời lượng: {durationWeeks} tuần]";
 
         if (dto.PreferredType == ClassroomType.OneToOne && selectedSlots.Count > 0)
         {
@@ -458,6 +543,10 @@ public class ConnectionRequestService : IConnectionRequestService
             SubjectId = dto.SubjectId,
             GradeLevelId = dto.GradeLevelId,
             PreferredType = dto.PreferredType,
+            IsTrial = isTrialRequest,
+            DurationWeeks = isTrialRequest ? 1 : durationWeeks,
+            RequestedStartDate = isTrialRequest ? null : requestedStartDate,
+            RequestedEndDate = isTrialRequest ? null : requestedEndDate,
             ClassroomId = dto.PreferredType == ClassroomType.Group ? dto.ClassroomId : null,
             ProposedTrialSlotUtc = dto.PreferredType == ClassroomType.OneToOne ? selectedSlots.FirstOrDefault() : null,
             Message = finalMessage,
@@ -548,11 +637,24 @@ public class ConnectionRequestService : IConnectionRequestService
         if (request.Status != RequestStatus.Pending)
             return new AcceptConnectionRequestResult { AlreadyHandled = true, Message = "Yêu cầu này đã được phản hồi trước đó." };
 
+        var isRelational = _db.Database.IsRelational();
         var strategy = _db.Database.CreateExecutionStrategy();
         return await strategy.ExecuteAsync(async () =>
         {
-            using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
+            await using var transaction = isRelational
+                ? await _db.Database.BeginTransactionAsync(cancellationToken)
+                : null;
 
+            async Task<AcceptConnectionRequestResult> RollbackAndReturnAsync(AcceptConnectionRequestResult result)
+            {
+                if (transaction != null)
+                {
+                    await transaction.RollbackAsync(cancellationToken);
+                }
+                return result;
+            }
+
+            var todayVn = ClassroomLifecycleHelper.GetVietnamToday();
             var studentUserId = request.Student?.UserId ?? request.Student?.User?.Id ?? "";
             var studentName = request.Student?.User?.FullName ?? "Học viên";
             var tutorName = request.Tutor?.User?.FullName ?? "Gia sư";
@@ -560,6 +662,7 @@ public class ConnectionRequestService : IConnectionRequestService
 
             int? finalClassroomId = null;
             int? finalSessionId = null;
+            ClassSession? createdTrialSession = null;
             bool isTrial = false;
             bool enrolled = false;
 
@@ -568,21 +671,26 @@ public class ConnectionRequestService : IConnectionRequestService
                 // 1. LỚP NHÓM
                 if (!request.ClassroomId.HasValue || request.Classroom == null)
                 {
-                    await transaction.RollbackAsync(cancellationToken);
-                    return new AcceptConnectionRequestResult { InvalidClassroom = true, Message = "Lớp nhóm không còn tồn tại hoặc thông tin không khớp." };
+                    return await RollbackAndReturnAsync(new AcceptConnectionRequestResult { InvalidClassroom = true, Message = "Lớp nhóm không còn tồn tại hoặc thông tin không khớp." });
                 }
 
                 var groupClass = request.Classroom;
                 if (groupClass.Status != ClassroomStatus.Active || groupClass.TutorId != request.TutorId)
                 {
-                    await transaction.RollbackAsync(cancellationToken);
-                    return new AcceptConnectionRequestResult { InvalidClassroom = true, Message = "Lớp nhóm hiện không hoạt động." };
+                    return await RollbackAndReturnAsync(new AcceptConnectionRequestResult { InvalidClassroom = true, Message = "Lớp nhóm hiện không hoạt động." });
                 }
 
-                // Khóa bi quan (Pessimistic Row Lock) trên lớp học để ngăn chặn race condition khi 2 yêu cầu duyệt cùng lúc
-                await _db.Database.ExecuteSqlRawAsync(
-                    "SELECT \"Id\" FROM \"Classrooms\" WHERE \"Id\" = {0} FOR UPDATE",
-                    new object[] { groupClass.Id },
+                if (isRelational)
+                {
+                    // Khóa bi quan (Pessimistic Row Lock) trên lớp học để ngăn chặn race condition khi 2 yêu cầu duyệt cùng lúc
+                    await _db.Database.ExecuteSqlRawAsync(
+                        "SELECT \"Id\" FROM \"Classrooms\" WHERE \"Id\" = {0} FOR UPDATE",
+                        new object[] { groupClass.Id },
+                        cancellationToken);
+                }
+
+                var hasStartedSession = await _db.ClassSessions.AnyAsync(
+                    s => s.ClassroomId == groupClass.Id && (s.Status == SessionStatus.Done || s.Status == SessionStatus.InProgress),
                     cancellationToken);
 
                 var currentCount = await _db.ClassroomStudents.CountAsync(cs => cs.ClassroomId == groupClass.Id, cancellationToken);
@@ -590,10 +698,19 @@ public class ConnectionRequestService : IConnectionRequestService
 
                 if (!alreadyInClass)
                 {
+                    if (!ClassroomLifecycleHelper.IsGroupEnrollmentOpen(groupClass, todayVn, hasStartedSession))
+                    {
+                        var closedReason = hasStartedSession
+                            ? "Lớp nhóm đã có buổi học diễn ra nên không thể nhận thêm học viên trễ tiến độ."
+                            : groupClass.RegistrationDeadline.HasValue && todayVn > groupClass.RegistrationDeadline.Value
+                                ? $"Lớp nhóm đã hết hạn đăng ký vào ngày {groupClass.RegistrationDeadline.Value:dd/MM/yyyy}."
+                                : "Lớp nhóm đã qua ngày khai giảng và đóng tuyển sinh.";
+                        return await RollbackAndReturnAsync(new AcceptConnectionRequestResult { InvalidClassroom = true, Message = closedReason });
+                    }
+
                     if (currentCount >= groupClass.MaxStudents)
                     {
-                        await transaction.RollbackAsync(cancellationToken);
-                        return new AcceptConnectionRequestResult { ClassroomFull = true, Message = "Lớp nhóm đã đủ sĩ số tối đa. Không thể nhận thêm học viên!" };
+                        return await RollbackAndReturnAsync(new AcceptConnectionRequestResult { ClassroomFull = true, Message = "Lớp nhóm đã đủ sĩ số tối đa. Không thể nhận thêm học viên!" });
                     }
 
                     _db.ClassroomStudents.Add(new ClassroomStudent
@@ -630,14 +747,14 @@ public class ConnectionRequestService : IConnectionRequestService
                 request.RespondedAt = DateTime.UtcNow;
 
                 var groupFeeNotice = groupClass.Fee > 0
-                    ? $" Học phí tháng là {groupClass.Fee:N0} đ. Vui lòng quét mã QR SePay để hoàn tất kích hoạt quyền vào lớp."
+                    ? $" Học phí là {groupClass.Fee:N0} đ. Vui lòng quét mã QR SePay để hoàn tất kích hoạt quyền vào lớp."
                     : "";
 
                 _db.Notifications.Add(new Notification
                 {
                     UserId = studentUserId,
                     Title = "Đã được nhận vào lớp nhóm",
-                    Content = $"Gia sư {tutorName} đã chấp nhận yêu cầu của bạn vào lớp {groupClass.NameClass}.{groupFeeNotice} [url:/Student_Parent/StudentClassroom]",
+                    Content = $"Gia sư {tutorName} đã chấp nhận yêu cầu của bạn vào lớp {groupClass.NameClass}.{groupFeeNotice} [url:/student/classrooms]",
                     CreatedAt = DateTime.UtcNow,
                     IsRead = false
                 });
@@ -645,17 +762,54 @@ public class ConnectionRequestService : IConnectionRequestService
             else
             {
                 // 2. LỚP 1 KÈM 1 (Phân định: Học thử 1 buổi VS Vào học chính thức)
-                // Xác định xem yêu cầu là học thử hay học chính thức
                 var message = request.Message ?? "";
-                var isExplicitTrial = message.Contains("Đăng ký học thử") || message.Contains("học thử 1 buổi");
-                var isExplicitOfficial = message.Contains("Vào học chính thức") || request.TrialSchedules.Count > 1;
+                var hasOfficialTag = message.Contains("Vào học chính thức")
+                    || request.RequestedStartDate.HasValue
+                    || request.RequestedEndDate.HasValue
+                    || request.DurationWeeks != 4
+                    || request.TrialSchedules.Count > 1;
+                var hasTrialTag = request.IsTrial
+                    || message.Contains("Đăng ký học thử")
+                    || message.Contains("học thử 1 buổi");
 
-                // Nếu có từ khóa học chính thức hoặc chọn nhiều hơn 1 buổi -> Vào thẳng lớp chính thức (không học thử)
-                isTrial = !isExplicitOfficial && (isExplicitTrial || request.TrialSchedules.Count <= 1);
+                isTrial = hasTrialTag || !hasOfficialTag;
 
                 if (isTrial)
                 {
-                    // 2.A: TẠO LỚP VÀ BUỔI HỌC THỬ 1 BUỔI TỰ ĐỘNG
+                    var trialSlotUtc = request.ProposedTrialSlotUtc
+                        ?? request.TrialSchedules.FirstOrDefault()?.ScheduledAt
+                        ?? DateTime.UtcNow.AddDays(1);
+                    trialSlotUtc = DateTime.SpecifyKind(trialSlotUtc, DateTimeKind.Utc);
+
+                    if (trialSlotUtc <= DateTime.UtcNow)
+                    {
+                        return await RollbackAndReturnAsync(new AcceptConnectionRequestResult
+                        {
+                            SlotConflict = true,
+                            Message = "Khung giờ học thử đã qua. Vui lòng từ chối hoặc đề nghị học viên chọn lịch mới."
+                        });
+                    }
+
+                    var trialConflict = await ScheduleConflictHelper.FindSingleSessionConflictAsync(
+                        _db,
+                        request.TutorId,
+                        request.ClassroomId,
+                        null,
+                        trialSlotUtc,
+                        2.0,
+                        new[] { request.StudentId },
+                        cancellationToken);
+
+                    if (trialConflict != null)
+                    {
+                        return await RollbackAndReturnAsync(new AcceptConnectionRequestResult
+                        {
+                            SlotConflict = true,
+                            Message = trialConflict
+                        });
+                    }
+
+                    var trialDateVn = DateOnly.FromDateTime(ClassroomLifecycleHelper.ToVietnamTime(trialSlotUtc));
                     var trialClassroom = request.Classroom;
                     if (trialClassroom == null)
                     {
@@ -671,7 +825,9 @@ public class ConnectionRequestService : IConnectionRequestService
                             TutorId = request.TutorId,
                             SubjectId = request.SubjectId,
                             GradeLevelId = request.GradeLevelId,
-                            StartDate = DateOnly.FromDateTime(DateTime.UtcNow.AddHours(VietnamUtcOffsetHours))
+                            StartDate = trialDateVn,
+                            EndDate = trialDateVn,
+                            TotalSessions = 1
                         };
                         _db.Classrooms.Add(trialClassroom);
                         request.Classroom = trialClassroom;
@@ -679,9 +835,10 @@ public class ConnectionRequestService : IConnectionRequestService
                     else
                     {
                         trialClassroom.Status = ClassroomStatus.Active;
+                        trialClassroom.EndDate ??= trialDateVn;
+                        trialClassroom.TotalSessions ??= 1;
                     }
 
-                    // Gán học viên vào lớp học thử
                     var isEnrolled = await _db.ClassroomStudents.AnyAsync(
                         cs => cs.ClassroomId == trialClassroom.Id && cs.StudentId == request.StudentId, cancellationToken);
                     if (!isEnrolled)
@@ -695,58 +852,36 @@ public class ConnectionRequestService : IConnectionRequestService
                         enrolled = true;
                     }
 
-                    // Tạo buổi học thử (ClassSession) với phòng video call
-                    var trialSlotUtc = request.ProposedTrialSlotUtc
-                        ?? request.TrialSchedules.FirstOrDefault()?.ScheduledAt
-                        ?? DateTime.UtcNow.AddDays(1);
-
-                    // Kiểm tra chống Race Condition / Double Booking: Khung giờ đã được xác nhận cho lớp/học viên khác chưa
-                    var isSlotConflict = await _db.ClassSessions.AnyAsync(cs =>
-                        cs.Classroom.TutorId == request.TutorId
-                        && cs.Status == SessionStatus.Scheduled
-                        && cs.ScheduledAt >= trialSlotUtc.AddMinutes(-90)
-                        && cs.ScheduledAt <= trialSlotUtc.AddMinutes(90), cancellationToken);
-
-                    if (isSlotConflict)
-                    {
-                        await transaction.RollbackAsync(cancellationToken);
-                        return new AcceptConnectionRequestResult
-                        {
-                            SlotConflict = true,
-                            Message = "Khung giờ học thử này đã được gia sư xác nhận cho một học viên khác trước đó. Không thể duyệt trùng giờ!"
-                        };
-                    }
-
                     var videoRoomId = $"OTSP-Trial-{request.Id}-{Guid.NewGuid():N}"[..28];
-                    var trialSession = new ClassSession
+                    createdTrialSession = new ClassSession
                     {
                         Classroom = trialClassroom,
                         ScheduledAt = trialSlotUtc,
+                        DurationHours = 2.0,
                         Status = SessionStatus.Scheduled,
+                        IsMakeup = false,
                         VideoRoom = videoRoomId
                     };
-                    _db.ClassSessions.Add(trialSession);
+                    _db.ClassSessions.Add(createdTrialSession);
 
-                    // Cập nhật trạng thái TrialSchedule
                     foreach (var ts in request.TrialSchedules)
                     {
                         ts.Status = ScheduleStatus.Confirmed;
-                        ts.ClassSession = trialSession;
+                        ts.ClassSession = createdTrialSession;
                     }
 
                     request.Status = RequestStatus.Accepted;
                     request.RespondedAt = DateTime.UtcNow;
-
                     finalClassroomId = trialClassroom.Id;
 
-                    var vnTrialTime = trialSlotUtc.AddHours(VietnamUtcOffsetHours);
+                    var vnTrialTime = ClassroomLifecycleHelper.ToVietnamTime(trialSlotUtc);
                     var timeStr = vnTrialTime.ToString("HH:mm, dddd dd/MM/yyyy", new System.Globalization.CultureInfo("vi-VN"));
 
                     _db.Notifications.Add(new Notification
                     {
                         UserId = studentUserId,
                         Title = "Gia sư đã đồng ý lịch học thử",
-                        Content = $"Gia sư {tutorName} đã xác nhận buổi học thử môn {subjectName} vào lúc {timeStr}. Phòng học trực tuyến đã sẵn sàng! [url:/Student_Parent/StudentSchedule]",
+                        Content = $"Gia sư {tutorName} đã xác nhận buổi học thử môn {subjectName} vào lúc {timeStr}. Phòng học trực tuyến đã sẵn sàng! [url:/student/schedule]",
                         CreatedAt = DateTime.UtcNow,
                         IsRead = false
                     });
@@ -762,8 +897,78 @@ public class ConnectionRequestService : IConnectionRequestService
                     var hourlyFee = (tutorSubject != null && tutorSubject.HourlyFee > 0) ? tutorSubject.HourlyFee : (request.Tutor?.HourlyFee ?? 150000);
                     if (hourlyFee <= 0) hourlyFee = 150000;
 
-                    var sessionsCount = Math.Clamp(request.TrialSchedules.Count, 1, 3);
-                    var monthlyFee = hourlyFee * 2.0m * sessionsCount * 4;
+                    var durationWeeks = request.DurationWeeks is > 0 and <= 52 ? request.DurationWeeks : 4;
+                    var startDateVn = request.RequestedStartDate
+                        ?? (request.TrialSchedules.Any()
+                            ? DateOnly.FromDateTime(request.TrialSchedules.Min(t => ClassroomLifecycleHelper.ToVietnamTime(t.ScheduledAt)))
+                            : todayVn);
+                    if (startDateVn < todayVn)
+                        startDateVn = todayVn;
+
+                    var distinctWeekly = new List<ClassroomWeeklySchedule>();
+                    var seenKeys = new HashSet<(DayOfWeek, TimeOnly)>();
+                    var slotIndex = 1;
+                    foreach (var sched in request.TrialSchedules.OrderBy(t => t.ScheduledAt))
+                    {
+                        var vn = ClassroomLifecycleHelper.ToVietnamTime(sched.ScheduledAt);
+                        var start = TimeOnly.FromTimeSpan(vn.TimeOfDay);
+                        if (!seenKeys.Add((vn.DayOfWeek, start)))
+                            continue;
+
+                        distinctWeekly.Add(new ClassroomWeeklySchedule
+                        {
+                            SessionIndex = slotIndex++,
+                            DayOfWeek = vn.DayOfWeek,
+                            StartTime = start,
+                            EndTime = start.AddHours(2)
+                        });
+                    }
+
+                    var sessionsCount = distinctWeekly.Count > 0 ? Math.Clamp(distinctWeekly.Count, 1, 3) : 1;
+                    int expectedTotal;
+                    DateOnly? resolvedEndDate;
+                    if (request.RequestedEndDate.HasValue && request.RequestedEndDate.Value >= startDateVn)
+                    {
+                        resolvedEndDate = request.RequestedEndDate.Value;
+                        expectedTotal = distinctWeekly.Count > 0
+                            ? Math.Max(1, ClassroomLifecycleHelper.CountScheduledOccurrences(startDateVn, resolvedEndDate.Value, distinctWeekly))
+                            : Math.Max(1, sessionsCount * durationWeeks);
+                    }
+                    else
+                    {
+                        expectedTotal = Math.Max(1, sessionsCount * durationWeeks);
+                        resolvedEndDate = distinctWeekly.Count > 0
+                            ? ClassroomLifecycleHelper.CalculateEndDateFromTotalSessions(startDateVn, expectedTotal, distinctWeekly)
+                            : startDateVn.AddDays(durationWeeks * 7 - 1);
+                    }
+
+                    if (distinctWeekly.Count > 0)
+                    {
+                        var candidateSlots = distinctWeekly
+                            .Select(w => new ScheduleConflictHelper.ScheduleSlotCandidate(w.DayOfWeek, w.StartTime, w.EndTime))
+                            .ToList();
+                        var conflictMsg = await ScheduleConflictHelper.FindClassroomScheduleConflictAsync(
+                            _db,
+                            request.TutorId,
+                            request.ClassroomId,
+                            startDateVn,
+                            resolvedEndDate,
+                            candidateSlots,
+                            new[] { request.StudentId },
+                            Array.Empty<(DateTime, double)>(),
+                            cancellationToken);
+
+                        if (conflictMsg != null)
+                        {
+                            return await RollbackAndReturnAsync(new AcceptConnectionRequestResult
+                            {
+                                SlotConflict = true,
+                                Message = conflictMsg
+                            });
+                        }
+                    }
+
+                    var courseFee = hourlyFee * 2.0m * expectedTotal;
 
                     var officialClassroom = request.Classroom;
                     if (officialClassroom == null)
@@ -771,7 +976,7 @@ public class ConnectionRequestService : IConnectionRequestService
                         officialClassroom = new Classroom
                         {
                             NameClass = $"Lớp 1-1: {subjectName} - {studentName}",
-                            Fee = monthlyFee,
+                            Fee = courseFee,
                             Status = ClassroomStatus.Active,
                             Type = ClassroomType.OneToOne,
                             MaxStudents = 1,
@@ -780,7 +985,9 @@ public class ConnectionRequestService : IConnectionRequestService
                             TutorId = request.TutorId,
                             SubjectId = request.SubjectId,
                             GradeLevelId = request.GradeLevelId,
-                            StartDate = DateOnly.FromDateTime(DateTime.UtcNow.AddHours(VietnamUtcOffsetHours))
+                            StartDate = startDateVn,
+                            EndDate = resolvedEndDate,
+                            TotalSessions = expectedTotal
                         };
                         _db.Classrooms.Add(officialClassroom);
                         request.Classroom = officialClassroom;
@@ -789,52 +996,22 @@ public class ConnectionRequestService : IConnectionRequestService
                     {
                         officialClassroom.NameClass = $"Lớp 1-1: {subjectName} - {studentName}";
                         officialClassroom.Status = ClassroomStatus.Active;
-                        officialClassroom.Fee = monthlyFee;
+                        officialClassroom.Fee = courseFee;
                         officialClassroom.SessionsPerWeek = sessionsCount;
+                        officialClassroom.StartDate = startDateVn;
+                        officialClassroom.EndDate = resolvedEndDate;
+                        officialClassroom.TotalSessions = expectedTotal;
                     }
 
-                    // Thiết lập lịch cố định hàng tuần (ClassroomWeeklySchedule) từ các buổi học viên đã chọn
-                    if (!officialClassroom.WeeklySchedules.Any())
+                    if (!officialClassroom.WeeklySchedules.Any() && distinctWeekly.Count > 0)
                     {
-                        var existingSchedules = await _db.ClassroomWeeklySchedules
-                            .AsNoTracking()
-                            .Where(ws => ws.Classroom.TutorId == request.TutorId && ws.Classroom.Status == ClassroomStatus.Active && ws.ClassroomId != officialClassroom.Id)
-                            .ToListAsync(cancellationToken);
-
-                        int sessionIdx = 1;
-                        foreach (var sched in request.TrialSchedules)
+                        foreach (var ws in distinctWeekly)
                         {
-                            var vn = sched.ScheduledAt.AddHours(VietnamUtcOffsetHours);
-                            var start = TimeOnly.FromTimeSpan(vn.TimeOfDay);
-                            var end = start.AddHours(2);
-
-                            var isConflict = existingSchedules.Any(ws =>
-                                ws.DayOfWeek == vn.DayOfWeek &&
-                                start < ws.EndTime &&
-                                end > ws.StartTime);
-
-                            if (isConflict)
-                            {
-                                await transaction.RollbackAsync(cancellationToken);
-                                return new AcceptConnectionRequestResult
-                                {
-                                    SlotConflict = true,
-                                    Message = $"Khung giờ {start:HH\\:mm} - {end:HH\\:mm} vào {vn.DayOfWeek} đã bị trùng với lịch dạy của một lớp khác của gia sư. Không thể duyệt yêu cầu này!"
-                                };
-                            }
-
-                            officialClassroom.WeeklySchedules.Add(new ClassroomWeeklySchedule
-                            {
-                                Classroom = officialClassroom,
-                                SessionIndex = sessionIdx++,
-                                DayOfWeek = vn.DayOfWeek,
-                                StartTime = start,
-                                EndTime = end
-                            });
+                            ws.Classroom = officialClassroom;
+                            officialClassroom.WeeklySchedules.Add(ws);
                         }
                     }
 
-                    // Đảm bảo học viên đã được ghi danh
                     var isEnrolled = await _db.ClassroomStudents.AnyAsync(
                         cs => cs.ClassroomId == officialClassroom.Id && cs.StudentId == request.StudentId, cancellationToken);
                     if (!isEnrolled)
@@ -848,8 +1025,7 @@ public class ConnectionRequestService : IConnectionRequestService
                         enrolled = true;
                     }
 
-                    // Tự động tạo bản ghi Payment cho lớp 1-1 chính thức
-                    if (monthlyFee > 0)
+                    if (courseFee > 0)
                     {
                         var existingPayment = await _db.Payments.FirstOrDefaultAsync(
                             p => p.ClassroomId == officialClassroom.Id && p.StudentId == request.StudentId && (p.Status == PaymentStatus.Pending || p.Status == PaymentStatus.Success),
@@ -861,14 +1037,13 @@ public class ConnectionRequestService : IConnectionRequestService
                             {
                                 StudentId = request.StudentId,
                                 Classroom = officialClassroom,
-                                Amount = monthlyFee,
+                                Amount = courseFee,
                                 Method = "VietQR",
                                 Status = PaymentStatus.Pending
                             });
                         }
                     }
 
-                    // Cập nhật trạng thái TrialSchedule thành Confirmed cho lớp chính thức
                     foreach (var ts in request.TrialSchedules)
                     {
                         ts.Status = ScheduleStatus.Confirmed;
@@ -876,14 +1051,13 @@ public class ConnectionRequestService : IConnectionRequestService
 
                     request.Status = RequestStatus.Accepted;
                     request.RespondedAt = DateTime.UtcNow;
-
                     finalClassroomId = officialClassroom.Id;
 
                     _db.Notifications.Add(new Notification
                     {
                         UserId = studentUserId,
                         Title = "Yêu cầu học chính thức đã được chấp nhận",
-                        Content = $"Gia sư {tutorName} đã chấp nhận vào học chính thức lớp {officialClassroom.NameClass}. Học phí tháng ({sessionsCount} buổi/tuần = {sessionsCount * 2 * 4} tiếng) là {monthlyFee:N0} đ. Vui lòng quét mã QR SePay để thanh toán kích hoạt quyền vào lớp! [url:/Student_Parent/StudentClassroom]",
+                        Content = $"Gia sư {tutorName} đã chấp nhận vào học chính thức lớp {officialClassroom.NameClass}. Học phí khóa {expectedTotal} buổi ({expectedTotal * 2} tiếng) là {courseFee:N0} đ. Vui lòng quét mã QR SePay để thanh toán kích hoạt quyền vào lớp! [url:/student/classrooms]",
                         CreatedAt = DateTime.UtcNow,
                         IsRead = false
                     });
@@ -892,13 +1066,28 @@ public class ConnectionRequestService : IConnectionRequestService
 
             await _db.SaveChangesAsync(cancellationToken);
 
-            // Tự động sinh lịch ClassSessions nếu là lớp chính thức có WeeklySchedules
-            if (!isTrial && finalClassroomId.HasValue)
+            if (createdTrialSession != null)
             {
-                await GenerateUpcomingSessionsAsync(finalClassroomId.Value, 28, cancellationToken);
+                finalSessionId = createdTrialSession.Id;
+            }
+            if (finalClassroomId == null && request.ClassroomId.HasValue)
+            {
+                finalClassroomId = request.ClassroomId;
             }
 
-            await transaction.CommitAsync(cancellationToken);
+            // Tự động sinh lịch ClassSessions nếu là lớp chính thức có WeeklySchedules (giới hạn theo StartDate/EndDate/TotalSessions)
+            if (!isTrial && finalClassroomId.HasValue)
+            {
+                var horizonDays = request.RequestedEndDate.HasValue
+                    ? Math.Clamp(request.RequestedEndDate.Value.DayNumber - todayVn.DayNumber + 7, 28, 365)
+                    : Math.Clamp(request.DurationWeeks * 7 + 7, 28, 365);
+                await GenerateUpcomingSessionsAsync(finalClassroomId.Value, horizonDays, cancellationToken);
+            }
+
+            if (transaction != null)
+            {
+                await transaction.CommitAsync(cancellationToken);
+            }
 
             // Phân phối thông báo (In-App + SignalR + Gmail) qua Central Dispatcher
             await _dispatcher.DispatchBookingAcceptedAsync(new BookingAcceptedNotificationEvent(
@@ -958,8 +1147,6 @@ public class ConnectionRequestService : IConnectionRequestService
         var tutorName = request.Tutor?.User?.FullName ?? "Gia sư";
         var subjectName = request.Subject?.Name ?? "môn học";
 
-        var reasonText = string.IsNullOrWhiteSpace(reason) ? "" : $" Lý do: {reason.Trim()}";
-
         await _db.SaveChangesAsync(cancellationToken);
 
         // Phân phối thông báo từ chối (In-App + SignalR + Gmail) qua Central Dispatcher
@@ -988,42 +1175,39 @@ public class ConnectionRequestService : IConnectionRequestService
     {
         var classroom = await _db.Classrooms
             .Include(c => c.WeeklySchedules)
+            .Include(c => c.ClassSessions)
             .FirstOrDefaultAsync(c => c.Id == classroomId, cancellationToken);
 
-        if (classroom == null || !classroom.WeeklySchedules.Any())
+        if (classroom == null || classroom.Status != ClassroomStatus.Active || !classroom.WeeklySchedules.Any())
             return;
 
         var nowUtc = DateTime.UtcNow;
-        var todayVn = DateOnly.FromDateTime(nowUtc.AddHours(VietnamUtcOffsetHours));
+        var existingNonCancelled = classroom.ClassSessions
+            .Where(s => s.Status != SessionStatus.Cancelled)
+            .Select(s => s.ScheduledAt)
+            .ToList();
 
-        for (var dayOffset = 1; dayOffset <= daysAhead; dayOffset++)
+        var plannedSessions = ClassroomLifecycleHelper.BuildPlannedSessions(
+            classroom,
+            classroom.WeeklySchedules,
+            nowUtc,
+            existingNonCancelled,
+            Math.Clamp(daysAhead, 14, 365));
+
+        if (plannedSessions.Count == 0)
+            return;
+
+        foreach (var planned in plannedSessions)
         {
-            var targetDateVn = todayVn.AddDays(dayOffset);
-            var matchingSchedules = classroom.WeeklySchedules
-                .Where(s => s.DayOfWeek == targetDateVn.DayOfWeek)
-                .ToList();
-
-            foreach (var sched in matchingSchedules)
+            _db.ClassSessions.Add(new ClassSession
             {
-                var sessionVn = targetDateVn.ToDateTime(sched.StartTime);
-                var sessionUtc = DateTime.SpecifyKind(sessionVn.AddHours(-VietnamUtcOffsetHours), DateTimeKind.Utc);
-
-                var windowStart = sessionUtc.AddMinutes(-30);
-                var windowEnd = sessionUtc.AddMinutes(30);
-                var exists = await _db.ClassSessions.AnyAsync(s =>
-                    s.ClassroomId == classroomId && s.ScheduledAt >= windowStart && s.ScheduledAt <= windowEnd, cancellationToken);
-
-                if (!exists)
-                {
-                    _db.ClassSessions.Add(new ClassSession
-                    {
-                        ClassroomId = classroomId,
-                        ScheduledAt = sessionUtc,
-                        Status = SessionStatus.Scheduled,
-                        VideoRoom = $"OTSP-Room-{classroomId}-{Guid.NewGuid():N}"[..28]
-                    });
-                }
-            }
+                ClassroomId = classroomId,
+                ScheduledAt = planned.ScheduledAtUtc,
+                DurationHours = planned.DurationHours,
+                Status = SessionStatus.Scheduled,
+                IsMakeup = false,
+                VideoRoom = $"OTSP-Room-{classroomId}-{Guid.NewGuid():N}"[..28]
+            });
         }
 
         await _db.SaveChangesAsync(cancellationToken);

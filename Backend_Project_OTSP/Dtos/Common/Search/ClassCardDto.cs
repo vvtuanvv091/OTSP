@@ -31,5 +31,8 @@ public class ClassCardDto
     public string? TutorAvatarUrl { get; set; }
     public double TutorRating { get; set; }
     public DateOnly? StartDate { get; set; }
+    public DateOnly? RegistrationDeadline { get; set; }
+    public DateOnly? EndDate { get; set; }
+    public int? TotalSessions { get; set; }
     public List<ClassroomScheduleItemDto> WeeklySchedules { get; set; } = new();
 }

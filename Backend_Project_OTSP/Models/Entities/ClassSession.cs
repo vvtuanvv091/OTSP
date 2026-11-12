@@ -13,6 +13,8 @@ namespace Backend_Project_OTSP.Models
         public SessionStatus Status { get; set; } = SessionStatus.Scheduled;
         public string? VideoRoom { get; set; }
         public string? RecordingUrl { get; set; }//ghi hình
+        public bool IsMakeup { get; set; } = false;
+        public double? DurationHours { get; set; }
         [ForeignKey("Classroom")]
         public int ClassroomId { get; set; }
         public Classroom Classroom { get; set; } = null!;

@@ -81,11 +81,9 @@ export default function TutorConnectionRequestsPage() {
     }
   };
 
-  const formatSlotTime = (slotUtc, slotsUtc) => {
-    const raw = slotUtc || (slotsUtc && slotsUtc.length > 0 ? slotsUtc[0] : null);
-    if (!raw) return 'Lịch linh hoạt';
-
+  const formatSingleSlot = (raw) => {
     const d = new Date(raw);
+    if (Number.isNaN(d.getTime())) return String(raw);
     const days = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
     const dayLabel = days[d.getDay()];
     const dateStr = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
@@ -95,12 +93,45 @@ export default function TutorConnectionRequestsPage() {
     endH.setHours(endH.getHours() + 2);
     const endHour = String(endH.getHours()).padStart(2, '0');
     const endMin = String(endH.getMinutes()).padStart(2, '0');
+    return `${dayLabel}, ${dateStr} · ${startHour}:${startMin}-${endHour}:${endMin}`;
+  };
 
-    let text = `${dayLabel}, ${dateStr} · ${startHour}:${startMin}-${endHour}:${endMin}`;
-    if (slotsUtc && slotsUtc.length > 1) {
-      text += ` (+${slotsUtc.length - 1} buổi)`;
+  const formatSlotTime = (slotUtc, slotsUtc) => {
+    const unique = [];
+    const seen = new Set();
+    [...(slotsUtc || []), slotUtc].filter(Boolean).forEach((s) => {
+      if (!seen.has(s)) {
+        seen.add(s);
+        unique.push(s);
+      }
+    });
+    if (unique.length === 0) return 'Lịch linh hoạt';
+    return unique.map(formatSingleSlot).join(' | ');
+  };
+
+  const formatLifecycleNote = (request) => {
+    const parts = [];
+    if (request.durationWeeks) parts.push(`Gói ${request.durationWeeks} tuần`);
+    if (request.requestedStartDate || request.requestedEndDate) {
+      const fmt = (iso) => {
+        if (!iso) return '—';
+        const [y, m, d] = String(iso).slice(0, 10).split('-');
+        return y && m && d ? `${d}/${m}/${y}` : iso;
+      };
+      parts.push(`${fmt(request.requestedStartDate)} → ${fmt(request.requestedEndDate)}`);
     }
-    return text;
+    return parts.join(' · ');
+  };
+
+  const resolveIsTrial = (request) => {
+    if (typeof request.isTrial === 'boolean') return request.isTrial;
+    if (request.durationWeeks) return false;
+    if (request.proposedTrialSlotsUtc && request.proposedTrialSlotsUtc.length > 1) return false;
+    return Boolean(
+      (request.message && request.message.includes('[Mục đích: Đăng ký học thử 1 buổi]')) ||
+      request.proposedTrialSlotUtc ||
+      (request.proposedTrialSlotsUtc && request.proposedTrialSlotsUtc.length === 1)
+    );
   };
 
   return (
@@ -208,9 +239,8 @@ export default function TutorConnectionRequestsPage() {
               </thead>
               <tbody>
                 {requests.map((request) => {
-                  const isTrial = (request.message && request.message.includes('[Mục đích: Đăng ký học thử 1 buổi]'))
-                    || Boolean(request.proposedTrialSlotUtc)
-                    || (request.proposedTrialSlotsUtc && request.proposedTrialSlotsUtc.length > 0);
+                  const isTrial = resolveIsTrial(request);
+                  const lifecycleNote = formatLifecycleNote(request);
 
                   const isPending = request.status === 'Pending';
                   const isAccepted = request.status === 'Accepted';
@@ -297,9 +327,14 @@ export default function TutorConnectionRequestsPage() {
                       </td>
 
                       <td>
-                        <div className="fw-semibold text-dark" style={{ fontSize: 13 }}>
+                        <div className="fw-semibold text-dark" style={{ fontSize: 13, fontVariantNumeric: 'tabular-nums' }}>
                           <i className="bi bi-clock text-muted me-1"></i>{formattedSlot}
                         </div>
+                        {lifecycleNote && (
+                          <div className="small text-secondary mt-0.5" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                            <i className="bi bi-calendar-range me-1"></i>{lifecycleNote}
+                          </div>
+                        )}
                         {request.matchesAvailability && (
                           <div className="small text-success fw-semibold mt-0.5">
                             <i className="bi bi-check2-circle me-1"></i>Khớp lịch rảnh
@@ -390,9 +425,8 @@ export default function TutorConnectionRequestsPage() {
           {/* ==================== MOBILE CARD VIEW (< 768px) ==================== */}
           <div className="d-md-none d-flex flex-column gap-3">
             {requests.map((request) => {
-              const isTrial = (request.message && request.message.includes('[Mục đích: Đăng ký học thử 1 buổi]'))
-                || Boolean(request.proposedTrialSlotUtc)
-                || (request.proposedTrialSlotsUtc && request.proposedTrialSlotsUtc.length > 0);
+              const isTrial = resolveIsTrial(request);
+              const lifecycleNote = formatLifecycleNote(request);
               const isPending = request.status === 'Pending';
               const isAccepted = request.status === 'Accepted';
               const isRejected = request.status === 'Rejected';
@@ -421,7 +455,8 @@ export default function TutorConnectionRequestsPage() {
                       <div>
                         <div className="fw-bold text-dark small">{request.studentName}</div>
                         <span className={isTrial ? 'text-danger small' : 'text-primary small'}>
-                          {isTrial ? '⚡ Học thử' : '🎓 Học chính thức'}
+                          <i className={`bi ${isTrial ? 'bi-lightning-charge-fill' : 'bi-mortarboard-fill'} me-1`}></i>
+                          {isTrial ? 'Học thử' : 'Học chính thức'}
                         </span>
                       </div>
                     </div>
@@ -441,8 +476,11 @@ export default function TutorConnectionRequestsPage() {
                   <div className="small text-secondary mb-1">
                     <i className="bi bi-book me-1"></i><strong>{request.subjectName}</strong> · {request.gradeLevelName}
                   </div>
-                  <div className="small text-secondary mb-2">
+                  <div className="small text-secondary mb-2" style={{ fontVariantNumeric: 'tabular-nums' }}>
                     <i className="bi bi-clock me-1"></i>{formattedSlot}
+                    {lifecycleNote && (
+                      <div className="mt-1"><i className="bi bi-calendar-range me-1"></i>{lifecycleNote}</div>
+                    )}
                   </div>
 
                   {request.message && (

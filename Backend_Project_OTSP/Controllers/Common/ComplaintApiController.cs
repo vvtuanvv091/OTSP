@@ -109,29 +109,23 @@ public class ComplaintApiController : ControllerBase
                 {
                     UserId = aId,
                     Title = "Khiếu nại mới #" + complaint.Id,
-                    Content = $"{senderName} vừa gửi khiếu nại: {(content.Length > 80 ? content.Substring(0, 80) + "..." : content)}",
+                    Content = $"{senderName} vừa gửi khiếu nại: {(content.Length > 80 ? content.Substring(0, 80) + "..." : content)} [url:/admin/complaints]",
                     CreatedAt = DateTime.UtcNow,
                     IsRead = false
                 });
             }
             await _db.SaveChangesAsync(cancellationToken);
 
-            // Gửi email thông báo khiếu nại tới email quản trị viên qua hàng đợi nền
-            if (emailQueue != null || emailSender != null)
+            // Gửi email thông báo khiếu nại tới danh sách email Quản trị viên
+            var adminEmails = await AdminNotificationHelper.ResolveAdminRecipientEmailsAsync(_db, configuration, cancellationToken);
+            if (adminEmails.Count > 0 && (emailQueue != null || emailSender != null))
             {
-                var adminEmail = configuration?["AdminNotification:Email"] ?? "tongngoctuan09@gmail.com";
                 var timeStr = DateTime.UtcNow.AddHours(7).ToString("dd/MM/yyyy HH:mm:ss") + " (GMT+7)";
                 var (complaintSubject, complaintBody) = NotificationEmailTemplates.ForComplaintCreated(
                     complaint.Id, senderName, sender?.Email, timeStr, content, evidenceUrl);
 
-                if (emailQueue != null)
-                {
-                    emailQueue.Enqueue(new EmailQueueItemDto(adminEmail, complaintSubject, complaintBody));
-                }
-                else if (emailSender != null)
-                {
-                    await emailSender.SendNotificationEmailAsync(adminEmail, complaintSubject, complaintBody, cancellationToken);
-                }
+                await AdminNotificationHelper.DispatchEmailToManyAsync(
+                    adminEmails, complaintSubject, complaintBody, emailQueue, emailSender, cancellationToken);
             }
         }
 

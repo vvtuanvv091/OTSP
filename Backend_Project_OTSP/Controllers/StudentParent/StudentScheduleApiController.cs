@@ -99,7 +99,9 @@ public class StudentScheduleApiController : ControllerBase
 
         var regularSessions = await _db.ClassSessions
             .AsNoTracking()
-            .Where(session => session.Classroom.ClassroomStudents.Any(cs => cs.Student.UserId == userId)
+            .Where(session => session.Classroom.ClassroomStudents.Any(cs =>
+                                  cs.Student.UserId == userId
+                                  && (session.Classroom.Type != ClassroomType.Group || session.ScheduledAt >= cs.JoinedAt))
                               && session.Classroom.Status == ClassroomStatus.Active
                               && session.ScheduledAt >= weekStartUtc
                               && session.ScheduledAt < weekEndUtc)
@@ -115,9 +117,11 @@ public class StudentScheduleApiController : ControllerBase
                 ClassroomType = session.Classroom.Type,
                 Fee = session.Classroom.Fee,
                 ScheduledAt = session.ScheduledAt,
+                SessionDurationHours = session.DurationHours,
                 HoursPerSession = session.Classroom.HoursPerSession,
                 Status = session.Status,
-                VideoRoom = session.VideoRoom
+                VideoRoom = session.VideoRoom,
+                session.IsMakeup
             })
             .ToListAsync(cancellationToken);
 
@@ -144,31 +148,33 @@ public class StudentScheduleApiController : ControllerBase
                 ClassroomType = ts.ConnectionRequest.PreferredType,
                 Fee = 0m,
                 ScheduledAt = ts.ScheduledAt,
+                SessionDurationHours = (double?)2.0,
                 HoursPerSession = 2.0,
                 Status = ts.ClassSession != null ? ts.ClassSession.Status : SessionStatus.Scheduled,
-                VideoRoom = ts.ClassSession != null ? ts.ClassSession.VideoRoom : null
+                VideoRoom = ts.ClassSession != null ? ts.ClassSession.VideoRoom : null,
+                IsMakeup = false
             })
             .ToListAsync(cancellationToken);
 
         var calendarSlots = new List<StudentScheduleItemDto>();
-        var allSessions = regularSessions.Select(s => new { s.SessionId, s.ClassroomId, s.ClassroomName, s.SubjectName, s.GradeLevelName, s.TutorName, s.TutorAvatarUrl, s.ClassroomType, s.Fee, s.ScheduledAt, s.HoursPerSession, s.Status, s.VideoRoom, IsTrial = false })
-            .Concat(trialSessions.Select(t => new { t.SessionId, t.ClassroomId, t.ClassroomName, t.SubjectName, t.GradeLevelName, t.TutorName, t.TutorAvatarUrl, t.ClassroomType, t.Fee, t.ScheduledAt, t.HoursPerSession, t.Status, t.VideoRoom, IsTrial = true }))
+        var allSessions = regularSessions.Select(s => new { s.SessionId, s.ClassroomId, s.ClassroomName, s.SubjectName, s.GradeLevelName, s.TutorName, s.TutorAvatarUrl, s.ClassroomType, s.Fee, s.ScheduledAt, s.SessionDurationHours, s.HoursPerSession, s.Status, s.VideoRoom, s.IsMakeup, IsTrial = false })
+            .Concat(trialSessions.Select(t => new { t.SessionId, t.ClassroomId, t.ClassroomName, t.SubjectName, t.GradeLevelName, t.TutorName, t.TutorAvatarUrl, t.ClassroomType, t.Fee, t.ScheduledAt, t.SessionDurationHours, t.HoursPerSession, t.Status, t.VideoRoom, t.IsMakeup, IsTrial = true }))
             .OrderBy(s => s.ScheduledAt);
 
         foreach (var s in allSessions)
         {
-            var sVn = DateTime.SpecifyKind(s.ScheduledAt.AddHours(VietnamUtcOffsetHours), DateTimeKind.Unspecified);
-            var dur = s.HoursPerSession >= 10.0 ? s.HoursPerSession / 10.0 : (s.HoursPerSession > 0 ? s.HoursPerSession : 2.0);
+            var dur = Backend_Project_OTSP.Services.Common.ClassroomLifecycleHelper.NormalizeHoursPerSession(
+                s.SessionDurationHours.HasValue && s.SessionDurationHours.Value > 0 ? s.SessionDurationHours.Value : s.HoursPerSession);
+            var sVn = DateTime.SpecifyKind(Backend_Project_OTSP.Services.Common.ClassroomLifecycleHelper.ToVietnamTime(s.ScheduledAt), DateTimeKind.Unspecified);
             var endVn = sVn.AddHours(dur);
 
-            // Buổi học chỉ kết thúc khi gia sư bấm "Kết thúc" (Done) hoặc quá giờ bắt đầu 6 tiếng.
-            // Không khóa phòng ngay khi qua giờ danh nghĩa để cho phép dạy bù / vào lại khi rớt mạng.
-            var isCompleted = s.Status == SessionStatus.Done
-                              || s.Status == SessionStatus.Cancelled
-                              || nowVn > sVn.AddHours(MaxSessionOpenHours);
-            var canJoin = !isCompleted
-                          && s.SessionId > 0
-                          && nowVn >= sVn.AddMinutes(-EarlyJoinMinutes)
+            var isWithinWindow = Backend_Project_OTSP.Services.Common.ClassroomLifecycleHelper.IsWithinJoinWindow(
+                s.ScheduledAt, s.Status, dur, nowUtc);
+            var isCompleted = s.Status == SessionStatus.Done;
+            var canJoin = s.SessionId > 0
+                          && s.Status != SessionStatus.Cancelled
+                          && !isCompleted
+                          && isWithinWindow
                           && (s.Status == SessionStatus.InProgress || s.Status == SessionStatus.Scheduled);
 
             var hasPaid = s.Fee <= 0 || s.IsTrial || paidSet.Contains(s.ClassroomId);
@@ -184,11 +190,14 @@ public class StudentScheduleApiController : ControllerBase
                 TutorName = s.TutorName,
                 TutorAvatarUrl = s.TutorAvatarUrl,
                 ClassroomType = s.ClassroomType,
-                ScheduledAtUtc = s.ScheduledAt,
+                ScheduledAtUtc = DateTime.SpecifyKind(s.ScheduledAt, DateTimeKind.Utc),
                 ScheduledAtVn = sVn,
-                Status = isCompleted ? SessionStatus.Done : s.Status,
+                Status = s.Status,
                 IsTrial = s.IsTrial,
                 VideoRoom = s.VideoRoom,
+                DurationHours = dur,
+                TimeRangeLabel = $"{sVn:HH:mm} - {endVn:HH:mm}",
+                IsMakeupFlag = s.IsMakeup,
                 CanJoin = canJoin,
                 HasPaid = hasPaid,
                 PendingPaymentId = pendingAlert?.PaymentId

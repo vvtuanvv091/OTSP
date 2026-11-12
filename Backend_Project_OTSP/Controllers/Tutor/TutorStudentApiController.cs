@@ -55,16 +55,28 @@ public class TutorStudentApiController : ControllerBase
                 SubjectName = cs.Classroom.Subject.Name,
                 HoursPerSession = cs.Classroom.HoursPerSession,
                 SessionsPerWeek = cs.Classroom.SessionsPerWeek,
-                TotalDoneSessions = cs.Classroom.ClassSessions.Count(s => s.Status == SessionStatus.Done),
-                TotalSessions = cs.Classroom.ClassSessions.Count,
+                cs.Classroom.StartDate,
+                cs.Classroom.EndDate,
+                ExplicitTotalSessions = cs.Classroom.TotalSessions,
+                cs.JoinedAt,
+                WeeklySchedules = cs.Classroom.WeeklySchedules.ToList(),
+                DoneSessionsCount = cs.Classroom.ClassSessions.Count(s =>
+                    s.Status == SessionStatus.Done
+                    && (cs.Classroom.Type != ClassroomType.Group || s.ScheduledAt >= cs.JoinedAt)),
+                ActualSessionsCount = cs.Classroom.ClassSessions.Count(s =>
+                    s.Status != SessionStatus.Cancelled
+                    && (cs.Classroom.Type != ClassroomType.Group || s.ScheduledAt >= cs.JoinedAt)),
                 NextSession = cs.Classroom.ClassSessions
-                    .Where(s => s.ScheduledAt >= nowUtc.AddHours(-6) && (s.Status == SessionStatus.Scheduled || s.Status == SessionStatus.InProgress))
+                    .Where(s => s.ScheduledAt >= nowUtc.AddHours(-6)
+                                && (s.Status == SessionStatus.Scheduled || s.Status == SessionStatus.InProgress)
+                                && (cs.Classroom.Type != ClassroomType.Group || s.ScheduledAt >= cs.JoinedAt))
                     .OrderBy(s => s.ScheduledAt)
                     .Select(s => new
                     {
                         s.Id,
                         s.ScheduledAt,
                         s.Status,
+                        s.DurationHours,
                         s.VideoRoom
                     })
                     .FirstOrDefault(),
@@ -78,8 +90,18 @@ public class TutorStudentApiController : ControllerBase
         var studentsList = classroomStudents.Select(cs =>
         {
             var isTrial = cs.ClassroomName.StartsWith("Học thử", StringComparison.OrdinalIgnoreCase);
-            var total = cs.TotalSessions > 0 ? cs.TotalSessions : Math.Max(1, cs.SessionsPerWeek * 4);
-            var progressText = isTrial ? "1 buổi học thử" : $"{cs.TotalDoneSessions}/{total} buổi";
+            var expectedTotal = Backend_Project_OTSP.Services.Common.ClassroomLifecycleHelper.CalculateExpectedTotalSessions(
+                cs.StartDate,
+                cs.EndDate,
+                cs.ExplicitTotalSessions,
+                cs.SessionsPerWeek,
+                cs.WeeklySchedules);
+            var total = cs.ClassroomType == ClassroomType.Group && cs.ActualSessionsCount > 0
+                ? Math.Min(expectedTotal, cs.ActualSessionsCount)
+                : expectedTotal;
+            total = Math.Max(total, cs.DoneSessionsCount);
+
+            var progressText = isTrial ? "1 buổi học thử" : $"{cs.DoneSessionsCount}/{Math.Max(1, total)} buổi";
 
             string nextSessionFormatted = "Chưa có lịch";
             int? nextSessionId = null;
@@ -91,25 +113,15 @@ public class TutorStudentApiController : ControllerBase
                 nextSessionId = cs.NextSession.Id;
                 videoRoom = cs.NextSession.VideoRoom;
 
-                var nowUtc = DateTime.UtcNow;
-                var openAt = cs.NextSession.ScheduledAt.AddMinutes(-60);
-                var closeAt = cs.NextSession.ScheduledAt.AddHours(6);
-                canJoinNextSession = cs.NextSession.Status == SessionStatus.InProgress || (nowUtc >= openAt && nowUtc <= closeAt);
+                var dur = Backend_Project_OTSP.Services.Common.ClassroomLifecycleHelper.NormalizeHoursPerSession(
+                    cs.NextSession.DurationHours.HasValue && cs.NextSession.DurationHours.Value > 0
+                        ? cs.NextSession.DurationHours.Value
+                        : cs.HoursPerSession);
+                canJoinNextSession = Backend_Project_OTSP.Services.Common.ClassroomLifecycleHelper.IsWithinJoinWindow(
+                    cs.NextSession.ScheduledAt, cs.NextSession.Status, dur, nowUtc);
 
-                var vnTime = cs.NextSession.ScheduledAt.AddHours(7);
-                var dayName = vnTime.DayOfWeek switch
-                {
-                    DayOfWeek.Sunday => "Chủ nhật",
-                    DayOfWeek.Monday => "Thứ 2",
-                    DayOfWeek.Tuesday => "Thứ 3",
-                    DayOfWeek.Wednesday => "Thứ 4",
-                    DayOfWeek.Thursday => "Thứ 5",
-                    DayOfWeek.Friday => "Thứ 6",
-                    DayOfWeek.Saturday => "Thứ 7",
-                    _ => ""
-                };
-                var rawDur = cs.HoursPerSession;
-                var dur = rawDur >= 10.0 ? rawDur / 10.0 : (rawDur > 0 ? rawDur : 2.0);
+                var vnTime = Backend_Project_OTSP.Services.Common.ClassroomLifecycleHelper.ToVietnamTime(cs.NextSession.ScheduledAt);
+                var dayName = Backend_Project_OTSP.Services.Common.ClassroomLifecycleHelper.FormatDayVn(vnTime.DayOfWeek);
                 var endTime = vnTime.AddHours(dur);
                 nextSessionFormatted = $"{dayName} {vnTime:dd/MM} · {vnTime:HH:mm}-{endTime:HH:mm}";
             }

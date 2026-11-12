@@ -40,6 +40,7 @@ def fetch_all_tutors_from_db() -> list[dict]:
                 LEFT JOIN "Subjects" s ON ts."SubjectId" = s."Id"
                 LEFT JOIN "GradeLevels" gl ON ts."GradeLevelId" = gl."Id"
                 WHERE u."Status" = 0
+                  AND tp."VerificationStatus" = 1
                 GROUP BY tp."Id", u."FullName", tp."HourlyFee", tp."AverageRating", tp."TeachingFormat", u."AvatarUrl"
                 ORDER BY tp."AverageRating" DESC, tp."HourlyFee" ASC;
             """)
@@ -64,7 +65,7 @@ def fetch_all_tutors_from_db() -> list[dict]:
         conn.close()
 
 def fetch_all_classrooms_from_db() -> list[dict]:
-    """Truy vấn các lớp học nhóm đang mở đăng ký"""
+    """Truy vấn các lớp học nhóm đang mở đăng ký (còn chỗ, còn hạn đăng ký, chưa bắt đầu học)"""
     conn = get_db_connection()
     if not conn:
         return []
@@ -75,15 +76,44 @@ def fetch_all_classrooms_from_db() -> list[dict]:
                     c."Id" AS classroom_id,
                     c."NameClass" AS class_name,
                     c."Fee" AS fee,
+                    c."StartDate" AS start_date,
+                    c."RegistrationDeadline" AS registration_deadline,
+                    c."EndDate" AS end_date,
+                    c."TotalSessions" AS total_sessions,
+                    c."MaxStudents" AS max_students,
+                    COALESCE(COUNT(cs."StudentId"), 0) AS student_count,
                     s."Name" AS subject_name,
                     gl."Name" AS grade_name,
                     u."FullName" AS tutor_name
                 FROM "Classrooms" c
                 LEFT JOIN "Subjects" s ON c."SubjectId" = s."Id"
                 LEFT JOIN "GradeLevels" gl ON c."GradeLevelId" = gl."Id"
-                LEFT JOIN "TutorProfiles" tp ON c."TutorId" = tp."Id"
-                LEFT JOIN "Users" u ON tp."UserId" = u."Id"
+                JOIN "TutorProfiles" tp ON c."TutorId" = tp."Id"
+                JOIN "Users" u ON tp."UserId" = u."Id"
+                LEFT JOIN "ClassroomStudents" cs ON c."Id" = cs."ClassroomId"
                 WHERE c."Status" = 0
+                  AND c."Type" = 1
+                  AND tp."VerificationStatus" = 1
+                  AND u."Status" = 0
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM "ClassSessions" ss
+                      WHERE ss."ClassroomId" = c."Id"
+                        AND ss."Status" IN (1, 3)
+                  )
+                  AND (
+                      CASE
+                          WHEN c."RegistrationDeadline" IS NOT NULL THEN
+                              c."RegistrationDeadline" >= (NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date
+                              AND (c."StartDate" IS NULL OR c."StartDate" >= (NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date)
+                          ELSE
+                              c."StartDate" IS NULL OR c."StartDate" > (NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date
+                      END
+                  )
+                GROUP BY
+                    c."Id", c."NameClass", c."Fee", c."StartDate", c."RegistrationDeadline",
+                    c."EndDate", c."TotalSessions", c."MaxStudents", s."Name", gl."Name", u."FullName"
+                HAVING COALESCE(COUNT(cs."StudentId"), 0) < c."MaxStudents"
                 ORDER BY c."Id" DESC;
             """)
             rows = cur.fetchall()
@@ -95,6 +125,11 @@ def fetch_all_classrooms_from_db() -> list[dict]:
                     "subject": r["subject_name"] or "Tổng hợp",
                     "grade": r["grade_name"] or "Phổ thông",
                     "tutorName": r["tutor_name"] or "Gia sư OTSP",
+                    "startDate": r["start_date"].isoformat() if r["start_date"] else None,
+                    "registrationDeadline": r["registration_deadline"].isoformat() if r["registration_deadline"] else None,
+                    "endDate": r["end_date"].isoformat() if r["end_date"] else None,
+                    "totalSessions": r["total_sessions"],
+                    "availableSeats": max(0, int(r["max_students"] or 0) - int(r["student_count"] or 0)),
                     "classUrl": f"/search?tab=classes&classroomId={r['classroom_id']}",
                 }
                 for r in rows

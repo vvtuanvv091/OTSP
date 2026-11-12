@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Backend_Project_OTSP.Data;
 using Backend_Project_OTSP.Dtos;
+using Backend_Project_OTSP.Models;
 using Backend_Project_OTSP.Services;
 using static Backend_Project_OTSP.Models.Enums;
 
@@ -84,8 +85,12 @@ public class SearchApiController : ControllerBase
                     x.CoverImageUrl,
                     x.Fee,
                     x.Type,
+                    x.Status,
                     x.MaxStudents,
                     x.StartDate,
+                    x.RegistrationDeadline,
+                    x.EndDate,
+                    x.TotalSessions,
                     x.SessionsPerWeek,
                     x.HoursPerSession,
                     x.SubjectId,
@@ -100,6 +105,7 @@ public class SearchApiController : ControllerBase
                     TutorIntro = x.Tutor.Introduction,
                     TutorHourlyFee = x.Tutor.HourlyFee,
                     StudentCount = x.ClassroomStudents.Count,
+                    HasStartedSession = x.ClassSessions.Any(s => s.Status == SessionStatus.Done || s.Status == SessionStatus.InProgress),
                     WeeklySchedules = x.WeeklySchedules
                         .OrderBy(ws => ws.SessionIndex)
                         .Select(ws => new { ws.DayOfWeek, ws.StartTime, ws.EndTime })
@@ -157,6 +163,35 @@ public class SearchApiController : ControllerBase
                 })
                 .ToList();
 
+            var todayVn = Backend_Project_OTSP.Services.Common.ClassroomLifecycleHelper.GetVietnamToday();
+            var dummyClassroom = new Classroom
+            {
+                Status = c.Status,
+                Type = c.Type,
+                StartDate = c.StartDate,
+                RegistrationDeadline = c.RegistrationDeadline,
+                EndDate = c.EndDate,
+                TotalSessions = c.TotalSessions,
+                SessionsPerWeek = c.SessionsPerWeek
+            };
+            var isEnrollmentOpen = c.Type != ClassroomType.Group
+                || (c.StudentCount < c.MaxStudents
+                    && Backend_Project_OTSP.Services.Common.ClassroomLifecycleHelper.IsGroupEnrollmentOpen(
+                        dummyClassroom, todayVn, c.HasStartedSession));
+            var safeHours = Backend_Project_OTSP.Services.Common.ClassroomLifecycleHelper.NormalizeHoursPerSession(c.HoursPerSession);
+            var expectedTotal = Backend_Project_OTSP.Services.Common.ClassroomLifecycleHelper.CalculateExpectedTotalSessions(
+                c.StartDate,
+                c.EndDate,
+                c.TotalSessions,
+                c.SessionsPerWeek,
+                c.WeeklySchedules.Select((ws, idx) => new ClassroomWeeklySchedule
+                {
+                    SessionIndex = idx + 1,
+                    DayOfWeek = ws.DayOfWeek,
+                    StartTime = ws.StartTime,
+                    EndTime = ws.EndTime
+                }));
+
             return Ok(new
             {
                 id = c.Id,
@@ -165,11 +200,15 @@ public class SearchApiController : ControllerBase
                 coverImageUrl = c.CoverImageUrl,
                 fee = c.Fee,
                 type = c.Type.ToString(),
+                status = c.Status.ToString(),
                 studentCount = c.StudentCount,
                 maxStudents = c.MaxStudents,
                 startDate = c.StartDate,
+                registrationDeadline = c.RegistrationDeadline,
+                endDate = c.EndDate,
+                totalSessions = expectedTotal,
                 sessionsPerWeek = c.SessionsPerWeek,
-                hoursPerSession = c.HoursPerSession,
+                hoursPerSession = safeHours,
                 subjectId = c.SubjectId,
                 subjectName = c.SubjectName,
                 gradeLevelId = c.GradeLevelId,
@@ -187,7 +226,9 @@ public class SearchApiController : ControllerBase
                 weeklySchedules = schedules,
                 isEnrolled,
                 isPending,
-                hasActiveSubject
+                hasActiveSubject,
+                hasStartedSession = c.HasStartedSession,
+                isEnrollmentOpen
             });
         }
         catch (Exception ex)

@@ -22,6 +22,10 @@ public class TutorClassroomDto
 
     public int SessionsPerWeek { get; set; } = 1;
     public double HoursPerSession { get; set; } = 2.0;
+    public DateOnly? StartDate { get; set; }
+    public DateOnly? RegistrationDeadline { get; set; }
+    public DateOnly? EndDate { get; set; }
+    public int? TotalSessions { get; set; }
     public string ScheduleSummary { get; set; } = string.Empty;
     public List<string> WeeklyScheduleItems { get; set; } = [];
 
@@ -38,6 +42,9 @@ public class CreateClassroomRequest
     public int SessionsPerWeek { get; set; } = 2;
     public double HoursPerSession { get; set; } = 2.0;
     public DateOnly? StartDate { get; set; }
+    public DateOnly? RegistrationDeadline { get; set; }
+    public DateOnly? EndDate { get; set; }
+    public int? TotalSessions { get; set; }
     public string? CoverImageUrl { get; set; }
     public int SubjectId { get; set; }
     public int GradeLevelId { get; set; }
@@ -48,12 +55,16 @@ public class CreateClassroomRequest
 public class UpdateClassroomRequest
 {
     public string? Name { get; set; }
+    public string? NameClass { get; set; }
     public string? Description { get; set; }
     public decimal? Fee { get; set; }
     public int? MaxStudents { get; set; }
     public int? SessionsPerWeek { get; set; }
     public double? HoursPerSession { get; set; }
     public DateOnly? StartDate { get; set; }
+    public DateOnly? RegistrationDeadline { get; set; }
+    public DateOnly? EndDate { get; set; }
+    public int? TotalSessions { get; set; }
     public string? CoverImageUrl { get; set; }
     public bool RemoveCoverImage { get; set; }
     public int? SubjectId { get; set; }

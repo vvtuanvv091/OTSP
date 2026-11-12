@@ -54,6 +54,50 @@ const getVietnamTodayStr = () => {
   return `${map.year}-${map.month}-${map.day}`;
 };
 
+const normalizeHoursValue = (raw) => {
+  let num = Number(raw);
+  if (!Number.isFinite(num) || num <= 0) return 2.0;
+  if (num >= 45) num /= 60;
+  else if (num >= 10) num /= 10;
+  return Math.min(4.0, Math.max(0.5, num));
+};
+
+const minutesToHHmm = (totalMinutes) => {
+  const safe = ((Math.round(totalMinutes) % (24 * 60)) + 24 * 60) % (24 * 60);
+  const hh = Math.floor(safe / 60);
+  const mm = safe % 60;
+  return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+};
+
+const extractVnDateAndTime = (rawTime) => {
+  if (!rawTime) return { date: '', hour: 0, minute: 0 };
+  const wallMatch = String(rawTime).match(/^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})/);
+  if (wallMatch && !String(rawTime).endsWith('Z')) {
+    return {
+      date: wallMatch[1],
+      hour: parseInt(wallMatch[2], 10),
+      minute: parseInt(wallMatch[3], 10)
+    };
+  }
+  const parsed = new Date(rawTime);
+  if (Number.isNaN(parsed.getTime())) return { date: '', hour: 0, minute: 0 };
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Ho_Chi_Minh',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23'
+  }).formatToParts(parsed);
+  const map = Object.fromEntries(parts.map(({ type, value }) => [type, value]));
+  return {
+    date: `${map.year}-${map.month}-${map.day}`,
+    hour: parseInt(map.hour, 10) || 0,
+    minute: parseInt(map.minute, 10) || 0
+  };
+};
+
 export default function TutorSchedulePage() {
   const toast = useToast();
   const confirm = useConfirm();
@@ -72,7 +116,9 @@ export default function TutorSchedulePage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedClassroomId, setSelectedClassroomId] = useState('');
   const [sessionDate, setSessionDate] = useState('');
-  const [sessionHour, setSessionHour] = useState(19);
+  const [sessionStartTime, setSessionStartTime] = useState('19:00');
+  const [sessionDurationHours, setSessionDurationHours] = useState(2.0);
+  const [modalError, setModalError] = useState('');
   const [creating, setCreating] = useState(false);
 
   // Modal: Xem chi tiết và hủy buổi học
@@ -133,19 +179,16 @@ export default function TutorSchedulePage() {
   const calendarSessions = useMemo(() => {
     const raw = scheduleData?.calendarSessions || [];
     return raw.map((s) => {
-      let dateStr = s.date;
-      let hourNum = s.hour;
-
-      if (!dateStr || hourNum === undefined) {
-        const rawTime = s.scheduledAtVn || s.scheduledAtUtc;
-        if (rawTime) {
-          const match = String(rawTime).match(/^(\d{4}-\d{2}-\d{2})T(\d{2}):/);
-          if (match) {
-            dateStr = match[1];
-            hourNum = parseInt(match[2], 10);
-          }
-        }
-      }
+      const parsedTime = extractVnDateAndTime(s.scheduledAtVn || s.scheduledAtUtc);
+      const dateStr = s.date || parsedTime.date;
+      const hourNum = Number.isFinite(Number(s.hour)) ? Number(s.hour) : parsedTime.hour;
+      const minuteNum = Number.isFinite(Number(s.minute)) ? Number(s.minute) : parsedTime.minute;
+      const durationHours = normalizeHoursValue(
+        s.hoursPerSession ?? s.durationHours ?? (s.durationMinutes ? s.durationMinutes / 60 : 2.0)
+      );
+      const startMin = hourNum * 60 + minuteNum;
+      const endMin = startMin + Math.round(durationHours * 60);
+      const computedRange = `${minutesToHHmm(startMin)}–${minutesToHHmm(endMin)}`;
 
       const status = s.status === 'InProgress' || s.status === 3
         ? 'InProgress'
@@ -157,12 +200,28 @@ export default function TutorSchedulePage() {
         ...s,
         date: dateStr,
         hour: hourNum,
+        minute: minuteNum,
+        startMin,
+        endMin,
+        durationHours,
+        timeLabel: s.timeRangeLabel || computedRange,
         normalizedStatus: status,
         sessionId: s.sessionId || s.id,
-        canJoin: s.canJoin ?? (status === 'InProgress')
+        isMakeup: Boolean(s.isMakeup),
+        canJoin: Boolean(s.canJoin)
       };
     });
   }, [scheduleData]);
+
+  // Các buổi học nằm ngoài 8 ca chuẩn trên lưới (ví dụ 12:00–13:00 hoặc trước 06:00 / sau 23:00)
+  const offGridSessions = useMemo(() => {
+    return calendarSessions.filter((s) => {
+      const matchesBlock = TIME_BLOCKS.some(
+        (b) => s.startMin >= b.start * 60 && s.startMin < b.end * 60
+      );
+      return !matchesBlock;
+    });
+  }, [calendarSessions]);
 
   // Danh sách buổi học đang diễn ra trực tuyến
   const liveSessions = useMemo(() => {
@@ -178,21 +237,46 @@ export default function TutorSchedulePage() {
     return { total, upcoming, inProgress, done };
   }, [calendarSessions]);
 
+  const selectInitialClassroom = (nextClassrooms) => {
+    const first = nextClassrooms?.[0];
+    if (!first) return;
+    setSelectedClassroomId(String(first.id));
+    setSessionDurationHours(normalizeHoursValue(first.hoursPerSession || 2.0));
+  };
+
   // Tự động điền thông tin khi bấm vào một ô trống trên lịch
   const handleSlotClick = (dateStr, hour) => {
+    setModalError('');
     setSessionDate(dateStr);
-    setSessionHour(hour);
+    setSessionStartTime(`${String(hour).padStart(2, '0')}:00`);
     if (scheduleData?.activeClassrooms?.length > 0 && !selectedClassroomId) {
-      setSelectedClassroomId(String(scheduleData.activeClassrooms[0].id));
+      selectInitialClassroom(scheduleData.activeClassrooms);
     }
     setShowCreateModal(true);
+  };
+
+  const handleClassroomSelectInModal = (classIdStr) => {
+    setSelectedClassroomId(classIdStr);
+    const matched = (scheduleData?.activeClassrooms || []).find((c) => String(c.id) === String(classIdStr));
+    if (matched) {
+      setSessionDurationHours(normalizeHoursValue(matched.hoursPerSession || 2.0));
+    }
   };
 
   // Xử lý tạo buổi học
   const handleCreateSession = async (e) => {
     e.preventDefault();
-    if (!selectedClassroomId || !sessionDate) {
-      setError('Vui lòng chọn lớp học và ngày học.');
+    setModalError('');
+    if (!selectedClassroomId || !sessionDate || !sessionStartTime) {
+      setModalError('Vui lòng chọn lớp học, ngày học và giờ bắt đầu.');
+      return;
+    }
+
+    const [hh, mm] = sessionStartTime.split(':').map(Number);
+    const utcMs = Date.parse(`${sessionDate}T00:00:00Z`) + ((hh || 0) * 60 + (mm || 0) - 7 * 60) * 60 * 1000;
+    const utcDate = new Date(utcMs);
+    if (utcMs <= Date.now() - 5 * 60 * 1000) {
+      setModalError('Không thể tạo buổi dạy bù trong quá khứ.');
       return;
     }
 
@@ -201,21 +285,18 @@ export default function TutorSchedulePage() {
     setError('');
 
     try {
-      // Giờ Việt Nam là UTC+7 -> Giờ UTC = sessionHour - 7
-      const utcDate = new Date(`${sessionDate}T00:00:00Z`);
-      utcDate.setUTCHours(Number(sessionHour) - 7);
-
       await tutorApi.createSession({
         classroomId: Number(selectedClassroomId),
         scheduledAtUtc: utcDate.toISOString(),
+        durationHours: normalizeHoursValue(sessionDurationHours)
       });
-      setMessage('Tạo buổi học thành công!');
+      setMessage('Đã tạo buổi dạy bù thành công!');
       setShowCreateModal(false);
       setSelectedClassroomId('');
       setSessionDate('');
       setReloadKey((k) => k + 1);
     } catch (err) {
-      setError(err.response?.data?.message || 'Có lỗi xảy ra khi tạo buổi học.');
+      setModalError(err.response?.data?.message || 'Có lỗi xảy ra khi tạo buổi học.');
     } finally {
       setCreating(false);
     }
@@ -531,11 +612,10 @@ export default function TutorSchedulePage() {
               className="btn btn-danger btn-sm px-3 py-2 fw-semibold rounded-2 d-inline-flex align-items-center gap-1.5 shadow-sm"
               style={{ backgroundColor: '#DB303A', borderColor: '#DB303A' }}
               onClick={() => {
+                setModalError('');
                 setSessionDate(todayStr);
-                setSessionHour(19);
-                if (scheduleData?.activeClassrooms?.length > 0) {
-                  setSelectedClassroomId(String(scheduleData.activeClassrooms[0].id));
-                }
+                setSessionStartTime('19:00');
+                selectInitialClassroom(scheduleData?.activeClassrooms);
                 setShowCreateModal(true);
               }}
             >
@@ -798,12 +878,20 @@ export default function TutorSchedulePage() {
 
                         {weekDates.map((curDate, dIdx) => {
                           const curDateStr = formatDateOnly(curDate);
+                          const blockStartMin = block.start * 60;
+                          const blockEndMin = block.end * 60;
 
-                          // Tìm các buổi học trùng ngày và trùng ca học này
+                          // Các buổi bắt đầu trong block này
                           const slotSessions = calendarSessions.filter((s) => {
                             if (s.date !== curDateStr) return false;
-                            const h = Number(s.hour);
-                            return h >= block.start && h < block.end;
+                            return s.startMin >= blockStartMin && s.startMin < blockEndMin;
+                          });
+
+                          // Các buổi bắt đầu từ block trước nhưng tràn sang khung giờ block này
+                          const continuingSessions = calendarSessions.filter((s) => {
+                            if (s.date !== curDateStr || s.normalizedStatus === 'Cancelled') return false;
+                            if (s.startMin >= blockStartMin && s.startMin < blockEndMin) return false;
+                            return s.startMin < blockEndMin && s.endMin > blockStartMin;
                           });
 
                           return (
@@ -847,9 +935,9 @@ export default function TutorSchedulePage() {
                                         title="Bấm để xem chi tiết buổi học"
                                       >
                                         <div className="d-flex align-items-center justify-content-between gap-1">
-                                          <span className="small fw-bold text-dark">
+                                          <span className="small fw-bold text-dark" style={{ fontVariantNumeric: 'tabular-nums' }}>
                                             <i className="bi bi-clock me-1 text-secondary" style={{ fontSize: 10 }}></i>
-                                            {String(session.hour).padStart(2, '0')}:00
+                                            {session.timeLabel}
                                           </span>
                                           <span className={`badge ${badgeClass}`} style={{ fontSize: 9, padding: '2px 5px' }}>
                                             {statusText}
@@ -866,45 +954,79 @@ export default function TutorSchedulePage() {
                                         </div>
 
                                         <div className="d-flex align-items-center justify-content-between gap-1 mt-auto pt-1">
-                                          <span
-                                            className="badge bg-light text-secondary border text-truncate flex-shrink-1"
-                                            style={{ fontSize: 9, padding: '2px 4px', maxWidth: '48%' }}
-                                            title={session.subjectName}
-                                          >
-                                            {session.subjectName}
-                                          </span>
+                                          <div className="d-flex align-items-center gap-1 min-w-0">
+                                            <span
+                                              className="badge bg-light text-secondary border text-truncate"
+                                              style={{ fontSize: 9, padding: '2px 4px', maxWidth: 68 }}
+                                              title={session.subjectName}
+                                            >
+                                              {session.subjectName}
+                                            </span>
+                                            {session.isMakeup && (
+                                              <span className="badge bg-info-subtle text-info-emphasis border" style={{ fontSize: 8.5, padding: '2px 4px' }}>
+                                                Bù
+                                              </span>
+                                            )}
+                                          </div>
 
                                           {Number(session.sessionId) > 0 && !isDone && !isCancelled && (
-                                            <Link
-                                              to={`/room/${session.sessionId}`}
-                                              className={`btn btn-sm text-nowrap fw-bold d-inline-flex align-items-center gap-1 ${
-                                                isInProgress
-                                                  ? 'btn-danger animate-pulse shadow-sm'
-                                                  : 'btn-outline-danger'
-                                              }`}
-                                              style={{
-                                                fontSize: 9.5,
-                                                padding: '2px 6px',
-                                                lineHeight: 1.2,
-                                                borderRadius: 5,
-                                                whiteSpace: 'nowrap',
-                                                flexShrink: 0
-                                              }}
-                                              onClick={(e) => e.stopPropagation()}
-                                              title={isInProgress ? 'Đang diễn ra - Bấm để vào lớp' : 'Bấm để mở lớp sớm'}
-                                            >
-                                              <i
-                                                className={isInProgress ? 'bi bi-camera-video-fill' : 'bi bi-camera-video'}
-                                                style={{ fontSize: 10 }}
-                                                aria-hidden="true"
-                                              />
-                                              <span>{isInProgress ? 'Vào lớp' : 'Mở lớp'}</span>
-                                            </Link>
+                                            session.canJoin ? (
+                                              <Link
+                                                to={`/room/${session.sessionId}`}
+                                                className={`btn btn-sm text-nowrap fw-bold d-inline-flex align-items-center gap-1 ${
+                                                  isInProgress
+                                                    ? 'btn-danger animate-pulse shadow-sm'
+                                                    : 'btn-outline-danger'
+                                                }`}
+                                                style={{
+                                                  fontSize: 9.5,
+                                                  padding: '2px 6px',
+                                                  lineHeight: 1.2,
+                                                  borderRadius: 5,
+                                                  whiteSpace: 'nowrap',
+                                                  flexShrink: 0
+                                                }}
+                                                onClick={(e) => e.stopPropagation()}
+                                                title={isInProgress ? 'Đang diễn ra - Bấm để vào lớp' : 'Đã đến giờ mở phòng học'}
+                                              >
+                                                <i
+                                                  className={isInProgress ? 'bi bi-camera-video-fill' : 'bi bi-camera-video'}
+                                                  style={{ fontSize: 10 }}
+                                                  aria-hidden="true"
+                                                />
+                                                <span>{isInProgress ? 'Vào lớp' : 'Mở lớp'}</span>
+                                              </Link>
+                                            ) : (
+                                              <span
+                                                className="badge bg-light text-secondary border text-nowrap"
+                                                style={{ fontSize: 9, padding: '2px 5px' }}
+                                                title="Chỉ có thể mở phòng học trong vòng 30 phút trước giờ bắt đầu"
+                                              >
+                                                Chưa tới giờ
+                                              </span>
+                                            )
                                           )}
                                         </div>
                                       </div>
                                     );
                                   })}
+                                </div>
+                              ) : continuingSessions.length > 0 ? (
+                                <div
+                                  className="schedule-cell-slot bg-light-subtle border rounded-2 p-2 d-flex flex-column justify-content-center align-items-center text-center"
+                                  style={{ cursor: 'pointer', minHeight: 74 }}
+                                  onClick={() => setSelectedSession(continuingSessions[0])}
+                                  title={`Ca ${continuingSessions[0].classroomName} (${continuingSessions[0].timeLabel}) đang chiếm khung giờ này`}
+                                >
+                                  <span className="badge bg-secondary-subtle text-secondary border mb-1" style={{ fontSize: 9 }}>
+                                    Đang diễn ra ca trước
+                                  </span>
+                                  <div className="small fw-semibold text-dark text-truncate w-100" style={{ fontSize: 11 }}>
+                                    {continuingSessions[0].classroomName}
+                                  </div>
+                                  <div className="text-muted" style={{ fontSize: 10, fontVariantNumeric: 'tabular-nums' }}>
+                                    {continuingSessions[0].timeLabel}
+                                  </div>
                                 </div>
                               ) : (
                                 <div
@@ -926,6 +1048,30 @@ export default function TutorSchedulePage() {
                   })}
                 </tbody>
               </table>
+            </div>
+          )}
+
+          {offGridSessions.length > 0 && (
+            <div className="mt-3 p-3 rounded-3 bg-warning-subtle border border-warning-subtle">
+              <div className="fw-semibold small text-dark mb-2">
+                <i className="bi bi-clock-history me-1 text-warning-emphasis"></i>
+                Buổi học ngoài khung ca lưới chuẩn (ví dụ trưa 12:00–13:00 hoặc sau 23:00):
+              </div>
+              <div className="d-flex flex-wrap gap-2">
+                {offGridSessions.map((s) => (
+                  <button
+                    key={s.sessionId || s.id}
+                    type="button"
+                    className="btn btn-sm btn-light border text-start d-inline-flex align-items-center gap-2"
+                    onClick={() => setSelectedSession(s)}
+                  >
+                    <span className="fw-bold text-danger" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                      {s.date} · {s.timeLabel}
+                    </span>
+                    <span className="text-dark">{s.classroomName}</span>
+                  </button>
+                ))}
+              </div>
             </div>
           )}
         </div>
@@ -966,9 +1112,12 @@ export default function TutorSchedulePage() {
 
                     return (
                       <tr key={s.sessionId || s.id}>
-                        <td className="fw-semibold text-danger">
+                        <td className="fw-semibold text-danger" style={{ fontVariantNumeric: 'tabular-nums' }}>
                           <i className="bi bi-clock me-1 text-secondary"></i>
-                          {s.date} lúc {String(s.hour).padStart(2, '0')}:00
+                          {s.date} · {s.timeLabel}
+                          {s.isMakeup && (
+                            <span className="badge bg-info-subtle text-info-emphasis border ms-2">Dạy bù</span>
+                          )}
                         </td>
                         <td className="fw-bold">{s.classroomName}</td>
                         <td>{s.studentName || 'Chưa xếp'}</td>
@@ -996,17 +1145,25 @@ export default function TutorSchedulePage() {
                           </span>
                         </td>
                         <td className="text-end">
-                          <div className="d-inline-flex align-items-center gap-1.5">
-                            {Number(s.sessionId) > 0 && !isDone && !isCancelled && (
+                          <div className="d-inline-flex align-items-center gap-1">
+                            {Number(s.sessionId) > 0 && !isDone && !isCancelled && s.canJoin && (
                               <Link
                                 to={`/room/${s.sessionId}`}
-                                className={`btn btn-sm ${isInProgress ? 'btn-danger animate-pulse shadow-sm' : 'btn-outline-danger'} px-2.5 py-1 text-nowrap fw-semibold d-inline-flex align-items-center gap-1`}
+                                className={`btn btn-sm ${isInProgress ? 'btn-danger animate-pulse shadow-sm' : 'btn-outline-danger'} px-2 py-1 text-nowrap fw-semibold d-inline-flex align-items-center gap-1`}
                                 style={{ fontSize: 12, borderRadius: 6 }}
-                                title={isInProgress ? 'Đang diễn ra - Bấm để vào lớp' : 'Bấm để mở lớp sớm'}
+                                title={isInProgress ? 'Đang diễn ra - Bấm để vào lớp' : 'Đã đến giờ mở phòng học'}
                               >
                                 <i className={isInProgress ? 'bi bi-camera-video-fill' : 'bi bi-camera-video'} aria-hidden="true" />
                                 <span>{isInProgress ? 'Vào lớp' : 'Mở lớp'}</span>
                               </Link>
+                            )}
+                            {Number(s.sessionId) > 0 && !isDone && !isCancelled && !s.canJoin && (
+                              <span
+                                className="badge bg-light text-secondary border px-2 py-1 text-nowrap"
+                                title="Chỉ mở lớp trước giờ học tối đa 30 phút"
+                              >
+                                Chưa tới giờ
+                              </span>
                             )}
                             <button
                               type="button"
@@ -1050,18 +1207,23 @@ export default function TutorSchedulePage() {
                     <button type="button" className="btn-close" onClick={() => setShowCreateModal(false)}></button>
                   </div>
                   <div className="modal-body">
+                    {modalError && (
+                      <div className="alert alert-danger py-2 small mb-3" role="alert">
+                        <i className="bi bi-exclamation-circle me-1"></i>{modalError}
+                      </div>
+                    )}
                     <div className="mb-3">
                       <label className="form-label fw-semibold">Chọn lớp học <span className="text-danger">*</span></label>
                       <select
                         className="form-select"
                         value={selectedClassroomId}
-                        onChange={(e) => setSelectedClassroomId(e.target.value)}
+                        onChange={(e) => handleClassroomSelectInModal(e.target.value)}
                         required
                       >
                         <option value="">-- Chọn lớp đang dạy --</option>
                         {(scheduleData?.activeClassrooms || []).map((c) => (
                           <option key={c.id} value={c.id}>
-                            {c.name} · {c.subjectName} ({c.type})
+                            {c.nameClass || c.name} · {c.subjectName} ({c.type === 'OneToOne' || c.type === 0 ? '1-1' : 'Lớp nhóm'})
                           </option>
                         ))}
                       </select>
@@ -1078,27 +1240,40 @@ export default function TutorSchedulePage() {
                         type="date"
                         className="form-control"
                         value={sessionDate}
+                        min={todayStr}
                         onChange={(e) => setSessionDate(e.target.value)}
                         required
                       />
                     </div>
 
-                    <div className="mb-3">
-                      <label className="form-label fw-semibold">Khung giờ bắt đầu <span className="text-danger">*</span></label>
-                      <select
-                        className="form-select"
-                        value={sessionHour}
-                        onChange={(e) => setSessionHour(Number(e.target.value))}
-                      >
-                        {TIME_BLOCKS.map((b) => (
-                          <option key={b.start} value={b.start}>
-                            {b.label} ({b.period})
-                          </option>
-                        ))}
-                      </select>
-                      <div className="form-text small text-secondary">
-                        Mỗi buổi học theo chuẩn kéo dài 2 tiếng (GMT+7).
+                    <div className="row g-2 mb-2">
+                      <div className="col-6">
+                        <label className="form-label fw-semibold">Giờ bắt đầu <span className="text-danger">*</span></label>
+                        <input
+                          type="time"
+                          className="form-control"
+                          value={sessionStartTime}
+                          onChange={(e) => setSessionStartTime(e.target.value)}
+                          required
+                        />
                       </div>
+                      <div className="col-6">
+                        <label className="form-label fw-semibold">Thời lượng</label>
+                        <select
+                          className="form-select"
+                          value={sessionDurationHours}
+                          onChange={(e) => setSessionDurationHours(Number(e.target.value))}
+                        >
+                          <option value={1}>1.0 giờ (60 phút)</option>
+                          <option value={1.5}>1.5 giờ (90 phút)</option>
+                          <option value={2}>2.0 giờ (120 phút)</option>
+                          <option value={2.5}>2.5 giờ (150 phút)</option>
+                          <option value={3}>3.0 giờ (180 phút)</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div className="form-text small text-secondary">
+                      Hệ thống sẽ kiểm tra trùng lịch của gia sư và học viên trước khi lưu buổi dạy bù (GMT+7).
                     </div>
                   </div>
                   <div className="modal-footer border-top">
@@ -1165,8 +1340,8 @@ export default function TutorSchedulePage() {
                   <div className="row g-2 mb-3">
                     <div className="col-6">
                       <div className="small text-secondary">Thời gian</div>
-                      <div className="fw-semibold text-danger">
-                        {selectedSession.date} lúc {String(selectedSession.hour).padStart(2, '0')}:00
+                      <div className="fw-semibold text-danger" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                        {selectedSession.date} · {selectedSession.timeLabel}
                       </div>
                     </div>
                     <div className="col-6">
@@ -1202,14 +1377,20 @@ export default function TutorSchedulePage() {
                       Đóng
                     </button>
                     {Number(selectedSession.sessionId) > 0 && !['Done', 'Cancelled'].includes(selectedSession.normalizedStatus) && (
-                      <Link
-                        to={`/room/${selectedSession.sessionId}`}
-                        className={`btn ${selectedSession.normalizedStatus === 'InProgress' ? 'btn-danger' : 'btn-outline-danger'} btn-sm px-3 fw-semibold d-inline-flex align-items-center gap-1.5`}
-                        style={selectedSession.normalizedStatus === 'InProgress' ? { backgroundColor: '#DB303A', borderColor: '#DB303A' } : {}}
-                      >
-                        <i className={selectedSession.normalizedStatus === 'InProgress' ? 'bi bi-camera-video-fill' : 'bi bi-camera-video'} aria-hidden="true" />
-                        <span>{selectedSession.normalizedStatus === 'InProgress' ? 'Vào lớp' : 'Mở lớp'}</span>
-                      </Link>
+                      selectedSession.canJoin ? (
+                        <Link
+                          to={`/room/${selectedSession.sessionId}`}
+                          className={`btn ${selectedSession.normalizedStatus === 'InProgress' ? 'btn-danger' : 'btn-outline-danger'} btn-sm px-3 fw-semibold d-inline-flex align-items-center gap-1`}
+                          style={selectedSession.normalizedStatus === 'InProgress' ? { backgroundColor: '#DB303A', borderColor: '#DB303A' } : {}}
+                        >
+                          <i className={selectedSession.normalizedStatus === 'InProgress' ? 'bi bi-camera-video-fill' : 'bi bi-camera-video'} aria-hidden="true" />
+                          <span>{selectedSession.normalizedStatus === 'InProgress' ? 'Vào lớp' : 'Mở lớp'}</span>
+                        </Link>
+                      ) : (
+                        <span className="badge bg-light text-secondary border align-self-center py-2 px-3">
+                          Chưa tới giờ mở lớp (mở trước 30 phút)
+                        </span>
+                      )
                     )}
                   </div>
                 </div>

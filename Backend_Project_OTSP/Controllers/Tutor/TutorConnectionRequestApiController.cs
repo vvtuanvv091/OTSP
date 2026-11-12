@@ -61,6 +61,7 @@ public class TutorConnectionRequestApiController : ControllerBase
             .Select(request => new TutorConnectionRequestDto
             {
                 Id = request.Id,
+                StudentUserId = request.Student.UserId,
                 StudentName = request.Student.User.FullName,
                 StudentAvatarUrl = request.Student.User.AvatarUrl,
                 SubjectName = request.Subject.Name,
@@ -70,6 +71,14 @@ public class TutorConnectionRequestApiController : ControllerBase
                 ClassroomName = request.Classroom == null ? null : request.Classroom.NameClass,
                 Status = request.Status,
                 CreatedAt = request.CreatedAt,
+                IsTrial = request.IsTrial
+                    || (request.PreferredType == ClassroomType.OneToOne
+                        && request.ClassroomId == null
+                        && request.Message != null
+                        && request.Message.Contains("Đăng ký học thử")),
+                DurationWeeks = request.DurationWeeks,
+                RequestedStartDate = request.RequestedStartDate,
+                RequestedEndDate = request.RequestedEndDate,
                 ProposedTrialSlotUtc = request.ProposedTrialSlotUtc,
                 ProposedTrialSlotsUtc = request.TrialSchedules.Select(t => t.ScheduledAt).ToList(),
                 MatchesAvailability = true,

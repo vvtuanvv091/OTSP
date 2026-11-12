@@ -26,32 +26,41 @@ public class EmailSenderService : IEmailSenderService
 
     public async Task<bool> SendNotificationEmailAsync(string toEmail, string subject, string bodyHtml, CancellationToken ct = default)
     {
-        return await SendEmailInternalAsync(toEmail, subject, bodyHtml);
+        return await SendEmailInternalAsync(toEmail, subject, bodyHtml, ct);
     }
 
-    private async Task<bool> SendEmailInternalAsync(string toEmail, string subject, string bodyHtml)
+    private async Task<bool> SendEmailInternalAsync(string toEmail, string subject, string bodyHtml, CancellationToken ct = default)
     {
+        if (string.IsNullOrWhiteSpace(toEmail) || !MailAddress.TryCreate(toEmail.Trim(), out var recipientAddress))
+        {
+            _logger.LogWarning("Bỏ qua gửi email vì địa chỉ người nhận không hợp lệ: {ToEmail}", toEmail);
+            return false;
+        }
+
         var smtpHost = _config["Smtp:Host"];
         var smtpPortStr = _config["Smtp:Port"];
         var smtpUser = _config["Smtp:Username"];
         var smtpPass = _config["Smtp:Password"];
-        var fromEmail = _config["Smtp:From"] ?? "tongngoctuan09@gmail.com";
+        var fromEmail = !string.IsNullOrWhiteSpace(_config["Smtp:From"])
+            ? _config["Smtp:From"]!.Trim()
+            : smtpUser?.Trim();
 
-        if (string.IsNullOrWhiteSpace(smtpHost) || string.IsNullOrWhiteSpace(smtpUser) || string.IsNullOrWhiteSpace(smtpPass))
+        if (string.IsNullOrWhiteSpace(smtpHost) || string.IsNullOrWhiteSpace(smtpUser) || string.IsNullOrWhiteSpace(smtpPass) || string.IsNullOrWhiteSpace(fromEmail))
         {
-            _logger.LogInformation("SMTP chưa được cấu hình mật khẩu. Ghi nhận thông báo email tới {ToEmail} - Tiêu đề: {Subject}", toEmail, subject);
-            return true;
+            _logger.LogInformation("SMTP chưa được cấu hình đầy đủ. Không thể gửi email thực tế tới {ToEmail} - Tiêu đề: {Subject}", recipientAddress.Address, subject);
+            return false;
         }
 
         try
         {
             int port = int.TryParse(smtpPortStr, out var p) ? p : 587;
-            bool enableSsl = bool.TryParse(_config["Smtp:EnableSsl"], out var ssl) ? ssl : true;
+            bool enableSsl = !bool.TryParse(_config["Smtp:EnableSsl"], out var ssl) || ssl;
 
             using var client = new SmtpClient(smtpHost, port)
             {
                 Credentials = new NetworkCredential(smtpUser, smtpPass),
                 EnableSsl = enableSsl,
+                Timeout = 15000
             };
 
             using var mail = new MailMessage
@@ -61,16 +70,16 @@ public class EmailSenderService : IEmailSenderService
                 Body = bodyHtml,
                 IsBodyHtml = true,
             };
-            mail.To.Add(toEmail);
+            mail.To.Add(recipientAddress);
 
-            await client.SendMailAsync(mail);
-            _logger.LogInformation("Đã gửi email thành công tới {ToEmail}", toEmail);
+            await client.SendMailAsync(mail, ct);
+            _logger.LogInformation("Đã gửi email SMTP thành công tới {ToEmail} | Subject: {Subject}", recipientAddress.Address, subject);
             return true;
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Lỗi khi gửi email SMTP tới {ToEmail}. Tiếp tục quy trình bình thường.", toEmail);
-            return true;
+            _logger.LogError(ex, "Gửi email SMTP thất bại tới {ToEmail} | Subject: {Subject}", recipientAddress.Address, subject);
+            return false;
         }
     }
 }

@@ -42,20 +42,47 @@ const getVietnamToday = () => {
   return `${values.year}-${values.month}-${values.day}`;
 };
 
+const normalizeHoursValue = (raw) => {
+  let num = Number(raw);
+  if (!Number.isFinite(num) || num <= 0) return 2.0;
+  if (num >= 45) num /= 60;
+  else if (num >= 10) num /= 10;
+  return Math.min(4.0, Math.max(0.5, num));
+};
+
+const minutesToHHmm = (totalMinutes) => {
+  const safe = ((Math.round(totalMinutes) % (24 * 60)) + 24 * 60) % (24 * 60);
+  const hh = Math.floor(safe / 60);
+  const mm = safe % 60;
+  return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+};
+
 const getVietnamDateTime = (value) => {
-  if (!value) return { date: getVietnamToday(), hour: 0 };
+  if (!value) return { date: getVietnamToday(), hour: 0, minute: 0 };
+  const wallMatch = String(value).match(/^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})/);
+  if (wallMatch && !String(value).endsWith('Z')) {
+    return {
+      date: wallMatch[1],
+      hour: Number(wallMatch[2]),
+      minute: Number(wallMatch[3])
+    };
+  }
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return { date: getVietnamToday(), hour: 0, minute: 0 };
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Ho_Chi_Minh',
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
     hour: '2-digit',
+    minute: '2-digit',
     hourCycle: 'h23'
-  }).formatToParts(new Date(value));
+  }).formatToParts(parsed);
   const values = Object.fromEntries(parts.map(({ type, value: partValue }) => [type, partValue]));
   return {
     date: `${values.year}-${values.month}-${values.day}`,
-    hour: Number(values.hour)
+    hour: Number(values.hour) || 0,
+    minute: Number(values.minute) || 0
   };
 };
 
@@ -101,16 +128,17 @@ export default function StudentSchedulePage() {
           setPendingPayments(res.data.pendingPayments || []);
           const rawSlots = res.data.calendarSlots || res.data.sessions || [];
           const mapped = rawSlots.map((s) => {
-            const vietnamWallTime = typeof s.scheduledAtVn === 'string'
-              ? s.scheduledAtVn.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}):/)
-              : null;
-            const localDateTime = vietnamWallTime
-              ? { date: vietnamWallTime[1], hour: Number(vietnamWallTime[2]) }
-              : getVietnamDateTime(s.scheduledAtUtc || s.scheduledAt);
+            const localDateTime = getVietnamDateTime(s.scheduledAtVn || s.scheduledAtUtc || s.scheduledAt);
             const sessionDate = s.date || localDateTime.date;
-            const sessionHour = s.hour ?? localDateTime.hour;
+            const startHour = Number(s.hour ?? localDateTime.hour);
+            const startMinute = Number(s.minute ?? localDateTime.minute ?? 0);
             const dayOfWeek = (parseDateOnly(sessionDate).getUTCDay() + 6) % 7;
-            const startHour = Number(sessionHour);
+            const durationHours = normalizeHoursValue(
+              s.hoursPerSession ?? s.durationHours ?? (s.durationMinutes ? s.durationMinutes / 60 : 2.0)
+            );
+            const startMin = startHour * 60 + startMinute;
+            const endMin = startMin + Math.round(durationHours * 60);
+            const fullRange = s.timeRangeLabel || `${minutesToHHmm(startMin)}–${minutesToHHmm(endMin)}`;
 
             const statusStr = typeof s.status === 'string'
               ? s.status
@@ -127,12 +155,18 @@ export default function StudentSchedulePage() {
               subjectName: s.subjectName,
               tutorName: s.tutorName,
               classroomType: s.classroomType === 0 || s.classroomType === 'OneToOne' ? 'OneToOne' : 'Group',
+              sessionDate,
               dayOfWeek,
               startHour,
-              timeDisplay: `${String(startHour).padStart(2, '0')}:00`,
-              fullTimeDisplay: `${String(startHour).padStart(2, '0')}:00 – ${String(startHour + 2).padStart(2, '0')}:00`,
+              startMinute,
+              startMin,
+              endMin,
+              durationHours,
+              timeDisplay: fullRange,
+              fullTimeDisplay: fullRange,
               status: statusStr,
-              canJoin: s.canJoin ?? (statusStr === 'InProgress'),
+              isMakeup: Boolean(s.isMakeup),
+              canJoin: Boolean(s.canJoin),
               isPaid: s.hasPaid ?? true,
               pendingPaymentId: s.pendingPaymentId,
               videoRoom: s.videoRoom
@@ -773,8 +807,18 @@ export default function StudentSchedulePage() {
 
                       {weekDates.map((dayDate, i) => {
                         const dayOfWeek = i; // 0 = Monday, ..., 6 = Sunday
+                        const rowStartMin = row.start * 60;
+                        const rowEndMin = row.end * 60;
                         const daySessions = sessions.filter(
-                          (s) => s.dayOfWeek === dayOfWeek && s.startHour >= row.start && s.startHour < row.end
+                          (s) => s.dayOfWeek === dayOfWeek && s.startMin >= rowStartMin && s.startMin < rowEndMin
+                        );
+                        const continuingSessions = sessions.filter(
+                          (s) =>
+                            s.dayOfWeek === dayOfWeek &&
+                            s.status !== 'Cancelled' &&
+                            !(s.startMin >= rowStartMin && s.startMin < rowEndMin) &&
+                            s.startMin < rowEndMin &&
+                            s.endMin > rowStartMin
                         );
 
                         return (
@@ -812,12 +856,12 @@ export default function StudentSchedulePage() {
 
                                   return (
                                     <div
-                                      key={`${session.sessionId}-${session.startHour}`}
+                                      key={`${session.sessionId}-${session.startMin}`}
                                       className={`schedule-session-card ${sessionStatusClass}`}
                                       title={`${session.tutorName} · ${session.subjectName} (${session.timeDisplay})`}
                                     >
                                       <div className="d-flex align-items-center justify-content-between gap-1 mb-1">
-                                        <span className="session-time">
+                                        <span className="session-time" style={{ fontVariantNumeric: 'tabular-nums' }}>
                                           <i className="bi bi-clock me-1"></i>
                                           {session.timeDisplay}
                                         </span>
@@ -830,6 +874,7 @@ export default function StudentSchedulePage() {
                                       </div>
                                       <div className="session-subject text-truncate">
                                         {session.subjectName} · {session.classroomName || (session.classroomType === 'OneToOne' ? '1-1' : 'Lớp nhóm')}
+                                        {session.isMakeup ? ' · Học bù' : ''}
                                       </div>
                                       {Number(session.sessionId) > 0 && !isDone && !isCancelled && (
                                         !session.isPaid && session.pendingPaymentId ? (
@@ -840,26 +885,32 @@ export default function StudentSchedulePage() {
                                           >
                                             <i className="bi bi-qr-code me-1"></i>Đóng học phí
                                           </Link>
-                                         ) : session.canJoin ? (
-                                           <Link
-                                             to={`/room/${session.sessionId}`}
-                                             className="btn btn-danger btn-sm w-100 py-0.5 mt-1 d-block text-center text-white fw-semibold"
-                                             style={{ fontSize: 10.5, lineHeight: 1.4, backgroundColor: '#dc2626' }}
-                                           >
-                                             <i className="bi bi-camera-video me-1"></i>Vào lớp
-                                           </Link>
-                                         ) : (
-                                           <span
-                                             className="badge bg-light text-muted border w-100 py-1 mt-1 d-block text-center"
-                                             style={{ fontSize: 9.5, lineHeight: 1.2 }}
-                                           >
-                                             Chưa mở
-                                           </span>
-                                         )
+                                        ) : session.canJoin ? (
+                                          <Link
+                                            to={`/room/${session.sessionId}`}
+                                            className="btn btn-danger btn-sm w-100 py-0.5 mt-1 d-block text-center text-white fw-semibold"
+                                            style={{ fontSize: 10.5, lineHeight: 1.4, backgroundColor: '#dc2626' }}
+                                          >
+                                            <i className="bi bi-camera-video me-1"></i>Vào lớp
+                                          </Link>
+                                        ) : (
+                                          <span
+                                            className="badge bg-light text-muted border w-100 py-1 mt-1 d-block text-center"
+                                            style={{ fontSize: 9.5, lineHeight: 1.2 }}
+                                            title="Phòng học mở trước giờ bắt đầu 30 phút"
+                                          >
+                                            Chưa tới giờ mở lớp
+                                          </span>
+                                        )
                                       )}
                                     </div>
                                   );
                                 })}
+                              </div>
+                            ) : continuingSessions.length > 0 ? (
+                              <div className="p-2 rounded bg-light border text-center small text-secondary" style={{ fontSize: 10 }}>
+                                <div className="fw-semibold text-dark text-truncate">{continuingSessions[0].classroomName}</div>
+                                <div style={{ fontVariantNumeric: 'tabular-nums' }}>Ca nối tiếp ({continuingSessions[0].timeDisplay})</div>
                               </div>
                             ) : (
                               <div className="availability-slot is-empty"></div>
@@ -873,6 +924,32 @@ export default function StudentSchedulePage() {
               </tbody>
             </table>
           </div>
+
+          {sessions.some((s) => !PERIOD_ROWS.some((r) => s.startMin >= r.start * 60 && s.startMin < r.end * 60)) && (
+            <div className="mt-3 p-3 rounded-3 bg-warning-subtle border border-warning-subtle">
+              <div className="fw-semibold small text-dark mb-2">
+                <i className="bi bi-clock-history me-1 text-warning-emphasis"></i>
+                Buổi học ngoài khung ca lưới chuẩn (ví dụ trưa 12:00–13:00 hoặc sau 23:00):
+              </div>
+              <div className="d-flex flex-wrap gap-2">
+                {sessions
+                  .filter((s) => !PERIOD_ROWS.some((r) => s.startMin >= r.start * 60 && s.startMin < r.end * 60))
+                  .map((s) => (
+                    <div key={`${s.sessionId}-offgrid`} className="px-2 py-1 rounded bg-white border small d-flex align-items-center gap-2">
+                      <span className="fw-bold text-danger" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                        {s.sessionDate} · {s.timeDisplay}
+                      </span>
+                      <span className="text-dark fw-medium">{s.classroomName}</span>
+                      {s.canJoin && Number(s.sessionId) > 0 && (
+                        <Link to={`/room/${s.sessionId}`} className="btn btn-danger btn-xs px-2 py-0 text-white fw-semibold" style={{ fontSize: 11 }}>
+                          Vào lớp
+                        </Link>
+                      )}
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </>

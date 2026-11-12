@@ -10,6 +10,9 @@ public sealed class StudentClassroomSessionDto
     public DateTime ScheduledAtVn { get; init; }
     public SessionStatus Status { get; init; }
     public string? VideoRoom { get; init; }
+    public double DurationHours { get; init; } = 2.0;
+    public string? TimeRangeLabel { get; init; }
+    public bool IsMakeup { get; init; }
     public bool CanJoin { get; init; }
     public bool IsFuture { get; init; }
     public bool IsCompleted { get; init; }
@@ -35,7 +38,12 @@ public sealed class StudentClassroomItemDto
     public string ScheduleSummary { get; init; } = string.Empty;
     public string WeeklyScheduleSummary { get => ScheduleSummary; init => ScheduleSummary = value; }
     public DateTime JoinedAt { get; init; }
+    public DateOnly? StartDate { get; init; }
+    public DateOnly? RegistrationDeadline { get; init; }
+    public DateOnly? EndDate { get; init; }
     public int TotalSessionsCount { get; init; }
+    public int ExpectedTotalSessions { get; init; }
+    public int CompletedSessionsCount { get; init; }
     public DateTime? NextSessionScheduledAtVn { get; init; }
     public int? NextSessionId { get; init; }
     public ClassroomStatus Status { get; init; }

@@ -94,7 +94,9 @@ public class StudentDashboardApiController : ControllerBase
 
         var regularSessions = await _db.ClassSessions
             .AsNoTracking()
-            .Where(s => s.Classroom.ClassroomStudents.Any(cs => cs.StudentId == studentId)
+            .Where(s => s.Classroom.ClassroomStudents.Any(cs =>
+                            cs.StudentId == studentId
+                            && (s.Classroom.Type != ClassroomType.Group || s.ScheduledAt >= cs.JoinedAt))
                      && s.Classroom.Status == ClassroomStatus.Active
                      && s.Status != SessionStatus.Cancelled
                      && s.Status != SessionStatus.Done
@@ -112,7 +114,9 @@ public class StudentDashboardApiController : ControllerBase
                 ScheduledAtUtc = s.ScheduledAt,
                 Status = s.Status,
                 VideoRoom = s.VideoRoom,
-                Hours = s.Classroom.HoursPerSession > 0 ? s.Classroom.HoursPerSession : 2.0
+                Hours = s.DurationHours.HasValue && s.DurationHours.Value > 0
+                    ? Backend_Project_OTSP.Services.Common.ClassroomLifecycleHelper.NormalizeHoursPerSession(s.DurationHours.Value)
+                    : Backend_Project_OTSP.Services.Common.ClassroomLifecycleHelper.NormalizeHoursPerSession(s.Classroom.HoursPerSession)
             })
             .ToListAsync(cancellationToken);
 
@@ -139,13 +143,14 @@ public class StudentDashboardApiController : ControllerBase
                 ScheduledAtUtc = ts.ScheduledAt,
                 Status = SessionStatus.Scheduled,
                 VideoRoom = (string?)null,
-                Hours = 1.0
+                Hours = 2.0
             })
             .ToListAsync(cancellationToken);
 
         var allUpcomingRaw = regularSessions
             .Concat(trialSessions)
-            .Where(x => x.Status != SessionStatus.Done && x.ScheduledAtUtc.AddHours(MaxSessionOpenHours) >= nowUtc)
+            .Where(x => x.Status != SessionStatus.Done
+                        && x.ScheduledAtUtc.AddHours(Math.Max(1.0, x.Hours) + Backend_Project_OTSP.Services.Common.ClassroomLifecycleHelper.ExtraSessionCloseHours) >= nowUtc)
             .OrderBy(x => x.ScheduledAtUtc)
             .ToList();
 
@@ -161,15 +166,16 @@ public class StudentDashboardApiController : ControllerBase
             var nextStartVn = DateTime.SpecifyKind(
                 nextCandidate.ScheduledAtUtc.AddHours(VietnamUtcOffsetHours),
                 DateTimeKind.Unspecified);
+            var nextEndVn = nextStartVn.AddHours(nextCandidate.Hours);
             var nextRoomOpenVn = nextStartVn.AddMinutes(-EarlyJoinMinutes);
             var isOngoing = nextCandidate.Status == SessionStatus.InProgress
-                || (nowVn >= nextStartVn && nowVn <= nextStartVn.AddHours(MaxSessionOpenHours));
+                || (nowVn >= nextStartVn && nowVn <= nextEndVn);
             var canJoinNext = nextCandidate.Id > 0
-                && (nextCandidate.Status == SessionStatus.InProgress
-                    || (nowVn >= nextRoomOpenVn && nowVn <= nextStartVn.AddHours(MaxSessionOpenHours)));
+                && Backend_Project_OTSP.Services.Common.ClassroomLifecycleHelper.IsWithinJoinWindow(
+                    nextCandidate.ScheduledAtUtc, nextCandidate.Status, nextCandidate.Hours, nowUtc);
 
             var dayFull = $"{dayNames[(int)nextStartVn.DayOfWeek]}, {nextStartVn:dd/MM}";
-            var timeFormatted = $"{nextStartVn:HH:mm}";
+            var timeFormatted = $"{nextStartVn:HH:mm} - {nextEndVn:HH:mm}";
             var statusText = isOngoing ? "Đang diễn ra" : (nowVn >= nextRoomOpenVn && nowVn < nextStartVn ? "Sắp bắt đầu" : "Sắp diễn ra");
 
             var bannerTitle = !string.IsNullOrWhiteSpace(nextCandidate.SubjectName) && !string.IsNullOrWhiteSpace(nextCandidate.TutorName)
@@ -196,15 +202,15 @@ public class StudentDashboardApiController : ControllerBase
             var sVn = DateTime.SpecifyKind(
                 x.ScheduledAtUtc.AddHours(VietnamUtcOffsetHours),
                 DateTimeKind.Unspecified);
+            var endVn = sVn.AddHours(x.Hours);
             var isOngoing = (x.Status == SessionStatus.InProgress
-                || (nowVn >= sVn && nowVn <= sVn.AddHours(MaxSessionOpenHours)))
+                || (nowVn >= sVn && nowVn <= endVn))
                 && x.Status != SessionStatus.Done;
             var canJoin = x.Id > 0
-                && x.Status != SessionStatus.Done
-                && (x.Status == SessionStatus.InProgress
-                    || (nowVn >= sVn.AddMinutes(-EarlyJoinMinutes) && nowVn <= sVn.AddHours(MaxSessionOpenHours)));
+                && Backend_Project_OTSP.Services.Common.ClassroomLifecycleHelper.IsWithinJoinWindow(
+                    x.ScheduledAtUtc, x.Status, x.Hours, nowUtc);
             var isToday = x.ScheduledAtUtc >= todayStartUtc && x.ScheduledAtUtc < todayEndUtc;
-            var displayTime = $"{sVn:HH:mm} {dayNames[(int)sVn.DayOfWeek]}, {sVn:dd/MM/yyyy}";
+            var displayTime = $"{sVn:HH:mm} - {endVn:HH:mm} {dayNames[(int)sVn.DayOfWeek]}, {sVn:dd/MM/yyyy}";
 
             return new
             {
@@ -215,6 +221,8 @@ public class StudentDashboardApiController : ControllerBase
                 tutorName = x.TutorName,
                 scheduledAt = x.ScheduledAtUtc,
                 scheduledAtVn = sVn,
+                durationHours = x.Hours,
+                timeRangeLabel = $"{sVn:HH:mm} - {endVn:HH:mm}",
                 displayTime,
                 status = x.Status.ToString(),
                 videoRoom = x.VideoRoom,

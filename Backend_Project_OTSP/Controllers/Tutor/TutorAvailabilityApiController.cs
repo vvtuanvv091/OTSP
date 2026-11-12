@@ -108,24 +108,61 @@ public class TutorAvailabilityApiController : ControllerBase
     private async Task<HashSet<string>> GetBusySlotKeysAsync(int tutorId, CancellationToken cancellationToken)
     {
         var nowUtc = DateTime.UtcNow;
-        var scheduledTimesUtc = await _db.ClassSessions
+        var todayVn = ClassroomLifecycleHelper.GetVietnamToday(nowUtc);
+
+        var activeSessions = await _db.ClassSessions
             .AsNoTracking()
-            .Where(x => x.Status == SessionStatus.Scheduled
-                        && x.ScheduledAt >= nowUtc
+            .Where(x => (x.Status == SessionStatus.Scheduled || x.Status == SessionStatus.InProgress)
+                        && x.ScheduledAt >= nowUtc.AddHours(-4)
                         && x.Classroom.TutorId == tutorId
                         && x.Classroom.Status == ClassroomStatus.Active)
-            .Select(x => x.ScheduledAt)
+            .Select(x => new
+            {
+                x.ScheduledAt,
+                x.DurationHours,
+                ClassroomHours = x.Classroom.HoursPerSession
+            })
             .ToListAsync(cancellationToken);
 
         var busy = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var scheduledUtc in scheduledTimesUtc)
+        foreach (var item in activeSessions)
         {
-            var vietnamTime = DateTime.SpecifyKind(scheduledUtc, DateTimeKind.Utc)
-                .AddHours(VietnamUtcOffsetHours);
+            var startVn = ClassroomLifecycleHelper.ToVietnamTime(item.ScheduledAt);
+            var durationHours = ClassroomLifecycleHelper.NormalizeHoursPerSession(
+                item.DurationHours.HasValue && item.DurationHours.Value > 0 ? item.DurationHours.Value : item.ClassroomHours);
+            var startDate = DateOnly.FromDateTime(startVn);
+            var endVn = startVn.AddHours(durationHours);
 
-            var block = _blocks.Containing(vietnamTime.Hour);
-            if (block.HasValue)
-                busy.Add(ToSlotKey(vietnamTime.DayOfWeek, block.Value.Start));
+            foreach (var block in _blocks.Blocks)
+            {
+                var blockStart = startDate.ToDateTime(new TimeOnly(block.Start, 0));
+                var blockEnd = startDate.ToDateTime(new TimeOnly(block.End, 0));
+                if (startVn < blockEnd && blockStart < endVn)
+                {
+                    busy.Add(ToSlotKey(startVn.DayOfWeek, block.Start));
+                }
+            }
+        }
+
+        var weeklySchedules = await _db.ClassroomWeeklySchedules
+            .AsNoTracking()
+            .Where(ws => ws.Classroom.TutorId == tutorId
+                         && ws.Classroom.Status == ClassroomStatus.Active
+                         && (!ws.Classroom.EndDate.HasValue || ws.Classroom.EndDate.Value >= todayVn))
+            .Select(ws => new { ws.DayOfWeek, ws.StartTime, ws.EndTime })
+            .ToListAsync(cancellationToken);
+
+        foreach (var ws in weeklySchedules)
+        {
+            foreach (var block in _blocks.Blocks)
+            {
+                var bStart = new TimeOnly(block.Start, 0);
+                var bEnd = new TimeOnly(block.End, 0);
+                if (ScheduleConflictHelper.TimesOverlap(ws.StartTime, ws.EndTime, bStart, bEnd))
+                {
+                    busy.Add(ToSlotKey(ws.DayOfWeek, block.Start));
+                }
+            }
         }
 
         return busy;

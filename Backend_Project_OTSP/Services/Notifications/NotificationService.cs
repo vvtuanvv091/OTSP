@@ -15,6 +15,7 @@ public class NotificationService : INotificationService, INotificationDispatcher
     private readonly IEmailQueue? _emailQueue;
     private readonly IEmailSenderService? _emailSender;
     private readonly ILogger<NotificationService> _logger;
+    private readonly IConfiguration? _configuration;
 
     public NotificationService(
         ApplicationDbContext db,
@@ -22,7 +23,8 @@ public class NotificationService : INotificationService, INotificationDispatcher
         IHubContext<ChatHub> chatHub,
         ILogger<NotificationService> logger,
         IEmailQueue? emailQueue = null,
-        IEmailSenderService? emailSender = null)
+        IEmailSenderService? emailSender = null,
+        IConfiguration? configuration = null)
     {
         _db = db;
         _connectionRequestHub = connectionRequestHub;
@@ -30,7 +32,13 @@ public class NotificationService : INotificationService, INotificationDispatcher
         _logger = logger;
         _emailQueue = emailQueue;
         _emailSender = emailSender;
+        _configuration = configuration;
     }
+
+    private string FrontendBaseUrl =>
+        _configuration?["App:FrontendUrl"]?.TrimEnd('/') is { Length: > 0 } configured
+            ? configured
+            : "https://otsp-giasu.vercel.app";
 
     public async Task<Notification> CreateInAppNotificationAsync(string userId, string title, string content, CancellationToken ct = default)
     {
@@ -108,7 +116,7 @@ public class NotificationService : INotificationService, INotificationDispatcher
 
     public async Task DispatchBookingCreatedAsync(BookingCreatedNotificationEvent evt, CancellationToken ct = default)
     {
-        var inAppContent = $"Học viên {evt.StudentName} vừa gửi cho bạn một yêu cầu {evt.ActionLabel} môn {evt.SubjectName}. [url:/Tutor/TutorConnectionRequest]";
+        var inAppContent = $"Học viên {evt.StudentName} vừa gửi cho bạn một yêu cầu {evt.ActionLabel} môn {evt.SubjectName}. [url:/tutor/connection-requests]";
         await CreateInAppNotificationAsync(evt.TutorUserId, "Yêu cầu kết nối mới", inAppContent, ct);
 
         await BroadcastSignalRAsync(
@@ -156,8 +164,8 @@ public class NotificationService : INotificationService, INotificationDispatcher
         if (!string.IsNullOrWhiteSpace(evt.StudentEmail))
         {
             var targetUrl = evt.IsTrial
-                ? "https://otsp-giasu.vercel.app/student/schedule"
-                : "https://otsp-giasu.vercel.app/student/classes";
+                ? $"{FrontendBaseUrl}/student/schedule"
+                : $"{FrontendBaseUrl}/student/classrooms";
 
             var (subject, body) = NotificationEmailTemplates.ForBookingAccepted(
                 evt.StudentName,
@@ -173,7 +181,7 @@ public class NotificationService : INotificationService, INotificationDispatcher
     public async Task DispatchBookingRejectedAsync(BookingRejectedNotificationEvent evt, CancellationToken ct = default)
     {
         var reasonText = string.IsNullOrWhiteSpace(evt.Reason) ? "" : $" Lý do: {evt.Reason.Trim()}";
-        var inAppContent = $"Gia sư {evt.TutorName} hiện chưa thể nhận yêu cầu môn {evt.SubjectName} của bạn.{reasonText} [url:/Student_Parent/Send_Details_Tutor/MyRequests]";
+        var inAppContent = $"Gia sư {evt.TutorName} hiện chưa thể nhận yêu cầu môn {evt.SubjectName} của bạn.{reasonText} [url:/student/connection-requests]";
         await CreateInAppNotificationAsync(evt.StudentUserId, "Yêu cầu kết nối chưa được chấp nhận", inAppContent, ct);
 
         await BroadcastSignalRAsync(
@@ -203,8 +211,8 @@ public class NotificationService : INotificationService, INotificationDispatcher
     {
         var title = evt.IsApproved ? "Hồ sơ gia sư đã được duyệt" : "Hồ sơ gia sư chưa được duyệt";
         var content = evt.IsApproved
-            ? "Hồ sơ của bạn đã được duyệt và có thể hiển thị trong danh sách tìm gia sư."
-            : $"Hồ sơ của bạn chưa được duyệt. Lý do: {evt.Reason}";
+            ? "Hồ sơ của bạn đã được duyệt và có thể hiển thị trong danh sách tìm gia sư. [url:/tutor/profile]"
+            : $"Hồ sơ của bạn chưa được duyệt. Lý do: {evt.Reason} [url:/tutor/profile]";
 
         await CreateInAppNotificationAsync(evt.TutorUserId, title, content, ct);
 
@@ -221,9 +229,9 @@ public class NotificationService : INotificationService, INotificationDispatcher
     public async Task DispatchComplaintUpdatedAsync(ComplaintUpdatedNotificationEvent evt, CancellationToken ct = default)
     {
         var title = $"Khiếu nại #{evt.ComplaintId} {evt.StatusText}";
-        var content = string.IsNullOrWhiteSpace(evt.Resolution)
+        var content = (string.IsNullOrWhiteSpace(evt.Resolution)
             ? $"Quản trị viên đã cập nhật trạng thái khiếu nại của bạn thành: {evt.StatusText}."
-            : $"Kết quả giải quyết: {evt.Resolution}";
+            : $"Kết quả giải quyết: {evt.Resolution}") + " [url:/complaints]";
 
         await CreateInAppNotificationAsync(evt.SenderUserId, title, content, ct);
 

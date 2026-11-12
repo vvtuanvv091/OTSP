@@ -10,16 +10,21 @@ public sealed class TutorScheduleCalendarSlotDto
     public string SubjectName { get; init; } = string.Empty;
     public string GradeLevelName { get; init; } = string.Empty;
     public ClassroomType ClassroomType { get; init; }
+    public DateTime ScheduledAtUtc { get; init; }
     public DateTime ScheduledAtVn { get; init; }
     public DateOnly Date => DateOnly.FromDateTime(ScheduledAtVn);
     public int Hour => ScheduledAtVn.Hour;
     public int Minute => ScheduledAtVn.Minute;
+    public double HoursPerSession { get; init; } = 2.0;
+    public int DurationMinutes => (int)Math.Round(HoursPerSession * 60);
+    public string? TimeRangeLabel { get; init; }
     public SessionStatus Status { get; init; }
     public bool IsTrial { get; init; }
     public string? VideoRoom { get; init; }
     public int ClassroomId { get; init; }
     public string ClassroomName { get; init; } = string.Empty;
-    public bool IsMakeup => VideoRoom != null && VideoRoom.Contains("MAKEUP");
+    public bool IsMakeupFlag { get; init; }
+    public bool IsMakeup => IsMakeupFlag || (VideoRoom != null && VideoRoom.Contains("MAKEUP"));
     public bool CanJoin { get; init; }
 }
 

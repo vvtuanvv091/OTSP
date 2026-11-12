@@ -1,18 +1,44 @@
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Backend_Project_OTSP.Data;
 using Backend_Project_OTSP.Dtos;
 using Backend_Project_OTSP.Dtos.Admin;
+using Backend_Project_OTSP.Dtos.Common.Notification;
+using Backend_Project_OTSP.Hubs;
 using Backend_Project_OTSP.Models;
 using static Backend_Project_OTSP.Models.Enums;
 using Backend_Project_OTSP.Services.Admin;
+using Backend_Project_OTSP.Services.Common;
+using Backend_Project_OTSP.Services.Notifications;
 
 namespace BACKEND_PROJECT_OTSP.Services.Admin;
 
 public sealed class AdminClassroomManagementService : IAdminClassroomManagementService
 {
     private readonly ApplicationDbContext _db;
+    private readonly IEmailQueue? _emailQueue;
+    private readonly IEmailSenderService? _emailSender;
+    private readonly IHubContext<ConnectionRequestHub>? _hubContext;
+    private readonly IConfiguration? _configuration;
 
-    public AdminClassroomManagementService(ApplicationDbContext db) => _db = db;
+    public AdminClassroomManagementService(
+        ApplicationDbContext db,
+        IEmailQueue? emailQueue = null,
+        IEmailSenderService? emailSender = null,
+        IHubContext<ConnectionRequestHub>? hubContext = null,
+        IConfiguration? configuration = null)
+    {
+        _db = db;
+        _emailQueue = emailQueue;
+        _emailSender = emailSender;
+        _hubContext = hubContext;
+        _configuration = configuration;
+    }
+
+    private string FrontendBaseUrl =>
+        _configuration?["App:FrontendUrl"]?.TrimEnd('/') is { Length: > 0 } configured
+            ? configured
+            : "https://otsp-giasu.vercel.app";
 
     public async Task<AdminClassroomDashboardDto> GetClassroomsAsync(AdminClassroomQuery query, CancellationToken cancellationToken = default)
     {
@@ -115,7 +141,7 @@ public sealed class AdminClassroomManagementService : IAdminClassroomManagementS
         foreach (var session in futureSessions) session.Status = SessionStatus.Cancelled;
 
         var pendingRequests = await _db.ConnectionRequests
-            .Include(request => request.Student)
+            .Include(request => request.Student).ThenInclude(s => s.User)
             .Where(request => request.ClassroomId == classroomId && request.Status == RequestStatus.Pending)
             .ToListAsync(cancellationToken);
         foreach (var request in pendingRequests)
@@ -126,29 +152,34 @@ public sealed class AdminClassroomManagementService : IAdminClassroomManagementS
             {
                 UserId = request.Student.UserId,
                 Title = "Lớp nhóm đã đóng",
-                Content = $"Lớp {classroom.NameClass} đã được quản trị viên đóng. Lý do: {reasonText}"
+                Content = $"Lớp {classroom.NameClass} đã được quản trị viên đóng. Lý do: {reasonText} [url:/student/connection-requests]"
             });
         }
 
-        var studentUserIds = await _db.ClassroomStudents.AsNoTracking()
+        var enrolledStudents = await _db.ClassroomStudents.AsNoTracking()
             .Where(member => member.ClassroomId == classroomId)
-            .Select(member => member.Student.UserId)
+            .Select(member => new
+            {
+                member.Student.UserId,
+                FullName = member.Student.User.FullName,
+                Email = member.Student.User.Email
+            })
             .Distinct()
             .ToListAsync(cancellationToken);
-        foreach (var studentUserId in studentUserIds)
+        foreach (var student in enrolledStudents)
         {
             _db.Notifications.Add(new Notification
             {
-                UserId = studentUserId,
+                UserId = student.UserId,
                 Title = "Lớp học đã được đóng",
-                Content = $"Lớp {classroom.NameClass} đã được quản trị viên đóng. Lý do: {reasonText}"
+                Content = $"Lớp {classroom.NameClass} đã được quản trị viên đóng. Lý do: {reasonText} [url:/student/classrooms]"
             });
         }
         _db.Notifications.Add(new Notification
         {
             UserId = classroom.Tutor.UserId,
             Title = "Lớp học đã được quản trị viên đóng",
-            Content = $"Lớp {classroom.NameClass} đã được đóng. Lý do: {reasonText}"
+            Content = $"Lớp {classroom.NameClass} đã được đóng. Lý do: {reasonText} [url:/tutor/classrooms]"
         });
         _db.AuditLogs.Add(new AuditLog
         {
@@ -158,6 +189,44 @@ public sealed class AdminClassroomManagementService : IAdminClassroomManagementS
         });
 
         await _db.SaveChangesAsync(cancellationToken);
+
+        foreach (var req in pendingRequests)
+        {
+            if (_hubContext != null)
+            {
+                await _hubContext.Clients.User(req.Student.UserId).SendAsync(
+                    "ConnectionRequestStatusChanged",
+                    new { requestId = req.Id, status = "Cancelled", classroomId },
+                    cancellationToken);
+            }
+            if (!string.IsNullOrWhiteSpace(req.Student.User?.Email))
+            {
+                var (subj, body) = NotificationEmailTemplates.ForClassroomCancelledByAdmin(
+                    req.Student.User.FullName, classroom.NameClass, reasonText, $"{FrontendBaseUrl}/student/connection-requests");
+                await AdminNotificationHelper.DispatchEmailToManyAsync(
+                    new[] { req.Student.User.Email }, subj, body, _emailQueue, _emailSender, cancellationToken);
+            }
+        }
+
+        foreach (var student in enrolledStudents)
+        {
+            if (!string.IsNullOrWhiteSpace(student.Email))
+            {
+                var (subj, body) = NotificationEmailTemplates.ForClassroomCancelledByAdmin(
+                    student.FullName, classroom.NameClass, reasonText, $"{FrontendBaseUrl}/student/classrooms");
+                await AdminNotificationHelper.DispatchEmailToManyAsync(
+                    new[] { student.Email }, subj, body, _emailQueue, _emailSender, cancellationToken);
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(classroom.Tutor.User?.Email))
+        {
+            var (subj, body) = NotificationEmailTemplates.ForClassroomCancelledByAdmin(
+                classroom.Tutor.User.FullName, classroom.NameClass, reasonText, $"{FrontendBaseUrl}/tutor/classrooms");
+            await AdminNotificationHelper.DispatchEmailToManyAsync(
+                new[] { classroom.Tutor.User.Email }, subj, body, _emailQueue, _emailSender, cancellationToken);
+        }
+
         return (true, false, null);
     }
 
@@ -173,25 +242,31 @@ public sealed class AdminClassroomManagementService : IAdminClassroomManagementS
 
         session.Status = SessionStatus.Cancelled;
         var reasonText = reason.Trim();
-        var studentUserIds = await _db.ClassroomStudents.AsNoTracking()
+        var timeVnStr = ClassroomLifecycleHelper.ToVietnamTime(session.ScheduledAt).ToString("dd/MM/yyyy HH:mm") + " (GMT+7)";
+        var enrolledStudents = await _db.ClassroomStudents.AsNoTracking()
             .Where(member => member.ClassroomId == session.ClassroomId)
-            .Select(member => member.Student.UserId)
+            .Select(member => new
+            {
+                member.Student.UserId,
+                FullName = member.Student.User.FullName,
+                Email = member.Student.User.Email
+            })
             .Distinct()
             .ToListAsync(cancellationToken);
-        foreach (var studentUserId in studentUserIds)
+        foreach (var student in enrolledStudents)
         {
             _db.Notifications.Add(new Notification
             {
-                UserId = studentUserId,
+                UserId = student.UserId,
                 Title = "Buổi học đã được hủy",
-                Content = $"Buổi học của lớp {session.Classroom.NameClass} lúc {session.ScheduledAt:dd/MM/yyyy HH:mm} đã được hủy. Lý do: {reasonText}"
+                Content = $"Buổi học của lớp {session.Classroom.NameClass} lúc {timeVnStr} đã được hủy. Lý do: {reasonText} [url:/student/schedule]"
             });
         }
         _db.Notifications.Add(new Notification
         {
             UserId = session.Classroom.Tutor.UserId,
             Title = "Buổi học đã được hủy",
-            Content = $"Buổi học của lớp {session.Classroom.NameClass} lúc {session.ScheduledAt:dd/MM/yyyy HH:mm} đã được hủy. Lý do: {reasonText}"
+            Content = $"Buổi học của lớp {session.Classroom.NameClass} lúc {timeVnStr} đã được hủy. Lý do: {reasonText} [url:/tutor/schedule]"
         });
         _db.AuditLogs.Add(new AuditLog
         {
@@ -200,6 +275,25 @@ public sealed class AdminClassroomManagementService : IAdminClassroomManagementS
             Action = $"AdminCancelClassSession:{sessionId}: {reasonText}"
         });
         await _db.SaveChangesAsync(cancellationToken);
+
+        foreach (var student in enrolledStudents)
+        {
+            if (!string.IsNullOrWhiteSpace(student.Email))
+            {
+                var (subj, body) = NotificationEmailTemplates.ForSessionCancelledByAdmin(
+                    student.FullName, session.Classroom.NameClass, timeVnStr, reasonText, $"{FrontendBaseUrl}/student/schedule");
+                await AdminNotificationHelper.DispatchEmailToManyAsync(
+                    new[] { student.Email }, subj, body, _emailQueue, _emailSender, cancellationToken);
+            }
+        }
+        if (!string.IsNullOrWhiteSpace(session.Classroom.Tutor.User?.Email))
+        {
+            var (subj, body) = NotificationEmailTemplates.ForSessionCancelledByAdmin(
+                session.Classroom.Tutor.User.FullName, session.Classroom.NameClass, timeVnStr, reasonText, $"{FrontendBaseUrl}/tutor/schedule");
+            await AdminNotificationHelper.DispatchEmailToManyAsync(
+                new[] { session.Classroom.Tutor.User.Email }, subj, body, _emailQueue, _emailSender, cancellationToken);
+        }
+
         return (true, false, null);
     }
 

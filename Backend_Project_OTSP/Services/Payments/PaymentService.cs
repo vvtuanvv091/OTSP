@@ -591,7 +591,7 @@ public class PaymentService : IPaymentService
                 {
                     UserId = studentUserId,
                     Title = "Thanh toán học phí thành công",
-                    Content = $"Bạn đã thanh toán thành công {amountStr} cho lớp {className} ({subjectName}). Quyền vào phòng học trực tuyến đã được kích hoạt! [url:/Student_Parent/StudentPayments]",
+                    Content = $"Bạn đã thanh toán thành công {amountStr} cho lớp {className} ({subjectName}). Quyền vào phòng học trực tuyến đã được kích hoạt! [url:/student/payments]",
                     CreatedAt = DateTime.UtcNow,
                     IsRead = false
                 });
@@ -604,7 +604,7 @@ public class PaymentService : IPaymentService
                 {
                     UserId = tutorUserId,
                     Title = "Học viên đã nộp học phí",
-                    Content = $"Học viên {studentName} vừa thanh toán thành công {amountStr} học phí cho lớp {className}. [url:/Tutor/TutorIncome]",
+                    Content = $"Học viên {studentName} vừa thanh toán thành công {amountStr} học phí cho lớp {className}. [url:/tutor/income]",
                     CreatedAt = DateTime.UtcNow,
                     IsRead = false
                 });

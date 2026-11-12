@@ -145,11 +145,18 @@ public class SearchService : ISearchService
     {
         var (page, size, skip) = Paging(q);
         var kw = Keyword(q);
+        var todayVn = Backend_Project_OTSP.Services.Common.ClassroomLifecycleHelper.GetVietnamToday();
 
         var query = _db.Classrooms.AsNoTracking()
             .Where(c => c.Status == ClassroomStatus.Active
                      && c.Tutor.VerificationStatus == VerificationStatus.Approved
-                     && c.Tutor.User.Status == AccountStatus.Active);
+                     && c.Tutor.User.Status == AccountStatus.Active
+                     && (c.Type != ClassroomType.Group
+                         || (c.ClassroomStudents.Count < c.MaxStudents
+                             && !c.ClassSessions.Any(s => s.Status == SessionStatus.Done || s.Status == SessionStatus.InProgress)
+                             && (c.RegistrationDeadline.HasValue
+                                 ? c.RegistrationDeadline.Value >= todayVn && (!c.StartDate.HasValue || c.StartDate.Value >= todayVn)
+                                 : (!c.StartDate.HasValue || c.StartDate.Value > todayVn)))));
 
         if (kw is not null)
             query = query.Where(c => EF.Functions.ILike(c.NameClass, kw)
@@ -198,6 +205,9 @@ public class SearchService : ISearchService
                 TutorAvatarUrl = c.Tutor.User.AvatarUrl,
                 TutorRating = c.Tutor.AverageRating,
                 StartDate = c.StartDate,
+                RegistrationDeadline = c.RegistrationDeadline,
+                EndDate = c.EndDate,
+                TotalSessions = c.TotalSessions,
                 WeeklySchedules = c.WeeklySchedules
                     .OrderBy(ws => ws.SessionIndex)
                     .Select(ws => new ClassroomScheduleItemDto

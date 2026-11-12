@@ -62,9 +62,18 @@ export default function ClassDetailModal({ classId, initialData = null, onClose,
   const tutorRating = Number(c.tutor?.rating ?? c.tutor?.averageRating ?? c.tutorRating ?? 0);
   const tutorContactId = c.tutor?.userId || c.tutorUserId || '';
 
-  // Kiểm tra thời điểm đăng ký so với ngày khai giảng
-  const todayIso = new Date().toISOString().slice(0, 10);
-  const isStarted = Boolean(c.startDate && c.startDate < todayIso);
+  // Kiểm tra điều kiện mở tuyển sinh theo múi giờ Việt Nam (GMT+7)
+  const vnTodayParts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Ho_Chi_Minh',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(new Date());
+  const vnMap = Object.fromEntries(vnTodayParts.map(({ type, value }) => [type, value]));
+  const todayVnIso = `${vnMap.year}-${vnMap.month}-${vnMap.day}`;
+  const effectiveDeadline = c.registrationDeadline || c.startDate;
+  const isDeadlinePassed = Boolean(effectiveDeadline && todayVnIso > effectiveDeadline);
+  const isStarted = Boolean(c.hasStartedSession) || c.isEnrollmentOpen === false || isDeadlinePassed;
 
   const handleEnrollSubmit = async (e) => {
     e.preventDefault();
@@ -180,7 +189,7 @@ export default function ClassDetailModal({ classId, initialData = null, onClose,
                   </span>
                   {isStarted && (
                     <span className="badge rounded-pill px-3 py-1.5 fw-semibold" style={{ backgroundColor: '#fee2e2', color: '#b91c1c', border: '1px solid #fca5a5' }}>
-                      <i className="bi bi-lock-fill me-1"></i>Đã khai giảng ({c.startDate}) · Đóng tuyển sinh đợt này
+                      <i className="bi bi-lock-fill me-1"></i>Đã đóng tuyển sinh ({c.hasStartedSession ? 'Đã bắt đầu học' : `Hạn ĐK: ${effectiveDeadline || c.startDate}`})
                     </span>
                   )}
                   {isEnrolled && (
@@ -243,13 +252,23 @@ export default function ClassDetailModal({ classId, initialData = null, onClose,
                   </div>
                   <div className="col-6 col-md-3">
                     <div className="p-3 bg-light rounded-3 border text-center h-100">
-                      <small className="text-secondary d-block mb-1">Khai giảng</small>
-                      <strong className="text-body fs-6 d-block mt-1">
-                        {c.startDate ? c.startDate : 'Nhận học viên ngay'}
+                      <small className="text-secondary d-block mb-1">Thời gian khóa</small>
+                      <strong className="text-body fs-6 d-block mt-1" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                        {c.startDate ? `${c.startDate}${c.endDate ? ` → ${c.endDate}` : ''}` : 'Nhận học viên ngay'}
                       </strong>
+                      {c.registrationDeadline && (
+                        <small className="text-secondary d-block mt-1" style={{ fontSize: '0.72rem', fontVariantNumeric: 'tabular-nums' }}>
+                          Hạn ĐK: {c.registrationDeadline}
+                        </small>
+                      )}
+                      {c.totalSessions && (
+                        <small className="text-danger d-block fw-semibold" style={{ fontSize: '0.72rem' }}>
+                          {c.totalSessions} buổi học
+                        </small>
+                      )}
                       {isStarted && (
                         <span className="badge rounded-pill mt-1" style={{ backgroundColor: '#fee2e2', color: '#b91c1c', fontSize: '0.68rem', border: '1px solid #fca5a5' }}>
-                          Đã khai giảng
+                          Đã đóng ĐK
                         </span>
                       )}
                     </div>
@@ -351,7 +370,11 @@ export default function ClassDetailModal({ classId, initialData = null, onClose,
                       <div className="mx-auto mb-2 d-inline-flex align-items-center justify-content-center" style={{ width: 44, height: 44, borderRadius: '50%', backgroundColor: 'rgba(219, 48, 58, 0.1)', color: '#DB303A' }}>
                         <i className="bi bi-calendar-x fs-4"></i>
                       </div>
-                      <h6 className="fw-bold text-dark mb-1">Lớp học đã bắt đầu từ ngày {c.startDate} và đã chốt danh sách</h6>
+                      <h6 className="fw-bold text-dark mb-1">
+                        {c.hasStartedSession
+                          ? `Lớp học đã bắt đầu buổi học đầu tiên và đã chốt danh sách`
+                          : `Lớp học đã quá hạn đăng ký (${effectiveDeadline || c.startDate})`}
+                      </h6>
                       <p className="text-secondary small mb-3">
                         Để đảm bảo tất cả học viên trong nhóm cùng học chung tiến độ từ đầu, lớp này hiện đã đóng nhận học viên mới.
                       </p>

@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using System.Globalization;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
@@ -5,7 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Backend_Project_OTSP.Data;
 using Backend_Project_OTSP.Dtos.Tutor;
-using System.ComponentModel.DataAnnotations;
+using Backend_Project_OTSP.Services.Common;
 using static Backend_Project_OTSP.Models.Enums;
 
 namespace Backend_Project_OTSP.Controllers.Api.Tutor;
@@ -63,10 +64,16 @@ public class TutorIncomeApiController : ControllerBase
                 {
                     classroom.Fee,
                     classroom.SessionsPerWeek,
+                    classroom.HoursPerSession,
+                    classroom.StartDate,
+                    classroom.EndDate,
+                    classroom.TotalSessions,
+                    WeeklySchedules = classroom.WeeklySchedules.ToList(),
                     Sessions = classroom.ClassSessions.Select(session => new
                     {
                         session.Status,
-                        session.ScheduledAt
+                        session.ScheduledAt,
+                        session.DurationHours
                     }).ToList()
                 }).ToList()
             })
@@ -79,38 +86,55 @@ public class TutorIncomeApiController : ControllerBase
         var pendingConfirmSessions = 0;
         var upcomingSessions = 0;
         var totalSessions = 0;
+        double totalTeachingHours = 0;
         decimal totalTuition = 0;
+        decimal estimatedMonthFeeSum = 0;
 
         foreach (var classroom in tutor.Classrooms)
         {
-            var expectedForClass = classroom.Sessions.Count > 0
-                ? classroom.Sessions.Count
-                : Math.Max(1, classroom.SessionsPerWeek * 4);
+            var nonCancelledCount = classroom.Sessions.Count(s => s.Status != SessionStatus.Cancelled);
+            var expectedForClass = ClassroomLifecycleHelper.CalculateExpectedTotalSessions(
+                classroom.StartDate,
+                classroom.EndDate,
+                classroom.TotalSessions,
+                classroom.SessionsPerWeek,
+                classroom.WeeklySchedules);
+            if (!classroom.TotalSessions.HasValue && !classroom.EndDate.HasValue && nonCancelledCount > expectedForClass)
+            {
+                expectedForClass = nonCancelledCount;
+            }
+            expectedForClass = Math.Max(1, expectedForClass);
+
             var feePerSession = Math.Round(classroom.Fee / expectedForClass, 0);
+            var defaultHours = ClassroomLifecycleHelper.NormalizeHoursPerSession(classroom.HoursPerSession);
+
             var sessionsInMonth = classroom.Sessions
                 .Where(session =>
                 {
-                    var localTime = session.ScheduledAt.AddHours(VietnamUtcOffsetHours);
+                    if (session.Status == SessionStatus.Cancelled) return false;
+                    var localTime = ClassroomLifecycleHelper.ToVietnamTime(session.ScheduledAt);
                     return localTime.Month == selectedDate.Month && localTime.Year == selectedDate.Year;
                 })
                 .ToList();
 
             if (sessionsInMonth.Count == 0)
-            {
-                totalSessions += expectedForClass;
-                upcomingSessions += expectedForClass;
                 continue;
-            }
 
             totalSessions += sessionsInMonth.Count;
+            estimatedMonthFeeSum += feePerSession * sessionsInMonth.Count;
+
             foreach (var session in sessionsInMonth)
             {
                 if (session.Status == SessionStatus.Done)
                 {
                     completedSessions++;
                     totalTuition += feePerSession;
+                    var sessionHours = session.DurationHours.HasValue && session.DurationHours.Value > 0
+                        ? ClassroomLifecycleHelper.NormalizeHoursPerSession(session.DurationHours.Value)
+                        : defaultHours;
+                    totalTeachingHours += sessionHours;
                 }
-                else if (session.Status == SessionStatus.Scheduled)
+                else if (session.Status == SessionStatus.Scheduled || session.Status == SessionStatus.InProgress)
                 {
                     if (session.ScheduledAt < nowUtc)
                         pendingConfirmSessions++;
@@ -124,11 +148,11 @@ public class TutorIncomeApiController : ControllerBase
         var tutorPayout = totalTuition - platformCommission;
         var averageFeePerSession = completedSessions > 0
             ? Math.Round(totalTuition / completedSessions, 0)
-            : totalSessions > 0 && tutor.Classrooms.Count > 0
-                ? Math.Round(tutor.Classrooms.Sum(classroom => classroom.Fee) / Math.Max(1, totalSessions), 0)
+            : totalSessions > 0
+                ? Math.Round(estimatedMonthFeeSum / totalSessions, 0)
                 : 0m;
         var completionPercentage = totalSessions > 0
-            ? Math.Round((double)completedSessions / totalSessions * 100, 1)
+            ? Math.Clamp(Math.Round((double)completedSessions / totalSessions * 100, 1), 0, 100)
             : 0;
 
         var reconciliations = await _db.Reconciliations
@@ -165,7 +189,7 @@ public class TutorIncomeApiController : ControllerBase
             completedSessions,
             pendingConfirmSessions,
             upcomingSessions,
-            totalTeachingHours = completedSessions * 2.0,
+            totalTeachingHours = Math.Round(totalTeachingHours, 2),
             averageFeePerSession,
             totalTuition,
             platformCommission,

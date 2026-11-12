@@ -11,5 +11,6 @@ public class CreateSessionRequest
     public int ClassroomId { get; set; }
     public string? Title { get; set; }
     public DateTime ScheduledAtUtc { get; set; }
+    public double? DurationHours { get; set; }
 }
 

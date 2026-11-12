@@ -35,4 +35,8 @@ public sealed class GroupBookingEligibilityDto
     public bool HasPendingRequest { get; init; }
     public bool CanJoin { get; init; }
     public string? Reason { get; init; }
+    public DateOnly? StartDate { get; init; }
+    public DateOnly? RegistrationDeadline { get; init; }
+    public DateOnly? EndDate { get; init; }
+    public int? TotalSessions { get; init; }
 }

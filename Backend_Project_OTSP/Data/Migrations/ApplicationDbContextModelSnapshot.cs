@@ -247,6 +247,12 @@ namespace Backend_Project_OTSP.Data.Migrations
                     b.Property<int>("ClassroomId")
                         .HasColumnType("integer");
 
+                    b.Property<double?>("DurationHours")
+                        .HasColumnType("double precision");
+
+                    b.Property<bool>("IsMakeup")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("RecordingUrl")
                         .HasColumnType("text");
 
@@ -322,6 +328,9 @@ namespace Backend_Project_OTSP.Data.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
 
+                    b.Property<DateOnly?>("EndDate")
+                        .HasColumnType("date");
+
                     b.Property<decimal>("Fee")
                         .HasPrecision(18)
                         .HasColumnType("numeric(18,0)");
@@ -340,6 +349,9 @@ namespace Backend_Project_OTSP.Data.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
+                    b.Property<DateOnly?>("RegistrationDeadline")
+                        .HasColumnType("date");
+
                     b.Property<int>("SessionsPerWeek")
                         .HasColumnType("integer");
 
@@ -350,6 +362,9 @@ namespace Backend_Project_OTSP.Data.Migrations
                         .HasColumnType("integer");
 
                     b.Property<int>("SubjectId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("TotalSessions")
                         .HasColumnType("integer");
 
                     b.Property<int>("TutorId")
@@ -483,8 +498,14 @@ namespace Backend_Project_OTSP.Data.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<int>("DurationWeeks")
+                        .HasColumnType("integer");
+
                     b.Property<int>("GradeLevelId")
                         .HasColumnType("integer");
+
+                    b.Property<bool>("IsTrial")
+                        .HasColumnType("boolean");
 
                     b.Property<string>("Message")
                         .HasMaxLength(1000)
@@ -495,6 +516,12 @@ namespace Backend_Project_OTSP.Data.Migrations
 
                     b.Property<DateTime?>("ProposedTrialSlotUtc")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateOnly?>("RequestedEndDate")
+                        .HasColumnType("date");
+
+                    b.Property<DateOnly?>("RequestedStartDate")
+                        .HasColumnType("date");
 
                     b.Property<DateTime?>("RespondedAt")
                         .HasColumnType("timestamp with time zone");

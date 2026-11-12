@@ -78,12 +78,26 @@ public class TutorScheduleApiController : ControllerBase
             {
                 c.Id,
                 c.NameClass,
+                Name = c.NameClass,
                 Type = c.Type.ToString(),
+                c.HoursPerSession,
                 SubjectName = c.Subject.Name,
                 GradeLevelName = c.GradeLevel.Name,
                 Students = c.ClassroomStudents.Select(cs => cs.Student.User.FullName).ToList()
             })
             .ToListAsync(cancellationToken);
+
+        var normalizedActiveClassrooms = activeClassrooms.Select(c => new
+        {
+            c.Id,
+            c.NameClass,
+            c.Name,
+            c.Type,
+            HoursPerSession = ClassroomLifecycleHelper.NormalizeHoursPerSession(c.HoursPerSession),
+            c.SubjectName,
+            c.GradeLevelName,
+            c.Students
+        }).ToList();
 
         var openGroupClasses = await _db.Classrooms
             .AsNoTracking()
@@ -99,7 +113,7 @@ public class TutorScheduleApiController : ControllerBase
             todayVn,
             availabilities,
             calendarSessions,
-            activeClassrooms,
+            activeClassrooms = normalizedActiveClassrooms,
             openGroupClasses
         });
     }
@@ -126,16 +140,36 @@ public class TutorScheduleApiController : ControllerBase
             return BadRequest(new { message = "Yêu cầu phải được chấp nhận trước khi xếp lịch học thử." });
         }
 
-        var scheduledAtUtc = request.ScheduledAtUtc;
+        var scheduledAtUtc = DateTime.SpecifyKind(request.ScheduledAtUtc, DateTimeKind.Utc);
+        if (scheduledAtUtc <= DateTime.UtcNow)
+        {
+            return BadRequest(new { message = "Không thể xác nhận lịch học thử trong quá khứ." });
+        }
+
+        var conflict = await ScheduleConflictHelper.FindSingleSessionConflictAsync(
+            _db,
+            connRequest.TutorId,
+            connRequest.ClassroomId,
+            null,
+            scheduledAtUtc,
+            2.0,
+            new[] { connRequest.StudentId },
+            cancellationToken);
+        if (conflict != null)
+        {
+            return BadRequest(new { message = conflict });
+        }
+
         var classroom = GetOrCreateClassroom(connRequest);
         await EnsureEnrolledAsync(classroom, connRequest.StudentId, cancellationToken);
 
-        var sessionName = $"Buổi học thử: {connRequest.Subject?.Name ?? "Môn học"}";
         var classSession = new ClassSession
         {
             Classroom = classroom,
             ScheduledAt = scheduledAtUtc,
+            DurationHours = 2.0,
             Status = SessionStatus.Scheduled,
+            IsMakeup = false,
             VideoRoom = $"room-trial-{connRequest.Id}-{Guid.NewGuid():N}"
         };
 
@@ -174,26 +208,62 @@ public class TutorScheduleApiController : ControllerBase
         if (string.IsNullOrEmpty(tutorUserId)) return Unauthorized();
 
         var classroom = await _db.Classrooms
+            .Include(c => c.ClassroomStudents)
             .FirstOrDefaultAsync(c => c.Id == request.ClassroomId && c.Tutor.UserId == tutorUserId, cancellationToken);
 
         if (classroom == null) return NotFound(new { message = "Không tìm thấy lớp học." });
+        if (classroom.Status != ClassroomStatus.Active)
+            return BadRequest(new { message = "Chỉ có thể tạo buổi học cho lớp đang hoạt động." });
 
-        var scheduledStartTime = request.ScheduledAtUtc;
-        var hours = classroom.HoursPerSession > 0 ? classroom.HoursPerSession : 2.0;
-        var scheduledEndTime = scheduledStartTime.AddHours(hours);
+        var scheduledStartTime = DateTime.SpecifyKind(request.ScheduledAtUtc, DateTimeKind.Utc);
+        if (scheduledStartTime <= DateTime.UtcNow.AddMinutes(-5))
+        {
+            return BadRequest(new { message = "Không thể tạo buổi học bù ở thời điểm trong quá khứ." });
+        }
+
+        var safeHours = ClassroomLifecycleHelper.NormalizeHoursPerSession(
+            request.DurationHours is > 0 ? request.DurationHours.Value : classroom.HoursPerSession);
+
+        var studentIds = classroom.ClassroomStudents.Select(cs => cs.StudentId).Distinct().ToList();
+        var conflict = await ScheduleConflictHelper.FindSingleSessionConflictAsync(
+            _db,
+            classroom.TutorId,
+            null,
+            null,
+            scheduledStartTime,
+            safeHours,
+            studentIds,
+            cancellationToken);
+        if (conflict != null)
+        {
+            return BadRequest(new { message = conflict });
+        }
 
         var session = new ClassSession
         {
             ClassroomId = classroom.Id,
             ScheduledAt = scheduledStartTime,
+            DurationHours = safeHours,
             Status = SessionStatus.Scheduled,
-            VideoRoom = $"room-otsp-{classroom.Id}-{Guid.NewGuid():N}"
+            IsMakeup = true,
+            VideoRoom = $"OTSP-MAKEUP-{classroom.Id}-{Guid.NewGuid():N}"
         };
 
         _db.ClassSessions.Add(session);
         await _db.SaveChangesAsync(cancellationToken);
 
-        return Ok(new { success = true, message = "Đã tạo buổi học thành công.", session = new { session.Id, session.ScheduledAt } });
+        return Ok(new
+        {
+            success = true,
+            message = "Đã tạo buổi học bù thành công.",
+            session = new
+            {
+                session.Id,
+                session.ScheduledAt,
+                DurationHours = safeHours,
+                session.IsMakeup
+            }
+        });
     }
 
     [HttpPost("sessions/{id:int}/cancel")]
@@ -334,8 +404,11 @@ public class TutorScheduleApiController : ControllerBase
         string GradeLevelName,
         ClassroomType Type,
         DateTime ScheduledAtUtc,
+        double? SessionDurationHours,
+        double ClassroomHoursPerSession,
         SessionStatus Status,
         string? VideoRoom,
+        bool IsMakeup,
         bool IsTrial);
 
     private async Task<List<TutorScheduleCalendarSlotDto>> LoadCalendarSessionsAsync(
@@ -372,8 +445,11 @@ public class TutorScheduleApiController : ControllerBase
                 session.Classroom.GradeLevel.Name,
                 session.Classroom.Type,
                 session.ScheduledAt,
+                session.DurationHours,
+                session.Classroom.HoursPerSession,
                 session.Status,
                 session.VideoRoom,
+                session.IsMakeup,
                 _db.TrialSchedules.Any(ts => ts.ClassSessionId == session.Id)))
             .ToListAsync(ct);
 
@@ -398,8 +474,11 @@ public class TutorScheduleApiController : ControllerBase
                 schedule.ConnectionRequest.GradeLevel.Name,
                 schedule.ConnectionRequest.PreferredType,
                 schedule.ScheduledAt,
+                schedule.ClassSession != null ? schedule.ClassSession.DurationHours : 2.0,
+                schedule.ClassSession != null ? schedule.ClassSession.Classroom.HoursPerSession : 2.0,
                 schedule.ClassSession != null ? schedule.ClassSession.Status : SessionStatus.Scheduled,
                 schedule.ClassSession != null ? schedule.ClassSession.VideoRoom : null,
+                false,
                 true))
             .ToListAsync(ct);
 
@@ -408,11 +487,14 @@ public class TutorScheduleApiController : ControllerBase
             .Concat(trialRows)
             .Select(row =>
             {
-                var canJoin = row.Status != SessionStatus.Cancelled && row.Status != SessionStatus.Done
-                    && (row.Status == SessionStatus.InProgress
-                        || row.Status == SessionStatus.Scheduled
-                        || (nowUtc >= row.ScheduledAtUtc.AddMinutes(-ClassSessionService.EarlyJoinMinutes)
-                            && nowUtc <= row.ScheduledAtUtc.AddHours(ClassSessionService.MaxSessionOpenHours)));
+                var safeDuration = ClassroomLifecycleHelper.NormalizeHoursPerSession(
+                    row.SessionDurationHours.HasValue && row.SessionDurationHours.Value > 0
+                        ? row.SessionDurationHours.Value
+                        : row.ClassroomHoursPerSession);
+                var scheduledUtc = DateTime.SpecifyKind(row.ScheduledAtUtc, DateTimeKind.Utc);
+                var startVn = ClassroomLifecycleHelper.ToVietnamTime(scheduledUtc);
+                var endVn = startVn.AddHours(safeDuration);
+                var canJoin = ClassroomLifecycleHelper.IsWithinJoinWindow(scheduledUtc, row.Status, safeDuration, nowUtc);
 
                 return new TutorScheduleCalendarSlotDto
                 {
@@ -424,10 +506,14 @@ public class TutorScheduleApiController : ControllerBase
                     SubjectName = row.SubjectName,
                     GradeLevelName = row.GradeLevelName,
                     ClassroomType = row.Type,
-                    ScheduledAtVn = row.ScheduledAtUtc.AddHours(VietnamUtcOffsetHours),
+                    ScheduledAtUtc = scheduledUtc,
+                    ScheduledAtVn = startVn,
+                    HoursPerSession = safeDuration,
+                    TimeRangeLabel = $"{startVn:HH:mm} - {endVn:HH:mm}",
                     Status = row.Status,
                     IsTrial = row.IsTrial,
                     VideoRoom = row.VideoRoom,
+                    IsMakeupFlag = row.IsMakeup,
                     CanJoin = canJoin
                 };
             })

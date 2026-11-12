@@ -18,11 +18,15 @@ public sealed class StudentScheduleItemDto
     public bool IsTrial { get; init; }
     public string? VideoRoom { get; init; }
     public double DurationHours { get; init; } = 2.0;
+    public double HoursPerSession => DurationHours;
+    public string? TimeRangeLabel { get; init; }
+    public bool IsMakeupFlag { get; init; }
     public DateOnly Date => DateOnly.FromDateTime(ScheduledAtVn);
     public int Hour => ScheduledAtVn.Hour;
+    public int Minute => ScheduledAtVn.Minute;
     public bool CanJoin { get; init; }
     public bool HasReviewed { get; init; }
-    public bool IsMakeup => VideoRoom != null && VideoRoom.Contains("MAKEUP");
+    public bool IsMakeup => IsMakeupFlag || (VideoRoom != null && VideoRoom.Contains("MAKEUP"));
     public bool HasPaid { get; init; } = true;
     public int? PendingPaymentId { get; init; }
 }

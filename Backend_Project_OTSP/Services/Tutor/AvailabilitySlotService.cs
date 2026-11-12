@@ -1,8 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 using Backend_Project_OTSP.Data;
 using Backend_Project_OTSP.Dtos;
-using static Backend_Project_OTSP.Models.Enums;
 using Backend_Project_OTSP.Dtos.StudentParent;
+using Backend_Project_OTSP.Services.Common;
+using static Backend_Project_OTSP.Models.Enums;
 
 namespace Backend_Project_OTSP.Services.Tutor;
 
@@ -47,7 +48,9 @@ public sealed class AvailabilitySlotService : IAvailabilitySlotService
             {
                 w.DayOfWeek,
                 w.StartTime,
-                w.EndTime
+                w.EndTime,
+                w.Classroom.StartDate,
+                w.Classroom.EndDate
             })
             .ToListAsync(cancellationToken);
 
@@ -57,11 +60,12 @@ public sealed class AvailabilitySlotService : IAvailabilitySlotService
             .Where(s => s.Classroom.TutorId == tutorId
                      && s.Classroom.Status == ClassroomStatus.Active
                      && (s.Status == SessionStatus.Scheduled || s.Status == SessionStatus.InProgress)
-                     && s.ScheduledAt >= windowStartUtc && s.ScheduledAt < windowEndUtc)
+                     && s.ScheduledAt >= windowStartUtc.AddHours(-4) && s.ScheduledAt < windowEndUtc)
             .Select(s => new
             {
                 StartUtc = s.ScheduledAt,
-                DurationHours = s.Classroom.HoursPerSession > 0 ? s.Classroom.HoursPerSession : 2.0
+                s.DurationHours,
+                ClassroomHours = s.Classroom.HoursPerSession
             })
             .ToListAsync(cancellationToken);
 
@@ -79,16 +83,23 @@ public sealed class AvailabilitySlotService : IAvailabilitySlotService
             .ToListAsync(cancellationToken);
 
         var busyIntervals = busySessions
-            .Select(s => (Start: s.StartUtc, End: s.StartUtc.AddHours(s.DurationHours)))
+            .Select(s =>
+            {
+                var dur = ClassroomLifecycleHelper.NormalizeHoursPerSession(
+                    s.DurationHours.HasValue && s.DurationHours.Value > 0 ? s.DurationHours.Value : s.ClassroomHours);
+                return (Start: s.StartUtc, End: s.StartUtc.AddHours(dur));
+            })
             .Concat(busyTrials.Select(t => (Start: t.StartUtc, End: t.StartUtc.AddHours(t.DurationHours))))
             .ToList();
 
-        // Thêm các khung giờ bận từ lịch học cố định hàng tuần của các lớp chính thức cho toàn bộ 14 ngày tới
+        // Thêm các khung giờ bận từ lịch học cố định hàng tuần của các lớp chính thức theo đúng [StartDate..EndDate]
         if (activeClassroomWeeklySchedules.Count > 0)
         {
             for (var d = startDateVn.AddDays(-1); d <= endDateVn; d = d.AddDays(1))
             {
-                var daySchedules = activeClassroomWeeklySchedules.Where(w => w.DayOfWeek == d.DayOfWeek);
+                var daySchedules = activeClassroomWeeklySchedules.Where(w =>
+                    w.DayOfWeek == d.DayOfWeek
+                    && ScheduleConflictHelper.DateRangesOverlap(w.StartDate, w.EndDate, d, d));
                 foreach (var w in daySchedules)
                 {
                     var busyStartUtc = DateTime.SpecifyKind(
@@ -107,7 +118,6 @@ public sealed class AvailabilitySlotService : IAvailabilitySlotService
         busyIntervals = busyIntervals.OrderBy(i => i.Start).ToList();
 
         // 1. Thuật toán gộp khoảng bận (Interval Merging Algorithm - O(N log N))
-        // Gộp các khoảng thời gian bận trùng lặp hoặc gối đầu nhau thành danh sách các khoảng rời rạc duy nhất
         var mergedBusy = new List<(DateTime Start, DateTime End)>(busyIntervals.Count);
         foreach (var interval in busyIntervals)
         {
@@ -122,6 +132,7 @@ public sealed class AvailabilitySlotService : IAvailabilitySlotService
         }
 
         var result = new List<TutorAvailableSlotDto>();
+        var seenSlotKeys = new HashSet<DateTime>();
         var nowUtc = DateTime.UtcNow;
 
         for (var d = startDateVn; d <= endDateVn; d = d.AddDays(1))
@@ -132,33 +143,40 @@ public sealed class AvailabilitySlotService : IAvailabilitySlotService
                 var availabilityDuration = a.EndTime > a.StartTime
                     ? a.EndTime - a.StartTime
                     : a.EndTime - a.StartTime + TimeSpan.FromDays(1);
-                if (availabilityDuration < TimeSpan.FromHours(2))
+
+                var availHours = availabilityDuration.TotalHours;
+                if (availHours < 2.0)
                     continue;
 
-                var slotStartUtc = DateTime.SpecifyKind(
-                    d.ToDateTime(a.StartTime).AddHours(-VietnamUtcOffsetHours),
-                    DateTimeKind.Utc);
-
-                var slotEndUtc = slotStartUtc.AddHours(2);
-
-                if (slotStartUtc <= nowUtc)
-                    continue;
-
-                // 2. Thuật toán Binary Search kiểm tra giao khoảng thời gian (O(log M) thay vì O(M)):
-                // Nhanh hơn vượt trội so với quét tuần tự (Linear Scan)
-                bool isConflict = HasConflict(mergedBusy, slotStartUtc, slotEndUtc);
-
-                if (!isConflict)
+                // Tách khung rảnh >= 4h thành từng ca 2h riêng biệt để không mất ca học thứ 2
+                for (var offsetHours = 0.0; offsetHours + 2.0 <= availHours + 0.001; offsetHours += 2.0)
                 {
-                    result.Add(new TutorAvailableSlotDto
+                    var slotStartVn = d.ToDateTime(a.StartTime).AddHours(offsetHours);
+                    var slotStartUtc = DateTime.SpecifyKind(
+                        slotStartVn.AddHours(-VietnamUtcOffsetHours),
+                        DateTimeKind.Utc);
+                    var slotEndUtc = slotStartUtc.AddHours(2);
+
+                    if (slotStartUtc <= nowUtc || seenSlotKeys.Contains(slotStartUtc))
+                        continue;
+
+                    // 2. Binary Search O(log M)
+                    bool isConflict = HasConflict(mergedBusy, slotStartUtc, slotEndUtc);
+                    if (!isConflict)
                     {
-                        SlotUtc = slotStartUtc,
-                        DateLabel = $"{ToVnDay(d.DayOfWeek)}, {d:dd/MM/yyyy}",
-                        TimeRange = $"{a.StartTime:HH\\:mm} – {a.EndTime:HH\\:mm}",
-                        DayOfWeek = d.DayOfWeek,
-                        StartTime = a.StartTime,
-                        EndTime = a.EndTime
-                    });
+                        var slotStartTime = TimeOnly.FromDateTime(slotStartVn);
+                        var slotEndTime = slotStartTime.AddHours(2);
+                        seenSlotKeys.Add(slotStartUtc);
+                        result.Add(new TutorAvailableSlotDto
+                        {
+                            SlotUtc = slotStartUtc,
+                            DateLabel = $"{ToVnDay(d.DayOfWeek)}, {d:dd/MM/yyyy}",
+                            TimeRange = $"{slotStartTime:HH\\:mm} – {slotEndTime:HH\\:mm}",
+                            DayOfWeek = d.DayOfWeek,
+                            StartTime = slotStartTime,
+                            EndTime = slotEndTime
+                        });
+                    }
                 }
             }
         }
@@ -187,7 +205,14 @@ public sealed class AvailabilitySlotService : IAvailabilitySlotService
             .AsNoTracking()
             .Where(w => w.Classroom.Status == ClassroomStatus.Active
                      && w.Classroom.ClassroomStudents.Any(cs => cs.StudentId == studentId))
-            .Select(w => new { w.DayOfWeek, w.StartTime, w.EndTime })
+            .Select(w => new
+            {
+                w.DayOfWeek,
+                w.StartTime,
+                w.EndTime,
+                w.Classroom.StartDate,
+                w.Classroom.EndDate
+            })
             .ToListAsync(cancellationToken);
 
         var busyIntervals = new List<(DateTime Start, DateTime End)>();
@@ -195,7 +220,9 @@ public sealed class AvailabilitySlotService : IAvailabilitySlotService
         {
             for (var date = startDateVn.AddDays(-1); date <= endDateVn; date = date.AddDays(1))
             {
-                foreach (var schedule in studentWeeklySchedules.Where(s => s.DayOfWeek == date.DayOfWeek))
+                foreach (var schedule in studentWeeklySchedules.Where(s =>
+                             s.DayOfWeek == date.DayOfWeek
+                             && ScheduleConflictHelper.DateRangesOverlap(s.StartDate, s.EndDate, date, date)))
                 {
                     var start = DateTime.SpecifyKind(
                         date.ToDateTime(schedule.StartTime).AddHours(-VietnamUtcOffsetHours),
@@ -214,11 +241,12 @@ public sealed class AvailabilitySlotService : IAvailabilitySlotService
             .Where(s => s.Classroom.Status == ClassroomStatus.Active
                      && s.Classroom.ClassroomStudents.Any(cs => cs.StudentId == studentId)
                      && (s.Status == SessionStatus.Scheduled || s.Status == SessionStatus.InProgress)
-                     && s.ScheduledAt >= windowStartUtc && s.ScheduledAt < windowEndUtc)
+                     && s.ScheduledAt >= windowStartUtc.AddHours(-4) && s.ScheduledAt < windowEndUtc)
             .Select(s => new
             {
                 StartUtc = s.ScheduledAt,
-                DurationHours = s.Classroom.HoursPerSession > 0 ? s.Classroom.HoursPerSession : 2.0
+                s.DurationHours,
+                ClassroomHours = s.Classroom.HoursPerSession
             })
             .ToListAsync(cancellationToken);
 
@@ -231,7 +259,11 @@ public sealed class AvailabilitySlotService : IAvailabilitySlotService
             .ToListAsync(cancellationToken);
 
         busyIntervals.AddRange(busySessions.Select(s =>
-            (s.StartUtc, s.StartUtc.AddHours(s.DurationHours))));
+        {
+            var dur = ClassroomLifecycleHelper.NormalizeHoursPerSession(
+                s.DurationHours.HasValue && s.DurationHours.Value > 0 ? s.DurationHours.Value : s.ClassroomHours);
+            return (s.StartUtc, s.StartUtc.AddHours(dur));
+        }));
         busyIntervals.AddRange(busyTrials.Select(start =>
             (start, start.AddHours(2))));
 

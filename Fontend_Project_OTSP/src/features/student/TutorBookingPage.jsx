@@ -7,6 +7,31 @@ import { useAuth } from '../../context/AuthContext';
 const formatMoney = (val) =>
   new Intl.NumberFormat('vi-VN').format(val || 0);
 
+const getVietnamTodayIso = () => {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Ho_Chi_Minh',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(new Date());
+  const map = Object.fromEntries(parts.map(({ type, value }) => [type, value]));
+  return `${map.year}-${map.month}-${map.day}`;
+};
+
+const addDaysIso = (isoDate, deltaDays) => {
+  if (!isoDate) return '';
+  const [y, m, d] = isoDate.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, (m || 1) - 1, d || 1));
+  dt.setUTCDate(dt.getUTCDate() + deltaDays);
+  return dt.toISOString().slice(0, 10);
+};
+
+const formatVnDate = (isoDate) => {
+  if (!isoDate) return '—';
+  const [y, m, d] = String(isoDate).slice(0, 10).split('-');
+  return y && m && d ? `${d}/${m}/${y}` : String(isoDate);
+};
+
 const formatTeaching = (fmt) => {
   if (fmt === 'Online' || fmt === 0) return 'Trực tuyến';
   if (fmt === 'Offline' || fmt === 1) return 'Trực tiếp / Tại nhà';
@@ -42,8 +67,10 @@ export default function TutorBookingPage() {
   const [preferredType, setPreferredType] = useState(queryClassroomId || queryType === 'Group' ? 'Group' : 'OneToOne'); // 1 kèm 1 | Lớp nhóm
   const [isTrial, setIsTrial] = useState(true);
   const [selectedClassroomId, setSelectedClassroomId] = useState(queryClassroomId || '');
-  const [selectedSlotUtc, setSelectedSlotUtc] = useState('');
-  const [selectedSlotText, setSelectedSlotText] = useState('');
+  const [selectedSlots, setSelectedSlots] = useState([]);
+  const [durationWeeks, setDurationWeeks] = useState(4);
+  const [requestedStartDate, setRequestedStartDate] = useState(() => getVietnamTodayIso());
+  const [requestedEndDate, setRequestedEndDate] = useState(() => addDaysIso(getVietnamTodayIso(), 4 * 7 - 1));
   const [allowTutorReschedule, setAllowTutorReschedule] = useState(true);
   const [message, setMessage] = useState('');
 
@@ -51,31 +78,36 @@ export default function TutorBookingPage() {
   const [activeWeekIndex, setActiveWeekIndex] = useState(0);
   const [dayRangeTab, setDayRangeTab] = useState('weekday'); // 'weekday' (5 ngày đầu: T2-T6) | 'weekend' (T7, CN) | 'all' (Cả 7 ngày)
 
-  // Tự động sinh dữ liệu 4 tuần bắt đầu từ tuần hiện tại
+  const availableSlots = useMemo(() => data?.availableSlots || [], [data?.availableSlots]);
+
+  // Tự động sinh dữ liệu tuần theo đúng cửa sổ 14 ngày (hoặc lên đến 4 tuần nếu API trả nhiều hơn)
   const weeks = useMemo(() => {
+    const todayVnIso = getVietnamTodayIso();
+    let maxOffsetDays = 13;
+    availableSlots.forEach((slot) => {
+      if (!slot?.slotUtc) return;
+      const dStr = new Date(slot.slotUtc).toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' });
+      const diff = Math.round((Date.parse(`${dStr}T00:00:00Z`) - Date.parse(`${todayVnIso}T00:00:00Z`)) / (24 * 60 * 60 * 1000));
+      if (diff > maxOffsetDays) maxOffsetDays = diff;
+    });
+    const weekCount = Math.min(4, Math.max(2, Math.ceil((maxOffsetDays + 1) / 7)));
     const list = [];
-    const now = new Date();
     const dayNames = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
 
-    for (let w = 0; w < 4; w++) {
+    for (let w = 0; w < weekCount; w++) {
       const days = [];
-      const weekStartDate = new Date(now);
-      weekStartDate.setDate(now.getDate() + w * 7);
-
-      const weekEndDate = new Date(now);
-      weekEndDate.setDate(now.getDate() + w * 7 + 6);
-
-      const startStr = `${String(weekStartDate.getDate()).padStart(2, '0')}/${String(weekStartDate.getMonth() + 1).padStart(2, '0')}`;
-      const endStr = `${String(weekEndDate.getDate()).padStart(2, '0')}/${String(weekEndDate.getMonth() + 1).padStart(2, '0')}`;
+      const weekStartIso = addDaysIso(todayVnIso, w * 7);
+      const weekEndIso = addDaysIso(todayVnIso, w * 7 + 6);
+      const [, sm, sd] = weekStartIso.split('-');
+      const [, em, ed] = weekEndIso.split('-');
 
       for (let d = 0; d < 7; d++) {
-        const dayDate = new Date(now);
-        dayDate.setDate(now.getDate() + w * 7 + d);
-
-        const dayOfWeekNum = dayDate.getDay();
+        const fullDateIso = addDaysIso(todayVnIso, w * 7 + d);
+        const [yy, mm, dd] = fullDateIso.split('-').map(Number);
+        const dayDate = new Date(Date.UTC(yy, mm - 1, dd));
+        const dayOfWeekNum = dayDate.getUTCDay();
         const dayName = dayNames[dayOfWeekNum];
-        const dateStr = `${String(dayDate.getDate()).padStart(2, '0')}/${String(dayDate.getMonth() + 1).padStart(2, '0')}`;
-        const fullDateIso = `${dayDate.getFullYear()}-${String(dayDate.getMonth() + 1).padStart(2, '0')}-${String(dayDate.getDate()).padStart(2, '0')}`;
+        const dateStr = `${String(dd).padStart(2, '0')}/${String(mm).padStart(2, '0')}`;
 
         days.push({
           date: dayDate,
@@ -89,12 +121,12 @@ export default function TutorBookingPage() {
 
       list.push({
         weekIndex: w,
-        title: `Tuần ${w + 1} (${startStr} - ${endStr})`,
+        title: `Tuần ${w + 1} (${sd}/${sm} - ${ed}/${em})`,
         days
       });
     }
     return list;
-  }, []);
+  }, [availableSlots]);
 
   useEffect(() => {
     let isMounted = true;
@@ -156,7 +188,6 @@ export default function TutorBookingPage() {
   const availabilities = useMemo(() => data?.availabilities || [], [data?.availabilities]);
   const reviews = data?.reviews || [];
   const classrooms = data?.classrooms || [];
-  const availableSlots = useMemo(() => data?.availableSlots || [], [data?.availableSlots]);
   const existingRequest = data?.existingRequest;
   const groupBookingOptions = data?.bookingEligibility?.groupClassrooms || [];
 
@@ -178,6 +209,9 @@ export default function TutorBookingPage() {
       }));
 
   const selectedSubjectParts = selectedSubjectKey ? selectedSubjectKey.split('_').map(Number) : [];
+  const selectedSubjectObj = subjects.find(
+    (subject) => subject.subjectId === selectedSubjectParts[0] && subject.gradeLevelId === selectedSubjectParts[1]
+  );
   const selectedSubjectEligibility = data?.bookingEligibility?.subjects?.find(
     (subject) => subject.subjectId === selectedSubjectParts[0] && subject.gradeLevelId === selectedSubjectParts[1]
   );
@@ -185,7 +219,7 @@ export default function TutorBookingPage() {
     (classroom) => classroom.classroomId === Number(selectedClassroomId)
   );
 
-  // Tạo bảng tra cứu O(1) cho các slot cụ thể (chỉ tính 1 lần khi availableSlots thay đổi)
+  // Bảng tra cứu O(1) CHỈ dựa trên availableSlots thực tế từ máy chủ (đã trừ lịch bận & xung đột)
   const slotLookupMap = useMemo(() => {
     const map = new Map();
     availableSlots.forEach((slot) => {
@@ -197,7 +231,6 @@ export default function TutorBookingPage() {
         slotHour = d.toLocaleTimeString('en-GB', { timeZone: 'Asia/Ho_Chi_Minh', hour: '2-digit', minute: '2-digit' });
       }
 
-      // Giờ bắt đầu chuẩn (ví dụ "17:00 - 19:00" -> "17:00")
       const rangeStart = slot.timeRange ? slot.timeRange.slice(0, 5) : '';
       const startKey = slotHour || rangeStart;
 
@@ -212,56 +245,79 @@ export default function TutorBookingPage() {
     return map;
   }, [availableSlots]);
 
-  // Tạo bảng tra cứu O(1) cho lịch cố định hàng tuần
-  const recurringLookupMap = useMemo(() => {
-    const map = new Map();
-    availabilities.forEach((av) => {
-      const dayNum = Number(av.dayOfWeek);
-      const start = av.startTime ? String(av.startTime).slice(0, 5) : (av.timeRange ? String(av.timeRange).slice(0, 5) : '');
-      if (start) {
-        map.set(`${dayNum}_${start}`, av);
-      }
-    });
-    return map;
-  }, [availabilities]);
-
-  // Hàm phụ trợ tìm ô lịch học theo (thứ, ca) - Tốc độ O(1) tức thì
+  // Tìm khung giờ rảnh thực tế cho từng ô (không dùng fallback lịch tuần để tránh báo xanh ảo khi gia sư đang bận)
   const getSlotForCell = (day, block) => {
-    // 1. Kiểm tra trong danh sách ô lịch cụ thể (O(1))
     const found = slotLookupMap.get(`${day.fullDateIso}_${block.start}`);
-    if (found) {
-      return {
-        slotUtc: found.slotUtc,
-        displayText: found.displayText || `${day.dayName}, ${day.dateStr} (${block.label})`,
-        timeRange: found.timeRange || block.label
-      };
-    }
+    if (!found) return null;
+    return {
+      slotUtc: found.slotUtc,
+      displayText: found.displayText || `${day.dayName}, ${day.dateStr} (${block.label})`,
+      timeRange: found.timeRange || block.label
+    };
+  };
 
-    // 2. Kiểm tra lịch cố định lặp lại hàng tuần (O(1))
-    const recurring = recurringLookupMap.get(`${day.dayOfWeekNum}_${block.start}`);
-    if (recurring) {
-      return {
-        slotUtc: new Date(`${day.fullDateIso}T${block.start}:00+07:00`).toISOString(),
-        displayText: `${day.dayName}, ${day.dateStr} (${block.label})`,
-        timeRange: block.label
-      };
+  const handleToggleTrialMode = (trialFlag) => {
+    setIsTrial(trialFlag);
+    setErrorMsg('');
+    if (trialFlag && selectedSlots.length > 1) {
+      setSelectedSlots((prev) => prev.slice(0, 1));
     }
+  };
 
-    return null;
+  const handleDurationWeeksChange = (weeksVal) => {
+    const nextWeeks = Math.max(1, Math.min(52, Number(weeksVal) || 4));
+    setDurationWeeks(nextWeeks);
+    if (requestedStartDate) {
+      setRequestedEndDate(addDaysIso(requestedStartDate, nextWeeks * 7 - 1));
+    }
+  };
+
+  const handleRequestedStartDateChange = (nextStart) => {
+    setRequestedStartDate(nextStart);
+    if (nextStart) {
+      setRequestedEndDate(addDaysIso(nextStart, durationWeeks * 7 - 1));
+    }
+  };
+
+  const handleRequestedEndDateChange = (nextEnd) => {
+    setRequestedEndDate(nextEnd);
+    if (requestedStartDate && nextEnd && nextEnd >= requestedStartDate) {
+      const diffDays = Math.round((Date.parse(`${nextEnd}T00:00:00Z`) - Date.parse(`${requestedStartDate}T00:00:00Z`)) / (24 * 60 * 60 * 1000)) + 1;
+      setDurationWeeks(Math.max(1, Math.ceil(diffDays / 7)));
+    }
   };
 
   const handleSelectSlot = (slot) => {
-    if (selectedSlotUtc === slot.slotUtc) {
-      setSelectedSlotUtc('');
-      setSelectedSlotText('');
-    } else {
-      setSelectedSlotUtc(slot.slotUtc);
-      setSelectedSlotText(slot.displayText || slot.timeRange);
-      setPreferredType('OneToOne');
-    }
+    setErrorMsg('');
+    setPreferredType('OneToOne');
+    setSelectedSlots((prev) => {
+      const exists = prev.some((item) => item.slotUtc === slot.slotUtc);
+      if (exists) {
+        return prev.filter((item) => item.slotUtc !== slot.slotUtc);
+      }
+      if (isTrial) {
+        return [slot];
+      }
+      if (prev.length >= 3) {
+        setErrorMsg('Gói học chính thức 1 kèm 1 chọn tối đa 3 buổi cố định/tuần (6 tiếng).');
+        return prev;
+      }
+      const next = [...prev, slot].sort((a, b) => Date.parse(a.slotUtc) - Date.parse(b.slotUtc));
+      if (next[0]?.slotUtc) {
+        const earliestVn = new Date(next[0].slotUtc).toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' });
+        setRequestedStartDate(earliestVn);
+        setRequestedEndDate(addDaysIso(earliestVn, durationWeeks * 7 - 1));
+      }
+      return next;
+    });
   };
 
   const handleSelectGroupClass = (cls) => {
+    if (cls.canJoin === false) {
+      setErrorMsg(cls.reason || 'Lớp nhóm này hiện đã đóng nhận học viên mới.');
+      return;
+    }
+    setErrorMsg('');
     setPreferredType('Group');
     setSelectedClassroomId(cls.id);
     const sub = subjects.find((s) => s.subjectId === cls.subjectId && s.gradeLevelId === cls.gradeLevelId);
@@ -296,7 +352,12 @@ export default function TutorBookingPage() {
       setErrorMsg(selectedGroupEligibility.reason || 'Lớp nhóm này hiện không thể đăng ký.');
       return;
     }
+    if (preferredType === 'OneToOne' && !isTrial && requestedEndDate && requestedStartDate && requestedEndDate < requestedStartDate) {
+      setErrorMsg('Ngày kết thúc dự kiến phải sau hoặc bằng ngày bắt đầu.');
+      return;
+    }
 
+    const slotUtcs = selectedSlots.map((s) => s.slotUtc);
     const payload = {
       tutorId: requestedTutorId,
       subjectId,
@@ -304,8 +365,11 @@ export default function TutorBookingPage() {
       preferredType: preferredType === 'Group' ? 1 : 0,
       isTrial: preferredType === 'Group' ? false : isTrial,
       classroomId: preferredType === 'Group' && selectedClassroomId ? Number(selectedClassroomId) : null,
-      proposedTrialSlotUtc: selectedSlotUtc || null,
-      proposedTrialSlotsUtc: selectedSlotUtc ? [selectedSlotUtc] : [],
+      proposedTrialSlotUtc: slotUtcs[0] || null,
+      proposedTrialSlotsUtc: slotUtcs,
+      durationWeeks: preferredType === 'OneToOne' && !isTrial ? durationWeeks : null,
+      startDate: preferredType === 'OneToOne' && !isTrial ? requestedStartDate : null,
+      endDate: preferredType === 'OneToOne' && !isTrial ? requestedEndDate : null,
       message: message.trim() + (allowTutorReschedule ? ' [Gia sư có thể đề xuất khung giờ khác nếu bận]' : '')
     };
 
@@ -677,11 +741,11 @@ export default function TutorBookingPage() {
               )}
             </div>
 
-            {/* 6. Khung lịch rảnh & Đặt giờ học (4 tuần) - MATRIX GRID */}
+            {/* 6. Khung lịch rảnh & Đặt giờ học */}
             <div className="card border rounded-3 p-4 shadow-sm bg-white">
               <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
                 <h2 className="h6 fw-bold mb-0 text-dark d-flex align-items-center gap-2">
-                  <i className="bi bi-calendar2-check-fill text-danger"></i> Khung lịch rảnh &amp; Đặt giờ học (4 tuần)
+                  <i className="bi bi-calendar2-check-fill text-danger"></i> Khung lịch rảnh thực tế ({weeks.length} tuần tới)
                 </h2>
                 <span className="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill px-3 py-1.5 small fw-semibold">
                   <i className="bi bi-clock me-1"></i> Mỗi buổi 2 tiếng - Tối đa 3 buổi/tuần (6 tiếng)
@@ -803,7 +867,7 @@ export default function TutorBookingPage() {
                         </td>
                         {displayedDays.map((day, dIdx) => {
                           const slot = getSlotForCell(day, block);
-                          const isSelected = slot && selectedSlotUtc === slot.slotUtc;
+                          const isSelected = Boolean(slot && selectedSlots.some((s) => s.slotUtc === slot.slotUtc));
 
                           return (
                             <td key={dIdx} className="p-1" style={{ height: 56 }}>
@@ -897,6 +961,26 @@ export default function TutorBookingPage() {
                                 <strong>Lịch học:</strong> {cls.scheduleSummary}
                               </div>
                             )}
+                            {(cls.startDate || cls.endDate || cls.registrationDeadline) && (
+                              <div className="d-flex flex-wrap gap-2 small text-secondary mb-2" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                                {cls.startDate && (
+                                  <span>
+                                    <i className="bi bi-play-circle me-1 text-danger"></i>Khai giảng: <strong className="text-dark">{formatVnDate(cls.startDate)}</strong>
+                                  </span>
+                                )}
+                                {cls.endDate && (
+                                  <span>
+                                    · Kết thúc: <strong className="text-dark">{formatVnDate(cls.endDate)}</strong>
+                                  </span>
+                                )}
+                                {cls.registrationDeadline && (
+                                  <span className="w-100">
+                                    <i className="bi bi-hourglass-split me-1 text-warning-emphasis"></i>Hạn đăng ký: <strong className="text-dark">{formatVnDate(cls.registrationDeadline)}</strong>
+                                    {cls.totalSessions ? ` · ${cls.totalSessions} buổi` : ''}
+                                  </span>
+                                )}
+                              </div>
+                            )}
                           </div>
 
                           <div>
@@ -914,10 +998,12 @@ export default function TutorBookingPage() {
                             </div>
                             <button
                               type="button"
-                              className="btn btn-sm btn-outline-danger w-100 rounded-pill fw-medium"
+                              disabled={cls.canJoin === false}
+                              className={`btn btn-sm w-100 rounded-pill fw-medium ${cls.canJoin === false ? 'btn-outline-secondary' : 'btn-outline-danger'}`}
                               onClick={() => handleSelectGroupClass(cls)}
                             >
-                              <i className="bi bi-eye me-1"></i> Xem chi tiết &amp; Đăng ký
+                              <i className={`bi ${cls.canJoin === false ? 'bi-lock' : 'bi-eye'} me-1`}></i>
+                              {cls.canJoin === false ? 'Đã đóng tuyển sinh' : 'Chọn lớp & Đăng ký'}
                             </button>
                           </div>
                         </div>
@@ -1028,18 +1114,18 @@ export default function TutorBookingPage() {
                       width: 22,
                       height: 22,
                       fontSize: '0.75rem',
-                      backgroundColor: selectedSlotUtc ? '#fff1f2' : '#f8fafc',
-                      border: selectedSlotUtc ? '1.5px solid #DB303A' : '1px solid #e2e8f0',
-                      color: selectedSlotUtc ? '#DB303A' : '#64748b'
+                      backgroundColor: selectedSlots.length > 0 ? '#fff1f2' : '#f8fafc',
+                      border: selectedSlots.length > 0 ? '1.5px solid #DB303A' : '1px solid #e2e8f0',
+                      color: selectedSlots.length > 0 ? '#DB303A' : '#64748b'
                     }}
                   >
                     2
                   </span>
                   <span
-                    className={selectedSlotUtc ? 'fw-bold text-danger' : 'text-secondary'}
+                    className={selectedSlots.length > 0 ? 'fw-bold text-danger' : 'text-secondary'}
                     style={{ fontSize: '0.84rem' }}
                   >
-                    Đặt lịch thử
+                    {isTrial ? 'Đặt lịch thử' : 'Chọn lịch học'}
                   </span>
                 </div>
 
@@ -1154,7 +1240,7 @@ export default function TutorBookingPage() {
                         <div
                           className={`p-2.5 border rounded-3 cursor-pointer transition-all ${isTrial ? 'border-danger bg-danger-subtle' : 'bg-light'
                             }`}
-                          onClick={() => setIsTrial(true)}
+                          onClick={() => handleToggleTrialMode(true)}
                           style={{ cursor: 'pointer' }}
                         >
                           <div className="d-flex align-items-start gap-2">
@@ -1162,7 +1248,7 @@ export default function TutorBookingPage() {
                               type="radio"
                               name="trialOption"
                               checked={isTrial}
-                              onChange={() => setIsTrial(true)}
+                              onChange={() => handleToggleTrialMode(true)}
                               className="mt-1"
                             />
                             <div>
@@ -1170,7 +1256,7 @@ export default function TutorBookingPage() {
                                 <i className="bi bi-mortarboard text-danger me-1"></i> Đăng ký Học thử 1 buổi
                               </span>
                               <span className="text-secondary small" style={{ fontSize: 11 }}>
-                                Trải nghiệm 1 buổi học trực tuyến cùng gia sư với mức giá ưu đãi/ngay lập tức
+                                Trải nghiệm 1 buổi học trực tuyến cùng gia sư trước khi đăng ký lộ trình dài hạn
                               </span>
                             </div>
                           </div>
@@ -1179,7 +1265,7 @@ export default function TutorBookingPage() {
                         <div
                           className={`p-2.5 border rounded-3 cursor-pointer transition-all ${!isTrial ? 'border-danger bg-danger-subtle' : 'bg-light'
                             }`}
-                          onClick={() => setIsTrial(false)}
+                          onClick={() => handleToggleTrialMode(false)}
                           style={{ cursor: 'pointer' }}
                         >
                           <div className="d-flex align-items-start gap-2">
@@ -1187,15 +1273,15 @@ export default function TutorBookingPage() {
                               type="radio"
                               name="trialOption"
                               checked={!isTrial}
-                              onChange={() => setIsTrial(false)}
+                              onChange={() => handleToggleTrialMode(false)}
                               className="mt-1"
                             />
                             <div>
                               <span className="d-block fw-bold small text-dark">
-                                <i className="bi bi-lightning-charge text-danger me-1"></i> Vào học chính thức (Gói tối đa 3 buổi/tuần = 6 tiếng/tuần)
+                                <i className="bi bi-lightning-charge text-danger me-1"></i> Vào học chính thức (1–3 buổi/tuần)
                               </span>
                               <span className="text-secondary small" style={{ fontSize: 11 }}>
-                                Chọn các khung giờ cố định trong tuần để học lâu dài và kích hoạt gói học phí tháng
+                                Chọn 1 đến 3 khung giờ cố định/tuần và thời lượng khóa (tuần / ngày kết thúc)
                               </span>
                             </div>
                           </div>
@@ -1209,16 +1295,13 @@ export default function TutorBookingPage() {
                     <div className="mb-3">
                       <div className="d-flex justify-content-between align-items-center mb-1">
                         <label className="form-label small fw-semibold text-dark mb-0">
-                          {isTrial ? 'Chọn giờ học thử 01 buổi (1 buổi)' : 'Chọn khung giờ học'}
+                          {isTrial ? 'Chọn 1 khung giờ học thử' : `Chọn lịch cố định/tuần (${selectedSlots.length}/3 buổi)`}
                         </label>
-                        {selectedSlotUtc && (
+                        {selectedSlots.length > 0 && (
                           <button
                             type="button"
                             className="btn btn-link btn-sm text-danger text-decoration-none p-0 small"
-                            onClick={() => {
-                              setSelectedSlotUtc('');
-                              setSelectedSlotText('');
-                            }}
+                            onClick={() => setSelectedSlots([])}
                           >
                             Xóa chọn
                           </button>
@@ -1227,22 +1310,36 @@ export default function TutorBookingPage() {
 
                       {/* Ô hiển thị thông tin ca học đã chọn */}
                       <div className="p-3 border rounded-3 bg-light text-center mb-2">
-                        {selectedSlotUtc ? (
+                        {selectedSlots.length > 0 ? (
                           <div className="text-start">
                             <div className="d-flex align-items-center gap-2 text-success fw-bold small mb-1">
                               <i className="bi bi-calendar-check-fill fs-5"></i>
-                              <span>Đã chọn khung giờ:</span>
+                              <span>Đã chọn {selectedSlots.length} khung giờ:</span>
                             </div>
-                            <div className="fw-semibold text-dark ps-4 small">
-                              {selectedSlotText || selectedSlotUtc}
-                            </div>
+                            <ul className="list-unstyled mb-0 ps-4 small fw-semibold text-dark">
+                              {selectedSlots.map((slot) => (
+                                <li key={slot.slotUtc} className="d-flex align-items-center justify-content-between gap-2 py-0.5">
+                                  <span>{slot.displayText || slot.timeRange}</span>
+                                  <button
+                                    type="button"
+                                    className="btn btn-link btn-sm text-danger p-0 text-decoration-none"
+                                    title="Bỏ khung giờ này"
+                                    onClick={() => setSelectedSlots((prev) => prev.filter((item) => item.slotUtc !== slot.slotUtc))}
+                                  >
+                                    <i className="bi bi-x-circle"></i>
+                                  </button>
+                                </li>
+                              ))}
+                            </ul>
                           </div>
                         ) : (
                           <div>
                             <i className="bi bi-calendar-x text-danger fs-3 d-block mb-1"></i>
-                            <div className="fw-bold text-dark small mb-0.5">Chưa chọn lịch học thử</div>
+                            <div className="fw-bold text-dark small mb-0.5">
+                              {isTrial ? 'Chưa chọn lịch học thử' : 'Chưa chọn lịch học cố định'}
+                            </div>
                             <div className="text-secondary small" style={{ fontSize: 11 }}>
-                              Bạn chọn 1 khung giờ rảnh trên lịch bên trái hoặc chọn từ danh sách bên dưới.
+                              Bấm trực tiếp vào các ô xanh rảnh trên lịch bên trái hoặc chọn từ danh sách bên dưới.
                             </div>
                           </div>
                         )}
@@ -1252,21 +1349,83 @@ export default function TutorBookingPage() {
                       {availableSlots.length > 0 && (
                         <select
                           className="form-select form-select-sm rounded-2"
-                          value={selectedSlotUtc}
+                          value=""
                           onChange={(e) => {
                             const val = e.target.value;
-                            setSelectedSlotUtc(val);
+                            if (!val) return;
                             const found = availableSlots.find((s) => (s.slotUtc || s.isoValue) === val);
-                            setSelectedSlotText(found?.displayText || found?.timeRange || '');
+                            if (found) {
+                              handleSelectSlot({
+                                slotUtc: found.slotUtc || found.isoValue,
+                                displayText: found.displayText || `${found.dateLabel} (${found.timeRange})`,
+                                timeRange: found.timeRange
+                              });
+                            }
                           }}
                         >
-                          <option value="">-- Hoặc chọn nhanh từ danh sách rảnh ({availableSlots.length}) --</option>
+                          <option value="">-- Thêm nhanh khung giờ rảnh ({availableSlots.length}) --</option>
                           {availableSlots.map((slot) => (
                             <option key={slot.slotUtc || slot.isoValue} value={slot.slotUtc || slot.isoValue}>
                               {slot.displayText || `${slot.dateLabel} (${slot.timeRange})`}
                             </option>
                           ))}
                         </select>
+                      )}
+
+                      {/* Lộ trình khóa học chính thức 1-1: số tuần & ngày bắt đầu / kết thúc */}
+                      {!isTrial && (
+                        <div className="p-3 border rounded-3 bg-light-subtle mt-2">
+                          <div className="small fw-semibold text-dark mb-2">
+                            <i className="bi bi-calendar-range text-danger me-1"></i>Thời hạn gói học 1-1
+                          </div>
+                          <div className="d-flex flex-wrap gap-1 mb-2">
+                            {[4, 8, 12].map((w) => (
+                              <button
+                                key={w}
+                                type="button"
+                                className={`btn btn-sm ${durationWeeks === w ? 'btn-danger' : 'btn-outline-secondary'}`}
+                                onClick={() => handleDurationWeeksChange(w)}
+                              >
+                                {w} tuần
+                              </button>
+                            ))}
+                          </div>
+                          <div className="row g-2 mb-2">
+                            <div className="col-6">
+                              <label className="form-label small text-secondary mb-1">Ngày bắt đầu</label>
+                              <input
+                                type="date"
+                                className="form-control form-control-sm"
+                                value={requestedStartDate}
+                                min={getVietnamTodayIso()}
+                                onChange={(e) => handleRequestedStartDateChange(e.target.value)}
+                              />
+                            </div>
+                            <div className="col-6">
+                              <label className="form-label small text-secondary mb-1">Ngày kết thúc</label>
+                              <input
+                                type="date"
+                                className="form-control form-control-sm"
+                                value={requestedEndDate}
+                                min={requestedStartDate}
+                                onChange={(e) => handleRequestedEndDateChange(e.target.value)}
+                              />
+                            </div>
+                          </div>
+                          {(() => {
+                            const weeklyCount = Math.max(1, selectedSlots.length);
+                            const totalPlanned = weeklyCount * durationWeeks;
+                            const estTuition = (Number(selectedSubjectObj?.hourlyFee) || 0) * 2 * totalPlanned;
+                            return (
+                              <div className="small text-secondary" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                                Dự kiến: <strong>{totalPlanned} buổi</strong> ({totalPlanned * 2} giờ)
+                                {estTuition > 0 && (
+                                  <> · Tạm tính: <strong className="text-danger">{formatMoney(estTuition)} đ</strong></>
+                                )}
+                              </div>
+                            );
+                          })()}
+                        </div>
                       )}
 
                       {/* Checkbox: Gia sư có thể tự đề xuất khung giờ học nếu lịch trên tạm thời kín */}

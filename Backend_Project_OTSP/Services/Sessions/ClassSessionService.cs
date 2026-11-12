@@ -57,18 +57,19 @@ public sealed class ClassSessionService : IClassSessionService
         if (!await IsParticipantAsync(session.ClassroomId, userId, cancellationToken))
             return ClassSessionJoinResultDto.Forbidden();
 
-        // Gia sư có thể mở lớp sớm bất cứ lúc nào để chuẩn bị giảng dạy. Học viên chỉ được vào khi gia sư đã mở phòng.
+        // Kiểm tra khung giờ mở lớp hợp lệ cho cả Gia sư và Học viên (mở trước 60 phút đến sau giờ học kết thúc)
+        if (!IsWithinJoinWindow(session, DateTime.UtcNow))
+        {
+            var sVn = ClassroomLifecycleHelper.ToVietnamTime(session.ScheduledAt);
+            return ClassSessionJoinResultDto.Fail($"Phòng học chỉ mở trước giờ học {EarlyJoinMinutes} phút. Buổi học diễn ra lúc {sVn:HH:mm dd/MM/yyyy}.");
+        }
+
+        // Học viên chỉ được vào sau khi gia sư đã mở phòng (InProgress)
         if (!isTutor)
         {
             if (session.Status == SessionStatus.Scheduled)
             {
                 return ClassSessionJoinResultDto.Fail("Gia sư chưa mở lớp học. Vui lòng chờ gia sư vào phòng trước khi tham gia.");
-            }
-
-            if (!IsWithinJoinWindow(session, DateTime.UtcNow))
-            {
-                var sVn = session.ScheduledAt.AddHours(7);
-                return ClassSessionJoinResultDto.Fail($"Phòng học chỉ mở trước giờ học 60 phút. Buổi học bắt đầu lúc {sVn:HH:mm dd/MM/yyyy}.");
             }
         }
 
@@ -92,7 +93,7 @@ public sealed class ClassSessionService : IClassSessionService
                     {
                         return ClassSessionJoinResultDto.PaymentRequired(
                             "Bạn cần hoàn tất đóng học phí cho lớp học này trước khi vào phòng học trực tuyến.",
-                            "/Student_Parent/StudentClassroom");
+                            "/student/classrooms");
                     }
                 }
             }
@@ -179,6 +180,8 @@ public sealed class ClassSessionService : IClassSessionService
 
         session.Status = SessionStatus.Done;
         await _db.SaveChangesAsync(cancellationToken);
+
+        await TryAutoCompleteClassroomsAsync(_db, new[] { session.ClassroomId }, cancellationToken);
 
         await _db.ClassSessionAttendances
             .Where(attendance => attendance.ClassSessionId == sessionId && attendance.LeftAtUtc == null)
@@ -482,7 +485,7 @@ public sealed class ClassSessionService : IClassSessionService
                     {
                         UserId = st.UserId,
                         Title = "Buổi học đã bắt đầu!",
-                        Content = $"Gia sư {tutorName} đã mở phòng học lớp {className} ({subjectName}). Mời bạn vào lớp ngay! [url:/room/{session.VideoRoom}]",
+                        Content = $"Gia sư {tutorName} đã mở phòng học lớp {className} ({subjectName}). Mời bạn vào lớp ngay! [url:/room/{session.Id}]",
                         CreatedAt = DateTime.UtcNow,
                         IsRead = false
                     });
@@ -501,7 +504,7 @@ public sealed class ClassSessionService : IClassSessionService
                         {
                             UserId = st.UserId,
                             Title = "Buổi học đã bị hủy",
-                            Content = $"Buổi học lớp {className} ({subjectName}) lúc {timeStr} đã bị hủy. Lý do: {reason}. [url:/Student_Parent/StudentSchedule]",
+                            Content = $"Buổi học lớp {className} ({subjectName}) lúc {timeStr} đã bị hủy. Lý do: {reason}. [url:/student/schedule]",
                             CreatedAt = DateTime.UtcNow,
                             IsRead = false
                         });
@@ -532,7 +535,7 @@ public sealed class ClassSessionService : IClassSessionService
                     {
                         UserId = st.UserId,
                         Title = "Buổi học đã hoàn thành",
-                        Content = $"Buổi học lớp {className} ({subjectName}) đã kết thúc. Bạn hãy đánh giá và viết nhận xét cho gia sư nhé! [url:/Student_Parent/StudentClassroom]",
+                        Content = $"Buổi học lớp {className} ({subjectName}) đã kết thúc. Bạn hãy đánh giá và viết nhận xét cho gia sư nhé! [url:/student/classrooms]",
                         CreatedAt = DateTime.UtcNow,
                         IsRead = false
                     });
@@ -548,17 +551,55 @@ public sealed class ClassSessionService : IClassSessionService
 
     private static bool IsWithinJoinWindow(ClassSession session, DateTime nowUtc)
     {
-        if (session.Status == SessionStatus.InProgress)
-            return true;
+        var duration = ClassroomLifecycleHelper.GetSessionDurationHours(session, session.Classroom);
+        return ClassroomLifecycleHelper.IsWithinJoinWindow(session.ScheduledAt, session.Status, duration, nowUtc);
+    }
 
-        if (session.Status == SessionStatus.Scheduled)
+    public static async Task TryAutoCompleteClassroomsAsync(
+        ApplicationDbContext db,
+        IEnumerable<int> classroomIds,
+        CancellationToken cancellationToken = default)
+    {
+        var ids = classroomIds.Distinct().ToList();
+        if (ids.Count == 0) return;
+
+        var nowUtc = DateTime.UtcNow;
+        var todayVn = ClassroomLifecycleHelper.GetVietnamToday(nowUtc);
+
+        var classrooms = await db.Classrooms
+            .Include(c => c.WeeklySchedules)
+            .Include(c => c.ClassSessions)
+            .Where(c => ids.Contains(c.Id) && c.Status == ClassroomStatus.Active)
+            .ToListAsync(cancellationToken);
+
+        var changed = false;
+        foreach (var classroom in classrooms)
         {
-            var openAt = session.ScheduledAt.AddMinutes(-EarlyJoinMinutes);
-            var closeAt = session.ScheduledAt.AddHours(MaxSessionOpenHours);
-            return nowUtc >= openAt && nowUtc <= closeAt;
+            var sessions = classroom.ClassSessions;
+            if (sessions.Count == 0) continue;
+
+            var hasInProgress = sessions.Any(s => s.Status == SessionStatus.InProgress);
+            var hasUpcomingScheduled = sessions.Any(s => s.Status == SessionStatus.Scheduled && s.ScheduledAt >= nowUtc.AddHours(-6));
+            if (hasInProgress || hasUpcomingScheduled) continue;
+
+            var expectedTotal = ClassroomLifecycleHelper.CalculateExpectedTotalSessions(
+                classroom.StartDate, classroom.EndDate, classroom.TotalSessions, classroom.SessionsPerWeek, classroom.WeeklySchedules);
+            var doneCount = sessions.Count(s => s.Status == SessionStatus.Done);
+
+            var reachedSessionQuota = expectedTotal > 0 && doneCount >= expectedTotal;
+            var passedEndDate = classroom.EndDate.HasValue && todayVn > classroom.EndDate.Value;
+
+            if (reachedSessionQuota || passedEndDate)
+            {
+                classroom.Status = ClassroomStatus.Completed;
+                changed = true;
+            }
         }
 
-        return false;
+        if (changed)
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
     }
 
     public Task EnsureWeeklySessionsForClassroomsAsync(
@@ -590,20 +631,20 @@ public sealed class ClassSessionService : IClassSessionService
         if (activeClassrooms.Count == 0)
             return;
 
-        const int vnOffsetHours = 7;
         var nowUtc = DateTime.UtcNow;
-        var todayVn = DateOnly.FromDateTime(nowUtc.AddHours(vnOffsetHours));
+        var todayVn = ClassroomLifecycleHelper.GetVietnamToday(nowUtc);
         var effectiveStartVn = rangeStartVn < todayVn ? todayVn : rangeStartVn;
         if (rangeEndVn < effectiveStartVn)
             return;
 
-        var rangeStartUtc = DateTime.SpecifyKind(effectiveStartVn.ToDateTime(TimeOnly.MinValue).AddHours(-vnOffsetHours).AddMinutes(-30), DateTimeKind.Utc);
-        var rangeEndUtc = DateTime.SpecifyKind(rangeEndVn.AddDays(1).ToDateTime(TimeOnly.MinValue).AddHours(-vnOffsetHours).AddMinutes(30), DateTimeKind.Utc);
+        // Giới hạn không tự động sinh lịch quá xa vượt quá chân trời hợp lý nếu lớp chưa đặt EndDate
+        var maxRollingHorizonVn = todayVn.AddDays(ClassroomLifecycleHelper.RollingPreGenerateWeeks * 7);
+        var boundedRangeEndVn = rangeEndVn > maxRollingHorizonVn ? maxRollingHorizonVn : rangeEndVn;
 
         var targetIds = activeClassrooms.Select(c => c.Id).ToList();
         var existingSessions = await db.ClassSessions
             .AsNoTracking()
-            .Where(cs => targetIds.Contains(cs.ClassroomId) && cs.ScheduledAt >= rangeStartUtc && cs.ScheduledAt <= rangeEndUtc)
+            .Where(cs => targetIds.Contains(cs.ClassroomId) && cs.Status != SessionStatus.Cancelled)
             .Select(cs => new { cs.ClassroomId, cs.ScheduledAt })
             .ToListAsync(cancellationToken);
 
@@ -614,43 +655,42 @@ public sealed class ClassSessionService : IClassSessionService
         bool hasChanges = false;
         foreach (var classroom in activeClassrooms)
         {
-            if (!existingByClassroom.TryGetValue(classroom.Id, out var existingTimes))
-            {
-                existingTimes = [];
-                existingByClassroom[classroom.Id] = existingTimes;
-            }
+            if (classroom.EndDate.HasValue && classroom.EndDate.Value < effectiveStartVn)
+                continue;
 
-            for (var targetDate = effectiveStartVn; targetDate <= rangeEndVn; targetDate = targetDate.AddDays(1))
+            var existingTimes = existingByClassroom.GetValueOrDefault(classroom.Id) ?? [];
+            var minAllowedUtc = ClassroomLifecycleHelper.VietnamDateTimeToUtc(effectiveStartVn, TimeOnly.MinValue);
+
+            var planned = ClassroomLifecycleHelper.BuildPlannedSessions(
+                classroom,
+                classroom.WeeklySchedules,
+                minAllowedUtc,
+                existingTimes,
+                maxGenerateHorizonDays: 365);
+
+            var classroomCutoffEndVn = classroom.EndDate.HasValue
+                ? (classroom.EndDate.Value < boundedRangeEndVn ? classroom.EndDate.Value : boundedRangeEndVn)
+                : boundedRangeEndVn;
+            var cutoffUtc = ClassroomLifecycleHelper.VietnamDateTimeToUtc(classroomCutoffEndVn.AddDays(1), TimeOnly.MinValue);
+
+            foreach (var (sessionUtc, durationHours) in planned)
             {
-                if (classroom.StartDate.HasValue && targetDate < classroom.StartDate.Value)
+                if (sessionUtc >= cutoffUtc)
                     continue;
 
-                foreach (var ws in classroom.WeeklySchedules)
+                var status = markNearbyInProgress && Math.Abs((sessionUtc - nowUtc).TotalHours) < 1.0
+                    ? SessionStatus.InProgress
+                    : SessionStatus.Scheduled;
+
+                db.ClassSessions.Add(new ClassSession
                 {
-                    if (ws.DayOfWeek != targetDate.DayOfWeek)
-                        continue;
-
-                    var sessionVn = targetDate.ToDateTime(ws.StartTime);
-                    var sessionUtc = DateTime.SpecifyKind(sessionVn.AddHours(-vnOffsetHours), DateTimeKind.Utc);
-
-                    var alreadyExists = existingTimes.Any(t => Math.Abs((t - sessionUtc).TotalMinutes) <= 30);
-                    if (!alreadyExists)
-                    {
-                        var status = markNearbyInProgress && Math.Abs((sessionUtc - nowUtc).TotalHours) < 1.0
-                            ? SessionStatus.InProgress
-                            : SessionStatus.Scheduled;
-
-                        db.ClassSessions.Add(new ClassSession
-                        {
-                            ClassroomId = classroom.Id,
-                            ScheduledAt = sessionUtc,
-                            Status = status,
-                            VideoRoom = $"OTSP-Room-{classroom.Id}-{Guid.NewGuid():N}"[..26]
-                        });
-                        existingTimes.Add(sessionUtc);
-                        hasChanges = true;
-                    }
-                }
+                    ClassroomId = classroom.Id,
+                    ScheduledAt = sessionUtc,
+                    DurationHours = durationHours,
+                    Status = status,
+                    VideoRoom = $"OTSP-Room-{classroom.Id}-{Guid.NewGuid():N}"[..26]
+                });
+                hasChanges = true;
             }
         }
 

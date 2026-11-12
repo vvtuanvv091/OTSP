@@ -14,6 +14,11 @@ public class ConnectionRequest
     public DateTime? RespondedAt { get; set; }
     // Khung giờ học thử đề xuất do học viên chọn từ lịch rảnh của gia sư (UTC)
     public DateTime? ProposedTrialSlotUtc { get; set; }
+    // Phân biệt rõ yêu cầu học thử 1 buổi vs học chính thức (tránh suy diễn từ có slot hay không)
+    public bool IsTrial { get; set; } = false;
+    public int DurationWeeks { get; set; } = 4;
+    public DateOnly? RequestedStartDate { get; set; }
+    public DateOnly? RequestedEndDate { get; set; }
     // Kiểu học học viên muốn: 1-1 hoặc nhóm
     public ClassroomType PreferredType { get; set; } = ClassroomType.OneToOne;
     // Chỉ có khi xin vào một lớp nhóm đã mở
