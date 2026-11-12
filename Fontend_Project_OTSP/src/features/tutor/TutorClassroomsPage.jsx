@@ -3,10 +3,11 @@ import { Link } from 'react-router-dom';
 import tutorApi from '../../api/tutorApi';
 import { resolveAssetUrl } from '../../api/config';
 import { useAuth } from '../../context/AuthContext';
-import { useToast } from '../../context/ToastContext';
-import { useConfirm } from '../../context/ConfirmDialogContext';
+import { useToast } from '../../context/toastHooks';
+import { useConfirm } from '../../context/confirmHooks';
 import ComplaintModal from '../../components/common/ComplaintModal';
 import OtspPagination from '../../components/common/OtspPagination';
+import '../../styles/tutor/TutorClassroomsPage.css';
 
 export default function TutorClassroomsPage() {
   const { user } = useAuth();
@@ -82,44 +83,6 @@ export default function TutorClassroomsPage() {
 
   return (
     <>
-      <style>{`
-        .tutor-classroom-card {
-          transition: all 0.2s ease;
-          border: 1px solid #E2E8F0;
-          background: #FFFFFF;
-        }
-        .tutor-classroom-card:hover {
-          border-color: #CBD5E1;
-          box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
-          transform: translateY(-1px);
-        }
-        .tutor-fee-badge {
-          background-color: #FAFAFA;
-          border: 1px solid #F1F5F9;
-          min-width: 76px;
-          height: 60px;
-        }
-        .progress-bar-custom {
-          background-color: #DB303A;
-          border-radius: 999px;
-        }
-        .btn-danger {
-          background-color: #DB303A !important;
-          border-color: #DB303A !important;
-        }
-        .btn-outline-danger {
-          color: #DB303A !important;
-          border-color: #DB303A !important;
-          background: #ffffff !important;
-          font-weight: 500;
-        }
-        .btn-outline-danger:hover {
-          background-color: #DB303A !important;
-          border-color: #DB303A !important;
-          color: #ffffff !important;
-        }
-      `}</style>
-
       <div className="container-fluid py-4">
         {/* Header */}
         <div className="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">

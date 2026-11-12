@@ -1,6 +1,5 @@
-import React, { createContext, useContext, useState, useCallback, useMemo } from 'react';
-
-const ToastContext = createContext(null);
+import { useState, useCallback, useMemo } from 'react';
+import { ToastContext } from './toastHooks';
 
 export function ToastProvider({ children }) {
   const [toasts, setToasts] = useState([]);
@@ -105,21 +104,5 @@ export function ToastProvider({ children }) {
       </div>
     </ToastContext.Provider>
   );
-}
-
-export function useToast() {
-  const context = useContext(ToastContext);
-  if (!context) {
-    // Trả về fallback an toàn nếu component được render ngoài ToastProvider
-    return {
-      show: (msg) => console.log('Toast:', msg),
-      success: (msg) => console.log('Toast Success:', msg),
-      error: (msg) => console.error('Toast Error:', msg),
-      warning: (msg) => console.warn('Toast Warning:', msg),
-      info: (msg) => console.log('Toast Info:', msg),
-      remove: () => {},
-    };
-  }
-  return context;
 }
 

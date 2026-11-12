@@ -89,7 +89,7 @@ public class StudentScheduleApiController : ControllerBase
                 ClassroomId = p.ClassroomId,
                 ClassroomName = p.Classroom.NameClass,
                 SubjectName = p.Classroom.Subject.Name,
-                TutorName = p.Classroom.Tutor.User.FullName,
+                TutorName = p.Classroom.Tutor.User.FullName ?? string.Empty,
                 Amount = p.Amount
             })
             .ToListAsync(cancellationToken);
@@ -187,7 +187,7 @@ public class StudentScheduleApiController : ControllerBase
                 ClassroomName = s.ClassroomName,
                 SubjectName = s.SubjectName,
                 GradeLevelName = s.GradeLevelName,
-                TutorName = s.TutorName,
+                TutorName = s.TutorName ?? string.Empty,
                 TutorAvatarUrl = s.TutorAvatarUrl,
                 ClassroomType = s.ClassroomType,
                 ScheduledAtUtc = DateTime.SpecifyKind(s.ScheduledAt, DateTimeKind.Utc),

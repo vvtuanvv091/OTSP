@@ -197,7 +197,6 @@ public class AdminDashboardApiController : ControllerBase
 
         // 8. Tin nhắn / Thông báo gia sư gần nhất
         var recentTutorNotifications = await _db.Notifications.AsNoTracking()
-            .Include(n => n.User)
             .Where(n => tutorQuery.Any(tp => tp.UserId == n.UserId))
             .OrderByDescending(n => n.CreatedAt)
             .Take(5)

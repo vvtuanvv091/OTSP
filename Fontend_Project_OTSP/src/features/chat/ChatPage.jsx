@@ -3,10 +3,11 @@ import { hubUrl, resolveAssetUrl } from '../../api/config';
 import { useSearchParams } from 'react-router-dom';
 import { HubConnectionBuilder, LogLevel } from '@microsoft/signalr';
 import { useAuth } from '../../context/AuthContext';
-import { useToast } from '../../context/ToastContext';
-import { useConfirm } from '../../context/ConfirmDialogContext';
+import { useToast } from '../../context/toastHooks';
+import { useConfirm } from '../../context/confirmHooks';
 import chatApi from '../../api/chatApi';
 import { getStoredToken } from '../../utils/authStorage';
+import '../../styles/chat/ChatPage.css';
 
 // Hàm helper hợp nhất và chuẩn hóa tin nhắn chống trùng lặp / race condition khi 2 người gửi cùng lúc
 function upsertChatMessage(prevList, incoming, currentUserId) {
@@ -66,12 +67,17 @@ export default function ChatPage() {
   const inquiryParam = searchParams.get('inquiry');
   const classTitleParam = searchParams.get('classTitle');
 
+  const inquiryKey = inquiryParam && classTitleParam ? `${inquiryParam}:${classTitleParam}` : '';
+  const buildInquiryDraft = (title) =>
+    `[Tư vấn lớp: ${decodeURIComponent(title)}] Em chào thầy/cô, em muốn hỏi thêm thông tin về lịch học và giáo trình của lớp này trước khi đăng ký ạ.`;
+
   const [conversations, setConversations] = useState([]);
   const [selectedContact, setSelectedContact] = useState(null);
   const [messages, setMessages] = useState([]);
   const [loadingConversations, setLoadingConversations] = useState(true);
   const [loadingMessages, setLoadingMessages] = useState(false);
-  const [inputText, setInputText] = useState('');
+  const [prevInquiryKey, setPrevInquiryKey] = useState(inquiryKey);
+  const [inputText, setInputText] = useState(() => (inquiryKey ? buildInquiryDraft(classTitleParam) : ''));
   const [searchQuery, setSearchQuery] = useState('');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [isMobileChatActive, setIsMobileChatActive] = useState(false);
@@ -84,17 +90,19 @@ export default function ChatPage() {
   const selectedContactRef = useRef(null);
   const hubConnectionRef = useRef(null);
 
+  if (prevInquiryKey !== inquiryKey) {
+    setPrevInquiryKey(inquiryKey);
+    if (inquiryKey && !inputText) {
+      setInputText(buildInquiryDraft(classTitleParam));
+    }
+  }
+
   useEffect(() => {
     selectedContactRef.current = selectedContact;
   }, [selectedContact]);
 
-  // Tự động điền lời nhắn tư vấn khi mở từ modal "Chi tiết lớp học"
-  useEffect(() => {
-    if (inquiryParam && classTitleParam && !inputText) {
-      const decodedTitle = decodeURIComponent(classTitleParam);
-      setInputText(`[Tư vấn lớp: ${decodedTitle}] Em chào thầy/cô, em muốn hỏi thêm thông tin về lịch học và giáo trình của lớp này trước khi đăng ký ạ.`);
-    }
-  }, [inquiryParam, classTitleParam]);
+  const userRole = user?.role;
+  const userRolesKey = Array.isArray(user?.roles) ? user.roles.join(',') : '';
 
   const scrollToBottom = () => {
     if (messagesBoxRef.current) {
@@ -113,8 +121,8 @@ export default function ChatPage() {
           let list = Array.isArray(res.data) ? res.data : [];
 
           // Học viên CHỈ được phép chat với Gia sư và Hỗ trợ OTSP (xóa bạn cùng lớp / học viên khác)
-          const isStudentUser = user?.role === 'Student_Parent' || user?.role === 'Student' ||
-            (Array.isArray(user?.roles) && user.roles.some((r) => String(r).toLowerCase().includes('student')));
+          const isStudentUser = userRole === 'Student_Parent' || userRole === 'Student' ||
+            userRolesKey.toLowerCase().includes('student');
 
           if (isStudentUser) {
             list = list.filter((c) => c.roleLabel !== 'Bạn cùng lớp' && c.roleLabel !== 'Học viên');
@@ -174,7 +182,7 @@ export default function ChatPage() {
 
     loadConversations();
     return () => { isMounted = false; };
-  }, [contactIdParam, classTitleParam]);
+  }, [contactIdParam, contactNameParam, contactAvatarParam, classTitleParam, userRole, userRolesKey]);
 
   // 2. Tải lịch sử tin nhắn khi chọn một cuộc trò chuyện
   useEffect(() => {
@@ -408,7 +416,9 @@ export default function ChatPage() {
             return fresh ? { ...curr, isOnline: fresh.isOnline } : curr;
           });
         }
-      } catch { }
+      } catch (err) {
+        console.debug('Presence check skipped:', err);
+      }
     }, 30000);
 
     return () => clearInterval(presenceTimer);
@@ -625,375 +635,6 @@ export default function ChatPage() {
 
   return (
     <div className={`chat-workspace-page ${isMobileChatActive ? 'is-chatting-mobile' : ''}`} id="chatWorkspace">
-      {/* Phong cách CSS tông đỏ thương hiệu OTSP */}
-      <style>{`
-        .chat-workspace-page {
-          width: 100%;
-          max-width: 100%;
-          margin: 0;
-          padding: 0;
-        }
-        .chat-workspace-card {
-          background-color: var(--bs-card-bg, #ffffff);
-          border: 1px solid var(--bs-border-color, #eaedf1);
-          border-radius: 16px;
-          overflow: hidden;
-          height: calc(100vh - 180px);
-          min-height: 540px;
-          display: flex;
-          flex-direction: column;
-        }
-        .chat-sidebar-column {
-          display: flex;
-          flex-direction: column;
-          height: 100%;
-          background-color: var(--bs-body-bg, #ffffff);
-        }
-        .chat-search-input-group {
-          position: relative;
-          display: flex;
-          align-items: center;
-        }
-        .chat-search-input-group i {
-          position: absolute;
-          left: 12px;
-          font-size: 13px;
-          pointer-events: none;
-        }
-        .chat-search-input {
-          border-radius: 20px;
-          padding-left: 34px;
-          padding-right: 14px;
-          font-size: 13px;
-          background-color: var(--bs-tertiary-bg, #f8fafc);
-          border: 1px solid var(--bs-border-color, #e2e8f0);
-        }
-        .chat-conversations-list {
-          flex-grow: 1;
-          overflow-y: auto;
-          padding: 8px 12px;
-        }
-        .chat-conv-item {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          padding: 10px 14px;
-          border-radius: 12px;
-          cursor: pointer;
-          transition: all 0.18s ease;
-          margin-bottom: 4px;
-          user-select: none;
-          border-left: 3px solid transparent;
-        }
-        .chat-conv-item:hover {
-          background-color: var(--bs-tertiary-bg, #f8fafc);
-        }
-        /* Unified OTSP Red Theme for Active Chat (NO PURPLE) */
-        .chat-conv-item.is-active {
-          background-color: rgba(219, 48, 58, 0.08) !important;
-          border-left: 3px solid #DB303A !important;
-        }
-        .chat-avatar-wrap {
-          width: 44px;
-          height: 44px;
-          border-radius: 50%;
-          overflow: hidden;
-          flex-shrink: 0;
-          background-color: #f1f5f9;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          border: 1px solid #e2e8f0;
-        }
-        .chat-avatar-img {
-          width: 100%;
-          height: 100%;
-          object-fit: cover;
-        }
-        .chat-avatar-fallback {
-          font-size: 16px;
-          font-weight: 700;
-          color: #DB303A;
-        }
-        .chat-conv-name {
-          font-size: 14px;
-          font-weight: 700;
-          color: var(--bs-body-color, #0f172a);
-        }
-        .chat-conv-preview {
-          font-size: 12px;
-          color: var(--bs-secondary-color, #64748b);
-        }
-        /* Unified Red Badge for Unread Messages */
-        .chat-unread-badge {
-          background-color: #DB303A;
-          color: #ffffff;
-          font-size: 11px;
-          font-weight: 700;
-          padding: 2px 7px;
-          border-radius: 12px;
-          flex-shrink: 0;
-        }
-        .chat-main-column {
-          height: 100%;
-          background-color: var(--bs-body-bg, #ffffff);
-        }
-        .chat-room-header {
-          background-color: var(--bs-body-bg, #ffffff);
-        }
-        .chat-online-dot {
-          font-size: 8px;
-          vertical-align: middle;
-        }
-        .chat-messages-body {
-          background-color: var(--bs-tertiary-bg, #f8fafc);
-          overflow-y: auto;
-          display: flex;
-          flex-direction: column;
-          gap: 12px;
-        }
-        .chat-message-row {
-          display: flex;
-          align-items: flex-end;
-          width: 100%;
-          position: relative;
-          margin-bottom: 6px;
-          clear: both;
-        }
-        .chat-message-row.is-mine {
-          justify-content: flex-end;
-        }
-        .chat-message-row.is-theirs {
-          justify-content: flex-start;
-        }
-        .chat-message-row .chat-message-actions {
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          margin-right: 8px;
-          opacity: 0;
-          transition: opacity 0.15s ease;
-        }
-        .chat-message-row:hover .chat-message-actions,
-        .chat-message-row:focus-within .chat-message-actions {
-          opacity: 1;
-        }
-        .btn-msg-action {
-          background: transparent;
-          border: none;
-          color: #64748b;
-          padding: 5px 7px;
-          border-radius: 6px;
-          font-size: 13px;
-          cursor: pointer;
-          line-height: 1;
-          transition: all 0.15s ease;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-        }
-        .btn-edit-msg {
-          background-color: #fde8e8 !important;
-          color: #dc2626 !important;
-        }
-        .btn-edit-msg:hover {
-          background-color: #fbd5d5 !important;
-          color: #991b1b !important;
-        }
-        .btn-delete-msg {
-          color: #64748b !important;
-        }
-        .btn-delete-msg:hover {
-          color: #dc2626 !important;
-          background-color: rgba(220, 38, 38, 0.12) !important;
-        }
-        .chat-bubble {
-          display: inline-block;
-          width: fit-content;
-          max-width: 100%;
-          min-width: 32px;
-          padding: 10px 16px;
-          border-radius: 18px;
-          font-size: 14px;
-          line-height: 1.5;
-          white-space: pre-wrap;
-          word-break: normal;
-          overflow-wrap: break-word;
-          box-shadow: 0 1px 2px rgba(0,0,0,0.04);
-        }
-        .chat-bubble-text {
-          white-space: pre-wrap;
-          word-break: normal;
-          overflow-wrap: break-word;
-        }
-        .chat-message-row.is-mine .chat-bubble {
-          background-color: #DB303A;
-          color: #ffffff;
-          border-bottom-right-radius: 4px;
-        }
-        .chat-message-row.is-theirs .chat-bubble {
-          background-color: #ffffff;
-          color: #1e293b;
-          border-bottom-left-radius: 4px;
-          border: 1px solid #e2e8f0;
-        }
-        .chat-bubble-image {
-          padding: 4px;
-          background: transparent !important;
-          border: none !important;
-          box-shadow: none !important;
-        }
-        .chat-message-img {
-          max-width: 240px;
-          max-height: 240px;
-          border-radius: 12px;
-          display: block;
-          cursor: pointer;
-          border: 1px solid #e2e8f0;
-          background-color: #ffffff;
-          object-fit: cover;
-          box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-        }
-        .chat-room-footer {
-          background-color: var(--bs-body-bg, #ffffff);
-        }
-        .btn-chat-tool {
-          border: none;
-          background: transparent;
-          color: var(--bs-secondary-color, #64748b);
-          padding: 6px 10px;
-          border-radius: 50%;
-          cursor: pointer;
-          transition: all 0.15s ease;
-        }
-        .btn-chat-tool:hover {
-          color: #DB303A;
-          background-color: rgba(219, 48, 58, 0.08);
-        }
-        .chat-input-rounded {
-          border-radius: 20px;
-          padding: 8px 16px;
-          font-size: 14px;
-          border: 1px solid #e2e8f0;
-        }
-        .chat-input-rounded:focus {
-          border-color: #DB303A;
-          box-shadow: 0 0 0 0.2rem rgba(219, 48, 58, 0.15);
-        }
-        .btn-chat-send {
-          background-color: #DB303A;
-          border-color: #DB303A;
-          color: #ffffff;
-          border-radius: 20px;
-          padding: 8px 20px;
-          font-size: 14px;
-          font-weight: 600;
-          border: none;
-          transition: all 0.15s ease;
-        }
-        .btn-chat-send:hover {
-          background-color: #b7212b;
-          color: #ffffff;
-        }
-        .chat-emoji-popover {
-          position: absolute;
-          bottom: 60px;
-          left: 16px;
-          z-index: 1050;
-          background: #ffffff;
-          border: 1px solid #e2e8f0;
-          border-radius: 12px;
-          width: 260px;
-        }
-        .chat-emoji-grid {
-          display: grid;
-          grid-template-columns: repeat(5, 1fr);
-          gap: 6px;
-        }
-        .btn-emoji {
-          border: none;
-          background: transparent;
-          font-size: 20px;
-          cursor: pointer;
-          border-radius: 6px;
-          padding: 4px;
-        }
-        .btn-emoji:hover {
-          background-color: #f1f5f9;
-        }
-        .chat-message-content {
-          position: relative;
-          max-width: 82%;
-          display: flex;
-          flex-direction: column;
-          align-items: flex-start;
-        }
-        .chat-message-row.is-mine .chat-message-content { align-items: flex-end; }
-        .chat-message-actions { position: relative; z-index: 2; margin-bottom: 3px; }
-        .chat-message-menu-trigger {
-          width: 28px;
-          height: 24px;
-          padding: 0;
-          border: 0;
-          border-radius: 4px;
-          background: transparent;
-          color: var(--bs-secondary-color, #4b5563);
-        }
-        .chat-message-menu-trigger:hover,
-        .chat-message-menu-trigger[aria-expanded="true"] { background: var(--bs-tertiary-bg, #f3f4f6); }
-        .chat-message-menu {
-          position: absolute;
-          right: 0;
-          top: 26px;
-          min-width: 130px;
-          padding: 4px;
-          border: 1px solid var(--bs-border-color, #d1d5db);
-          border-radius: 6px;
-          background: var(--bs-body-bg, #fff);
-          box-shadow: 0 4px 14px rgba(0, 0, 0, .14);
-        }
-        .chat-message-menu button {
-          display: block;
-          width: 100%;
-          padding: 7px 9px;
-          border: 0;
-          border-radius: 4px;
-          background: transparent;
-          color: var(--bs-body-color, #111827);
-          text-align: left;
-          font-size: 13px;
-        }
-        .chat-message-menu button:hover { background: var(--bs-tertiary-bg, #f3f4f6); }
-        .chat-bubble.is-deleted {
-          background: #e5e7eb !important;
-          border: 1px solid #9ca3af !important;
-          color: #374151 !important;
-          font-style: italic;
-        }
-        .chat-deleted-message { font-size: 13px; }
-        .chat-edited-label { display: block; margin-top: 4px; opacity: .8; font-size: 11px; }
-        .chat-edit-form { min-width: min(320px, 70vw); }
-        .chat-edit-form textarea {
-          width: 100%;
-          min-height: 76px;
-          padding: 7px;
-          border: 1px solid #d1d5db;
-          border-radius: 4px;
-          resize: vertical;
-          color: #111827;
-        }
-        .chat-edit-form textarea:focus { outline: 2px solid rgba(255,255,255,.65); }
-        [data-bs-theme="dark"] .chat-bubble.is-deleted {
-          background: #334155 !important;
-          border-color: #64748b !important;
-          color: #e2e8f0 !important;
-        }
-        @media (max-width: 575px) {
-          .chat-message-content { max-width: 90%; }
-          .chat-edit-form { min-width: min(240px, 72vw); }
-        }
-      `}</style>
-
       {/* Tiêu đề trang */}
       <div className="chat-page-header mb-3 d-flex align-items-center justify-content-between">
         <div>

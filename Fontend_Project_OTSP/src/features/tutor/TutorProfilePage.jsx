@@ -1,15 +1,21 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import tutorApi from '../../api/tutorApi';
 import { resolveAssetUrl } from '../../api/config';
 import { useAuth } from '../../context/AuthContext';
-import { useToast } from '../../context/ToastContext';
-import { useConfirm } from '../../context/ConfirmDialogContext';
+import { useToast } from '../../context/toastHooks';
+import { useConfirm } from '../../context/confirmHooks';
 import CollapsibleProfileSection from '../../components/common/CollapsibleProfileSection';
 import ChangePasswordPanel from '../auth/ChangePasswordPanel';
 import compressImageFile from '../../utils/imageCompressor';
+import '../../styles/tutor/TutorProfilePage.css';
 
 export default function TutorProfilePage() {
   const { user, updateUser } = useAuth();
+  const authSyncRef = useRef({ user, updateUser });
+
+  useEffect(() => {
+    authSyncRef.current = { user, updateUser };
+  }, [user, updateUser]);
   const toast = useToast();
   const confirm = useConfirm();
   const [profile, setProfile] = useState(null);
@@ -62,11 +68,12 @@ export default function TutorProfilePage() {
           if (grades.length > 0) setSelectedGradeLevelId((prev) => prev || grades[0].id);
 
           // Tự động đồng bộ ảnh đại diện và họ tên với AuthContext (Header, Sidebar)
-          if (p.avatarUrl && p.avatarUrl !== user?.avatarUrl) {
-            updateUser({ avatarUrl: p.avatarUrl });
+          const { user: currentUser, updateUser: syncUser } = authSyncRef.current;
+          if (p.avatarUrl && p.avatarUrl !== currentUser?.avatarUrl) {
+            syncUser({ avatarUrl: p.avatarUrl });
           }
-          if (p.fullName && p.fullName !== user?.fullName) {
-            updateUser({ fullName: p.fullName });
+          if (p.fullName && p.fullName !== currentUser?.fullName) {
+            syncUser({ fullName: p.fullName });
           }
         }
       } catch {
@@ -272,207 +279,7 @@ export default function TutorProfilePage() {
 
   return (
     <>
-      <style>{`
-        .profile-wrap { padding-top: 1.5rem; padding-bottom: 3.5rem; }
-        .pro-card {
-          background: var(--bs-body-bg);
-          border: 1px solid var(--bs-border-color);
-          border-radius: 1.25rem;
-          box-shadow: 0 10px 30px rgba(0, 0, 0, .06);
-          padding: 1.75rem;
-        }
-        @media (min-width: 992px) {
-          .sticky-side { position: sticky; top: 90px; }
-        }
-        .avatar-wrapper {
-          position: relative;
-          width: 136px;
-          height: 136px;
-          margin: 0 auto 1.25rem;
-          display: block;
-        }
-        .avatar-ring {
-          width: 100%;
-          height: 100%;
-          padding: 4px;
-          border-radius: 50%;
-          background: linear-gradient(135deg, #DB303A, #ff7a85);
-          box-shadow: 0 8px 24px rgba(219, 48, 58, .22);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          overflow: hidden;
-          transition: transform .25s ease, box-shadow .25s ease;
-        }
-        .avatar-wrapper:hover .avatar-ring {
-          transform: translateY(-2px);
-          box-shadow: 0 12px 28px rgba(219, 48, 58, .28);
-        }
-        .avatar-ring img {
-          width: 100%;
-          height: 100%;
-          aspect-ratio: 1 / 1;
-          object-fit: cover;
-          object-position: center;
-          border-radius: 50%;
-          border: 3.5px solid var(--bs-body-bg);
-          background-color: var(--bs-tertiary-bg);
-          display: block;
-          transition: transform .25s ease;
-        }
-        .avatar-wrapper:hover .avatar-ring img {
-          transform: scale(1.05);
-        }
-        .avatar-upload-btn {
-          position: absolute;
-          bottom: 2px;
-          right: 2px;
-          width: 38px;
-          height: 38px;
-          border-radius: 50%;
-          background: #DB303A;
-          color: #fff !important;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          cursor: pointer;
-          border: 3px solid var(--bs-body-bg);
-          box-shadow: 0 4px 12px rgba(0, 0, 0, .18);
-          transition: transform .2s ease, background-color .2s ease;
-          z-index: 2;
-        }
-        .avatar-upload-btn:hover {
-          transform: scale(1.12);
-          background: #B7212B;
-          color: #fff !important;
-        }
-        .avatar-loading-overlay {
-          position: absolute;
-          inset: 0;
-          border-radius: 50%;
-          background: rgba(0, 0, 0, .55);
-          backdrop-filter: blur(2px);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          z-index: 3;
-        }
-        .status-pill {
-          display: inline-flex;
-          align-items: center;
-          gap: .4rem;
-          padding: .4rem 1rem;
-          border-radius: 999px;
-          font-size: .85rem;
-          font-weight: 600;
-        }
-        .status-approved {
-          background: #166534;
-          color: #ffffff;
-        }
-        .status-rejected {
-          background: rgba(219, 48, 58, .14);
-          color: #DB303A;
-        }
-        .status-pending {
-          background: rgba(245, 158, 11, .14);
-          color: #d97706;
-        }
-        .rating-line {
-          font-size: .9rem;
-          color: var(--bs-secondary-color);
-        }
-        .section-head {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          margin-bottom: 1.25rem;
-        }
-        .section-title {
-          font-size: 1.15rem;
-          font-weight: 700;
-          margin-bottom: 0;
-          display: flex;
-          align-items: center;
-          gap: .5rem;
-        }
-        .section-icon {
-          color: #DB303A;
-          font-size: 1.3rem;
-        }
-        .subject-chip {
-          display: inline-flex;
-          align-items: center;
-          gap: .4rem;
-          background: rgba(219, 48, 58, .09);
-          color: #B7212B;
-          border: 1px solid rgba(219, 48, 58, .2);
-          border-radius: 999px;
-          padding: .35rem .75rem;
-          font-size: .85rem;
-          font-weight: 500;
-          margin: 0 .4rem .4rem 0;
-        }
-        .empty-box {
-          text-align: center;
-          padding: 2rem 1rem;
-          border: 1px dashed var(--bs-border-color);
-          border-radius: .9rem;
-          color: var(--bs-secondary-color);
-          font-size: .9rem;
-        }
-        .empty-box i {
-          display: block;
-          font-size: 1.75rem;
-          margin-bottom: .5rem;
-          color: var(--bs-secondary-color);
-        }
-        .qual-item {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          gap: 1rem;
-          padding: 1rem 1.1rem;
-          border: 1px solid var(--bs-border-color);
-          border-radius: .9rem;
-          transition: border-color .2s, box-shadow .2s, transform .2s;
-        }
-        .qual-item + .qual-item { margin-top: .75rem; }
-        .qual-item:hover {
-          transform: translateY(-2px);
-          border-color: #DB303A;
-          box-shadow: 0 10px 24px rgba(0,0,0,.08);
-        }
-        .qual-icon {
-          width: 46px;
-          height: 46px;
-          border-radius: 12px;
-          background: rgba(219, 48, 58, .12);
-          color: #DB303A;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 1.25rem;
-          flex-shrink: 0;
-        }
-        .btn-brand {
-          background-color: #DB303A;
-          border-color: #DB303A;
-          color: #fff;
-        }
-        .btn-brand:hover {
-          background-color: #B7212B;
-          border-color: #B7212B;
-          color: #fff;
-        }
-        .save-bar {
-          display: flex;
-          justify-content: flex-end;
-          margin: .5rem 0 1.5rem;
-        }
-      `}</style>
-
-      <div className="container profile-wrap">
+      <div className="container profile-wrap tutor-profile-page">
         {message && (
           <div className="alert alert-success alert-dismissible fade show shadow-sm" role="alert">
             <i className="bi bi-check-circle me-2"></i>{message}

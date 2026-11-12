@@ -28,9 +28,9 @@ public sealed class AdminConnectionManagementService : IAdminConnectionManagemen
         if (!string.IsNullOrEmpty(search))
         {
             filtered = filtered.Where(request =>
-                request.Student.User.FullName.Contains(search) ||
+                (request.Student.User.FullName != null && request.Student.User.FullName.Contains(search)) ||
                 (request.Student.User.Email != null && request.Student.User.Email.Contains(search)) ||
-                request.Tutor.User.FullName.Contains(search) ||
+                (request.Tutor.User.FullName != null && request.Tutor.User.FullName.Contains(search)) ||
                 (request.Tutor.User.Email != null && request.Tutor.User.Email.Contains(search)) ||
                 request.Subject.Name.Contains(search) ||
                 request.GradeLevel.Name.Contains(search));
@@ -49,10 +49,10 @@ public sealed class AdminConnectionManagementService : IAdminConnectionManagemen
             {
                 Id = request.Id,
                 StudentUserId = request.Student.UserId,
-                StudentName = request.Student.User.FullName,
+                StudentName = request.Student.User.FullName ?? string.Empty,
                 StudentEmail = request.Student.User.Email,
                 TutorUserId = request.Tutor.UserId,
-                TutorName = request.Tutor.User.FullName,
+                TutorName = request.Tutor.User.FullName ?? string.Empty,
                 TutorEmail = request.Tutor.User.Email,
                 SubjectName = request.Subject.Name,
                 GradeLevelName = request.GradeLevel.Name,

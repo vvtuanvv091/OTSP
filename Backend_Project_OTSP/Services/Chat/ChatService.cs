@@ -879,9 +879,9 @@ namespace Backend_Project_OTSP.Services.Chat
                     .Select(request => new ConversationParticipants
                     {
                         StudentUserId = request.Student.UserId,
-                        StudentName = request.Student.User.FullName,
+                        StudentName = request.Student.User.FullName ?? string.Empty,
                         TutorUserId = request.Tutor.UserId,
-                        TutorName = request.Tutor.User.FullName
+                        TutorName = request.Tutor.User.FullName ?? string.Empty
                     })
                     .FirstOrDefaultAsync(cancellationToken);
             });

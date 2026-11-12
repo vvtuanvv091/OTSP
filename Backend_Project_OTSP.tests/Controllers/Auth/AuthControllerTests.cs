@@ -294,6 +294,7 @@ public class AuthControllerTests
         _mockAuthService.Verify(s => s.LogoutAsync(), Times.Once);
     }
 
+#if DEBUG
     [Fact]
     public async Task GetDevToken_WhenUserExists_ReturnsOk()
     {
@@ -364,5 +365,6 @@ public class AuthControllerTests
         // Assert
         Assert.IsType<NotFoundResult>(result);
     }
+#endif
 }
 

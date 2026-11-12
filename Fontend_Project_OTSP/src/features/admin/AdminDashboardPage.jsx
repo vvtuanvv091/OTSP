@@ -1,13 +1,12 @@
 import { useEffect, useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
 import adminApi from '../../api/adminApi';
 import adminOperationsApi from '../../api/adminOperationsApi';
 import { ensureVisitTracked } from '../../utils/visitTracker';
 import '../../styles/admin-pages.css';
+import '../../styles/admin/AdminDashboardPage.css';
 
 export default function AdminDashboardPage() {
-  const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(new Date());
@@ -27,17 +26,13 @@ export default function AdminDashboardPage() {
   const [dailyMetrics, setDailyMetrics] = useState([]);
   const [topTutors, setTopTutors] = useState([]);
   const [topStudents, setTopStudents] = useState([]);
-  const [recentTutorNotifications, setRecentTutorNotifications] = useState([]);
 
   // Tab điều khiển sơ đồ tăng trưởng & con trỏ rê chuột
   const [chartActiveSeries, setChartActiveSeries] = useState('all'); // 'all' | 'revenue' | 'ai' | 'students'
   const [hoveredIdx, setHoveredIdx] = useState(null);
 
   // Load all data from real backend APIs
-  const loadAllDashboardData = async (isManualRefresh = false) => {
-    if (isManualRefresh) setRefreshing(true);
-    else setLoading(true);
-
+  const fetchDashboardData = async () => {
     try {
       await ensureVisitTracked(window.location.pathname || '/admin/dashboard');
 
@@ -72,9 +67,6 @@ export default function AdminDashboardPage() {
           }
           if (Array.isArray(d.topStudents)) {
             setTopStudents(d.topStudents);
-          }
-          if (Array.isArray(d.recentTutorNotifications)) {
-            setRecentTutorNotifications(d.recentTutorNotifications);
           }
           setStudentsCount(d.overview.totalStudents ?? 0);
           setClassroomsCount(d.overview.activeClassrooms ?? d.overview.totalClassrooms ?? 0);
@@ -140,8 +132,17 @@ export default function AdminDashboardPage() {
     }
   };
 
+  const loadAllDashboardData = async (isManualRefresh = false) => {
+    if (isManualRefresh) setRefreshing(true);
+    await fetchDashboardData();
+  };
+
   useEffect(() => {
-    loadAllDashboardData();
+    let active = true;
+    Promise.resolve().then(() => {
+      if (active) fetchDashboardData();
+    });
+    return () => { active = false; };
   }, []);
 
   // Format VND chuẩn dấu chấm
@@ -275,8 +276,6 @@ export default function AdminDashboardPage() {
     };
   }, [dailyMetrics]);
 
-  const chartSeries = chartData;
-
   // Hằng số tọa độ SVG chuẩn hóa
   const CHART_LEFT = 52;
   const CHART_RIGHT = 624;
@@ -298,7 +297,7 @@ export default function AdminDashboardPage() {
   };
 
   // Hàm tạo đường cong Bézier mượt mà chuẩn SVG (Smooth Curved Path)
-  const buildSmoothCurve = (points, width = 640, height = 200, maxVal = 100) => {
+  const buildSmoothCurve = (points, maxVal = 100) => {
     if (!points || points.length === 0) return '';
     const pts = points.map((val, idx) => ({
       x: getChartX(idx, points.length),
@@ -316,8 +315,8 @@ export default function AdminDashboardPage() {
   };
 
   // Hàm tạo vùng tô bóng mờ dưới đường cong (Area Path)
-  const buildSmoothArea = (points, width = 640, height = 200, maxVal = 100) => {
-    const curve = buildSmoothCurve(points, width, height, maxVal);
+  const buildSmoothArea = (points, maxVal = 100) => {
+    const curve = buildSmoothCurve(points, maxVal);
     if (!curve || points.length === 0) return '';
     const lastX = getChartX(points.length - 1, points.length).toFixed(1);
     const firstX = getChartX(0, points.length).toFixed(1);
@@ -339,407 +338,6 @@ export default function AdminDashboardPage() {
 
   return (
     <div className="admin-dashboard-container py-3 px-2 px-md-4">
-      <style>{`
-        /* ============================================================
-           PROFESSIONAL EXECUTIVE ADMIN DASHBOARD SYSTEM
-           Phong cách Sơ đồ dữ liệu kiến trúc phẳng & Tinh gọn OTSP
-           ============================================================ */
-        :root {
-          --dash-surface: #ffffff;
-          --dash-subtle: #f8fafc;
-          --dash-border: #e2e8f0;
-          --dash-border-subtle: #f1f5f9;
-          --dash-text: #0f172a;
-          --dash-text-muted: #64748b;
-          --dash-primary: #DB303A;
-          --dash-primary-soft: rgba(219, 48, 58, 0.08);
-          --dash-green: #15803d;
-          --dash-green-soft: rgba(21, 128, 61, 0.08);
-          --dash-amber: #b45309;
-          --dash-amber-soft: rgba(180, 83, 9, 0.08);
-          --dash-blue: #0284c7;
-          --dash-blue-soft: rgba(2, 132, 199, 0.08);
-          --dash-card-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 6px 16px -4px rgba(15, 23, 42, 0.04);
-        }
-
-        [data-bs-theme="dark"] {
-          --dash-surface: #14152d;
-          --dash-subtle: #1c1d3b;
-          --dash-border: #282a52;
-          --dash-border-subtle: #1f2042;
-          --dash-text: #f8fafc;
-          --dash-text-muted: #94a3b8;
-          --dash-primary: #ff4d5a;
-          --dash-primary-soft: rgba(255, 77, 90, 0.12);
-          --dash-card-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
-        }
-
-        /* 1. Header điều hành tinh gọn */
-        .admin-exec-header {
-          background: var(--dash-surface);
-          border: 1px solid var(--dash-border);
-          border-radius: 14px;
-          padding: 16px 20px;
-          margin-bottom: 20px;
-          box-shadow: var(--dash-card-shadow);
-        }
-
-        /* 2. Bento KPI Cards */
-        .dash-kpi-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-          gap: 16px;
-          margin-bottom: 22px;
-        }
-        .dash-kpi-box {
-          background: var(--dash-surface);
-          border: 1px solid var(--dash-border);
-          border-radius: 14px;
-          padding: 18px 20px;
-          display: flex;
-          flex-direction: column;
-          justify-content: space-between;
-          box-shadow: var(--dash-card-shadow);
-          transition: transform 0.18s ease, border-color 0.18s ease;
-          position: relative;
-        }
-        .dash-kpi-box:hover {
-          transform: translateY(-2px);
-          border-color: #cbd5e1;
-        }
-        .dash-kpi-title {
-          font-size: 11px;
-          font-weight: 700;
-          letter-spacing: 0.6px;
-          text-transform: uppercase;
-          color: var(--dash-text-muted);
-          margin-bottom: 6px;
-        }
-        .dash-kpi-val {
-          font-size: 24px;
-          font-weight: 800;
-          color: var(--dash-text);
-          letter-spacing: -0.4px;
-          line-height: 1.2;
-        }
-        .dash-kpi-icon {
-          width: 40px;
-          height: 40px;
-          border-radius: 10px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 19px;
-        }
-
-        /* 3. Card chung cho Sơ đồ */
-        .diagram-card {
-          background: var(--dash-surface);
-          border: 1px solid var(--dash-border);
-          border-radius: 16px;
-          padding: 20px 22px;
-          box-shadow: var(--dash-card-shadow);
-          height: 100%;
-          display: flex;
-          flex-direction: column;
-        }
-        .diagram-header-badge {
-          width: 32px;
-          height: 32px;
-          border-radius: 8px;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 16px;
-          margin-right: 10px;
-        }
-
-        /* 4. SƠ ĐỒ LUỒNG DÒNG TIỀN (Sankey / Financial Flow Architecture) */
-        .flow-architecture-stage {
-          background: var(--dash-subtle);
-          border: 1px solid var(--dash-border);
-          border-radius: 14px;
-          padding: 20px 16px;
-          position: relative;
-        }
-        .flow-node-box {
-          background: var(--dash-surface);
-          border: 1px solid var(--dash-border);
-          border-radius: 12px;
-          padding: 14px 16px;
-          box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
-          position: relative;
-          transition: transform 0.18s ease;
-        }
-        .flow-node-box:hover {
-          transform: translateY(-2px);
-          border-color: #cbd5e1;
-        }
-        .flow-connector-line {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          color: var(--dash-text-muted);
-          font-size: 18px;
-        }
-
-        /* 5. SƠ ĐỒ QUY TRÌNH KIỂM DUYỆT (Quality Pipeline Steps) */
-        .pipeline-track {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-          gap: 12px;
-          margin-top: 10px;
-        }
-        .pipeline-step {
-          background: var(--dash-subtle);
-          border: 1px solid var(--dash-border);
-          border-radius: 12px;
-          padding: 14px;
-          position: relative;
-        }
-        .pipeline-step-badge {
-          width: 24px;
-          height: 24px;
-          border-radius: 50%;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 11px;
-          font-weight: 700;
-          margin-bottom: 8px;
-        }
-
-        /* 6. SƠ ĐỒ BIỂU ĐỒ SÓNG MƯỢT (SVG Smooth Area Chart) */
-        .chart-svg-wrap {
-          background: var(--dash-subtle);
-          border: 1px solid var(--dash-border);
-          border-radius: 14px;
-          padding: 16px 14px 10px;
-          position: relative;
-        }
-        .chart-filter-pill {
-          font-size: 11.5px;
-          font-weight: 600;
-          padding: 4px 12px;
-          border-radius: 20px;
-          cursor: pointer;
-          border: 1px solid var(--dash-border);
-          background: var(--dash-surface);
-          color: var(--dash-text-muted);
-          transition: all 0.15s ease;
-        }
-        .chart-filter-pill.active {
-          background: #DB303A;
-          color: #ffffff;
-          border-color: #DB303A;
-        }
-
-        .chart-summary-chip {
-          background: var(--dash-surface);
-          border: 1px solid var(--dash-border);
-          border-radius: 8px;
-          padding: 4px 10px;
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          font-size: 11.5px;
-          box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
-        }
-
-        .chart-y-axis-text {
-          font-size: 9.5px;
-          fill: var(--dash-text-muted);
-          font-weight: 500;
-          font-family: inherit;
-        }
-
-        .chart-inspector-panel {
-          animation: chartFadeIn 0.12s ease-out;
-        }
-        @keyframes chartFadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-
-        .pulse-ring {
-          animation: chartPulse 1.8s infinite;
-        }
-        @keyframes chartPulse {
-          0% { r: 5px; opacity: 0.6; }
-          50% { r: 9px; opacity: 0.15; }
-          100% { r: 5px; opacity: 0.6; }
-        }
-
-        /* 7. SƠ ĐỒ CỘT 7 NGÀY (Daily Bars Diagram) */
-        .daily-bars-container {
-          display: grid;
-          grid-template-columns: repeat(7, 1fr);
-          gap: 8px;
-          align-items: flex-end;
-          height: 145px;
-          padding: 12px 6px 4px;
-          border-bottom: 1px dashed var(--dash-border);
-        }
-        .daily-bar-column {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          height: 100%;
-          justify-content: flex-end;
-        }
-        .daily-bar-fill {
-          width: 14px;
-          border-radius: 4px 4px 1px 1px;
-          transition: height 0.4s ease;
-        }
-
-        .table-responsive {
-          overflow-x: auto;
-          -webkit-overflow-scrolling: touch;
-        }
-
-        /* 8. Modern Table */
-        .modern-diagram-table {
-          width: 100%;
-          border-collapse: separate;
-          border-spacing: 0 6px;
-        }
-        .modern-diagram-table th {
-          font-size: 11px;
-          text-transform: uppercase;
-          letter-spacing: 0.5px;
-          color: var(--dash-text-muted);
-          font-weight: 700;
-          padding: 6px 12px;
-          border: none;
-        }
-        .modern-diagram-table td {
-          background: var(--dash-subtle);
-          padding: 10px 12px;
-          font-size: 12.5px;
-          vertical-align: middle;
-          border-top: 1px solid var(--dash-border);
-          border-bottom: 1px solid var(--dash-border);
-        }
-        .modern-diagram-table tr td:first-child {
-          border-left: 1px solid var(--dash-border);
-          border-top-left-radius: 10px;
-          border-bottom-left-radius: 10px;
-        }
-        .modern-diagram-table tr td:last-child {
-          border-right: 1px solid var(--dash-border);
-          border-top-right-radius: 10px;
-          border-bottom-right-radius: 10px;
-        }
-
-        .spin-icon {
-          animation: spin 0.8s linear infinite;
-        }
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-
-        /* ============================================================
-           MOBILE RESPONSIVE & ADAPTIVE STYLING (IMPECCABLE CRAFT)
-           ============================================================ */
-        @media (max-width: 991.98px) {
-          .dash-kpi-grid {
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-            gap: 12px;
-          }
-          .admin-exec-header {
-            padding: 14px 16px;
-          }
-          .chart-svg-wrap {
-            overflow-x: auto;
-            -webkit-overflow-scrolling: touch;
-          }
-        }
-
-        @media (max-width: 767.98px) {
-          .dash-kpi-grid {
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-            gap: 10px;
-          }
-          .dash-kpi-box {
-            padding: 12px 14px;
-            border-radius: 12px;
-          }
-          .dash-kpi-val {
-            font-size: 19px;
-          }
-          .dash-kpi-icon {
-            width: 34px;
-            height: 34px;
-            font-size: 16px;
-          }
-          .diagram-card {
-            padding: 14px 16px;
-            border-radius: 14px;
-          }
-          .flow-architecture-stage {
-            padding: 14px 12px;
-          }
-          .flow-connector-line {
-            transform: rotate(90deg);
-            margin: 6px 0;
-          }
-          .pipeline-track {
-            grid-template-columns: 1fr;
-            gap: 10px;
-          }
-          .chart-filter-pill {
-            font-size: 10.5px;
-            padding: 3px 8px;
-          }
-          .daily-bars-container {
-            height: 120px;
-            gap: 4px;
-          }
-          .daily-bar-fill {
-            width: 10px;
-          }
-          .modern-diagram-table-wrap {
-            overflow-x: auto;
-            -webkit-overflow-scrolling: touch;
-            margin: 0 -8px;
-            padding: 0 8px;
-          }
-          .modern-diagram-table th,
-          .modern-diagram-table td {
-            padding: 8px 10px;
-            font-size: 11.5px;
-            white-space: nowrap;
-          }
-        }
-
-        @media (max-width: 479.98px) {
-          .dash-kpi-grid {
-            grid-template-columns: 1fr;
-            gap: 8px;
-          }
-          .dash-kpi-box {
-            padding: 12px;
-          }
-          .admin-exec-header h5 {
-            font-size: 17px;
-          }
-          .admin-exec-header small {
-            font-size: 11.5px;
-          }
-          .diagram-header-badge {
-            width: 28px;
-            height: 28px;
-            font-size: 14px;
-          }
-          .chart-summary-chip {
-            font-size: 10.5px;
-            padding: 2px 6px;
-          }
-        }
-      `}</style>
-
       {/* 1. THANH TIÊU ĐỀ ĐIỀU HÀNH CHUYÊN NGHIỆP */}
       <div className="admin-exec-header d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between gap-3">
         <div>
@@ -1134,7 +732,7 @@ export default function AdminDashboardPage() {
                         {/* Đường lưới tọa độ Y và nhãn số liệu trục tung */}
                         {[0, 0.25, 0.5, 0.75, 1].map((ratio, i) => {
                           const yPos = CHART_BOTTOM - ratio * CHART_H;
-                          let yLabel = '';
+                          let yLabel;
                           if (chartActiveSeries === 'all') {
                             yLabel = `${Math.round(ratio * 100)}%`;
                           } else if (chartActiveSeries === 'revenue') {
@@ -1198,8 +796,6 @@ export default function AdminDashboardPage() {
                               chartActiveSeries === 'all'
                                 ? chartData.items.map(it => (it.cumulativeRevenue / chartData.maxCumRev) * 100)
                                 : chartData.items.map(it => it.cumulativeRevenue),
-                              640,
-                              200,
                               chartActiveSeries === 'all' ? 100 : chartData.maxCumRev
                             )}
                             fill="url(#revenueGrad)"
@@ -1211,8 +807,6 @@ export default function AdminDashboardPage() {
                               chartActiveSeries === 'all'
                                 ? chartData.items.map(it => (it.aiQuestions / chartData.maxAi) * 100)
                                 : chartData.items.map(it => it.aiQuestions),
-                              640,
-                              200,
                               chartActiveSeries === 'all' ? 100 : chartData.maxAi
                             )}
                             fill="url(#aiGrad)"
@@ -1224,8 +818,6 @@ export default function AdminDashboardPage() {
                               chartActiveSeries === 'all'
                                 ? chartData.items.map(it => (it.students / chartData.maxStud) * 100)
                                 : chartData.items.map(it => it.students),
-                              640,
-                              200,
                               chartActiveSeries === 'all' ? 100 : chartData.maxStud
                             )}
                             fill="url(#studentGrad)"
@@ -1239,8 +831,6 @@ export default function AdminDashboardPage() {
                               chartActiveSeries === 'all'
                                 ? chartData.items.map(it => (it.cumulativeRevenue / chartData.maxCumRev) * 100)
                                 : chartData.items.map(it => it.cumulativeRevenue),
-                              640,
-                              200,
                               chartActiveSeries === 'all' ? 100 : chartData.maxCumRev
                             )}
                             fill="none"
@@ -1255,8 +845,6 @@ export default function AdminDashboardPage() {
                               chartActiveSeries === 'all'
                                 ? chartData.items.map(it => (it.aiQuestions / chartData.maxAi) * 100)
                                 : chartData.items.map(it => it.aiQuestions),
-                              640,
-                              200,
                               chartActiveSeries === 'all' ? 100 : chartData.maxAi
                             )}
                             fill="none"
@@ -1271,8 +859,6 @@ export default function AdminDashboardPage() {
                               chartActiveSeries === 'all'
                                 ? chartData.items.map(it => (it.students / chartData.maxStud) * 100)
                                 : chartData.items.map(it => it.students),
-                              640,
-                              200,
                               chartActiveSeries === 'all' ? 100 : chartData.maxStud
                             )}
                             fill="none"

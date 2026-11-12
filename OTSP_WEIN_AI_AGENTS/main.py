@@ -37,13 +37,13 @@ async def add_utf8_charset(request: Request, call_next):
         response.headers["content-type"] = f"{content_type}; charset=utf-8"
     return response
 
-# Cấu hình CORS để Frontend React và Backend .NET gọi thoải mái
+# Cấu hình CORS chặt chẽ theo danh sách domain được phép (không dùng wildcard kèm credentials)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=settings.ALLOWED_ORIGINS,
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Content-Type", "X-Internal-Key"],
 )
 
 class AgentChatRequest(BaseModel):

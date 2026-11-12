@@ -76,7 +76,11 @@ public class JwtService : IJwtService
             claims.Add(new Claim("studentProfileId", studentProfileId.Value.ToString()));
         }
 
-        var jwtKey = _configuration["Jwt:Key"] ?? "OTSP_Super_Secret_Key_For_Jwt_Token_2026_AtLeast32BytesLong!";
+        var jwtKey = _configuration["Jwt:Key"];
+        if (string.IsNullOrWhiteSpace(jwtKey) || jwtKey.Length < 32)
+        {
+            throw new InvalidOperationException("Configuration 'Jwt:Key' is missing or shorter than 32 characters.");
+        }
         var issuer = _configuration["Jwt:Issuer"] ?? "Backend_Project_OTSP";
         var audience = _configuration["Jwt:Audience"] ?? "OTSP_React_App";
 

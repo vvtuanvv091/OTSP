@@ -2,15 +2,21 @@ import { useEffect, useRef, useState } from 'react';
 import adminApi from '../../api/adminApi';
 import { resolveAssetUrl } from '../../api/config';
 import { useAuth } from '../../context/AuthContext';
-import { useToast } from '../../context/ToastContext';
+import { useToast } from '../../context/toastHooks';
 import CollapsibleProfileSection from '../../components/common/CollapsibleProfileSection';
 import ChangePasswordPanel from '../auth/ChangePasswordPanel';
 import compressImageFile from '../../utils/imageCompressor';
+import '../../styles/admin/AdminProfilePage.css';
 
 export default function AdminProfilePage() {
   const { user, updateUser } = useAuth();
   const toast = useToast();
   const fileInputRef = useRef(null);
+  const authSyncRef = useRef({ user, updateUser });
+
+  useEffect(() => {
+    authSyncRef.current = { user, updateUser };
+  }, [user, updateUser]);
   const [profile, setProfile] = useState({ fullName: '', email: '', phoneNumber: '', avatarUrl: '' });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -25,11 +31,12 @@ export default function AdminProfilePage() {
         if (active && response.data) {
           const d = response.data.profile || response.data || {};
           setProfile((current) => ({ ...current, ...d }));
-          if (d.avatarUrl && d.avatarUrl !== user?.avatarUrl) {
-            updateUser({ avatarUrl: d.avatarUrl });
+          const { user: currentUser, updateUser: syncUser } = authSyncRef.current;
+          if (d.avatarUrl && d.avatarUrl !== currentUser?.avatarUrl) {
+            syncUser({ avatarUrl: d.avatarUrl });
           }
-          if (d.fullName && d.fullName !== user?.fullName) {
-            updateUser({ fullName: d.fullName });
+          if (d.fullName && d.fullName !== currentUser?.fullName) {
+            syncUser({ fullName: d.fullName });
           }
         }
       })
@@ -152,12 +159,6 @@ export default function AdminProfilePage() {
 
       <ChangePasswordPanel />
 
-      <style>{`
-        .admin-profile-avatar-wrap { position: relative; width: 112px; height: 112px; flex: 0 0 112px; }
-        .admin-profile-avatar-wrap > img { width: 100%; height: 100%; border: 3px solid #f4c7cb; border-radius: 50%; object-fit: cover; background: #fff; }
-        .admin-profile-avatar-edit { position: absolute; right: 0; bottom: 0; display: grid; width: 36px; height: 36px; place-items: center; border: 2px solid #fff; border-radius: 50%; color: #fff; background: #c92536; }
-        .admin-profile-avatar-edit:disabled { opacity: .7; }
-      `}</style>
     </div>
   );
 }

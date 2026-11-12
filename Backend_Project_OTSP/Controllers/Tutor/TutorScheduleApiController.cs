@@ -469,7 +469,7 @@ public class TutorScheduleApiController : ControllerBase
                 schedule.ClassSession != null 
                     ? schedule.ClassSession.Classroom.NameClass 
                     : (schedule.ConnectionRequest.Classroom != null ? schedule.ConnectionRequest.Classroom.NameClass : "Lớp học thử"),
-                schedule.ConnectionRequest.Student.User.FullName,
+                schedule.ConnectionRequest.Student.User.FullName ?? string.Empty,
                 schedule.ConnectionRequest.Subject.Name,
                 schedule.ConnectionRequest.GradeLevel.Name,
                 schedule.ConnectionRequest.PreferredType,

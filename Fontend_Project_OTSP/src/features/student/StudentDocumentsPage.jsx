@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import studentApi from '../../api/studentApi';
 import { repairMojibake } from '../../utils/repairMojibake';
-import { useToast } from '../../context/ToastContext';
+import { useToast } from '../../context/toastHooks';
 import OtspPagination from '../../components/common/OtspPagination';
 
 export default function StudentDocumentsPage() {

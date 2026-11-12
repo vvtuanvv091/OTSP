@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import adminApi from '../../api/adminApi';
 import { repairMojibake } from '../../utils/repairMojibake';
-import { useToast } from '../../context/ToastContext';
-import { useConfirm } from '../../context/ConfirmDialogContext';
+import { useToast } from '../../context/toastHooks';
+import { useConfirm } from '../../context/confirmHooks';
 import { AdminFeedback, AdminLoadingRows, AdminPageHeader, AdminPagination, AdminStats } from './AdminPageShared';
 
 const PAGE_SIZE = 10;
@@ -56,9 +56,20 @@ export default function AdminLearningDocumentsPage() {
   const updateFilter = (setter, value) => { setter(value); setPage(1); };
 
   const review = async (document, approve) => {
-    const reason = approve ? null : window.prompt(document.status === 'Approved' ? 'Nhập lý do gỡ tài liệu khỏi mục công khai:' : 'Nhập lý do từ chối tài liệu:');
+    const isPublished = document.status === 'Approved';
+    const reason = approve ? null : await confirm({
+      title: isPublished ? 'Gỡ tài liệu khỏi mục công khai' : 'Từ chối tài liệu',
+      message: isPublished ? `Nhập lý do gỡ tài liệu “${document.title}” khỏi mục công khai:` : `Nhập lý do từ chối tài liệu “${document.title}”:`,
+      confirmText: isPublished ? 'Gỡ tài liệu' : 'Từ chối',
+      variant: 'danger',
+      input: {
+        label: 'Lý do',
+        placeholder: 'Nhập lý do (tối thiểu 5 ký tự)...',
+        required: true,
+        minLength: 5,
+      },
+    });
     if (!approve && reason === null) return;
-    if (!approve && reason.trim().length < 5) { setError('Lý do cần tối thiểu 5 ký tự.'); return; }
     setBusyId(document.id);
     setError('');
     setMessage('');

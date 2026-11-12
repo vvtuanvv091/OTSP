@@ -50,7 +50,7 @@ public sealed class AdminLearningDocumentService : IAdminLearningDocumentService
             filtered = filtered.Where(document =>
                 document.Title.Contains(search) ||
                 (document.Description != null && document.Description.Contains(search)) ||
-                document.Tutor.User.FullName.Contains(search) ||
+                (document.Tutor.User.FullName != null && document.Tutor.User.FullName.Contains(search)) ||
                 (document.Tutor.User.Email != null && document.Tutor.User.Email.Contains(search)) ||
                 document.Subject.Name.Contains(search));
         }
@@ -70,7 +70,7 @@ public sealed class AdminLearningDocumentService : IAdminLearningDocumentService
                 Id = document.Id,
                 Title = document.Title,
                 Description = document.Description,
-                TutorName = document.Tutor.User.FullName,
+                TutorName = document.Tutor.User.FullName ?? string.Empty,
                 TutorEmail = document.Tutor.User.Email,
                 SubjectName = document.Subject.Name,
                 GradeLevelName = document.GradeLevel.Name,

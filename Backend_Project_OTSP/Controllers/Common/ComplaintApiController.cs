@@ -234,9 +234,9 @@ public class ComplaintApiController : ControllerBase
             var s = search.Trim();
             query = query.Where(c =>
                 c.Content.Contains(s) ||
-                c.Sender.FullName.Contains(s) ||
+                (c.Sender.FullName != null && c.Sender.FullName.Contains(s)) ||
                 (c.Sender.Email != null && c.Sender.Email.Contains(s)) ||
-                (c.TargetUser != null && c.TargetUser.FullName.Contains(s)) ||
+                (c.TargetUser != null && c.TargetUser.FullName != null && c.TargetUser.FullName.Contains(s)) ||
                 (c.Resolution != null && c.Resolution.Contains(s)));
         }
 

@@ -115,8 +115,6 @@ namespace Backend_Project_OTSP.Data
             const string tutorEmail = "tutor1@otsp.local";
             const string studentEmail = "hocvien1@otsp.local";
             const string adminAvatar = "https://res.cloudinary.com/dodglt55b/image/upload/v1793847115/otsp/avatars/b72bzktmq1rs8trlfvlf.jpg";
-            const string tutorAvatar = "https://res.cloudinary.com/dodglt55b/image/upload/otsp/avatars/c4b80ebcb9444915b2b9fbcb9c8658a1.jpg";
-            const string studentAvatar = "https://res.cloudinary.com/dodglt55b/image/upload/otsp/avatars/b72bzktmq1rs8trlfvlf.jpg";
  
             var coreEmails = adminAccounts.Select(a => a.Email).Concat(new[] { tutorEmail, studentEmail }).ToArray();
 

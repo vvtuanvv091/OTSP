@@ -6,7 +6,6 @@ using Backend_Project_OTSP.Data;
 using Backend_Project_OTSP.Models;
 using Backend_Project_OTSP.Services;
 using static Backend_Project_OTSP.Models.Enums;
-using static Backend_Project_OTSP.Models.Enums;
 using Backend_Project_OTSP.Services.Common;
 
 namespace Backend_Project_OTSP.Controllers.Api.Tutor;

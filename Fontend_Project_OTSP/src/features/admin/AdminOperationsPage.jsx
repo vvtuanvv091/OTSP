@@ -2,8 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import adminOperationsApi from '../../api/adminOperationsApi';
 import { resolveAssetUrl } from '../../api/config';
-import { useToast } from '../../context/ToastContext';
-import { useConfirm } from '../../context/ConfirmDialogContext';
+import { useToast } from '../../context/toastHooks';
+import { useConfirm } from '../../context/confirmHooks';
 import { AdminFeedback, AdminLoadingRows, AdminPageHeader, AdminPagination, AdminStats } from './AdminPageShared';
 
 const PAGE_SIZE = 10;
@@ -203,9 +203,21 @@ export default function AdminOperationsPage() {
   const updateComplaint = async (complaint, nextStatus) => {
     let resolution = complaint.resolution || '';
     if (nextStatus === 'Resolved' || nextStatus === 'Rejected') {
-      resolution = window.prompt(nextStatus === 'Resolved' ? 'Nhập kết quả giải quyết:' : 'Nhập lý do từ chối:', resolution);
-      if (resolution === null) return;
-      if (resolution.trim().length < 5) { setError('Kết quả cần tối thiểu 5 ký tự.'); return; }
+      const promptResult = await confirm({
+        title: nextStatus === 'Resolved' ? 'Giải quyết khiếu nại' : 'Từ chối khiếu nại',
+        message: nextStatus === 'Resolved' ? 'Nhập kết quả giải quyết cho khiếu nại này.' : 'Nhập lý do từ chối khiếu nại này.',
+        confirmText: 'Xác nhận',
+        variant: nextStatus === 'Rejected' ? 'danger' : 'primary',
+        input: {
+          label: nextStatus === 'Resolved' ? 'Kết quả giải quyết' : 'Lý do từ chối',
+          placeholder: 'Nhập tối thiểu 5 ký tự...',
+          defaultValue: resolution,
+          required: true,
+          minLength: 5,
+        },
+      });
+      if (promptResult === null) return;
+      resolution = promptResult;
     }
     setBusyId(complaint.id); clearFeedback();
     try { await adminOperationsApi.reviewComplaint(complaint.id, { status: nextStatus, resolution: resolution.trim() || null }); setMessage('Đã cập nhật trạng thái khiếu nại.'); const response = await adminOperationsApi.getComplaints({ search: query, page, pageSize: PAGE_SIZE, ...(status !== 'all' ? { status } : {}) }); setData(response.data); }
@@ -324,7 +336,19 @@ export default function AdminOperationsPage() {
   };
 
   const handleFlagReview = async (review) => {
-    const reason = window.prompt(`Nhập lý do gắn cờ cảnh báo cho đánh giá này:`, 'Nghi vấn đánh giá ảo hoặc ngôn từ chưa chuẩn mực');
+    const reason = await confirm({
+      title: 'Gắn cờ cảnh báo đánh giá',
+      message: 'Nhập lý do gắn cờ cảnh báo cho đánh giá này.',
+      confirmText: 'Gắn cờ cảnh báo',
+      variant: 'warning',
+      input: {
+        label: 'Lý do cảnh báo',
+        placeholder: 'Nhập lý do gắn cờ cảnh báo...',
+        defaultValue: 'Nghi vấn đánh giá ảo hoặc ngôn từ chưa chuẩn mực',
+        required: true,
+        minLength: 1,
+      },
+    });
     if (!reason || !reason.trim()) return;
     setBusyId(review.id);
     clearFeedback();

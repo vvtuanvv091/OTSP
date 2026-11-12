@@ -42,7 +42,11 @@ public class AiService : IAiService
         _httpClientFactory = httpClientFactory;
 
         _baseUrl = _config["AiService:BaseUrl"] ?? "http://localhost:8000";
-        _apiKey = _config["AiService:InternalApiKey"] ?? "Qxzyo3UdQQ2RtWxJAFGOhhCIDwIbGSWTzsC-ShRA324";
+        _apiKey = _config["AiService:InternalApiKey"] ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(_apiKey))
+        {
+            _logger.LogWarning("AiService:InternalApiKey is not configured; internal AI calls will fall back if rejected.");
+        }
 
         if (Uri.TryCreate(_baseUrl, UriKind.Absolute, out var uri))
         {
@@ -55,7 +59,10 @@ public class AiService : IAiService
     private HttpRequestMessage CreateAuthorizedRequest(HttpMethod method, string path, object? body = null)
     {
         var req = new HttpRequestMessage(method, path);
-        req.Headers.Add("X-Internal-Key", _apiKey);
+        if (!string.IsNullOrWhiteSpace(_apiKey))
+        {
+            req.Headers.Add("X-Internal-Key", _apiKey);
+        }
         if (body != null)
         {
             var json = JsonSerializer.Serialize(body, JsonOptions);
@@ -72,7 +79,7 @@ public class AiService : IAiService
             var user = await _db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == currentUserId, ct);
             if (user != null)
             {
-                request.SystemContext["userName"] = user.FullName;
+                request.SystemContext["userName"] = user.FullName ?? string.Empty;
 
                 var roleNames = await _db.UserRoles.AsNoTracking()
                     .Where(ur => ur.UserId == currentUserId)
@@ -657,7 +664,7 @@ Nhiệm vụ:
                         var text = parts[0].GetProperty("text").GetString() ?? "";
                         if (!string.IsNullOrWhiteSpace(text))
                         {
-                            var lower = request.Message.ToLower();
+                            var lower = (request.Message ?? string.Empty).ToLower();
                             UIActionDto uiAction = new UIActionDto { Type = "NONE", AutoExecute = false };
                             if (lower.Contains("gia sư") || lower.Contains("tìm"))
                             {

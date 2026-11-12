@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react';
 import adminApi from '../../api/adminApi';
 import complaintApi from '../../api/complaintApi';
 import { resolveAssetUrl } from '../../api/config';
-import { useToast } from '../../context/ToastContext';
-import { useConfirm } from '../../context/ConfirmDialogContext';
+import { useToast } from '../../context/toastHooks';
+import { useConfirm } from '../../context/confirmHooks';
 import {
   AdminFeedback,
   AdminLoadingRows,

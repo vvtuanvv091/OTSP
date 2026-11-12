@@ -83,7 +83,7 @@ public class PublicLearningDocumentApiController : ControllerBase
             Description = d.Description,
             SubjectName = d.SubjectName,
             GradeLevelName = d.GradeLevelName,
-            TutorName = d.TutorName,
+            TutorName = d.TutorName ?? string.Empty,
             TutorAvatarUrl = d.TutorAvatarUrl,
             UploadedAt = d.UploadedAt,
             FileExtension = Path.GetExtension(d.FileUrl ?? "")

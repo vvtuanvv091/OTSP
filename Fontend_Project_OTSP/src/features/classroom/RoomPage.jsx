@@ -5,8 +5,8 @@ import * as signalR from '@microsoft/signalr';
 import classroomApi from '../../api/classroomApi';
 import studentApi from '../../api/studentApi';
 import { useAuth } from '../../context/AuthContext';
-import { useToast } from '../../context/ToastContext';
-import { useConfirm } from '../../context/ConfirmDialogContext';
+import { useToast } from '../../context/toastHooks';
+import { useConfirm } from '../../context/confirmHooks';
 import { getStoredToken } from '../../utils/authStorage';
 
 /**

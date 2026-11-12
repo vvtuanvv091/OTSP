@@ -1,0 +1,4 @@
+.admin-profile-avatar-wrap { position: relative; width: 112px; height: 112px; flex: 0 0 112px; }
+.admin-profile-avatar-wrap > img { width: 100%; height: 100%; border: 3px solid #f4c7cb; border-radius: 50%; object-fit: cover; background: #fff; }
+.admin-profile-avatar-edit { position: absolute; right: 0; bottom: 0; display: grid; width: 36px; height: 36px; place-items: center; border: 2px solid #fff; border-radius: 50%; color: #fff; background: #c92536; }
+.admin-profile-avatar-edit:disabled { opacity: .7; }

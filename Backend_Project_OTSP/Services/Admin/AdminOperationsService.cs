@@ -45,8 +45,8 @@ public sealed class AdminOperationsService : IAdminOperationsService
         {
             var term = query.Search.Trim().ToLower();
             rows = rows.Where(x => (x.Comment != null && x.Comment.ToLower().Contains(term)) ||
-                                   x.Student.User.FullName.ToLower().Contains(term) ||
-                                   x.ClassSession.Classroom.Tutor.User.FullName.ToLower().Contains(term));
+                                   ((x.Student.User.FullName ?? string.Empty).ToLower().Contains(term)) ||
+                                   (x.ClassSession.Classroom.Tutor != null && x.ClassSession.Classroom.Tutor.User != null && (x.ClassSession.Classroom.Tutor.User.FullName ?? string.Empty).ToLower().Contains(term)));
         }
 
         if (!string.IsNullOrWhiteSpace(query.Status) && query.Status != "all")
@@ -160,8 +160,8 @@ public sealed class AdminOperationsService : IAdminOperationsService
                 };
             })
             .Where(x => string.IsNullOrWhiteSpace(query.Search) ||
-                x.userOneName.Contains(query.Search.Trim(), StringComparison.OrdinalIgnoreCase) ||
-                x.userTwoName.Contains(query.Search.Trim(), StringComparison.OrdinalIgnoreCase))
+                (x.userOneName ?? string.Empty).Contains(query.Search.Trim(), StringComparison.OrdinalIgnoreCase) ||
+                (x.userTwoName ?? string.Empty).Contains(query.Search.Trim(), StringComparison.OrdinalIgnoreCase))
             .OrderByDescending(x => x.latestReportAt).Take(100).ToList();
         return new { stats = new { conversations = conversations.Count, reports = reports.Count }, conversations };
     }
@@ -173,7 +173,7 @@ public sealed class AdminOperationsService : IAdminOperationsService
         if (!string.IsNullOrWhiteSpace(query.Search))
         {
             var term = query.Search.Trim();
-            rows = rows.Where(x => x.Content.Contains(term) || x.Sender.FullName.Contains(term) || (x.TargetUser != null && x.TargetUser.FullName.Contains(term)));
+            rows = rows.Where(x => x.Content.Contains(term) || (x.Sender.FullName != null && x.Sender.FullName.Contains(term)) || (x.TargetUser != null && x.TargetUser.FullName != null && x.TargetUser.FullName.Contains(term)));
         }
         var stats = await _db.Complaints.AsNoTracking().GroupBy(x => x.Status).Select(g => new { status = g.Key.ToString(), count = g.Count() }).ToListAsync(ct);
         var page = await PageAsync(rows.OrderByDescending(x => x.CreatedAt).ThenByDescending(x => x.Id)
@@ -296,7 +296,7 @@ public sealed class AdminOperationsService : IAdminOperationsService
         if (!string.IsNullOrWhiteSpace(query.Search))
         {
             var term = query.Search.Trim();
-            rows = rows.Where(x => (x.Student.User.FullName.Contains(term)) || x.Classroom.Tutor.User.FullName.Contains(term) ||
+            rows = rows.Where(x => (x.Student.User.FullName != null && x.Student.User.FullName.Contains(term)) || (x.Classroom.Tutor.User.FullName != null && x.Classroom.Tutor.User.FullName.Contains(term)) ||
                 (x.GatewayTransactionCode != null && x.GatewayTransactionCode.Contains(term)) || x.Classroom.NameClass.Contains(term));
         }
         var stats = await _db.Payments.AsNoTracking().GroupBy(x => x.Status)
@@ -467,7 +467,7 @@ public sealed class AdminOperationsService : IAdminOperationsService
         if (!string.IsNullOrWhiteSpace(query.Search))
         {
             var term = query.Search.Trim();
-            users = users.Where(x => x.FullName.Contains(term) || (x.Email != null && x.Email.Contains(term)));
+            users = users.Where(x => (x.FullName != null && x.FullName.Contains(term)) || (x.Email != null && x.Email.Contains(term)));
         }
         if (Enum.TryParse<AccountStatus>(query.Status, true, out var status)) users = users.Where(x => x.Status == status);
         var total = await users.CountAsync(ct);
@@ -510,63 +510,87 @@ public sealed class AdminOperationsService : IAdminOperationsService
     {
         if (!ManagedRoles.Contains(role, StringComparer.Ordinal)) return (false, "Vai trò không hợp lệ.");
         if (id == adminUserId && role != "Admin") return (false, "Không thể tự gỡ quyền Admin đang đăng nhập.");
-        var user = await _users.FindByIdAsync(id);
-        if (user == null) return (false, "Không tìm thấy tài khoản.");
-        var oldRoles = await _users.GetRolesAsync(user);
-        if (oldRoles.Count == 1 && string.Equals(oldRoles[0], role, StringComparison.Ordinal))
-            return (true, null);
 
-        if (oldRoles.Contains("Admin") && role != "Admin" && (await _users.GetUsersInRoleAsync("Admin")).Count <= 1)
-            return (false, "Không thể gỡ quyền Admin cuối cùng.");
+        var isRelational = _db.Database.IsRelational();
+        var strategy = _db.Database.CreateExecutionStrategy();
+        var attempt = 0;
 
-        var (blockError, oldStudentProfile, oldTutorProfile, oldAdminProfile) =
-            await ValidateCleanForRoleSwitchAsync(user.Id, role, ct);
-        if (!string.IsNullOrWhiteSpace(blockError))
-            return (false, blockError);
-
-        await using IDbContextTransaction? tx = _db.Database.IsRelational()
-            ? await _db.Database.BeginTransactionAsync(ct)
-            : null;
-
-        if (oldRoles.Count > 0)
+        var (success, error) = await strategy.ExecuteAsync(async () =>
         {
-            var removeResult = await _users.RemoveFromRolesAsync(user, oldRoles);
-            if (!removeResult.Succeeded) return (false, string.Join(" ", removeResult.Errors.Select(x => x.Description)));
-        }
+            if (attempt++ > 0)
+            {
+                _db.ChangeTracker.Clear();
+            }
 
-        var addResult = await _users.AddToRoleAsync(user, role);
-        if (!addResult.Succeeded)
-        {
-            if (oldRoles.Count > 0) await _users.AddToRolesAsync(user, oldRoles);
-            return (false, string.Join(" ", addResult.Errors.Select(x => x.Description)));
-        }
+            var user = await _users.FindByIdAsync(id);
+            if (user == null) return (false, (string?)"Không tìm thấy tài khoản.");
+            var oldRoles = await _users.GetRolesAsync(user);
+            if (oldRoles.Count == 1 && string.Equals(oldRoles[0], role, StringComparison.Ordinal))
+                return (true, (string?)null);
 
-        await RemoveOldRoleProfilesAsync(oldStudentProfile, oldTutorProfile, oldAdminProfile, ct);
+            if (oldRoles.Contains("Admin") && role != "Admin" && (await _users.GetUsersInRoleAsync("Admin")).Count <= 1)
+                return (false, (string?)"Không thể gỡ quyền Admin cuối cùng.");
 
-        if (role == "Admin" && !await _db.AdminProfiles.AnyAsync(x => x.UserId == user.Id, ct))
-            _db.AdminProfiles.Add(new AdminProfile { UserId = user.Id, Rank = "Quản trị viên" });
-        if (role == "Tutor" && !await _db.TutorProfiles.AnyAsync(x => x.UserId == user.Id, ct))
-            _db.TutorProfiles.Add(new TutorProfile { UserId = user.Id });
-        if (role == "Student_Parent" && !await _db.StudentProfiles.AnyAsync(x => x.UserId == user.Id, ct))
-            _db.StudentProfiles.Add(new StudentProfile { UserId = user.Id });
+            var (blockError, oldStudentProfile, oldTutorProfile, oldAdminProfile) =
+                await ValidateCleanForRoleSwitchAsync(user.Id, role, ct);
+            if (!string.IsNullOrWhiteSpace(blockError))
+                return (false, (string?)blockError);
 
-        await RotateSecurityStampAsync(user);
+            await using IDbContextTransaction? tx = isRelational
+                ? await _db.Database.BeginTransactionAsync(ct)
+                : null;
 
-        var oldRoleText = oldRoles.Count > 0 ? string.Join(',', oldRoles) : "None";
-        _db.AuditLogs.Add(new AuditLog
-        {
-            UserId = string.IsNullOrWhiteSpace(adminUserId) ? null : adminUserId,
-            IpAddress = ipAddress,
-            Category = "System",
-            Action = $"AdminChangeRole:{id}:{oldRoleText}->{role}",
-            Detail = $"Chuyển vai trò từ {oldRoleText} sang {role} và xóa sạch hồ sơ vai trò cũ.",
-            Timestamp = DateTime.UtcNow
+            async Task<(bool, string?)> FailAsync(string message)
+            {
+                if (tx != null) await tx.RollbackAsync(ct);
+                return (false, message);
+            }
+
+            if (oldRoles.Count > 0)
+            {
+                var removeResult = await _users.RemoveFromRolesAsync(user, oldRoles);
+                if (!removeResult.Succeeded)
+                    return await FailAsync(string.Join(" ", removeResult.Errors.Select(x => x.Description)));
+            }
+
+            var addResult = await _users.AddToRoleAsync(user, role);
+            if (!addResult.Succeeded)
+                return await FailAsync(string.Join(" ", addResult.Errors.Select(x => x.Description)));
+
+            await RemoveOldRoleProfilesAsync(oldStudentProfile, oldTutorProfile, oldAdminProfile, ct);
+
+            if (role == "Admin" && !await _db.AdminProfiles.AnyAsync(x => x.UserId == user.Id, ct))
+                _db.AdminProfiles.Add(new AdminProfile { UserId = user.Id, Rank = "Quản trị viên" });
+            if (role == "Tutor" && !await _db.TutorProfiles.AnyAsync(x => x.UserId == user.Id, ct))
+                _db.TutorProfiles.Add(new TutorProfile { UserId = user.Id });
+            if (role == "Student_Parent" && !await _db.StudentProfiles.AnyAsync(x => x.UserId == user.Id, ct))
+                _db.StudentProfiles.Add(new StudentProfile { UserId = user.Id });
+
+            await RotateSecurityStampAsync(user);
+
+            var clampedIp = !string.IsNullOrEmpty(ipAddress) && ipAddress.Length > 480 ? ipAddress[..480] : ipAddress;
+            var oldRoleText = oldRoles.Count > 0 ? string.Join(',', oldRoles) : "None";
+            _db.AuditLogs.Add(new AuditLog
+            {
+                UserId = string.IsNullOrWhiteSpace(adminUserId) ? null : adminUserId,
+                IpAddress = clampedIp,
+                Category = "System",
+                Action = $"AdminChangeRole:{id}:{oldRoleText}->{role}",
+                Detail = $"Chuyển vai trò từ {oldRoleText} sang {role} và xóa sạch hồ sơ vai trò cũ.",
+                Timestamp = DateTime.UtcNow
+            });
+
+            await _db.SaveChangesAsync(ct);
+            if (tx != null) await tx.CommitAsync(ct);
+            return (true, (string?)null);
         });
 
-        await _db.SaveChangesAsync(ct);
-        if (tx != null) await tx.CommitAsync(ct);
-        _cache?.Remove(HomeApiController.HomeCacheKey);
-        return (true, null);
+        if (success)
+        {
+            _cache?.Remove(HomeApiController.HomeCacheKey);
+        }
+
+        return (success, error);
     }
 
     public async Task<(bool Success, string? Error)> SetAccountStatusAsync(string id, bool locked, string adminUserId, string? ipAddress, CancellationToken ct)
@@ -775,8 +799,8 @@ public sealed class AdminOperationsService : IAdminOperationsService
             var term = query.Search.Trim().ToLower();
             rows = rows.Where(x => x.Reason.ToLower().Contains(term) ||
                                    (x.Review.Comment != null && x.Review.Comment.ToLower().Contains(term)) ||
-                                   (x.Review.Student.User.FullName != null && x.Review.Student.User.FullName.ToLower().Contains(term)) ||
-                                   (x.Review.ClassSession.Classroom.Tutor.User.FullName != null && x.Review.ClassSession.Classroom.Tutor.User.FullName.ToLower().Contains(term)));
+                                   ((x.Review.Student.User.FullName ?? string.Empty).ToLower().Contains(term)) ||
+                                   (x.Review.ClassSession.Classroom.Tutor != null && x.Review.ClassSession.Classroom.Tutor.User != null && (x.Review.ClassSession.Classroom.Tutor.User.FullName ?? string.Empty).ToLower().Contains(term)));
         }
 
         var stats = await _db.ReviewAlerts.AsNoTracking().GroupBy(x => x.Status).Select(g => new { status = g.Key.ToString(), count = g.Count() }).ToListAsync(ct);

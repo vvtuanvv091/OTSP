@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import tutorApi from '../../api/tutorApi';
 import OtspPagination from '../../components/common/OtspPagination';
+import '../../styles/tutor/TutorReviewsPage.css';
 
 export default function TutorReviewsPage() {
   const [reviewsData, setReviewsData] = useState(null);
@@ -42,44 +43,6 @@ export default function TutorReviewsPage() {
 
   return (
     <>
-      <style>{`
-        .review-score-big {
-          font-size: 3.75rem;
-          font-weight: 800;
-          line-height: 1;
-          color: #C12026;
-          letter-spacing: -1.5px;
-        }
-        .star-gold i {
-          color: #D97706 !important;
-          font-size: 1.15rem;
-        }
-        .star-gold i.star-muted {
-          color: #E2E8F0 !important;
-        }
-        .rate-bar-track {
-          height: 6px;
-          background-color: #E2E8F0;
-          border-radius: 999px;
-          overflow: hidden;
-          flex-grow: 1;
-        }
-        .rate-bar-fill {
-          height: 100%;
-          background-color: #E85B0F;
-          border-radius: 999px;
-        }
-        .review-item-card {
-          transition: all 0.2s ease;
-          border: 1px solid #E2E8F0;
-          background: #FFFFFF;
-        }
-        .review-item-card:hover {
-          border-color: #CBD5E1;
-          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-        }
-      `}</style>
-
       <div className="tutor-page-container review-page py-3">
         {/* Tiêu đề trang */}
         <div className="mb-4">

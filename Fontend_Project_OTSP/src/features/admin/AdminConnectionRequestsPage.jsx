@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
 import adminApi from '../../api/adminApi';
+import { useConfirm } from '../../context/confirmHooks';
 import { AdminFeedback, AdminLoadingRows, AdminPageHeader, AdminPagination, AdminStats } from './AdminPageShared';
 
 const PAGE_SIZE = 10;
 const statusLabel = { Pending: 'Chờ phản hồi', Accepted: 'Đã chấp nhận', Rejected: 'Đã từ chối', Cancelled: 'Đã đóng' };
 
 export default function AdminConnectionRequestsPage() {
+  const confirm = useConfirm();
   const [data, setData] = useState(null);
   const [search, setSearch] = useState('');
   const [querySearch, setQuerySearch] = useState('');
@@ -43,9 +45,19 @@ export default function AdminConnectionRequestsPage() {
   }, [querySearch, status, page, reload]);
 
   const cancelRequest = async (request) => {
-    const reason = window.prompt('Nhập lý do đóng yêu cầu đang chờ phản hồi:');
+    const reason = await confirm({
+      title: 'Đóng yêu cầu kết nối',
+      message: 'Nhập lý do đóng yêu cầu đang chờ phản hồi này.',
+      confirmText: 'Đóng yêu cầu',
+      variant: 'danger',
+      input: {
+        label: 'Lý do đóng yêu cầu',
+        placeholder: 'Nhập lý do đóng yêu cầu (tối thiểu 5 ký tự)...',
+        required: true,
+        minLength: 5,
+      },
+    });
     if (reason === null) return;
-    if (reason.trim().length < 5) { setError('Lý do cần tối thiểu 5 ký tự.'); return; }
     setBusyId(request.id);
     setError('');
     setMessage('');
@@ -60,7 +72,6 @@ export default function AdminConnectionRequestsPage() {
 
   const requests = data?.requests?.items || [];
   const stats = data?.stats || {};
-  const selectedPage = data?.requests?.page || page;
 
   return (
     <div className="admin-page">

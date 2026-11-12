@@ -46,14 +46,17 @@ public class PaymentApiController : ControllerBase
     public async Task<IActionResult> SePayWebhook([FromBody] SePayWebhookDto? payload, CancellationToken ct)
     {
         var expectedSecret = _configuration?["SePay:SecretKey"];
-        if (!string.IsNullOrWhiteSpace(expectedSecret))
+        if (string.IsNullOrWhiteSpace(expectedSecret))
         {
-            var authHeader = Request?.Headers.Authorization.ToString();
-            if (!IsValidSePayWebhookAuth(authHeader, expectedSecret))
-            {
-                _logger.LogWarning("Rejected unauthorized SePay webhook request.");
-                return Unauthorized(new { success = false, message = "Webhook signature is invalid." });
-            }
+            _logger.LogError("SePay webhook rejected because SePay:SecretKey is not configured.");
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, new { success = false, message = "Webhook chưa được cấu hình bảo mật." });
+        }
+
+        var authHeader = Request?.Headers.Authorization.ToString();
+        if (!IsValidSePayWebhookAuth(authHeader, expectedSecret))
+        {
+            _logger.LogWarning("Rejected unauthorized SePay webhook request.");
+            return Unauthorized(new { success = false, message = "Webhook signature is invalid." });
         }
 
         if (payload == null)

@@ -19,6 +19,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -879,5 +880,96 @@ public class LifecycleAndNotificationTests
             var tutorCard = Assert.Single(result.Items);
             Assert.Equal("Real Tutor", tutorCard.FullName);
         }
+    }
+
+    private sealed class RecordingRetryingStrategyFactory : Microsoft.EntityFrameworkCore.Storage.IExecutionStrategyFactory
+    {
+        public int ExecuteCallCount { get; private set; }
+        private readonly Microsoft.EntityFrameworkCore.Storage.ExecutionStrategyDependencies _deps;
+
+        public RecordingRetryingStrategyFactory(Microsoft.EntityFrameworkCore.Storage.ExecutionStrategyDependencies deps) => _deps = deps;
+
+        public Microsoft.EntityFrameworkCore.Storage.IExecutionStrategy Create()
+            => new RecordingRetryingStrategy(_deps, () => ExecuteCallCount++);
+
+        private sealed class RecordingRetryingStrategy : Microsoft.EntityFrameworkCore.Storage.ExecutionStrategy
+        {
+            private readonly Action _onExecute;
+
+            public RecordingRetryingStrategy(Microsoft.EntityFrameworkCore.Storage.ExecutionStrategyDependencies deps, Action onExecute)
+                : base(deps, maxRetryCount: 3, maxRetryDelay: TimeSpan.FromMilliseconds(10))
+                => _onExecute = onExecute;
+
+            protected override bool ShouldRetryOn(Exception exception) => false;
+
+            public override async Task<TResult> ExecuteAsync<TState, TResult>(
+                TState state,
+                Func<DbContext, TState, CancellationToken, Task<TResult>> operation,
+                Func<DbContext, TState, CancellationToken, Task<Microsoft.EntityFrameworkCore.Storage.ExecutionResult<TResult>>>? verifySucceeded,
+                CancellationToken cancellationToken = default)
+            {
+                _onExecute();
+                return await operation(Dependencies.CurrentContext.Context, state, cancellationToken);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task ChangeRoleAsync_CleanStudentToAdmin_UsesExecutionStrategy_AndCompletesRoleSwitch()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddDataProtection();
+        services.AddMemoryCache();
+        services.AddDbContext<ApplicationDbContext>(opt => opt
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .ReplaceService<Microsoft.EntityFrameworkCore.Storage.IExecutionStrategyFactory, RecordingRetryingStrategyFactory>());
+        services.AddIdentityCore<ApplicationUser>()
+            .AddRoles<ApplicationRole>()
+            .AddEntityFrameworkStores<ApplicationDbContext>()
+            .AddDefaultTokenProviders();
+
+        await using var sp = services.BuildServiceProvider();
+        using var scope = sp.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        db.Database.EnsureCreated();
+
+        var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<ApplicationRole>>();
+        await roleManager.CreateAsync(new ApplicationRole { Name = "Admin" });
+        await roleManager.CreateAsync(new ApplicationRole { Name = "Student_Parent" });
+
+        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+        var admin = new ApplicationUser { Id = "adm-real", UserName = "adm@otsp.vn", Email = "adm@otsp.vn", FullName = "Admin", Status = AccountStatus.Active };
+        var student = new ApplicationUser { Id = "stu-real", UserName = "tongngoctuan09@gmail.com", Email = "tongngoctuan09@gmail.com", FullName = "Tống Ngọc Tuấn", Status = AccountStatus.Active };
+        Assert.True((await userManager.CreateAsync(admin, "Pass123!")).Succeeded);
+        Assert.True((await userManager.CreateAsync(student, "Pass123!")).Succeeded);
+        await userManager.AddToRoleAsync(admin, "Admin");
+        await userManager.AddToRoleAsync(student, "Student_Parent");
+
+        var oldStamp = student.SecurityStamp;
+        var profile = new StudentProfile { UserId = student.Id, Area = "HCM" };
+        db.StudentProfiles.Add(profile);
+        await db.SaveChangesAsync();
+
+        db.Guardians.Add(new Guardian { StudentProfileId = profile.Id, FullName = "Phụ huynh", ContactInfo = "0900000000" });
+        db.AiStudySessions.Add(new AiStudySession { StudentId = profile.Id, Question = "Q", Suggestion = "Ok" });
+        await db.SaveChangesAsync();
+
+        var cache = scope.ServiceProvider.GetRequiredService<IMemoryCache>();
+        var adminService = new AdminOperationsService(db, userManager, roleManager, cache: cache);
+
+        var res = await adminService.ChangeRoleAsync(student.Id, "Admin", admin.Id, "203.0.113.5", CancellationToken.None);
+
+        Assert.True(res.Success, res.Error);
+        var resolvedFactory = db.GetService<Microsoft.EntityFrameworkCore.Storage.IExecutionStrategyFactory>() as RecordingRetryingStrategyFactory;
+        Assert.NotNull(resolvedFactory);
+        Assert.True(resolvedFactory!.ExecuteCallCount >= 1);
+        Assert.Equal("Admin", Assert.Single(await userManager.GetRolesAsync(student)));
+        Assert.NotEqual(oldStamp, student.SecurityStamp);
+        Assert.Empty(db.StudentProfiles.Where(x => x.UserId == student.Id));
+        Assert.Empty(db.Guardians.Where(x => x.StudentProfileId == profile.Id));
+        Assert.Empty(db.AiStudySessions.Where(x => x.StudentId == profile.Id));
+        Assert.Single(db.AdminProfiles.Where(x => x.UserId == student.Id));
+        Assert.Contains(db.AuditLogs, l => l.Action == $"AdminChangeRole:{student.Id}:Student_Parent->Admin");
     }
 }

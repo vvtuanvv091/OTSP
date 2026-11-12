@@ -68,7 +68,7 @@ public class AdminTutorApprovalService : IAdminTutorApprovalService
         if (!string.IsNullOrEmpty(search))
         {
             filtered = filtered.Where(tutor =>
-                tutor.User.FullName.Contains(search) ||
+                (tutor.User.FullName != null && tutor.User.FullName.Contains(search)) ||
                 (tutor.User.Email != null && tutor.User.Email.Contains(search)) ||
                 tutor.TutorSubjects.Any(link => link.Subject.Name.Contains(search) || link.GradeLevel.Name.Contains(search)));
         }
@@ -122,7 +122,7 @@ public class AdminTutorApprovalService : IAdminTutorApprovalService
                 FileUrl = q.FileUrl,
                 Status = q.Status.ToString(),
                 TutorId = q.TutorId,
-                TutorName = q.Tutor.User.FullName,
+                TutorName = q.Tutor.User.FullName ?? string.Empty,
                 TutorEmail = q.Tutor.User.Email,
                 TutorPhone = q.Tutor.User.PhoneNumber
             })
@@ -141,7 +141,7 @@ public class AdminTutorApprovalService : IAdminTutorApprovalService
         {
             query = query.Where(q =>
                 q.Title.Contains(s) ||
-                q.Tutor.User.FullName.Contains(s) ||
+                (q.Tutor.User.FullName != null && q.Tutor.User.FullName.Contains(s)) ||
                 (q.Tutor.User.Email != null && q.Tutor.User.Email.Contains(s)));
         }
 
@@ -154,7 +154,7 @@ public class AdminTutorApprovalService : IAdminTutorApprovalService
                 FileUrl = q.FileUrl,
                 Status = q.Status.ToString(),
                 TutorId = q.TutorId,
-                TutorName = q.Tutor.User.FullName,
+                TutorName = q.Tutor.User.FullName ?? string.Empty,
                 TutorEmail = q.Tutor.User.Email,
                 TutorPhone = q.Tutor.User.PhoneNumber
             })
@@ -170,7 +170,7 @@ public class AdminTutorApprovalService : IAdminTutorApprovalService
         query.Select(t => new TutorApprovalViewModel
             {
                 TutorId = t.Id,
-                FullName = t.User.FullName,
+                FullName = t.User.FullName ?? string.Empty,
                 Email = t.User.Email,
                 PhoneNumber = t.User.PhoneNumber,
                 Address = t.User.Address,

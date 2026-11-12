@@ -117,4 +117,19 @@
     color: #f59e0b !important;
 }
 
+@media (prefers-reduced-motion: reduce) {
+    .otsp-class-card,
+    .notification-card-link,
+    .chat-conv-item {
+        transition-duration: 0.05s;
+        transform: none !important;
+    }
+
+    *,
+    *::before,
+    *::after {
+        scroll-behavior: auto !important;
+    }
+}
+
 

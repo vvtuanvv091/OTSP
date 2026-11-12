@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import tutorApi from '../../api/tutorApi';
-import { useToast } from '../../context/ToastContext';
-import { useConfirm } from '../../context/ConfirmDialogContext';
+import { useToast } from '../../context/toastHooks';
+import { useConfirm } from '../../context/confirmHooks';
 import OtspPagination from '../../components/common/OtspPagination';
 
 export default function TutorSubjectsPage() {

@@ -185,3 +185,4 @@ public class AdminCatalogControllerTests
         Assert.True(await db.Subjects.AnyAsync(s => s.Id == subject.Id));
     }
 }
+

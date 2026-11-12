@@ -106,3 +106,4 @@ public class NotificationApiControllerTests
         Assert.False(unchanged.IsRead);
     }
 }
+

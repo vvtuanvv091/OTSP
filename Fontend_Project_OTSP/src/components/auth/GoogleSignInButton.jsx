@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import '../../styles/components/GoogleSignInButton.css';
 
 let googleScriptPromise;
 
@@ -78,12 +79,6 @@ export default function GoogleSignInButton({ onCredential, mode = 'signin', disa
       <div ref={buttonRef} className="google-signin-button" />
       {disabled && <div className="google-signin-blocker" aria-hidden="true" />}
       {error && <div className="form-text text-danger text-center mt-2">{error}</div>}
-      <style>{`
-        .google-signin-wrap { position: relative; width: 100%; min-height: 42px; }
-        .google-signin-button { display: flex; justify-content: center; width: 100%; min-height: 42px; }
-        .google-signin-blocker { position: absolute; inset: 0; z-index: 1; cursor: wait; background: rgba(255,255,255,.55); }
-        .google-signin-wrap.is-disabled { opacity: .65; }
-      `}</style>
     </div>
   );
 }

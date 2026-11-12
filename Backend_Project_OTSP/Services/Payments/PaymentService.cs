@@ -469,9 +469,27 @@ public class PaymentService : IPaymentService
             return false;
         }
 
+        var txCode = !string.IsNullOrWhiteSpace(payload.referenceCode)
+            ? payload.referenceCode.Trim()
+            : payload.id.ToString();
+
+        // Chống dùng lại cùng 1 mã giao dịch ngân hàng cho nhiều khoản thanh toán khác nhau
+        if (!string.IsNullOrWhiteSpace(txCode) && txCode != "0")
+        {
+            var duplicateTxExists = await _db.Payments.AsNoTracking()
+                .AnyAsync(p => p.Id != payment.Id
+                            && p.Status == PaymentStatus.Success
+                            && p.GatewayTransactionCode == txCode, ct);
+            if (duplicateTxExists)
+            {
+                _logger.LogWarning("SePay webhook rejected duplicate GatewayTransactionCode {TxCode} for Payment {PaymentId}.", txCode, paymentId);
+                return false;
+            }
+        }
+
         payment.Status = PaymentStatus.Success;
         payment.PaidAt = DateTime.UtcNow;
-        payment.GatewayTransactionCode = payload.referenceCode ?? payload.id.ToString();
+        payment.GatewayTransactionCode = txCode;
 
         if (payment.Invoice == null)
         {

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import axiosClient from '../../api/axiosClient';
+import '../../styles/home/InfoPages.css';
 
 const NAV_ITEMS = [
   { path: '/guide', label: 'Hướng dẫn sử dụng', icon: 'bi-compass-fill', badge: 'Cẩm nang' },
@@ -11,7 +12,7 @@ const NAV_ITEMS = [
   { path: '/about', label: 'Về Nền tảng OTSP', icon: 'bi-info-circle-fill', badge: 'Giới thiệu' },
 ];
 
-export function InfoLayout({ eyebrow, title, subtitle, children }) {
+export function InfoLayout({ title, subtitle, children }) {
   const location = useLocation();
 
   return (
@@ -84,75 +85,6 @@ export function InfoLayout({ eyebrow, title, subtitle, children }) {
         </div>
       </div>
 
-      <style>{`
-        .otsp-info-page { min-height: 78vh; padding: 26px 0 68px; background: #f8fafc; color: #1e293b; }
-        .otsp-info-container { max-width: 1220px; }
-        .otsp-info-breadcrumb { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; font-size: 13px; color: #64748b; }
-        .otsp-info-breadcrumb a { color: #64748b; text-decoration: none; font-weight: 600; }
-        .otsp-info-breadcrumb a:hover { color: #db303a; }
-        .otsp-info-breadcrumb i { font-size: 10px; color: #94a3b8; }
-        .otsp-info-breadcrumb span { color: #db303a; font-weight: 700; }
-
-        .otsp-info-hero { padding: 26px 30px; margin-bottom: 24px; border-radius: 16px; background: linear-gradient(135deg, #1e293b 0%, #0f172a 60%, #7f1d1d 100%); color: #fff; box-shadow: 0 8px 24px rgba(15,23,42,.12); }
-        .otsp-info-eyebrow { display: inline-flex; align-items: center; padding: 4px 12px; border-radius: 999px; background: rgba(219,48,58,.25); border: 1px solid rgba(254,205,211,.3); color: #fecdd3; font-size: 11px; font-weight: 800; letter-spacing: .08em; margin-bottom: 10px; }
-        .otsp-info-hero h1 { margin: 0 0 8px; color: #fff; font-size: clamp(24px, 3vw, 32px); font-weight: 800; letter-spacing: -.02em; }
-        .otsp-info-hero p { margin: 0; color: #cbd5e1; font-size: 14.5px; max-width: 760px; line-height: 1.55; }
-
-        .otsp-info-grid { display: grid; grid-template-columns: 290px minmax(0, 1fr); align-items: start; gap: 24px; }
-        .otsp-info-sidebar { display: grid; gap: 18px; position: sticky; top: 92px; }
-        .otsp-info-nav-card, .otsp-info-help-card, .otsp-info-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 20px; box-shadow: 0 4px 14px rgba(15,23,42,.04); }
-        .otsp-info-nav-title { font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; color: #64748b; margin-bottom: 10px; padding: 0 6px; }
-        .otsp-info-nav-list { display: grid; gap: 5px; }
-        .otsp-info-nav-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; text-decoration: none; color: #334155; font-size: 13.5px; font-weight: 600; transition: all .15s; }
-        .otsp-info-nav-item i { font-size: 16px; color: #64748b; }
-        .otsp-info-nav-item small { margin-left: auto; font-size: 10.5px; padding: 2px 8px; border-radius: 999px; background: #f1f5f9; color: #64748b; font-weight: 700; }
-        .otsp-info-nav-item:hover { background: #fff1f2; color: #db303a; }
-        .otsp-info-nav-item:hover i { color: #db303a; }
-        .otsp-info-nav-item.active { background: #db303a; color: #fff; box-shadow: 0 4px 12px rgba(219,48,58,.25); }
-        .otsp-info-nav-item.active i { color: #fff; }
-        .otsp-info-nav-item.active small { background: rgba(255,255,255,.2); color: #fff; }
-
-        .otsp-info-help-card { background: linear-gradient(145deg, #fff, #fff5f5); border-color: #fecdd3; }
-        .otsp-info-help-icon { width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; background: #db303a; color: #fff; font-size: 19px; margin-bottom: 12px; }
-        .otsp-info-help-card h3 { font-size: 15.5px; font-weight: 800; color: #0f172a; margin: 0 0 6px; }
-        .otsp-info-help-card p { font-size: 12.5px; color: #475569; line-height: 1.5; margin: 0 0 12px; }
-        .otsp-info-help-line { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #334155; margin-bottom: 6px; }
-
-        .otsp-info-content { display: grid; gap: 20px; min-width: 0; }
-        .otsp-info-card { padding: 26px 28px; }
-        .otsp-info-card h2 { font-size: 20px; font-weight: 800; color: #0f172a; margin: 0 0 14px; display: flex; align-items: center; gap: 10px; }
-        .otsp-info-card h2 i { color: #db303a; }
-
-        .otsp-step-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
-        .otsp-step-box { padding: 18px; border: 1px solid #e2e8f0; border-radius: 14px; background: #f8fafc; position: relative; transition: all .18s; }
-        .otsp-step-box:hover { background: #fff; border-color: #fecdd3; box-shadow: 0 6px 18px rgba(15,23,42,.05); }
-        .otsp-step-num { display: inline-flex; align-items: center; justify-content: center; padding: 3px 10px; border-radius: 999px; background: #db303a; color: #fff; font-size: 11px; font-weight: 800; margin-bottom: 10px; }
-        .otsp-step-box h3 { font-size: 15.5px; font-weight: 800; color: #0f172a; margin: 0 0 6px; }
-        .otsp-step-box p { font-size: 13px; color: #475569; line-height: 1.55; margin: 0; }
-
-        .otsp-faq-item { border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; background: #fff; margin-bottom: 10px; }
-        .otsp-faq-btn { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 15px 18px; border: 0; background: transparent; text-align: left; font-size: 14.5px; font-weight: 700; color: #0f172a; }
-        .otsp-faq-btn:hover { color: #db303a; }
-        .otsp-faq-btn.open { background: #fff8f8; color: #db303a; border-bottom: 1px solid #fecdd3; }
-        .otsp-faq-body { padding: 16px 18px; font-size: 13.5px; color: #475569; line-height: 1.65; background: #fff; }
-
-        [data-bs-theme="dark"] .otsp-info-page { background: #0f172a; color: #e2e8f0; }
-        [data-bs-theme="dark"] .otsp-info-nav-card, [data-bs-theme="dark"] .otsp-info-help-card, [data-bs-theme="dark"] .otsp-info-card, [data-bs-theme="dark"] .otsp-faq-item, [data-bs-theme="dark"] .otsp-faq-body { background: #1e293b; border-color: #334155; color: #e2e8f0; }
-        [data-bs-theme="dark"] .otsp-info-card h2, [data-bs-theme="dark"] .otsp-step-box h3, [data-bs-theme="dark"] .otsp-faq-btn, [data-bs-theme="dark"] .otsp-info-help-card h3 { color: #f8fafc; }
-        [data-bs-theme="dark"] .otsp-step-box { background: #0f172a; border-color: #334155; }
-        [data-bs-theme="dark"] .otsp-step-box p, [data-bs-theme="dark"] .otsp-faq-body, [data-bs-theme="dark"] .otsp-info-help-card p { color: #cbd5e1; }
-        [data-bs-theme="dark"] .otsp-info-nav-item:not(.active) { color: #cbd5e1; }
-        [data-bs-theme="dark"] .otsp-info-nav-item:not(.active) small { background: #0f172a; color: #94a3b8; }
-
-        @media (max-width: 991.98px) {
-          .otsp-info-grid { grid-template-columns: 1fr; }
-          .otsp-info-sidebar { position: static; }
-        }
-        @media (max-width: 575.98px) {
-          .otsp-step-grid { grid-template-columns: 1fr; }
-          .otsp-info-card { padding: 18px 16px; }
-        }
-      `}</style>
     </main>
   );
 }

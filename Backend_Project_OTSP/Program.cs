@@ -104,7 +104,11 @@ builder.Services.AddIdentityCore<ApplicationUser>(options =>
 .AddDefaultTokenProviders();
 
 // ===== 3 Cấu hình JWT Bearer Authentication =====
-var jwtKey = builder.Configuration["Jwt:Key"] ?? "OTSP_Super_Secret_Key_For_Jwt_Token_2026_AtLeast32BytesLong!";
+var jwtKey = builder.Configuration["Jwt:Key"];
+if (string.IsNullOrWhiteSpace(jwtKey) || jwtKey.Length < 32)
+{
+    throw new InvalidOperationException("Configuration 'Jwt:Key' is missing or shorter than 32 characters.");
+}
 var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "Backend_Project_OTSP";
 var jwtAudience = builder.Configuration["Jwt:Audience"] ?? "OTSP_React_App";
 builder.Services.AddAuthentication(options =>
@@ -476,8 +480,16 @@ app.UseForwardedHeaders();
 //  9Redirect sang HTTPS làm request proxy rời khỏi origin Vite và bị trình duyệt chặn.
 if (!app.Environment.IsDevelopment())
 {
+    app.UseHsts();
     app.UseHttpsRedirection();
 }
+app.Use(async (context, next) =>
+{
+    context.Response.Headers.TryAdd("X-Content-Type-Options", "nosniff");
+    context.Response.Headers.TryAdd("X-Frame-Options", "SAMEORIGIN");
+    context.Response.Headers.TryAdd("Referrer-Policy", "strict-origin-when-cross-origin");
+    await next();
+});
 app.UseStaticFiles();
 
 app.UseCors("AllowAll");
@@ -501,7 +513,11 @@ app.Use(async (context, next) =>
                 var hubContext = context.RequestServices.GetRequiredService<Microsoft.AspNetCore.SignalR.IHubContext<Backend_Project_OTSP.Hubs.ChatHub>>();
                 await hubContext.Clients.All.SendAsync("UserPresenceChanged", userId, false);
             }
-            catch { }
+            catch (Exception ex)
+            {
+                var logger = context.RequestServices.GetService<ILoggerFactory>()?.CreateLogger("PresenceMiddleware");
+                logger?.LogDebug(ex, "Could not broadcast offline presence during logout for user {UserId}", userId);
+            }
         }
         else if (!context.Request.Path.StartsWithSegments("/api/chat/conversations") &&
                  !context.Request.Path.StartsWithSegments("/api/notifications") &&

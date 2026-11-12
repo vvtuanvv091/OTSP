@@ -2,9 +2,11 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import tutorApi from '../../api/tutorApi';
 import { resolveAssetUrl } from '../../api/config';
+import { useConfirm } from '../../context/confirmHooks';
 import OtspPagination from '../../components/common/OtspPagination';
 
 export default function TutorConnectionRequestsPage() {
+  const confirm = useConfirm();
   const [requests, setRequests] = useState([]);
   const [statusFilter, setStatusFilter] = useState('');
   const [page, setPage] = useState(1);
@@ -63,7 +65,17 @@ export default function TutorConnectionRequestsPage() {
   };
 
   const handleReject = async (id) => {
-    const reason = window.prompt('Nhập lý do từ chối (tùy chọn):');
+    const reason = await confirm({
+      title: 'Từ chối yêu cầu kết nối',
+      message: 'Bạn có chắc muốn từ chối yêu cầu kết nối này?',
+      confirmText: 'Từ chối yêu cầu',
+      variant: 'danger',
+      input: {
+        label: 'Lý do từ chối (tùy chọn)',
+        placeholder: 'Nhập lý do từ chối để học viên được biết...',
+        required: false,
+      },
+    });
     if (reason === null) return;
 
     setActionLoading(id);

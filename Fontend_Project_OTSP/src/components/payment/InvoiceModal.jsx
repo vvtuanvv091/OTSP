@@ -1,4 +1,4 @@
-import React from 'react';
+import '../../styles/components/InvoiceModal.css';
 
 const formatMoney = (val) =>
   new Intl.NumberFormat('vi-VN').format(val || 0) + ' đ';
@@ -93,40 +93,6 @@ export default function InvoiceModal({ payment, currentUser, guardianName, isOpe
 
   return (
     <>
-      {/* CSS in ấn & xuất PDF chuẩn trang A4 */}
-      <style>{`
-        @media print {
-          body * {
-            visibility: hidden !important;
-          }
-          #otsp-invoice-print-area, #otsp-invoice-print-area * {
-            visibility: visible !important;
-          }
-          #otsp-invoice-print-area {
-            position: absolute !important;
-            left: 0 !important;
-            top: 0 !important;
-            width: 100% !important;
-            max-width: 100% !important;
-            margin: 0 !important;
-            padding: 24px !important;
-            box-shadow: none !important;
-            border: 1px solid #ddd !important;
-            background: #ffffff !important;
-          }
-          .no-print {
-            display: none !important;
-          }
-          .modal-backdrop {
-            display: none !important;
-          }
-          .modal {
-            position: static !important;
-            overflow: visible !important;
-          }
-        }
-      `}</style>
-
       {/* Backdrop */}
       <div
         className="modal-backdrop fade show no-print"

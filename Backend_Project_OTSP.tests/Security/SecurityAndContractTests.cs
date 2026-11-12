@@ -114,6 +114,57 @@ public class SecurityAndContractTests
     }
 
     [Fact]
+    public async Task SePayWebhook_WhenSecretMissing_FailsClosedWith503()
+    {
+        var mockPaymentService = new Mock<IPaymentService>();
+        var logger = Mock.Of<ILogger<PaymentApiController>>();
+        var config = BuildConfig(new());
+
+        var controller = new PaymentApiController(mockPaymentService.Object, logger, config)
+        {
+            ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }
+        };
+
+        var payload = new SePayWebhookDto { id = 1, content = "OTSP1", transferAmount = 500000m, transferType = "in" };
+        var result = await controller.SePayWebhook(payload, CancellationToken.None);
+
+        var obj = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(StatusCodes.Status503ServiceUnavailable, obj.StatusCode);
+        mockPaymentService.Verify(s => s.ProcessSePayWebhookAsync(It.IsAny<SePayWebhookDto>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task ProcessSePayWebhook_RejectsDuplicateGatewayTransactionCodeAcrossPayments()
+    {
+        var db = TestDbContextFactory.Create();
+        var tutorUser = new ApplicationUser { Id = "t-u2", FullName = "Tutor Two" };
+        var studentUser = new ApplicationUser { Id = "s-u2", FullName = "Student Two" };
+        var subject = new Subject { Id = 2, Code = "LY", Name = "Lý" };
+        var grade = new GradeLevel { Id = 2, Name = "Lớp 11" };
+        var tutor = new TutorProfile { Id = 2, UserId = tutorUser.Id, User = tutorUser };
+        var student = new StudentProfile { Id = 2, UserId = studentUser.Id, User = studentUser };
+        var classroom = new Classroom { Id = 2, NameClass = "Lý 11", TutorId = 2, Tutor = tutor, SubjectId = 2, Subject = subject, GradeLevelId = 2, GradeLevel = grade, Fee = 400000m };
+        var settled = new Payment { Id = 20, ClassroomId = 2, Classroom = classroom, StudentId = 2, Student = student, Amount = 400000m, Status = PaymentStatus.Success, GatewayTransactionCode = "FT_DUP_999" };
+        var pending = new Payment { Id = 21, ClassroomId = 2, Classroom = classroom, StudentId = 2, Student = student, Amount = 400000m, Status = PaymentStatus.Pending };
+
+        db.AddRange(tutorUser, studentUser, subject, grade, tutor, student, classroom, settled, pending);
+        await db.SaveChangesAsync();
+
+        var service = new PaymentService(db, BuildConfig(new()), new MemoryCache(new MemoryCacheOptions()), Mock.Of<ILogger<PaymentService>>());
+        var replayOk = await service.ProcessSePayWebhookAsync(new SePayWebhookDto
+        {
+            id = 999,
+            referenceCode = "FT_DUP_999",
+            content = "OTSP21",
+            transferAmount = 400000m,
+            transferType = "in"
+        });
+
+        Assert.False(replayOk);
+        Assert.Equal(PaymentStatus.Pending, db.Payments.Single(p => p.Id == 21).Status);
+    }
+
+    [Fact]
     public async Task ChatService_ClassGroup_DeniesNonMembersAndAllowsEnrolledMembers()
     {
         var db = TestDbContextFactory.Create();

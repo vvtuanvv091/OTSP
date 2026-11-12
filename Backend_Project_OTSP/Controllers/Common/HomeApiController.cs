@@ -161,7 +161,7 @@ public class HomeApiController : ControllerBase
                 TotalSessions = c.TotalSessions,
                 TutorId = c.TutorId,
                 TutorUserId = c.Tutor.UserId,
-                TutorName = c.Tutor.User.FullName,
+                TutorName = c.Tutor.User.FullName ?? string.Empty,
                 TutorAvatarUrl = c.Tutor.User.AvatarUrl,
                 TutorRating = c.Tutor.AverageRating
             })
@@ -186,7 +186,7 @@ public class HomeApiController : ControllerBase
             .Select(t => new TutorCardDto
             {
                 Id = t.Id,
-                FullName = t.User.FullName,
+                FullName = t.User.FullName ?? string.Empty,
                 AvatarUrl = t.User.AvatarUrl,
                 Introduction = t.Introduction,
                 HourlyFee = t.HourlyFee,

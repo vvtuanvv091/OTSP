@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import adminApi from '../../api/adminApi';
-import { useToast } from '../../context/ToastContext';
-import { useConfirm } from '../../context/ConfirmDialogContext';
+import { useToast } from '../../context/toastHooks';
+import { useConfirm } from '../../context/confirmHooks';
 import { AdminFeedback, AdminPageHeader, AdminPagination } from './AdminPageShared';
 
 const emptyForm = { id: null, code: '', name: '', description: '' };

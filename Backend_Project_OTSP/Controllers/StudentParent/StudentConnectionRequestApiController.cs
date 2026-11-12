@@ -67,7 +67,7 @@ public class StudentConnectionRequestApiController : ControllerBase
             .Select(r => new TutorReviewDto
             {
                 Id = r.Id,
-                StudentName = r.Student.User.FullName,
+                StudentName = r.Student.User.FullName ?? string.Empty,
                 StudentAvatarUrl = r.Student.User.AvatarUrl,
                 Score = r.Score,
                 Comment = r.Comment,
@@ -250,7 +250,7 @@ public class StudentConnectionRequestApiController : ControllerBase
         {
             var searchTerm = search.Trim().ToLower();
             query = query.Where(r =>
-                r.Tutor.User.FullName.ToLower().Contains(searchTerm) ||
+                (r.Tutor.User.FullName != null && r.Tutor.User.FullName.ToLower().Contains(searchTerm)) ||
                 r.Subject.Name.ToLower().Contains(searchTerm) ||
                 r.GradeLevel.Name.ToLower().Contains(searchTerm) ||
                 (r.Classroom != null && r.Classroom.NameClass.ToLower().Contains(searchTerm)));

@@ -1,16 +1,22 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import studentApi from '../../api/studentApi';
 import { resolveAssetUrl } from '../../api/config';
 import { useAuth } from '../../context/AuthContext';
-import { useToast } from '../../context/ToastContext';
-import { useConfirm } from '../../context/ConfirmDialogContext';
+import { useToast } from '../../context/toastHooks';
+import { useConfirm } from '../../context/confirmHooks';
 import CollapsibleProfileSection from '../../components/common/CollapsibleProfileSection';
 import ChangePasswordPanel from '../auth/ChangePasswordPanel';
 import compressImageFile from '../../utils/imageCompressor';
+import '../../styles/student/StudentProfilePage.css';
 
 export default function StudentProfilePage() {
   const { user, updateUser } = useAuth();
+  const authSyncRef = useRef({ user, updateUser });
+
+  useEffect(() => {
+    authSyncRef.current = { user, updateUser };
+  }, [user, updateUser]);
   const toast = useToast();
   const confirm = useConfirm();
   const location = useLocation();
@@ -53,9 +59,10 @@ export default function StudentProfilePage() {
         const res = await studentApi.getProfile();
         if (isMounted && res.data) {
           const prof = res.data.profile || {};
+          const { user: currentUser, updateUser: syncUser } = authSyncRef.current;
           setProfile({
-            fullName: prof.fullName || user?.fullName || '',
-            email: prof.email || user?.email || '',
+            fullName: prof.fullName || currentUser?.fullName || '',
+            email: prof.email || currentUser?.email || '',
             phoneNumber: prof.phoneNumber || '',
             dateOfBirth: prof.dateOfBirth ? String(prof.dateOfBirth).split('T')[0] : '',
             citizenIdNumber: prof.citizenIdNumber || '',
@@ -63,7 +70,7 @@ export default function StudentProfilePage() {
             interestedSubjects: prof.interestedSubjects || '',
             area: prof.area || '',
             freeSchedule: prof.freeSchedule || '',
-            avatarUrl: prof.avatarUrl || user?.avatarUrl || '/assets/img/default-avatar.svg',
+            avatarUrl: prof.avatarUrl || currentUser?.avatarUrl || '/assets/img/default-avatar.svg',
             isMinor: !!prof.isMinor
           });
 
@@ -72,11 +79,11 @@ export default function StudentProfilePage() {
           }
 
           // Đồng bộ với AuthContext cho Header và Sidebar
-          if (prof.avatarUrl && prof.avatarUrl !== user?.avatarUrl) {
-            updateUser({ avatarUrl: prof.avatarUrl });
+          if (prof.avatarUrl && prof.avatarUrl !== currentUser?.avatarUrl) {
+            syncUser({ avatarUrl: prof.avatarUrl });
           }
-          if (prof.fullName && prof.fullName !== user?.fullName) {
-            updateUser({ fullName: prof.fullName });
+          if (prof.fullName && prof.fullName !== currentUser?.fullName) {
+            syncUser({ fullName: prof.fullName });
           }
         }
       } catch (err) {
@@ -221,7 +228,7 @@ export default function StudentProfilePage() {
   }
 
   return (
-    <div className="container-fluid profile-wrap py-3 px-1 px-md-3" style={{ width: '100%' }}>
+    <div className="container-fluid profile-wrap student-profile-page py-3 px-1 px-md-3" style={{ width: '100%' }}>
       {message.text && (
         <div
           className={`alert alert-${message.type} alert-dismissible fade show shadow-sm mb-4 d-flex align-items-center`}
@@ -724,17 +731,6 @@ export default function StudentProfilePage() {
         </main>
       </div>
 
-      <style>{`
-        .pro-card {
-          background: var(--bs-card-bg, #ffffff);
-          border: 1px solid var(--bs-border-color, #e5e7eb);
-          border-radius: 14px;
-        }
-        [data-bs-theme="dark"] .pro-card {
-          background-color: #1e293b;
-          border-color: #334155;
-        }
-      `}</style>
     </div>
   );
 }

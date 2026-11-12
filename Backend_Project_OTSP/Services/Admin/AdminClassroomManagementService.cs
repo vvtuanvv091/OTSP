@@ -61,11 +61,11 @@ public sealed class AdminClassroomManagementService : IAdminClassroomManagementS
         {
             filtered = filtered.Where(classroom =>
                 classroom.NameClass.Contains(search) ||
-                classroom.Tutor.User.FullName.Contains(search) ||
+                (classroom.Tutor.User.FullName != null && classroom.Tutor.User.FullName.Contains(search)) ||
                 (classroom.Tutor.User.Email != null && classroom.Tutor.User.Email.Contains(search)) ||
                 classroom.Subject.Name.Contains(search) ||
                 classroom.GradeLevel.Name.Contains(search) ||
-                classroom.ClassroomStudents.Any(member => member.Student.User.FullName.Contains(search)));
+                classroom.ClassroomStudents.Any(member => member.Student.User.FullName != null && member.Student.User.FullName.Contains(search)));
         }
 
         var total = await filtered.CountAsync(cancellationToken);
@@ -82,7 +82,7 @@ public sealed class AdminClassroomManagementService : IAdminClassroomManagementS
             {
                 Id = classroom.Id,
                 Name = classroom.NameClass,
-                TutorName = classroom.Tutor.User.FullName,
+                TutorName = classroom.Tutor.User.FullName ?? string.Empty,
                 TutorEmail = classroom.Tutor.User.Email,
                 SubjectName = classroom.Subject.Name,
                 GradeLevelName = classroom.GradeLevel.Name,
@@ -202,7 +202,7 @@ public sealed class AdminClassroomManagementService : IAdminClassroomManagementS
             if (!string.IsNullOrWhiteSpace(req.Student.User?.Email))
             {
                 var (subj, body) = NotificationEmailTemplates.ForClassroomCancelledByAdmin(
-                    req.Student.User.FullName, classroom.NameClass, reasonText, $"{FrontendBaseUrl}/student/connection-requests");
+                    req.Student.User.FullName ?? "Học viên", classroom.NameClass, reasonText, $"{FrontendBaseUrl}/student/connection-requests");
                 await AdminNotificationHelper.DispatchEmailToManyAsync(
                     new[] { req.Student.User.Email }, subj, body, _emailQueue, _emailSender, cancellationToken);
             }
@@ -213,7 +213,7 @@ public sealed class AdminClassroomManagementService : IAdminClassroomManagementS
             if (!string.IsNullOrWhiteSpace(student.Email))
             {
                 var (subj, body) = NotificationEmailTemplates.ForClassroomCancelledByAdmin(
-                    student.FullName, classroom.NameClass, reasonText, $"{FrontendBaseUrl}/student/classrooms");
+                    student.FullName ?? "Học viên", classroom.NameClass, reasonText, $"{FrontendBaseUrl}/student/classrooms");
                 await AdminNotificationHelper.DispatchEmailToManyAsync(
                     new[] { student.Email }, subj, body, _emailQueue, _emailSender, cancellationToken);
             }
@@ -222,7 +222,7 @@ public sealed class AdminClassroomManagementService : IAdminClassroomManagementS
         if (!string.IsNullOrWhiteSpace(classroom.Tutor.User?.Email))
         {
             var (subj, body) = NotificationEmailTemplates.ForClassroomCancelledByAdmin(
-                classroom.Tutor.User.FullName, classroom.NameClass, reasonText, $"{FrontendBaseUrl}/tutor/classrooms");
+                classroom.Tutor.User.FullName ?? "Gia sư", classroom.NameClass, reasonText, $"{FrontendBaseUrl}/tutor/classrooms");
             await AdminNotificationHelper.DispatchEmailToManyAsync(
                 new[] { classroom.Tutor.User.Email }, subj, body, _emailQueue, _emailSender, cancellationToken);
         }
@@ -281,7 +281,7 @@ public sealed class AdminClassroomManagementService : IAdminClassroomManagementS
             if (!string.IsNullOrWhiteSpace(student.Email))
             {
                 var (subj, body) = NotificationEmailTemplates.ForSessionCancelledByAdmin(
-                    student.FullName, session.Classroom.NameClass, timeVnStr, reasonText, $"{FrontendBaseUrl}/student/schedule");
+                    student.FullName ?? "Học viên", session.Classroom.NameClass, timeVnStr, reasonText, $"{FrontendBaseUrl}/student/schedule");
                 await AdminNotificationHelper.DispatchEmailToManyAsync(
                     new[] { student.Email }, subj, body, _emailQueue, _emailSender, cancellationToken);
             }
@@ -289,7 +289,7 @@ public sealed class AdminClassroomManagementService : IAdminClassroomManagementS
         if (!string.IsNullOrWhiteSpace(session.Classroom.Tutor.User?.Email))
         {
             var (subj, body) = NotificationEmailTemplates.ForSessionCancelledByAdmin(
-                session.Classroom.Tutor.User.FullName, session.Classroom.NameClass, timeVnStr, reasonText, $"{FrontendBaseUrl}/tutor/schedule");
+                session.Classroom.Tutor.User.FullName ?? "Gia sư", session.Classroom.NameClass, timeVnStr, reasonText, $"{FrontendBaseUrl}/tutor/schedule");
             await AdminNotificationHelper.DispatchEmailToManyAsync(
                 new[] { session.Classroom.Tutor.User.Email }, subj, body, _emailQueue, _emailSender, cancellationToken);
         }

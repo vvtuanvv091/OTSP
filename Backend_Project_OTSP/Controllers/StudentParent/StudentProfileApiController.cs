@@ -3,7 +3,6 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Backend_Project_OTSP.Dtos.StudentParent;
 using Backend_Project_OTSP.Services.StudentParent;
-using Backend_Project_OTSP.Services.StudentParent;
 
 namespace Backend_Project_OTSP.Controllers.Api.Student;
 

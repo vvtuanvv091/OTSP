@@ -68,7 +68,7 @@ public class StudentClassroomApiController : ControllerBase
                 cs.Classroom.NameClass.ToLower().Contains(searchTerm) ||
                 cs.Classroom.Subject.Name.ToLower().Contains(searchTerm) ||
                 cs.Classroom.GradeLevel.Name.ToLower().Contains(searchTerm) ||
-                cs.Classroom.Tutor.User.FullName.ToLower().Contains(searchTerm));
+                (cs.Classroom.Tutor.User.FullName != null && cs.Classroom.Tutor.User.FullName.ToLower().Contains(searchTerm)));
         }
 
         var totalClasses = await enrollmentsQuery.CountAsync(cancellationToken);
@@ -221,7 +221,7 @@ public class StudentClassroomApiController : ControllerBase
                 SubjectName = e.SubjectName,
                 GradeLevelName = e.GradeLevelName,
                 TutorUserId = e.TutorUserId,
-                TutorName = e.TutorName,
+                TutorName = e.TutorName ?? string.Empty,
                 TutorAvatarUrl = e.TutorAvatarUrl,
                 Fee = e.Classroom.Fee,
                 SessionsPerWeek = e.Classroom.SessionsPerWeek,

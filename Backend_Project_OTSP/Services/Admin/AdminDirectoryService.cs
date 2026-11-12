@@ -77,7 +77,7 @@ public sealed class AdminDirectoryService : IAdminDirectoryService
         if (!string.IsNullOrEmpty(search))
         {
             students = students.Where(student =>
-                student.User.FullName.Contains(search) ||
+                (student.User.FullName != null && student.User.FullName.Contains(search)) ||
                 (student.User.Email != null && student.User.Email.Contains(search)) ||
                 student.Guardians.Any(guardian => guardian.FullName.Contains(search) || guardian.ContactInfo.Contains(search)));
         }
@@ -110,7 +110,7 @@ public sealed class AdminDirectoryService : IAdminDirectoryService
         {
             StudentProfileId = row.Id,
             UserId = row.UserId,
-            FullName = row.FullName,
+            FullName = row.FullName ?? string.Empty,
             Email = row.Email,
             Age = CalculateAge(row.DateOfBirth, today),
             GuardianName = row.Guardian?.FullName,
@@ -180,7 +180,7 @@ public sealed class AdminDirectoryService : IAdminDirectoryService
         if (!string.IsNullOrEmpty(search))
         {
             tutors = tutors.Where(tutor =>
-                tutor.User.FullName.Contains(search) ||
+                (tutor.User.FullName != null && tutor.User.FullName.Contains(search)) ||
                 (tutor.User.Email != null && tutor.User.Email.Contains(search)) ||
                 (tutor.User.Address != null && tutor.User.Address.Contains(search)) ||
                 tutor.TutorSubjects.Any(link => link.Subject.Name.Contains(search) || link.GradeLevel.Name.Contains(search)));
@@ -199,7 +199,7 @@ public sealed class AdminDirectoryService : IAdminDirectoryService
             {
                 TutorId = tutor.Id,
                 UserId = tutor.UserId,
-                FullName = tutor.User.FullName,
+                FullName = tutor.User.FullName ?? string.Empty,
                 Email = tutor.User.Email,
                 Address = tutor.User.Address,
                 TeachingFormat = tutor.TeachingFormat,

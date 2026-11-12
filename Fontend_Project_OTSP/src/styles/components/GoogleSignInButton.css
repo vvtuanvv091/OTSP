@@ -1,0 +1,4 @@
+.google-signin-wrap { position: relative; width: 100%; min-height: 42px; }
+.google-signin-button { display: flex; justify-content: center; width: 100%; min-height: 42px; }
+.google-signin-blocker { position: absolute; inset: 0; z-index: 1; cursor: wait; background: rgba(255,255,255,.55); }
+.google-signin-wrap.is-disabled { opacity: .65; }

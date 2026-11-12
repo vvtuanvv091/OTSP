@@ -1,5 +1,3 @@
-import React from 'react';
-
 /**
  * Skeleton Loader Component
  * Cung cấp hiệu ứng placeholder shimmer hiện đại, loại bỏ giật layout (CLS).

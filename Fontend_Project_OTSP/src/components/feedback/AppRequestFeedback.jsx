@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import '../../styles/components/AppRequestFeedback.css';
 
 export default function AppRequestFeedback() {
   const [pendingRequests, setPendingRequests] = useState(0);
@@ -66,16 +67,6 @@ export default function AppRequestFeedback() {
           <button type="button" aria-label="Đóng thông báo" onClick={() => setForbiddenMessage('')}>×</button>
         </div>
       )}
-      <style>{`
-        .otsp-request-status { position: fixed; right: 18px; bottom: 18px; z-index: 2000; display: flex; align-items: center; gap: 10px; max-width: min(460px, calc(100vw - 28px)); padding: 12px 16px; color: #263448; background: #fff; border: 1px solid #cbd5e1; border-radius: 10px; box-shadow: 0 8px 28px rgba(15,23,42,.18); font-size: 14px; }
-        .otsp-request-status .spinner-border { color: #dc303a; }
-        .otsp-permission-notice { position: fixed; top: 18px; right: 18px; z-index: 2010; display: flex; align-items: center; gap: 10px; width: min(460px, calc(100vw - 28px)); padding: 13px 15px; color: #7f1d1d; background: #fff1f2; border: 1px solid #fda4af; border-radius: 9px; box-shadow: 0 8px 28px rgba(15,23,42,.16); font-size: 14px; }
-        .otsp-permission-notice > i { color: #be123c; }
-        .otsp-permission-notice button { margin-left: auto; border: 0; color: inherit; background: transparent; font-size: 22px; line-height: 1; }
-        [data-bs-theme="dark"] .otsp-request-status { color: #eef2f7; background: #1f2937; border-color: #536176; }
-        [data-bs-theme="dark"] .otsp-permission-notice { color: #ffe4e6; background: #3f2028; border-color: #a94051; }
-        @media (max-width: 575.98px) { .otsp-request-status { right: 10px; bottom: 10px; left: 10px; max-width: none; } .otsp-permission-notice { top: 10px; right: 10px; } }
-      `}</style>
     </>
   );
 }

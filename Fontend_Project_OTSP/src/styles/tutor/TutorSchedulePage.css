@@ -1,0 +1,268 @@
+.tutor-schedule-page {
+  --bs-primary: #DB303A;
+  --bs-primary-rgb: 219, 48, 58;
+  --tutor-accent: #DB303A;
+  --tutor-accent-soft: #FEE2E2;
+  --tutor-accent-border: #FCA5A5;
+  --tutor-border: var(--bs-border-color, #E5E7EB);
+}
+
+.tutor-schedule-page .schedule-card {
+  background: var(--bs-body-bg);
+  border: 1px solid var(--tutor-border);
+  border-radius: 12px;
+}
+
+.tutor-schedule-page .schedule-table-wrap {
+  overflow-x: auto;
+  width: 100%;
+}
+
+.tutor-schedule-page .schedule-table {
+  width: 100%;
+  min-width: 820px;
+  table-layout: fixed;
+  border-collapse: separate;
+  border-spacing: 4px;
+  font-size: 12px;
+}
+
+.tutor-schedule-page .schedule-table th {
+  padding: 8px 4px;
+  text-align: center;
+  white-space: nowrap;
+  border-radius: 6px;
+}
+
+.tutor-schedule-page .schedule-table th.period-column {
+  width: 48px;
+  color: var(--tutor-accent);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  background: rgba(219, 48, 58, 0.04);
+  vertical-align: middle;
+}
+
+.tutor-schedule-page .schedule-table th.time-column {
+  width: 105px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--bs-secondary-color);
+  background: rgba(0, 0, 0, 0.02);
+  vertical-align: middle;
+}
+
+.tutor-schedule-page .schedule-table th.day-column {
+  background: var(--bs-tertiary-bg);
+  border: 1px solid transparent;
+}
+
+.tutor-schedule-page .schedule-table th.day-column.is-today {
+  background: var(--tutor-accent-soft);
+  color: var(--tutor-accent);
+  border-color: var(--tutor-accent-border);
+  font-weight: 700;
+}
+
+.tutor-schedule-page .schedule-table td {
+  padding: 0;
+  vertical-align: top;
+  height: 84px;
+}
+
+.tutor-schedule-page .day-title {
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.tutor-schedule-page .day-date {
+  font-size: 11px;
+  color: var(--bs-secondary-color);
+}
+
+.tutor-schedule-page .is-today .day-date {
+  color: var(--tutor-accent);
+  font-weight: 600;
+}
+
+/* Clean slot box */
+.schedule-cell-slot {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-height: 84px;
+  padding: 4px;
+  border: 1px dashed var(--tutor-border);
+  border-radius: 8px;
+  background: var(--bs-body-bg);
+  transition: all .15s ease-in-out;
+}
+
+.schedule-cell-slot:hover {
+  border-color: var(--tutor-accent-border);
+  background: rgba(219, 48, 58, 0.02);
+}
+
+.schedule-cell-slot.has-session {
+  border: none;
+  padding: 0;
+  background: transparent;
+}
+
+.empty-slot-btn {
+  opacity: 0;
+  transition: opacity .15s ease;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  color: var(--bs-secondary-color);
+  font-size: 11px;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+}
+
+.schedule-cell-slot:hover .empty-slot-btn {
+  opacity: 1;
+  color: var(--tutor-accent);
+}
+
+/* Teaching Session Card */
+.session-card-item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  text-align: left;
+  cursor: pointer;
+  transition: transform .15s ease, box-shadow .15s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  border: 1px solid var(--bs-border-color, #E2E8F0);
+  border-top: 2px solid var(--otsp-primary, #DB303A);
+  background: var(--bs-body-bg);
+  height: 100%;
+}
+
+.session-card-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.12);
+}
+
+.session-card-item.status-scheduled {
+  border-color: #E2E8F0;
+  border-top-color: #3B82F6;
+  background: #F8FAFC;
+}
+
+.session-card-item.status-inprogress {
+  border-color: #FCA5A5;
+  border-top-color: #DC2626;
+  background: #FEF2F2;
+  animation: pulseBorder 2s infinite;
+}
+
+.session-card-item.status-done {
+  border-color: #E2E8F0;
+  border-top-color: #10B981;
+  background: #F0FDF4;
+  opacity: 0.9;
+}
+
+.session-card-item.status-cancelled {
+  border-color: #E2E8F0;
+  border-top-color: #64748B;
+  background: #F1F5F9;
+  opacity: 0.7;
+}
+
+@keyframes pulseBorder {
+  0% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.4); }
+  70% { box-shadow: 0 0 0 6px rgba(220, 38, 38, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }
+}
+
+.animate-pulse {
+  animation: pulseBtn 1.8s infinite;
+}
+@keyframes pulseBtn {
+  0% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.6); }
+  70% { box-shadow: 0 0 0 5px rgba(220, 38, 38, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }
+}
+
+.session-title {
+  font-weight: 700;
+  font-size: 11px;
+  line-height: 1.25;
+  color: #0F172A;
+}
+
+.session-meta {
+  font-size: 10px;
+  color: #475569;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Mobile day tabs */
+.tutor-schedule-page .availability-mobile-day-picker { display: none; }
+@media (max-width: 767.98px) {
+  .tutor-schedule-page .availability-mobile-day-picker {
+    display: flex;
+    gap: .35rem;
+    overflow-x: auto;
+    padding: .2rem 0 .6rem;
+  }
+  .tutor-schedule-page .availability-day-button {
+    flex: 1 0 auto;
+    min-width: 2.8rem;
+    padding: .45rem .4rem;
+    border-radius: 8px;
+    border: 1px solid var(--tutor-border);
+    background: var(--bs-body-bg);
+    font-size: .82rem;
+    text-align: center;
+  }
+  .tutor-schedule-page .availability-day-button[aria-pressed="true"] {
+    border-color: var(--tutor-accent);
+    background: var(--tutor-accent);
+    color: #fff;
+    font-weight: 700;
+  }
+  .tutor-schedule-page .schedule-table {
+    min-width: 0 !important;
+    width: 100% !important;
+    table-layout: fixed;
+  }
+  .tutor-schedule-page .schedule-table th.time-column,
+  .tutor-schedule-page .schedule-table td.time-cell {
+    width: 82px !important;
+    min-width: 82px !important;
+    padding: 0.45rem !important;
+    font-size: 0.75rem;
+  }
+  .tutor-schedule-page .schedule-table th.day-column,
+  .tutor-schedule-page .schedule-table td.day-cell {
+    display: none;
+    width: auto !important;
+    min-width: 0 !important;
+  }
+  .tutor-schedule-page[data-active-day="0"] .schedule-table [data-day-col="0"],
+  .tutor-schedule-page[data-active-day="1"] .schedule-table [data-day-col="1"],
+  .tutor-schedule-page[data-active-day="2"] .schedule-table [data-day-col="2"],
+  .tutor-schedule-page[data-active-day="3"] .schedule-table [data-day-col="3"],
+  .tutor-schedule-page[data-active-day="4"] .schedule-table [data-day-col="4"],
+  .tutor-schedule-page[data-active-day="5"] .schedule-table [data-day-col="5"],
+  .tutor-schedule-page[data-active-day="6"] .schedule-table [data-day-col="6"] {
+    display: table-cell;
+  }
+}

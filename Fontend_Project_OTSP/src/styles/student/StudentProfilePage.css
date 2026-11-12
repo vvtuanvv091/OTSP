@@ -1,0 +1,9 @@
+.student-profile-page .pro-card {
+  background: var(--bs-card-bg, #ffffff);
+  border: 1px solid var(--bs-border-color, #e5e7eb);
+  border-radius: 14px;
+}
+[data-bs-theme="dark"] .student-profile-page .pro-card {
+  background-color: #1e293b;
+  border-color: #334155;
+}

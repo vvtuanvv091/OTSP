@@ -19,7 +19,7 @@ export default function SearchPage() {
   const [classType, setClassType] = useState(() => searchParams.get('classType') || '');
   const [maxFee, setMaxFee] = useState(() => searchParams.get('maxFee') || '');
   const [page, setPage] = useState(() => Number(searchParams.get('page')) || 1);
-  const [pageSize, setPageSize] = useState(12);
+  const [pageSize] = useState(12);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [searchTrigger, setSearchTrigger] = useState(0);

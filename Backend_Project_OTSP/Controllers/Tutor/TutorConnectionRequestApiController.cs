@@ -62,7 +62,7 @@ public class TutorConnectionRequestApiController : ControllerBase
             {
                 Id = request.Id,
                 StudentUserId = request.Student.UserId,
-                StudentName = request.Student.User.FullName,
+                StudentName = request.Student.User.FullName ?? string.Empty,
                 StudentAvatarUrl = request.Student.User.AvatarUrl,
                 SubjectName = request.Subject.Name,
                 GradeLevelName = request.GradeLevel.Name,

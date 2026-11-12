@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import studentApi from '../../api/studentApi';
-import { useToast } from '../../context/ToastContext';
+import { useToast } from '../../context/toastHooks';
 import ComplaintModal from '../../components/common/ComplaintModal';
 import OtspPagination from '../../components/common/OtspPagination';
+import '../../styles/student/StudentClassroomsPage.css';
 
 export default function StudentClassroomsPage() {
   const toast = useToast();
@@ -690,50 +691,6 @@ export default function StudentClassroomsPage() {
         onSuccess={() => setMessage('Khiếu nại của bạn đã được gửi thành công tới Ban Quản Trị!')}
       />
 
-      <style>{`
-        .live-dot {
-          width: 6px;
-          height: 6px;
-          background-color: #ffffff;
-          border-radius: 50%;
-          display: inline-block;
-          animation: pulseLive 1.4s infinite;
-        }
-        @keyframes pulseLive {
-          0% { transform: scale(0.9); opacity: 0.6; }
-          50% { transform: scale(1.3); opacity: 1; }
-          100% { transform: scale(0.9); opacity: 0.6; }
-        }
-        .student-classroom-filters { border-radius: 6px; flex-wrap: wrap; }
-        .student-classroom-search { width: min(100%, 420px); }
-        .student-class-summary { min-width: 0; }
-        .session-list {
-          overflow: hidden;
-          transition: max-height .22s ease, opacity .22s ease;
-        }
-        .session-list.is-open { max-height: 5000px; opacity: 1; visibility: visible; }
-        .session-list.is-closed { max-height: 0; opacity: 0; visibility: hidden; }
-        .student-class-progress {
-          width: 100%;
-          height: 6px;
-          margin-top: 8px;
-          overflow: hidden;
-          border-radius: 4px;
-          background: #e5e7eb;
-        }
-        .student-class-progress-value { height: 100%; background: #166534; transition: width .2s ease; }
-        .student-classroom-pagination button { min-width: 92px; }
-        @media (max-width: 767px) {
-          .student-classroom-filters { width: 100%; }
-          .student-classroom-filters .nav-link { flex: 1 1 calc(50% - 8px); justify-content: center; }
-          .student-classroom-search { width: 100%; }
-          .session-row { align-items: flex-start !important; flex-direction: column; gap: 12px; }
-          .session-action { width: 100%; }
-          .session-action .btn, .session-action a { width: 100%; justify-content: center; }
-          .student-classroom-pagination button { min-width: 72px; }
-        }
-        [data-bs-theme="dark"] .student-class-progress { background: #334155; }
-      `}</style>
     </div>
   );
 }

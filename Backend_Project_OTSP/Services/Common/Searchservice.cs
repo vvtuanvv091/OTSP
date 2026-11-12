@@ -116,7 +116,7 @@ public class SearchService : ISearchService
             {
                 Id = t.Id,
                 UserId = t.UserId,
-                FullName = t.User.FullName,
+                FullName = t.User.FullName ?? string.Empty,
                 AvatarUrl = t.User.AvatarUrl,
                 Introduction = t.Introduction,
                 HourlyFee = t.HourlyFee,
@@ -208,7 +208,7 @@ public class SearchService : ISearchService
                 MaxStudents = c.MaxStudents,
                 TutorId = c.TutorId,
                 TutorUserId = c.Tutor.UserId,
-                TutorName = c.Tutor.User.FullName,
+                TutorName = c.Tutor.User.FullName ?? string.Empty,
                 TutorAvatarUrl = c.Tutor.User.AvatarUrl,
                 TutorRating = c.Tutor.AverageRating,
                 StartDate = c.StartDate,

@@ -98,7 +98,7 @@ public class StudentLearningDocumentApiController : ControllerBase
                 UploadedAt = d.UploadedAt,
                 ClassroomId = d.ClassroomId,
                 ClassroomName = d.Classroom != null ? d.Classroom.NameClass : null,
-                TutorName = d.Tutor.User.FullName,
+                TutorName = d.Tutor.User.FullName ?? string.Empty,
                 FileExtension = Path.GetExtension(d.FileUrl) ?? string.Empty
             })
             .ToListAsync(cancellationToken);

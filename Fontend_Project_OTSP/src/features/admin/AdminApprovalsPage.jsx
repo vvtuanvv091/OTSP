@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
 import adminApi from '../../api/adminApi';
 import { resolveAssetUrl } from '../../api/config';
+import { useConfirm } from '../../context/confirmHooks';
 import { AdminFeedback, AdminLoadingRows, AdminPageHeader, AdminPagination, AdminStats } from './AdminPageShared';
 
 const PAGE_SIZE = 10;
 
 export default function AdminApprovalsPage() {
+  const confirm = useConfirm();
   const [data, setData] = useState(null);
   const [search, setSearch] = useState('');
   const [querySearch, setQuerySearch] = useState('');
@@ -79,12 +81,19 @@ export default function AdminApprovalsPage() {
   const updateFilter = (setter, value) => { setter(value); setPage(1); };
 
   const processTutor = async (tutor, approve) => {
-    const reason = approve ? null : window.prompt('Nhập lý do từ chối hồ sơ gia sư:');
+    const reason = approve ? null : await confirm({
+      title: 'Từ chối hồ sơ gia sư',
+      message: `Xác nhận từ chối hồ sơ của gia sư “${tutor.fullName}”?`,
+      confirmText: 'Từ chối hồ sơ',
+      variant: 'danger',
+      input: {
+        label: 'Lý do từ chối',
+        placeholder: 'Nhập lý do từ chối hồ sơ gia sư...',
+        required: true,
+        minLength: 1,
+      },
+    });
     if (!approve && reason === null) return;
-    if (!approve && !reason.trim()) {
-      setError('Vui lòng nhập lý do từ chối.');
-      return;
-    }
 
     setBusyTutorId(tutor.tutorId);
     setError('');
@@ -102,12 +111,19 @@ export default function AdminApprovalsPage() {
   };
 
   const reviewQualification = async (qualification, approve) => {
-    const reason = approve ? null : window.prompt(`Nhập lý do từ chối “${qualification.title}”:`);
+    const reason = approve ? null : await confirm({
+      title: 'Từ chối chứng chỉ',
+      message: `Nhập lý do từ chối “${qualification.title}”.`,
+      confirmText: 'Từ chối chứng chỉ',
+      variant: 'danger',
+      input: {
+        label: 'Lý do từ chối chứng chỉ',
+        placeholder: 'Nhập lý do từ chối chứng chỉ...',
+        required: true,
+        minLength: 1,
+      },
+    });
     if (!approve && reason === null) return;
-    if (!approve && !reason.trim()) {
-      setError('Vui lòng nhập lý do từ chối chứng chỉ.');
-      return;
-    }
 
     setBusyQualificationId(qualification.id);
     setError('');

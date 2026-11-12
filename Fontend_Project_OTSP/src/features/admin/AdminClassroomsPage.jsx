@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import adminApi from '../../api/adminApi';
-import { useToast } from '../../context/ToastContext';
-import { useConfirm } from '../../context/ConfirmDialogContext';
+import { useToast } from '../../context/toastHooks';
+import { useConfirm } from '../../context/confirmHooks';
 import { AdminFeedback, AdminLoadingRows, AdminPageHeader, AdminPagination, AdminStats } from './AdminPageShared';
 
 const PAGE_SIZE = 10;
@@ -55,9 +55,19 @@ export default function AdminClassroomsPage() {
 
   const cancel = async (item, kind) => {
     const target = kind === 'class' ? `lớp “${item.name}”` : `buổi học gần nhất của lớp “${item.name}”`;
-    const reason = window.prompt(`Nhập lý do hủy ${target}:`);
+    const reason = await confirm({
+      title: kind === 'class' ? 'Đóng lớp học' : 'Hủy buổi học',
+      message: `Nhập lý do hủy ${target}:`,
+      confirmText: 'Xác nhận hủy',
+      variant: 'danger',
+      input: {
+        label: 'Lý do hủy',
+        placeholder: `Nhập lý do hủy ${target} (tối thiểu 5 ký tự)...`,
+        required: true,
+        minLength: 5,
+      },
+    });
     if (reason === null) return;
-    if (reason.trim().length < 5) { setError('Lý do cần tối thiểu 5 ký tự.'); return; }
     const key = `${kind}-${item.id}`;
     setBusyKey(key);
     setError('');
