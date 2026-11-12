@@ -14,8 +14,8 @@ def _parse_allowed_origins() -> list[str]:
         "http://localhost:5173",
         "http://localhost:5084",
         "https://otsp-giasu.vercel.app",
-        "https://otsp-ten.vercel.app",
         "https://otsp.onrender.com",
+        "https://otsp-1.onrender.com",
     ]
 
 class Settings:
