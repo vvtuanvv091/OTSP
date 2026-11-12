@@ -6,6 +6,42 @@ import { AdminFeedback, AdminLoadingRows, AdminPageHeader, AdminPagination, Admi
 
 const PAGE_SIZE = 10;
 
+function AiVerificationResult({ result }) {
+  if (!result) return null;
+  const recommended = result.recommendation === 'APPROVED_RECOMMENDED';
+  return (
+    <div className="admin-ai-result-card">
+      <div className="admin-ai-result-head">
+        <strong><i className="bi bi-cpu me-1" aria-hidden="true" />Kết quả AI OCR &amp; Đối chiếu</strong>
+        <span className={`admin-ai-badge ${recommended ? 'is-recommended' : 'is-warning'}`}>
+          <i className={`bi ${recommended ? 'bi-check-circle-fill' : 'bi-exclamation-triangle-fill'}`} aria-hidden="true" />
+          {recommended ? 'Đề xuất duyệt' : 'Cần kiểm tra kỹ'}
+        </span>
+      </div>
+      <div>
+        <strong>Tên trên bằng:</strong> {result.tutorName || 'N/A'}
+        <span className={`admin-ai-inline-match ${result.isNameMatched ? 'is-ok' : 'is-warn'}`}>
+          {result.isNameMatched ? '(Khớp hồ sơ)' : '(Chưa trùng khớp)'}
+        </span>
+      </div>
+      <div>
+        <strong>Trường / Tổ chức:</strong> {result.issuingOrganization || 'N/A'}
+        {result.certificateType ? ` (${result.certificateType})` : ''}
+      </div>
+      <div>
+        <strong>Xếp loại / Điểm:</strong> {result.scoreOrClassification || 'N/A'} ·{' '}
+        <strong>Chuẩn OTSP:</strong> {result.qualificationStandardMet ? 'Đạt' : 'Chưa đạt'}
+      </div>
+      {result.summaryNotes && (
+        <div className="admin-ai-result-notes">
+          <i className="bi bi-chat-left-text me-1" aria-hidden="true" />
+          {result.summaryNotes}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function AdminApprovalsPage() {
   const confirm = useConfirm();
   const [data, setData] = useState(null);
@@ -204,7 +240,7 @@ export default function AdminApprovalsPage() {
       <AdminPageHeader title="Duyệt hồ sơ & Bằng cấp gia sư" description="Xem xét hồ sơ đăng ký và chứng chỉ chuyên môn trước khi gia sư được xuất hiện trên nền tảng." />
       <AdminFeedback error={error} message={message} onDismiss={() => { setError(''); setMessage(''); }} />
 
-      <AdminStats items={[
+      <AdminStats columns={4} items={[
         { label: 'Hồ sơ chờ duyệt', value: stats.pending, note: 'Gia sư cần xét duyệt' },
         { label: 'Chứng chỉ chờ duyệt', value: stats.pendingQualifications ?? pendingQualifications.length, note: 'Bằng cấp cần kiểm định' },
         { label: 'Dạy trực tuyến', value: stats.online, note: 'Hồ sơ chờ duyệt · Online' },
@@ -212,54 +248,28 @@ export default function AdminApprovalsPage() {
       ]} />
 
       {/* Tab chuyển đổi: Hồ sơ gia sư vs Chứng chỉ cần xét duyệt */}
-      <div style={{ display: 'flex', gap: '10px', margin: '20px 0 16px', borderBottom: '2px solid #e2e8f0', paddingBottom: '10px' }}>
+      <div className="admin-approval-tabs">
         <button
           type="button"
-          style={{
-            background: activeTab === 'tutors' ? '#DB303A' : '#ffffff',
-            color: activeTab === 'tutors' ? '#ffffff' : '#475569',
-            border: activeTab === 'tutors' ? 'none' : '1px solid #cbd5e1',
-            borderRadius: '8px',
-            padding: '9px 18px',
-            fontWeight: '600',
-            fontSize: '0.9rem',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            boxShadow: activeTab === 'tutors' ? '0 2px 6px rgba(219, 48, 58, 0.25)' : 'none',
-          }}
+          className={`admin-approval-tab ${activeTab === 'tutors' ? 'is-active' : ''}`}
           onClick={() => {
             setActiveTab('tutors');
             setPage(1);
           }}
         >
-          <i className="bi bi-person-check"></i>
+          <i className="bi bi-person-check" aria-hidden="true"></i>
           <span>Hồ sơ gia sư cần duyệt ({data?.tutors?.total ?? tutors.length})</span>
         </button>
 
         <button
           type="button"
-          style={{
-            background: activeTab === 'qualifications' ? '#DB303A' : '#ffffff',
-            color: activeTab === 'qualifications' ? '#ffffff' : '#475569',
-            border: activeTab === 'qualifications' ? 'none' : '1px solid #cbd5e1',
-            borderRadius: '8px',
-            padding: '9px 18px',
-            fontWeight: '600',
-            fontSize: '0.9rem',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            boxShadow: activeTab === 'qualifications' ? '0 2px 6px rgba(219, 48, 58, 0.25)' : 'none',
-          }}
+          className={`admin-approval-tab ${activeTab === 'qualifications' ? 'is-active' : ''}`}
           onClick={() => {
             setActiveTab('qualifications');
             setQualPage(1);
           }}
         >
-          <i className="bi bi-award"></i>
+          <i className="bi bi-award" aria-hidden="true"></i>
           <span>Chứng chỉ &amp; Bằng cấp cần xét duyệt ({pendingQualifications.length})</span>
         </button>
       </div>
@@ -281,65 +291,45 @@ export default function AdminApprovalsPage() {
               <AdminLoadingRows columns={6} loading={loading} hasItems={tutors.length > 0} emptyText="Hiện không có hồ sơ chờ duyệt phù hợp." />
               {!loading && tutors.map((tutor) => (
                 <tr key={tutor.tutorId}>
-                  <td><span className="admin-table-primary">{tutor.fullName}</span><span className="admin-table-secondary">{tutor.introduction || 'Chưa có giới thiệu'}</span></td>
+                  <td className="admin-approval-tutor-cell"><span className="admin-table-primary">{tutor.fullName}</span><span className="admin-table-secondary">{tutor.introduction || 'Chưa có giới thiệu'}</span></td>
                   <td><div className="admin-subjects">{tutor.subjects?.length ? tutor.subjects.map((subject, index) => <span className="admin-subject-tag" key={`${subject.subjectName}-${subject.gradeName}-${index}`}>{subject.subjectName} · {subject.gradeName}</span>) : <span className="admin-table-secondary">Chưa cập nhật</span>}</div></td>
-                  <td>
+                  <td className="admin-qualification-cell">
                     {tutor.qualifications?.length ? (
                       <details open className="admin-qualification-details">
-                        <summary style={{ cursor: 'pointer', fontWeight: '600' }}>Kiểm tra tài liệu ({tutor.qualifications.length})</summary>
+                        <summary>Kiểm tra tài liệu ({tutor.qualifications.length})</summary>
                         <div className="admin-qualification-list">
                           {tutor.qualifications.map((qualification) => (
                             <div className="admin-qualification-item" key={qualification.id}>
-                              <div>
+                              <div className="admin-qualification-item-head">
                                 <span className="admin-table-primary">{qualification.title}</span>
-                                <span className={`admin-status ${qualification.status === 'Approved' ? 'is-active' : qualification.status === 'Rejected' ? 'is-locked' : ''}`}>
+                                <span className={`admin-status ${qualification.status === 'Approved' ? 'is-active' : qualification.status === 'Rejected' ? 'is-locked' : 'is-pending'}`}>
                                   {qualification.status === 'Approved' ? 'Đã duyệt' : qualification.status === 'Rejected' ? 'Từ chối' : 'Chờ duyệt'}
                                 </span>
                               </div>
                               <div className="admin-actions-inline">
                                 <button className="admin-action" type="button" onClick={() => openQualification(qualification)}>Xem file</button>
                                 <button
-                                  className="admin-action"
+                                  className="admin-action is-ai"
                                   type="button"
-                                  style={{ background: '#f0fdf4', color: '#166534', borderColor: '#bbf7d0', fontWeight: 'bold' }}
                                   disabled={aiVerifyingId === qualification.id}
                                   onClick={() => handleAiVerify(qualification)}
                                 >
-                                  {aiVerifyingId === qualification.id ? '🤖 Đang quét…' : '🤖 AI Quét'}
+                                  <i className="bi bi-cpu" aria-hidden="true" />
+                                  {aiVerifyingId === qualification.id ? 'Đang quét…' : 'AI Quét'}
                                 </button>
                                 {qualification.status === 'Pending' && <>
                                   <button className="admin-action is-approve" type="button" disabled={busyQualificationId === qualification.id} onClick={() => reviewQualification(qualification, true)}>{busyQualificationId === qualification.id ? 'Đang lưu…' : 'Duyệt'}</button>
                                   <button className="admin-action" type="button" disabled={busyQualificationId === qualification.id} onClick={() => reviewQualification(qualification, false)}>Từ chối</button>
                                 </>}
                               </div>
-                              {aiResults[qualification.id] && (
-                                <div style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '8px 10px', marginTop: '6px', fontSize: '0.82rem', width: '100%', boxSizing: 'border-box' }}>
-                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                                    <strong style={{ color: '#0f172a' }}>🤖 Kết quả AI OCR & Đối chiếu:</strong>
-                                    <span style={{
-                                      fontWeight: 'bold',
-                                      padding: '2px 6px',
-                                      borderRadius: '4px',
-                                      fontSize: '0.74rem',
-                                      background: aiResults[qualification.id].recommendation === 'APPROVED_RECOMMENDED' ? '#dcfce7' : '#fee2e2',
-                                      color: aiResults[qualification.id].recommendation === 'APPROVED_RECOMMENDED' ? '#166534' : '#991b1b',
-                                    }}>
-                                      {aiResults[qualification.id].recommendation === 'APPROVED_RECOMMENDED' ? '✅ Đề xuất DUYỆT' : '⚠️ Cần kiểm tra kỹ'}
-                                    </span>
-                                  </div>
-                                  <div><strong>Tên trên bằng:</strong> {aiResults[qualification.id].tutorName || 'N/A'} {aiResults[qualification.id].isNameMatched ? '✅ (Khớp hồ sơ)' : '⚠️ (Chưa trùng khớp)'}</div>
-                                  <div><strong>Trường / Tổ chức:</strong> {aiResults[qualification.id].issuingOrganization || 'N/A'} ({aiResults[qualification.id].certificateType})</div>
-                                  <div><strong>Xếp loại / Điểm:</strong> {aiResults[qualification.id].scoreOrClassification || 'N/A'} | <strong>Chuẩn OTSP:</strong> {aiResults[qualification.id].qualificationStandardMet ? 'Đạt' : 'Chưa đạt'}</div>
-                                  {aiResults[qualification.id].summaryNotes && <div style={{ color: '#334155', marginTop: '4px', fontStyle: 'italic', background: '#ffffff', padding: '4px 6px', borderRadius: '4px' }}>💬 {aiResults[qualification.id].summaryNotes}</div>}
-                                </div>
-                              )}
+                              <AiVerificationResult result={aiResults[qualification.id]} />
                             </div>
                           ))}
                         </div>
                       </details>
                     ) : <span className="admin-table-secondary">Chưa có tài liệu</span>}
                   </td>
-                  <td><span className="admin-table-primary">{tutor.email || 'Chưa có email'}</span><span className="admin-table-secondary">{tutor.phoneNumber || 'Chưa có số điện thoại'}</span></td>
+                  <td className="admin-approval-contact-cell"><span className="admin-table-primary">{tutor.email || 'Chưa có email'}</span><span className="admin-table-secondary">{tutor.phoneNumber || 'Chưa có số điện thoại'}</span></td>
                   <td className="admin-format">{tutor.teachingFormat === 'Hybrid' ? 'Kết hợp' : tutor.teachingFormat}</td>
                   <td><div className="admin-actions-inline">
                     <button className="admin-action is-approve" type="button" disabled={busyTutorId === tutor.tutorId} onClick={() => processTutor(tutor, true)}>{busyTutorId === tutor.tutorId ? 'Đang lưu…' : 'Duyệt'}</button>
@@ -413,56 +403,18 @@ export default function AdminApprovalsPage() {
                           <i className="bi bi-file-earmark-text me-1"></i> Xem file gốc
                         </button>
                       </td>
-                      <td style={{ minWidth: '260px' }}>
+                      <td className="admin-qualification-cell">
                         <button
-                          className="admin-action"
+                          className="admin-action is-ai mb-2"
                           type="button"
-                          style={{
-                            background: '#f0fdf4',
-                            color: '#166534',
-                            borderColor: '#86efac',
-                            fontWeight: 'bold',
-                            whiteSpace: 'nowrap',
-                          }}
                           disabled={aiVerifyingId === qualification.id}
                           onClick={() => handleAiVerify(qualification)}
                         >
-                          {aiVerifyingId === qualification.id ? '🤖 Đang quét OCR…' : '🤖 AI OCR Quét'}
+                          <i className="bi bi-cpu" aria-hidden="true" />
+                          {aiVerifyingId === qualification.id ? 'Đang quét OCR…' : 'AI OCR Quét'}
                         </button>
 
-                        {/* Thẻ hiển thị kết quả AI OCR trực tiếp */}
-                        {aiResults[qualification.id] && (
-                          <div style={{
-                            background: '#f8fafc',
-                            border: '1px solid #cbd5e1',
-                            borderRadius: '8px',
-                            padding: '10px',
-                            marginTop: '8px',
-                            fontSize: '0.82rem',
-                          }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                              <strong style={{ color: '#0f172a' }}>Kết quả AI OCR:</strong>
-                              <span style={{
-                                fontWeight: 'bold',
-                                padding: '2px 8px',
-                                borderRadius: '4px',
-                                fontSize: '0.74rem',
-                                background: aiResults[qualification.id].recommendation === 'APPROVED_RECOMMENDED' ? '#dcfce7' : '#fee2e2',
-                                color: aiResults[qualification.id].recommendation === 'APPROVED_RECOMMENDED' ? '#166534' : '#991b1b',
-                              }}>
-                                {aiResults[qualification.id].recommendation === 'APPROVED_RECOMMENDED' ? '✅ Đề xuất DUYỆT' : '⚠️ Cần xem kỹ'}
-                              </span>
-                            </div>
-                            <div><strong>Tên trên bằng:</strong> {aiResults[qualification.id].tutorName || 'N/A'} {aiResults[qualification.id].isNameMatched ? '✅ (Khớp hồ sơ)' : '⚠️ (Lệch tên)'}</div>
-                            <div><strong>Nơi cấp:</strong> {aiResults[qualification.id].issuingOrganization || 'N/A'} ({aiResults[qualification.id].certificateType})</div>
-                            <div><strong>Điểm / GPA:</strong> {aiResults[qualification.id].scoreOrClassification || 'N/A'} | <strong>Chuẩn OTSP:</strong> {aiResults[qualification.id].qualificationStandardMet ? 'Đạt' : 'Chưa đạt'}</div>
-                            {aiResults[qualification.id].summaryNotes && (
-                              <div style={{ color: '#334155', marginTop: '6px', fontStyle: 'italic', background: '#ffffff', padding: '6px', borderRadius: '4px', border: '1px solid #f1f5f9' }}>
-                                💬 {aiResults[qualification.id].summaryNotes}
-                              </div>
-                            )}
-                          </div>
-                        )}
+                        <AiVerificationResult result={aiResults[qualification.id]} />
                       </td>
                       <td>
                         <div className="admin-actions-inline">
