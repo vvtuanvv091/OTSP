@@ -11,8 +11,6 @@ def _parse_allowed_origins() -> list[str]:
     if raw:
         return [o.strip().rstrip("/") for o in raw.split(",") if o.strip()]
     return [
-        "http://localhost:5173",
-        "http://localhost:5084",
         "https://otsp-giasu.vercel.app",
         "https://otsp.onrender.com",
         "https://otsp-1.onrender.com",
