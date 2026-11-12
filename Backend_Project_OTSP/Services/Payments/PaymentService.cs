@@ -76,9 +76,9 @@ public class PaymentService : IPaymentService
             await _db.SaveChangesAsync(ct);
         }
 
-        // Tự động tạo bản ghi Payment cho các lớp đã đăng ký nhưng chưa có payment record
+        // Tự động tạo bản ghi Payment cho các lớp ĐANG HOẠT ĐỘNG đã đăng ký nhưng chưa có payment record
         var enrolledClassroomIds = await _db.ClassroomStudents
-            .Where(cs => cs.StudentId == student.Id)
+            .Where(cs => cs.StudentId == student.Id && cs.Classroom.Status == ClassroomStatus.Active)
             .Select(cs => cs.ClassroomId)
             .ToListAsync(ct);
 
@@ -128,7 +128,7 @@ public class PaymentService : IPaymentService
             .ToListAsync(ct);
 
         var pendingPayments = payments
-            .Where(p => p.Status == PaymentStatus.Pending)
+            .Where(p => p.Status == PaymentStatus.Pending && p.Classroom != null && p.Classroom.Status == ClassroomStatus.Active)
             .Select(MapToItemDto)
             .ToList();
 
@@ -169,7 +169,8 @@ public class PaymentService : IPaymentService
             .Include(p => p.Classroom).ThenInclude(c => c.Tutor).ThenInclude(t => t.User)
             .FirstOrDefaultAsync(p => p.Id == paymentId && p.StudentId == student.Id, ct);
 
-        if (payment == null) return null;
+        if (payment == null || (payment.Status == PaymentStatus.Pending && payment.Classroom?.Status != ClassroomStatus.Active))
+            return null;
 
         // Mã nội dung chuyển khoản chuẩn OTSP{paymentId}
         var transferContent = $"OTSP{paymentId}";
@@ -214,7 +215,8 @@ public class PaymentService : IPaymentService
             .Include(p => p.Classroom).ThenInclude(c => c.Tutor).ThenInclude(t => t.User)
             .FirstOrDefaultAsync(p => p.Id == paymentId && p.StudentId == student.Id, ct);
 
-        if (payment == null) return null;
+        if (payment == null || (payment.Status == PaymentStatus.Pending && payment.Classroom?.Status != ClassroomStatus.Active))
+            return null;
 
         // Đảm bảo có thực thể hóa đơn cho giao dịch
         if (payment.Invoice == null)
@@ -396,7 +398,7 @@ public class PaymentService : IPaymentService
             .Include(p => p.Classroom).ThenInclude(c => c.Tutor).ThenInclude(t => t.User)
             .FirstOrDefaultAsync(p => p.Id == paymentId && p.Student.UserId == userId, ct);
 
-        if (payment == null || payment.Status == PaymentStatus.Success)
+        if (payment == null || payment.Status == PaymentStatus.Success || payment.Classroom?.Status != ClassroomStatus.Active)
             return false;
 
         payment.Status = PaymentStatus.Success;

@@ -2,16 +2,22 @@ using System.Security.Claims;
 using System.Text.Json;
 using Backend_Project_OTSP.Controllers.Api.Student;
 using Backend_Project_OTSP.Controllers.Api.Tutor;
+using Backend_Project_OTSP.Controllers.Common;
 using Backend_Project_OTSP.Data;
+using Backend_Project_OTSP.Dtos.Common.Notification;
 using Backend_Project_OTSP.Dtos.StudentParent;
 using Backend_Project_OTSP.Dtos.Tutor;
 using Backend_Project_OTSP.Hubs;
 using Backend_Project_OTSP.Models;
 using Backend_Project_OTSP.Services;
 using Backend_Project_OTSP.Services.Admin;
+using BACKEND_PROJECT_OTSP.Services.Admin;
+using Backend_Project_OTSP.Services.Chat;
 using Backend_Project_OTSP.Services.Common;
 using Backend_Project_OTSP.Services.Notifications;
+using Backend_Project_OTSP.Services.Payments;
 using Backend_Project_OTSP.Services.Sessions;
+using Backend_Project_OTSP.Services.StudentParent;
 using Backend_Project_OTSP.Services.Tutor;
 using Backend_Project_OTSP.tests.Helpers;
 using Microsoft.AspNetCore.Http;
@@ -971,5 +977,456 @@ public class LifecycleAndNotificationTests
         Assert.Empty(db.AiStudySessions.Where(x => x.StudentId == profile.Id));
         Assert.Single(db.AdminProfiles.Where(x => x.UserId == student.Id));
         Assert.Contains(db.AuditLogs, l => l.Action == $"AdminChangeRole:{student.Id}:Student_Parent->Admin");
+    }
+
+    [Fact]
+    public async Task T1Fix_CancelClassroom_TransitionsPendingPaymentsToFailed_AndPaymentOverviewExcludesCancelledClassroom()
+    {
+        var db = TestDbContextFactory.Create();
+        var admin = new ApplicationUser { Id = "adm-1", FullName = "Admin", Status = AccountStatus.Active };
+        var tutorUser = new ApplicationUser { Id = "tut-1", FullName = "Gia sư 1", Email = "tut1@otsp.vn", Status = AccountStatus.Active };
+        var studentUser = new ApplicationUser { Id = "stu-1", FullName = "Học viên 1", Email = "stu1@otsp.vn", Status = AccountStatus.Active };
+        var subject = new Subject { Id = 1, Code = "CN", Name = "Công nghệ" };
+        var grade = new GradeLevel { Id = 1, Name = "Mầm non" };
+        var tutor = new TutorProfile { Id = 1, UserId = tutorUser.Id, User = tutorUser, VerificationStatus = VerificationStatus.Approved };
+        var student = new StudentProfile { Id = 1, UserId = studentUser.Id, User = studentUser };
+        var classroom = new Classroom
+        {
+            Id = 101,
+            NameClass = "Lớp 1-1: Công nghệ",
+            TutorId = 1,
+            Tutor = tutor,
+            SubjectId = 1,
+            Subject = subject,
+            GradeLevelId = 1,
+            GradeLevel = grade,
+            Status = ClassroomStatus.Active,
+            Fee = 120000m,
+            Type = ClassroomType.OneToOne
+        };
+        db.Users.AddRange(admin, tutorUser, studentUser);
+        db.Subjects.Add(subject);
+        db.GradeLevels.Add(grade);
+        db.TutorProfiles.Add(tutor);
+        db.StudentProfiles.Add(student);
+        db.Classrooms.Add(classroom);
+        db.ClassroomStudents.Add(new ClassroomStudent { ClassroomId = classroom.Id, StudentId = student.Id });
+        db.Payments.Add(new Payment
+        {
+            Id = 501,
+            ClassroomId = classroom.Id,
+            Classroom = classroom,
+            StudentId = student.Id,
+            Student = student,
+            Amount = 120000m,
+            Method = "BankTransfer",
+            Status = PaymentStatus.Pending,
+            GatewayTransactionCode = "OTSP-501"
+        });
+        await db.SaveChangesAsync();
+
+        var adminClassroomSvc = new AdminClassroomManagementService(db);
+        var cancelResult = await adminClassroomSvc.CancelClassroomAsync(classroom.Id, "Đóng lớp theo yêu cầu", admin.Id, "127.0.0.1");
+
+        Assert.True(cancelResult.Success, cancelResult.ErrorMessage);
+        Assert.Equal(ClassroomStatus.Cancelled, (await db.Classrooms.FindAsync(classroom.Id))!.Status);
+        Assert.Equal(PaymentStatus.Failed, (await db.Payments.FindAsync(501))!.Status);
+
+        var paymentSvc = new PaymentService(
+            db,
+            BuildConfig(new()),
+            new MemoryCache(new MemoryCacheOptions()),
+            Mock.Of<ILogger<PaymentService>>());
+        var overview = await paymentSvc.GetStudentPaymentOverviewAsync(studentUser.Id);
+
+        Assert.Empty(overview.PendingPayments);
+    }
+
+    [Fact]
+    public async Task T2Fix_UpdateStudentProfile_PersistsValidDateOfBirth_AndRejectsFutureDate()
+    {
+        var db = TestDbContextFactory.Create();
+        var user = new ApplicationUser { Id = "stu-dob", FullName = "Tuấn", Status = AccountStatus.Active };
+        var profile = new StudentProfile { Id = 11, UserId = user.Id, User = user };
+        db.Users.Add(user);
+        db.StudentProfiles.Add(profile);
+        await db.SaveChangesAsync();
+
+        var svc = new StudentProfileService(db, Mock.Of<IImageStorageService>(), new MemoryCache(new MemoryCacheOptions()));
+        var validDob = new DateOnly(2005, 8, 19);
+        var ok = await svc.UpdateProfileAsync(user.Id, new UpdateStudentProfileRequest
+        {
+            FullName = "Tuấn Tống Ngọc",
+            DateOfBirth = validDob
+        });
+
+        Assert.True(ok.Success, ok.ErrorMessage);
+        Assert.Equal(validDob, (await db.Users.FindAsync(user.Id))!.DateOfBirth);
+
+        var future = await svc.UpdateProfileAsync(user.Id, new UpdateStudentProfileRequest
+        {
+            DateOfBirth = ClassroomLifecycleHelper.GetVietnamToday().AddDays(2)
+        });
+        Assert.False(future.Success);
+    }
+
+    [Fact]
+    public async Task T3Fix_AdminDeletesWithDependencies_RefuseDeletionWithoutMutatingDatabase()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddDataProtection();
+        services.AddDbContext<ApplicationDbContext>(opt => opt.UseInMemoryDatabase(Guid.NewGuid().ToString()));
+        services.AddIdentityCore<ApplicationUser>()
+            .AddRoles<ApplicationRole>()
+            .AddEntityFrameworkStores<ApplicationDbContext>()
+            .AddDefaultTokenProviders();
+
+        await using var sp = services.BuildServiceProvider();
+        using var scope = sp.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        db.Database.EnsureCreated();
+
+        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+        var studentUser = new ApplicationUser { Id = "stu-dep", UserName = "studep@otsp.vn", Email = "studep@otsp.vn", FullName = "Học viên có lớp", Status = AccountStatus.Active };
+        var tutorUser = new ApplicationUser { Id = "tut-dep", UserName = "tutdep@otsp.vn", Email = "tutdep@otsp.vn", FullName = "Gia sư có lớp", Status = AccountStatus.Active };
+        Assert.True((await userManager.CreateAsync(studentUser, "Pass123!")).Succeeded);
+        Assert.True((await userManager.CreateAsync(tutorUser, "Pass123!")).Succeeded);
+
+        var subject = new Subject { Id = 1, Code = "TOAN", Name = "Toán" };
+        var grade = new GradeLevel { Id = 1, Name = "Lớp 10" };
+        var tutor = new TutorProfile { Id = 21, UserId = tutorUser.Id, VerificationStatus = VerificationStatus.Approved };
+        var student = new StudentProfile { Id = 21, UserId = studentUser.Id };
+        db.Subjects.Add(subject);
+        db.GradeLevels.Add(grade);
+        db.TutorProfiles.Add(tutor);
+        db.StudentProfiles.Add(student);
+        await db.SaveChangesAsync();
+
+        var classroom = new Classroom
+        {
+            Id = 201,
+            NameClass = "Lớp có lịch sử",
+            TutorId = tutor.Id,
+            SubjectId = subject.Id,
+            GradeLevelId = grade.Id,
+            Status = ClassroomStatus.Active,
+            Fee = 100000m
+        };
+        db.Classrooms.Add(classroom);
+        db.ClassroomStudents.Add(new ClassroomStudent { ClassroomId = classroom.Id, StudentId = student.Id });
+        db.Payments.Add(new Payment { Id = 701, ClassroomId = classroom.Id, StudentId = student.Id, Amount = 100000m, Method = "BankTransfer", Status = PaymentStatus.Pending, GatewayTransactionCode = "TX-701" });
+        await db.SaveChangesAsync();
+
+        var dirSvc = new AdminDirectoryService(db, userManager, Mock.Of<IUserPresenceService>());
+        var deleteStudent = await dirSvc.DeleteStudentAsync(studentUser.Id, "adm-1", "127.0.0.1");
+        Assert.False(deleteStudent.Success);
+        Assert.Contains("Khóa tài khoản", deleteStudent.ErrorMessage);
+        Assert.Equal(AccountStatus.Active, (await db.Users.FindAsync(studentUser.Id))!.Status);
+
+        var deleteTutor = await dirSvc.DeleteTutorAsync(tutorUser.Id, "adm-1", "127.0.0.1");
+        Assert.False(deleteTutor.Success);
+        Assert.Contains("Khóa tài khoản", deleteTutor.ErrorMessage);
+        Assert.Equal(AccountStatus.Active, (await db.Users.FindAsync(tutorUser.Id))!.Status);
+        Assert.Equal(VerificationStatus.Approved, (await db.TutorProfiles.FindAsync(tutor.Id))!.VerificationStatus);
+
+        var clsSvc = new AdminClassroomManagementService(db);
+        var deleteClassroom = await clsSvc.DeleteClassroomAsync(classroom.Id, "adm-1", "127.0.0.1");
+        Assert.False(deleteClassroom.Success);
+        Assert.False(deleteClassroom.NotFound);
+        Assert.Contains("Đóng lớp", deleteClassroom.ErrorMessage);
+        Assert.Equal(ClassroomStatus.Active, (await db.Classrooms.FindAsync(classroom.Id))!.Status);
+        Assert.Equal(PaymentStatus.Pending, (await db.Payments.FindAsync(701))!.Status);
+    }
+
+    [Fact]
+    public async Task T3Fix_AdminDeletesFreshAccountsAndEmptyClassroom_HardDeletesFromDatabase()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddDataProtection();
+        services.AddDbContext<ApplicationDbContext>(opt => opt.UseInMemoryDatabase(Guid.NewGuid().ToString()));
+        services.AddIdentityCore<ApplicationUser>()
+            .AddRoles<ApplicationRole>()
+            .AddEntityFrameworkStores<ApplicationDbContext>()
+            .AddDefaultTokenProviders();
+
+        await using var sp = services.BuildServiceProvider();
+        using var scope = sp.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        db.Database.EnsureCreated();
+
+        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+        var freshStudentUser = new ApplicationUser { Id = "stu-new", UserName = "stunew@otsp.vn", Email = "stunew@otsp.vn", FullName = "Học viên mới", Status = AccountStatus.Active };
+        var freshTutorUser = new ApplicationUser { Id = "tut-new", UserName = "tutnew@otsp.vn", Email = "tutnew@otsp.vn", FullName = "Gia sư mới", Status = AccountStatus.Active };
+        var ownerTutorUser = new ApplicationUser { Id = "tut-owner", UserName = "owner@otsp.vn", Email = "owner@otsp.vn", FullName = "Gia sư giữ lớp", Status = AccountStatus.Active };
+        Assert.True((await userManager.CreateAsync(freshStudentUser, "Pass123!")).Succeeded);
+        Assert.True((await userManager.CreateAsync(freshTutorUser, "Pass123!")).Succeeded);
+        Assert.True((await userManager.CreateAsync(ownerTutorUser, "Pass123!")).Succeeded);
+
+        var subject = new Subject { Id = 2, Code = "LY", Name = "Vật lý" };
+        var grade = new GradeLevel { Id = 2, Name = "Lớp 11" };
+        var freshStudent = new StudentProfile { Id = 301, UserId = freshStudentUser.Id };
+        var freshTutor = new TutorProfile { Id = 301, UserId = freshTutorUser.Id, VerificationStatus = VerificationStatus.Pending };
+        var ownerTutor = new TutorProfile { Id = 302, UserId = ownerTutorUser.Id, VerificationStatus = VerificationStatus.Approved };
+        db.Subjects.Add(subject);
+        db.GradeLevels.Add(grade);
+        db.StudentProfiles.Add(freshStudent);
+        db.TutorProfiles.AddRange(freshTutor, ownerTutor);
+        db.TutorSubjects.Add(new TutorSubject { TutorId = freshTutor.Id, SubjectId = subject.Id, GradeLevelId = grade.Id, HourlyFee = 120000m });
+        // Simulate normal login auth logs & system notifications on brand-new accounts
+        db.AuditLogs.AddRange(
+            new AuditLog { UserId = freshStudentUser.Id, Category = "Auth", Action = "Login" },
+            new AuditLog { UserId = freshTutorUser.Id, Category = "Auth", Action = "Register" });
+        db.Notifications.AddRange(
+            new Notification { UserId = freshStudentUser.Id, Title = "Chào mừng", Content = "Hi" },
+            new Notification { UserId = freshTutorUser.Id, Title = "Chào mừng", Content = "Hi" });
+
+        var emptyClassroom = new Classroom
+        {
+            Id = 401,
+            NameClass = "Lớp mới chưa có học viên",
+            TutorId = ownerTutor.Id,
+            SubjectId = subject.Id,
+            GradeLevelId = grade.Id,
+            Status = ClassroomStatus.Active,
+            Fee = 150000m
+        };
+        db.Classrooms.Add(emptyClassroom);
+        db.ClassroomWeeklySchedules.Add(new ClassroomWeeklySchedule { ClassroomId = emptyClassroom.Id, DayOfWeek = DayOfWeek.Monday, StartTime = new TimeOnly(18, 0), EndTime = new TimeOnly(19, 30) });
+        await db.SaveChangesAsync();
+
+        var dirSvc = new AdminDirectoryService(db, userManager, Mock.Of<IUserPresenceService>());
+        var deleteStudent = await dirSvc.DeleteStudentAsync(freshStudentUser.Id, "adm-1", "127.0.0.1");
+        Assert.True(deleteStudent.Success, deleteStudent.ErrorMessage);
+        Assert.Null(await db.StudentProfiles.FindAsync(freshStudent.Id));
+        Assert.Null(await db.Users.FindAsync(freshStudentUser.Id));
+
+        var deleteTutor = await dirSvc.DeleteTutorAsync(freshTutorUser.Id, "adm-1", "127.0.0.1");
+        Assert.True(deleteTutor.Success, deleteTutor.ErrorMessage);
+        Assert.Null(await db.TutorProfiles.FindAsync(freshTutor.Id));
+        Assert.Null(await db.Users.FindAsync(freshTutorUser.Id));
+
+        var clsSvc = new AdminClassroomManagementService(db);
+        var deleteClassroom = await clsSvc.DeleteClassroomAsync(emptyClassroom.Id, "adm-1", "127.0.0.1");
+        Assert.True(deleteClassroom.Success, deleteClassroom.ErrorMessage);
+        Assert.Null(await db.Classrooms.FindAsync(emptyClassroom.Id));
+        Assert.Empty(db.ClassroomWeeklySchedules.Where(w => w.ClassroomId == emptyClassroom.Id));
+    }
+
+    [Fact]
+    public async Task T6Fix_OneToOneConnectionRequest_RequiresSelectedSlot_EvenWithMessage()
+    {
+        var db = TestDbContextFactory.Create();
+        var tutorUser = new ApplicationUser { Id = "tut-slots", FullName = "Gia sư", Status = AccountStatus.Active };
+        var studentUser = new ApplicationUser { Id = "stu-slots", FullName = "Học viên", Status = AccountStatus.Active };
+        var subject = new Subject { Id = 1, Code = "ANH", Name = "Tiếng Anh" };
+        var grade = new GradeLevel { Id = 1, Name = "Lớp 12" };
+        var tutor = new TutorProfile { Id = 31, UserId = tutorUser.Id, User = tutorUser, VerificationStatus = VerificationStatus.Approved };
+        var student = new StudentProfile { Id = 31, UserId = studentUser.Id, User = studentUser };
+        db.Users.AddRange(tutorUser, studentUser);
+        db.Subjects.Add(subject);
+        db.GradeLevels.Add(grade);
+        db.TutorProfiles.Add(tutor);
+        db.StudentProfiles.Add(student);
+        db.TutorSubjects.Add(new TutorSubject { TutorId = tutor.Id, SubjectId = subject.Id, GradeLevelId = grade.Id, HourlyFee = 100000m });
+        await db.SaveChangesAsync();
+
+        var (hub, _) = CreateHubMock();
+        var service = new ConnectionRequestService(
+            db,
+            Mock.Of<IOpenGroupClassroomService>(),
+            new AvailabilitySlotService(db),
+            hub.Object,
+            Mock.Of<INotificationDispatcher>(),
+            Mock.Of<ILogger<ConnectionRequestService>>());
+
+        var trialNoSlot = await service.CreateRequestAsync(new SendConnectionRequestDto
+        {
+            TutorId = tutor.Id,
+            SubjectId = subject.Id,
+            GradeLevelId = grade.Id,
+            PreferredType = ClassroomType.OneToOne,
+            IsTrial = true,
+            Message = "Em muốn học thử dù gia sư chưa mở lịch"
+        }, studentUser.Id);
+
+        Assert.False(trialNoSlot.Success);
+
+        var officialNoSlot = await service.CreateRequestAsync(new SendConnectionRequestDto
+        {
+            TutorId = tutor.Id,
+            SubjectId = subject.Id,
+            GradeLevelId = grade.Id,
+            PreferredType = ClassroomType.OneToOne,
+            IsTrial = false,
+            DurationWeeks = 4,
+            Message = "Em muốn học chính thức ngay"
+        }, studentUser.Id);
+
+        Assert.False(officialNoSlot.Success);
+    }
+
+    [Fact]
+    public async Task T7Fix_SearchApiController_GetTutorDetails_AllowsAdminAndAnonymousPreview()
+    {
+        var db = TestDbContextFactory.Create();
+        var tutorUser = new ApplicationUser { Id = "tut-pub", FullName = "Gia sư 32", Email = "gs32@otsp.vn", Status = AccountStatus.Active };
+        var tutor = new TutorProfile { Id = 32, UserId = tutorUser.Id, User = tutorUser, VerificationStatus = VerificationStatus.Approved, TeachingFormat = TeachingFormat.Online };
+        db.Users.Add(tutorUser);
+        db.TutorProfiles.Add(tutor);
+        await db.SaveChangesAsync();
+
+        var controller = new SearchApiController(
+            Mock.Of<ISearchService>(),
+            db,
+            Mock.Of<ILogger<SearchApiController>>());
+        controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext
+            {
+                User = CreatePrincipal("adm-viewer", "Admin")
+            }
+        };
+
+        var result = await controller.GetTutorDetails(32, CancellationToken.None);
+        Assert.IsType<OkObjectResult>(result);
+    }
+
+    [Fact]
+    public async Task T8_NotificationAndEmailGaps_AreDispatchedForPayoutQualDocAndBookingAccepted()
+    {
+        var db = TestDbContextFactory.Create();
+        var tutorUser = new ApplicationUser { Id = "tu-n8", FullName = "Thầy Email", Email = "tutor.email@otsp.vn", Status = AccountStatus.Active };
+        var studentUser = new ApplicationUser { Id = "st-n8", FullName = "Học viên Email", Email = "student.email@otsp.vn", Status = AccountStatus.Active };
+        var adminUser = new ApplicationUser { Id = "adm-n8", FullName = "Admin Email", Email = "admin.email@otsp.vn", Status = AccountStatus.Active };
+        var tutor = new TutorProfile { Id = 88, UserId = tutorUser.Id, User = tutorUser, VerificationStatus = VerificationStatus.Approved };
+        var student = new StudentProfile { Id = 88, UserId = studentUser.Id, User = studentUser };
+        var subject = new Subject { Id = 88, Code = "TOAN88", Name = "Toán" };
+        var grade = new GradeLevel { Id = 88, Name = "Lớp 12" };
+        var qual = new Qualification { Id = 88, TutorId = tutor.Id, Tutor = tutor, Title = "Bằng Sư phạm", Status = VerificationStatus.Pending, FileUrl = "https://example.com/q.png" };
+        var doc = new LearningDocument
+        {
+            Id = 88,
+            TutorId = tutor.Id,
+            Tutor = tutor,
+            SubjectId = subject.Id,
+            Subject = subject,
+            GradeLevelId = grade.Id,
+            GradeLevel = grade,
+            Title = "Đề cương Toán 12",
+            FileUrl = "https://example.com/doc.pdf",
+            Scope = DocumentScope.Public,
+            Status = VerificationStatus.Pending
+        };
+        db.AddRange(tutorUser, studentUser, adminUser, tutor, student, subject, grade, qual, doc);
+        await db.SaveChangesAsync();
+
+        var enqueued = new List<EmailQueueItemDto>();
+        var queueMock = new Mock<IEmailQueue>();
+        queueMock.Setup(q => q.Enqueue(It.IsAny<EmailQueueItemDto>())).Callback<EmailQueueItemDto>(enqueued.Add);
+
+        var userMgr = IdentityMockHelper.MockUserManager();
+        var roleMgr = IdentityMockHelper.MockRoleManager();
+        var opsSvc = new AdminOperationsService(db, userMgr.Object, roleMgr.Object, emailQueue: queueMock.Object);
+        var payoutRes = await opsSvc.SettleTutorPayoutAsync(tutor.Id, "2026-11", adminUser.Id, CancellationToken.None);
+        Assert.True(payoutRes.Success);
+
+        var approvalSvc = new AdminTutorApprovalService(db, Mock.Of<IAiService>(), emailQueue: queueMock.Object);
+        var qualRes = await approvalSvc.ReviewQualificationAsync(qual.Id, adminUser.Id, true, null, null, CancellationToken.None);
+        Assert.True(qualRes.Success);
+
+        var docSvc = new AdminLearningDocumentService(db, emailQueue: queueMock.Object);
+        var docRes = await docSvc.ReviewAsync(doc.Id, VerificationStatus.Approved, null, adminUser.Id, null, CancellationToken.None);
+        Assert.True(docRes.Success);
+
+        var (reqHub, _) = CreateHubMock();
+        var chatHub = new Mock<IHubContext<ChatHub>>();
+        chatHub.Setup(h => h.Clients).Returns(CreateHubMock().Clients.Object);
+        var notifSvc = new NotificationService(db, reqHub.Object, chatHub.Object, Mock.Of<ILogger<NotificationService>>(), emailQueue: queueMock.Object);
+        await notifSvc.DispatchBookingAcceptedAsync(new BookingAcceptedNotificationEvent(
+            studentUser.Id,
+            studentUser.Email,
+            studentUser.FullName!,
+            tutorUser.FullName!,
+            subject.Name,
+            999,
+            null,
+            false));
+
+        Assert.Equal(4, enqueued.Count);
+        Assert.Contains(enqueued, e => e.ToEmail == tutorUser.Email && e.Subject.Contains("Quyết toán thu nhập"));
+        Assert.Contains(enqueued, e => e.ToEmail == tutorUser.Email && e.Subject.Contains("Bằng cấp/Chứng chỉ"));
+        Assert.Contains(enqueued, e => e.ToEmail == tutorUser.Email && e.Subject.Contains("Tài liệu công khai"));
+        Assert.Contains(enqueued, e => e.ToEmail == studentUser.Email && e.Subject.Contains("đã chấp nhận"));
+        Assert.Contains(await db.Notifications.ToListAsync(), n => n.UserId == studentUser.Id && n.Title == "Yêu cầu học đã được chấp nhận");
+    }
+
+    [Fact]
+    public async Task T9_ChatService_IncludesGroupClassroomsAndIsolatesDirectPreviews()
+    {
+        var db = TestDbContextFactory.Create();
+        var tutorUser = new ApplicationUser { Id = "tu-c9", FullName = "Gia sư Nhóm", Email = "tuc9@otsp.vn", Status = AccountStatus.Active };
+        var student1User = new ApplicationUser { Id = "st1-c9", FullName = "Học viên Một", Email = "st1@otsp.vn", Status = AccountStatus.Active };
+        var student2User = new ApplicationUser { Id = "st2-c9", FullName = "Học viên Hai", Email = "st2@otsp.vn", Status = AccountStatus.Active };
+        var tutor = new TutorProfile { Id = 91, UserId = tutorUser.Id, User = tutorUser, VerificationStatus = VerificationStatus.Approved };
+        var st1 = new StudentProfile { Id = 91, UserId = student1User.Id, User = student1User };
+        var st2 = new StudentProfile { Id = 92, UserId = student2User.Id, User = student2User };
+        var subject = new Subject { Id = 91, Code = "LY91", Name = "Vật lý" };
+        var grade = new GradeLevel { Id = 91, Name = "Lớp 11" };
+        var groupClass = new Classroom
+        {
+            Id = 91,
+            NameClass = "Vật lý Nhóm 11A",
+            Type = ClassroomType.Group,
+            Status = ClassroomStatus.Active,
+            MaxStudents = 5,
+            TutorId = tutor.Id,
+            Tutor = tutor,
+            SubjectId = subject.Id,
+            Subject = subject,
+            GradeLevelId = grade.Id,
+            GradeLevel = grade
+        };
+        db.AddRange(
+            tutorUser, student1User, student2User, tutor, st1, st2, subject, grade, groupClass,
+            new ClassroomStudent { ClassroomId = groupClass.Id, StudentId = st1.Id },
+            new ClassroomStudent { ClassroomId = groupClass.Id, StudentId = st2.Id });
+        await db.SaveChangesAsync();
+
+        var chatService = new ChatService(
+            db,
+            new MemoryCache(new MemoryCacheOptions()),
+            BuildConfig(new() { ["Chat:MessageEditWindowMinutes"] = "15" }),
+            Mock.Of<IUserPresenceService>());
+
+        var groupMsg = await chatService.SendMessageToUserAsync(student1User.Id, "class_91", "Chào cả lớp ạ");
+        Assert.Equal(91, groupMsg.ClassroomId);
+        Assert.Equal("class_91", groupMsg.ReceiverId);
+
+        var st2Conversations = await chatService.GetConversationsListAsync(student2User.Id);
+        var groupConv = Assert.Single(st2Conversations, c => c.ContactUserId == "class_91");
+        Assert.True(groupConv.IsGroupClass);
+        Assert.Equal(3, groupConv.MemberCount);
+        Assert.Contains("Chào cả lớp ạ", groupConv.LastMessageContent);
+        Assert.Equal(1, groupConv.UnreadCount);
+
+        // Tin nhắn trong nhóm lớp KHÔNG được lọt vào hội thoại 1-1 giữa st1 và gia sư
+        var tutorConversations = await chatService.GetConversationsListAsync(tutorUser.Id);
+        var directToSt1 = Assert.Single(tutorConversations, c => c.ContactUserId == student1User.Id);
+        Assert.Equal("Bắt đầu cuộc trò chuyện...", directToSt1.LastMessageContent);
+        Assert.Equal(0, directToSt1.UnreadCount);
+
+        // Student <-> Student chat riêng vẫn bị chặn
+        Assert.False(await chatService.CanUsersChatAsync(student1User.Id, student2User.Id));
+
+        // Edit & Delete trên tin nhắn nhóm giữ nguyên ClassroomId và class_91
+        var edited = await chatService.EditMessageAsync(groupMsg.Id, student1User.Id, "Chào thầy và các bạn");
+        Assert.Equal(91, edited.ClassroomId);
+        Assert.Equal("class_91", edited.ReceiverId);
+
+        var deleted = await chatService.DeleteMessageAsync(groupMsg.Id, student1User.Id);
+        Assert.Equal(91, deleted.ClassroomId);
+        Assert.Equal("class_91", deleted.ReceiverId);
     }
 }

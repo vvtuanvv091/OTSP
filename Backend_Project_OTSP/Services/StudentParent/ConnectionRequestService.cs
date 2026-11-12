@@ -443,12 +443,12 @@ public class ConnectionRequestService : IConnectionRequestService
                     selectedSlots = selectedSlots.Take(1).ToList();
                 }
 
-                if (selectedSlots.Count == 0 && string.IsNullOrWhiteSpace(dto.Message))
+                if (selectedSlots.Count == 0)
                 {
                     return new ConnectionRequestOperationResult
                     {
                         Success = false,
-                        Message = "Vui lòng bấm chọn 1 khung giờ học thử trên lịch rảnh của gia sư hoặc nhập lời nhắn nêu rõ thời gian bạn mong muốn."
+                        Message = "Vui lòng chọn 1 khung giờ học thử trên lịch rảnh của gia sư."
                     };
                 }
             }
@@ -464,12 +464,12 @@ public class ConnectionRequestService : IConnectionRequestService
                     };
                 }
 
-                if (selectedSlots.Count == 0 && string.IsNullOrWhiteSpace(dto.Message))
+                if (selectedSlots.Count == 0)
                 {
                     return new ConnectionRequestOperationResult
                     {
                         Success = false,
-                        Message = "Vui lòng chọn các khung giờ học cố định trong tuần (tối đa 3 buổi = 6 tiếng/tuần) từ lịch rảnh của gia sư."
+                        Message = "Vui lòng chọn từ 1 đến 3 khung giờ cố định/tuần từ lịch rảnh của gia sư."
                     };
                 }
             }
@@ -673,6 +673,8 @@ public class ConnectionRequestService : IConnectionRequestService
             ClassSession? createdTrialSession = null;
             bool isTrial = false;
             bool enrolled = false;
+            string? acceptNotifTitle = null;
+            string? acceptNotifContent = null;
 
             if (request.PreferredType == ClassroomType.Group)
             {
@@ -758,14 +760,8 @@ public class ConnectionRequestService : IConnectionRequestService
                     ? $" Học phí là {groupClass.Fee:N0} đ. Vui lòng quét mã QR SePay để hoàn tất kích hoạt quyền vào lớp."
                     : "";
 
-                _db.Notifications.Add(new Notification
-                {
-                    UserId = studentUserId,
-                    Title = "Đã được nhận vào lớp nhóm",
-                    Content = $"Gia sư {tutorName} đã chấp nhận yêu cầu của bạn vào lớp {groupClass.NameClass}.{groupFeeNotice} [url:/student/classrooms]",
-                    CreatedAt = DateTime.UtcNow,
-                    IsRead = false
-                });
+                acceptNotifTitle = "Đã được nhận vào lớp nhóm";
+                acceptNotifContent = $"Gia sư {tutorName} đã chấp nhận yêu cầu của bạn vào lớp {groupClass.NameClass}.{groupFeeNotice} [url:/student/classrooms]";
             }
             else
             {
@@ -784,10 +780,17 @@ public class ConnectionRequestService : IConnectionRequestService
 
                 if (isTrial)
                 {
-                    var trialSlotUtc = request.ProposedTrialSlotUtc
-                        ?? request.TrialSchedules.FirstOrDefault()?.ScheduledAt
-                        ?? DateTime.UtcNow.AddDays(1);
-                    trialSlotUtc = DateTime.SpecifyKind(trialSlotUtc, DateTimeKind.Utc);
+                    var nullableTrialSlotUtc = request.ProposedTrialSlotUtc
+                        ?? request.TrialSchedules.FirstOrDefault()?.ScheduledAt;
+                    if (!nullableTrialSlotUtc.HasValue)
+                    {
+                        return await RollbackAndReturnAsync(new AcceptConnectionRequestResult
+                        {
+                            SlotConflict = true,
+                            Message = "Yêu cầu học thử chưa có khung giờ cụ thể. Vui lòng từ chối hoặc đề nghị học viên chọn lịch rảnh."
+                        });
+                    }
+                    var trialSlotUtc = DateTime.SpecifyKind(nullableTrialSlotUtc.Value, DateTimeKind.Utc);
 
                     if (trialSlotUtc <= DateTime.UtcNow)
                     {
@@ -885,14 +888,8 @@ public class ConnectionRequestService : IConnectionRequestService
                     var vnTrialTime = ClassroomLifecycleHelper.ToVietnamTime(trialSlotUtc);
                     var timeStr = vnTrialTime.ToString("HH:mm, dddd dd/MM/yyyy", new System.Globalization.CultureInfo("vi-VN"));
 
-                    _db.Notifications.Add(new Notification
-                    {
-                        UserId = studentUserId,
-                        Title = "Gia sư đã đồng ý lịch học thử",
-                        Content = $"Gia sư {tutorName} đã xác nhận buổi học thử môn {subjectName} vào lúc {timeStr}. Phòng học trực tuyến đã sẵn sàng! [url:/student/schedule]",
-                        CreatedAt = DateTime.UtcNow,
-                        IsRead = false
-                    });
+                    acceptNotifTitle = "Gia sư đã đồng ý lịch học thử";
+                    acceptNotifContent = $"Gia sư {tutorName} đã xác nhận buổi học thử môn {subjectName} vào lúc {timeStr}. Phòng học trực tuyến đã sẵn sàng! [url:/student/schedule]";
                 }
                 else
                 {
@@ -932,7 +929,16 @@ public class ConnectionRequestService : IConnectionRequestService
                         });
                     }
 
-                    var sessionsCount = distinctWeekly.Count > 0 ? Math.Clamp(distinctWeekly.Count, 1, 3) : 1;
+                    if (distinctWeekly.Count == 0)
+                    {
+                        return await RollbackAndReturnAsync(new AcceptConnectionRequestResult
+                        {
+                            SlotConflict = true,
+                            Message = "Yêu cầu học chính thức chưa có khung giờ cố định/tuần. Vui lòng từ chối hoặc yêu cầu học viên chọn lịch rảnh."
+                        });
+                    }
+
+                    var sessionsCount = Math.Clamp(distinctWeekly.Count, 1, 3);
                     int expectedTotal;
                     DateOnly? resolvedEndDate;
                     if (request.RequestedEndDate.HasValue && request.RequestedEndDate.Value >= startDateVn)
@@ -1061,14 +1067,8 @@ public class ConnectionRequestService : IConnectionRequestService
                     request.RespondedAt = DateTime.UtcNow;
                     finalClassroomId = officialClassroom.Id;
 
-                    _db.Notifications.Add(new Notification
-                    {
-                        UserId = studentUserId,
-                        Title = "Yêu cầu học chính thức đã được chấp nhận",
-                        Content = $"Gia sư {tutorName} đã chấp nhận vào học chính thức lớp {officialClassroom.NameClass}. Học phí khóa {expectedTotal} buổi ({expectedTotal * 2} tiếng) là {courseFee:N0} đ. Vui lòng quét mã QR SePay để thanh toán kích hoạt quyền vào lớp! [url:/student/classrooms]",
-                        CreatedAt = DateTime.UtcNow,
-                        IsRead = false
-                    });
+                    acceptNotifTitle = "Yêu cầu học chính thức đã được chấp nhận";
+                    acceptNotifContent = $"Gia sư {tutorName} đã chấp nhận vào học chính thức lớp {officialClassroom.NameClass}. Học phí khóa {expectedTotal} buổi ({expectedTotal * 2} tiếng) là {courseFee:N0} đ. Vui lòng quét mã QR SePay để thanh toán kích hoạt quyền vào lớp! [url:/student/classrooms]";
                 }
             }
 
@@ -1106,7 +1106,9 @@ public class ConnectionRequestService : IConnectionRequestService
                 SubjectName: subjectName,
                 RequestId: request.Id,
                 ClassroomId: finalClassroomId,
-                IsTrial: isTrial
+                IsTrial: isTrial,
+                CustomTitle: acceptNotifTitle,
+                CustomContent: acceptNotifContent
             ), cancellationToken);
 
             return new AcceptConnectionRequestResult

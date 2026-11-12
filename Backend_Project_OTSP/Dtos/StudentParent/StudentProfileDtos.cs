@@ -6,6 +6,7 @@ public class UpdateStudentProfileRequest
     public string? CitizenIdNumber { get; set; }
     public string? ResidenceAddress { get; set; }
     public string? PhoneNumber { get; set; }
+    public DateOnly? DateOfBirth { get; set; }
     public string? InterestedSubjects { get; set; }
     public string? Area { get; set; }
     public string? FreeSchedule { get; set; }

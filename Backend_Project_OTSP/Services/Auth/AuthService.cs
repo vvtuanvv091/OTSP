@@ -55,6 +55,34 @@ public class AuthService : IAuthService
         _emailQueue = emailQueue;
     }
 
+    private async Task NotifyAdminsNewTutorEmailAsync(string tutorName, string tutorEmail, string authMethod)
+    {
+        try
+        {
+            var adminEmails = await AdminNotificationHelper.ResolveAdminRecipientEmailsAsync(_db, _configuration);
+            if (adminEmails.Count == 0) return;
+
+            var frontendBase = _configuration["App:FrontendUrl"]?.TrimEnd('/') is { Length: > 0 } configuredUrl
+                ? configuredUrl
+                : "https://otsp-giasu.vercel.app";
+            var (subject, bodyHtml) = NotificationEmailTemplates.ForNewTutorRegisteredToAdmin(
+                tutorName,
+                tutorEmail,
+                authMethod,
+                $"{frontendBase}/admin/tutor-approvals");
+            await AdminNotificationHelper.DispatchEmailToManyAsync(
+                adminEmails,
+                subject,
+                bodyHtml,
+                _emailQueue,
+                _emailSender);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Không thể gửi email báo Admin khi có gia sư mới đăng ký: {Email}", tutorEmail);
+        }
+    }
+
     private async Task RecordAuthAuditAsync(string userId, string action, string detail)
     {
         try
@@ -223,8 +251,8 @@ public class AuthService : IAuthService
                         UserId = admin.Id,
                         Title = role == RoleTutor ? "Gia sư mới đăng ký (Google)" : "Học viên mới đăng ký (Google)",
                         Content = role == RoleTutor
-                            ? $"Gia sư {user.FullName} ({user.Email}) vừa tạo tài khoản qua Google và đang chờ duyệt hồ sơ."
-                            : $"Học viên {user.FullName} ({user.Email}) vừa tạo tài khoản qua Google.",
+                            ? $"Gia sư {user.FullName} ({user.Email}) vừa tạo tài khoản qua Google và đang chờ duyệt hồ sơ. [url:/admin/tutor-approvals]"
+                            : $"Học viên {user.FullName} ({user.Email}) vừa tạo tài khoản qua Google. [url:/admin/accounts]",
                         CreatedAt = DateTime.UtcNow,
                         IsRead = false
                     });
@@ -232,6 +260,11 @@ public class AuthService : IAuthService
                 if (adminUsers.Count > 0)
                 {
                     await _db.SaveChangesAsync();
+                }
+
+                if (role == RoleTutor)
+                {
+                    await NotifyAdminsNewTutorEmailAsync(user.FullName ?? user.Email ?? "Gia sư", user.Email ?? string.Empty, "Google");
                 }
             }
             catch (Exception notifEx)
@@ -408,8 +441,8 @@ public class AuthService : IAuthService
                         UserId = admin.Id,
                         Title = role == RoleTutor ? "Gia sư mới đăng ký cần duyệt" : "Học viên mới đăng ký",
                         Content = role == RoleTutor
-                            ? $"Gia sư {user.FullName} ({user.Email}) vừa hoàn tất đăng ký và đang chờ xác nhận hồ sơ."
-                            : $"Học viên {user.FullName} ({user.Email}) vừa tạo tài khoản trên hệ thống.",
+                            ? $"Gia sư {user.FullName} ({user.Email}) vừa hoàn tất đăng ký và đang chờ xác nhận hồ sơ. [url:/admin/tutor-approvals]"
+                            : $"Học viên {user.FullName} ({user.Email}) vừa tạo tài khoản trên hệ thống. [url:/admin/accounts]",
                         CreatedAt = DateTime.UtcNow,
                         IsRead = false
                     });
@@ -417,6 +450,11 @@ public class AuthService : IAuthService
                 if (adminUsers.Count > 0)
                 {
                     await _db.SaveChangesAsync();
+                }
+
+                if (role == RoleTutor)
+                {
+                    await NotifyAdminsNewTutorEmailAsync(user.FullName ?? user.Email ?? "Gia sư", user.Email ?? string.Empty, "Email");
                 }
             }
             catch (Exception notifEx)

@@ -6,12 +6,13 @@ using Backend_Project_OTSP.Data;
 using Backend_Project_OTSP.Services.Common;
 using static Backend_Project_OTSP.Models.Enums;
 using Backend_Project_OTSP.Dtos.StudentParent;
+using Backend_Project_OTSP.Security;
 
 namespace Backend_Project_OTSP.Controllers.Api.Student;
 
 [ApiController]
 [Route("api/student/documents")]
-[Authorize(Roles = "Student_Parent")]
+[Authorize(Roles = AppRoles.StudentAccess)]
 public class StudentLearningDocumentApiController : ControllerBase
 {
     private readonly ApplicationDbContext _db;

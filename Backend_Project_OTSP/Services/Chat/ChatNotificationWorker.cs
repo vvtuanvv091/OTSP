@@ -62,7 +62,9 @@ public sealed class ChatNotificationWorker : BackgroundService
 
                 // 3. XỬ LÝ GỬI EMAIL THÔNG BÁO (Có Throttle chống spam)
                 // Nếu trong 30 phút qua đã gửi email thông báo từ người gửi này rồi, KHÔNG gửi thêm email nữa
-                var throttleKey = $"email_chat_throttle_{evt.SenderId}_{evt.ReceiverId}";
+                var throttleKey = evt.ClassroomId.HasValue
+                    ? $"email_chat_throttle_class_{evt.ClassroomId.Value}_{evt.ReceiverId}"
+                    : $"email_chat_throttle_{evt.SenderId}_{evt.ReceiverId}";
                 var emailQueue = scope.ServiceProvider.GetService<IEmailQueue>();
                 if (!cache.TryGetValue(throttleKey, out _) && (emailQueue != null || emailSender != null))
                 {
@@ -76,12 +78,23 @@ public sealed class ChatNotificationWorker : BackgroundService
                     {
                         // Đặt throttle 30 phút trong MemoryCache
                         cache.Set(throttleKey, true, EmailThrottleDuration);
+                        var configuration = scope.ServiceProvider.GetService<IConfiguration>();
+                        var frontendBase = configuration?["App:FrontendUrl"]?.TrimEnd('/') is { Length: > 0 } configuredUrl
+                            ? configuredUrl
+                            : "https://otsp-giasu.vercel.app";
+
+                        var targetContactId = evt.ClassroomId.HasValue
+                            ? $"class_{evt.ClassroomId.Value}"
+                            : evt.SenderId;
+                        var senderLabel = !string.IsNullOrWhiteSpace(evt.ClassroomName)
+                            ? $"{evt.SenderName} ({evt.ClassroomName})"
+                            : evt.SenderName;
 
                         var (subject, body) = NotificationEmailTemplates.ForChatMessage(
                             receiverName: receiverUser.FullName ?? "bạn",
-                            senderName: evt.SenderName,
+                            senderName: senderLabel,
                             contentSnippet: evt.Content,
-                            actionUrl: "https://otsp-giasu.vercel.app/chat");
+                            actionUrl: $"{frontendBase}/chat?contactId={Uri.EscapeDataString(targetContactId)}");
 
                         if (emailQueue != null)
                         {

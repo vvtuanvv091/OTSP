@@ -6,6 +6,8 @@ public record ChatMessageCreatedEvent(
     string SenderName,
     string ReceiverId,
     string Content,
-    DateTime SentAtUtc
+    DateTime SentAtUtc,
+    int? ClassroomId = null,
+    string? ClassroomName = null
 );
 

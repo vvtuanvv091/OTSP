@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Backend_Project_OTSP.Dtos.Payment;
+using Backend_Project_OTSP.Security;
 using Backend_Project_OTSP.Services;
 using Backend_Project_OTSP.Services.Payments;
 
@@ -9,7 +10,7 @@ namespace Backend_Project_OTSP.Controllers.Api.Student;
 
 [ApiController]
 [Route("api/student/payments")]
-[Authorize(Roles = "Student_Parent")]
+[Authorize(Roles = AppRoles.StudentAccess)]
 public class StudentPaymentApiController : ControllerBase
 {
     private readonly IPaymentService _paymentService;

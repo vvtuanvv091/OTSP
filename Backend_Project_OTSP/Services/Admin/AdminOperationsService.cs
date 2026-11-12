@@ -9,6 +9,7 @@ using Backend_Project_OTSP.Dtos;
 using Backend_Project_OTSP.Dtos.Admin;
 using Backend_Project_OTSP.Dtos.Common.Notification;
 using Backend_Project_OTSP.Models;
+using Backend_Project_OTSP.Services.Common;
 using Backend_Project_OTSP.Services.Notifications;
 using static Backend_Project_OTSP.Models.Enums;
 
@@ -23,19 +24,28 @@ public sealed class AdminOperationsService : IAdminOperationsService
     private readonly RoleManager<ApplicationRole> _roles;
     private readonly INotificationDispatcher? _dispatcher;
     private readonly IMemoryCache? _cache;
+    private readonly IEmailQueue? _emailQueue;
+    private readonly IEmailSenderService? _emailSender;
+    private readonly IConfiguration? _configuration;
 
     public AdminOperationsService(
         ApplicationDbContext db,
         UserManager<ApplicationUser> users,
         RoleManager<ApplicationRole> roles,
         INotificationDispatcher? dispatcher = null,
-        IMemoryCache? cache = null)
+        IMemoryCache? cache = null,
+        IEmailQueue? emailQueue = null,
+        IEmailSenderService? emailSender = null,
+        IConfiguration? configuration = null)
     {
         _db = db;
         _users = users;
         _roles = roles;
         _dispatcher = dispatcher;
         _cache = cache;
+        _emailQueue = emailQueue;
+        _emailSender = emailSender;
+        _configuration = configuration;
     }
 
     public async Task<object> GetReviewsAsync(AdminOperationsQuery query, CancellationToken ct)
@@ -103,8 +113,16 @@ public sealed class AdminOperationsService : IAdminOperationsService
         _db.ReviewAlerts.RemoveRange(review.ReviewAlerts);
         _db.Reviews.Remove(review);
         AddAudit(adminUserId, ipAddress, $"AdminDeleteReview:{id}");
-        await _db.SaveChangesAsync(ct);
-        return (true, null);
+        try
+        {
+            await _db.SaveChangesAsync(ct);
+            return (true, null);
+        }
+        catch (DbUpdateException)
+        {
+            _db.ChangeTracker.Clear();
+            return (false, "Không thể xóa đánh giá này vì đang có dữ liệu liên quan.");
+        }
     }
 
     public async Task<(bool Success, string? Error)> FlagReviewAlertAsync(int id, string reason, string adminUserId, string? ipAddress, CancellationToken ct)
@@ -241,8 +259,16 @@ public sealed class AdminOperationsService : IAdminOperationsService
         if (item == null) return (false, "Không tìm thấy khiếu nại.");
         _db.Complaints.Remove(item);
         AddAudit(adminUserId, ipAddress, $"AdminDeleteComplaint:{id}");
-        await _db.SaveChangesAsync(ct);
-        return (true, null);
+        try
+        {
+            await _db.SaveChangesAsync(ct);
+            return (true, null);
+        }
+        catch (DbUpdateException)
+        {
+            _db.ChangeTracker.Clear();
+            return (false, "Không thể xóa khiếu nại này vì đang có dữ liệu liên quan.");
+        }
     }
 
     public async Task<object> GetNewsAsync(AdminOperationsQuery query, CancellationToken ct)
@@ -285,8 +311,16 @@ public sealed class AdminOperationsService : IAdminOperationsService
         if (article == null) return (false, "Không tìm thấy bài viết.");
         _db.NewsArticles.Remove(article);
         AddAudit(adminUserId, ipAddress, $"AdminDeleteNews:{id}");
-        await _db.SaveChangesAsync(ct);
-        return (true, null);
+        try
+        {
+            await _db.SaveChangesAsync(ct);
+            return (true, null);
+        }
+        catch (DbUpdateException)
+        {
+            _db.ChangeTracker.Clear();
+            return (false, "Không thể xóa bài viết này vì đang có dữ liệu liên quan.");
+        }
     }
 
     public async Task<object> GetPaymentsAsync(AdminOperationsQuery query, CancellationToken ct)
@@ -452,12 +486,32 @@ public sealed class AdminOperationsService : IAdminOperationsService
         {
             UserId = tutor.UserId,
             Title = $"Quyết toán thu nhập kỳ {periodStr}",
-            Content = $"Admin đã quyết toán và giải ngân khoản thu nhập {net:N0} đ kỳ {periodStr} cho bạn. Bạn có thể kiểm tra chi tiết tại trang Thu nhập.",
+            Content = $"Admin đã quyết toán và giải ngân khoản thu nhập {net:N0} đ kỳ {periodStr} cho bạn. Bạn có thể kiểm tra chi tiết tại trang Thu nhập. [url:/tutor/income]",
             CreatedAt = DateTime.UtcNow,
             IsRead = false
         });
 
         await _db.SaveChangesAsync(ct);
+
+        if (!string.IsNullOrWhiteSpace(tutor.User?.Email))
+        {
+            var frontendBase = _configuration?["App:FrontendUrl"]?.TrimEnd('/') is { Length: > 0 } configuredUrl
+                ? configuredUrl
+                : "https://otsp-giasu.vercel.app";
+            var (subject, bodyHtml) = NotificationEmailTemplates.ForTutorPayoutSettled(
+                tutor.User.FullName ?? "Gia sư",
+                periodStr,
+                $"{net:N0} đ",
+                $"{frontendBase}/tutor/income");
+            await AdminNotificationHelper.DispatchEmailToManyAsync(
+                new[] { tutor.User.Email },
+                subject,
+                bodyHtml,
+                _emailQueue,
+                _emailSender,
+                ct);
+        }
+
         return (true, null);
     }
 

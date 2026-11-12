@@ -2,13 +2,14 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Backend_Project_OTSP.Dtos.StudentParent;
+using Backend_Project_OTSP.Security;
 using Backend_Project_OTSP.Services.StudentParent;
 
 namespace Backend_Project_OTSP.Controllers.Api.Student;
 
 [ApiController]
 [Route("api/student/profile")]
-[Authorize(Roles = "Student_Parent,Student")]
+[Authorize(Roles = AppRoles.StudentAccess)]
 public class StudentProfileApiController : ControllerBase
 {
     private readonly IStudentProfileService _studentProfileService;

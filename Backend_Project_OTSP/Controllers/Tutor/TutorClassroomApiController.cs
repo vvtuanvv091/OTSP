@@ -897,6 +897,7 @@ public class TutorClassroomApiController : ControllerBase
         if (tutorId == null) return NotFound();
 
         var classroom = await _db.Classrooms
+            .Include(c => c.Tutor).ThenInclude(t => t.User)
             .Include(c => c.ClassroomStudents).ThenInclude(cs => cs.Student).ThenInclude(s => s.User)
             .Include(c => c.ClassSessions)
             .FirstOrDefaultAsync(c => c.Id == id && c.TutorId == tutorId.Value, cancellationToken);
@@ -923,6 +924,8 @@ public class TutorClassroomApiController : ControllerBase
         {
             session.Status = SessionStatus.Cancelled;
         }
+
+        await ClassroomLifecycleHelper.CancelPendingPaymentsForClassroomsAsync(_db, [id], cancellationToken);
 
         var pendingRequests = await _db.ConnectionRequests
             .Include(cr => cr.Student).ThenInclude(s => s.User)
@@ -956,6 +959,7 @@ public class TutorClassroomApiController : ControllerBase
 
         await _db.SaveChangesAsync(cancellationToken);
 
+        var tutorName = classroom.Tutor?.User?.FullName ?? "Gia sư";
         foreach (var req in pendingRequests)
         {
             if (_hubContext != null)
@@ -964,6 +968,33 @@ public class TutorClassroomApiController : ControllerBase
                     "ConnectionRequestStatusChanged",
                     new { requestId = req.Id, status = "Rejected", classroomId = id },
                     cancellationToken);
+            }
+
+            if (!string.IsNullOrWhiteSpace(req.Student.User?.Email))
+            {
+                var (subj, body) = NotificationEmailTemplates.ForClassroomClosedByTutor(
+                    req.Student.User.FullName ?? "Học viên",
+                    tutorName,
+                    classroom.NameClass,
+                    $"{FrontendBaseUrl}/student/connection-requests",
+                    isPendingRequest: true);
+                await AdminNotificationHelper.DispatchEmailToManyAsync(
+                    new[] { req.Student.User.Email }, subj, body, _emailQueue, _emailSender, cancellationToken);
+            }
+        }
+
+        foreach (var member in classroom.ClassroomStudents)
+        {
+            if (!string.IsNullOrWhiteSpace(member.Student.User?.Email))
+            {
+                var (subj, body) = NotificationEmailTemplates.ForClassroomClosedByTutor(
+                    member.Student.User.FullName ?? "Học viên",
+                    tutorName,
+                    classroom.NameClass,
+                    $"{FrontendBaseUrl}/student/classrooms",
+                    isPendingRequest: false);
+                await AdminNotificationHelper.DispatchEmailToManyAsync(
+                    new[] { member.Student.User.Email }, subj, body, _emailQueue, _emailSender, cancellationToken);
             }
         }
 

@@ -85,7 +85,7 @@ public sealed class AdminLearningDocumentsController : ControllerBase
         if (!success)
         {
             if (notFound) return NotFound(new { message = error });
-            return BadRequest(new { message = error });
+            return Conflict(new { message = error });
         }
 
         return Ok(new { success = true, message = "Đã xóa tài liệu thành công." });

@@ -227,4 +227,80 @@ public static class NotificationEmailTemplates
         var content = $"<p>Xin chào <strong>{Enc(recipientName)}</strong>,</p><p>Buổi học lớp <strong>{Enc(className)}</strong> dự kiến lúc <strong>{Enc(timeStr)}</strong> đã được quản trị viên hủy.</p><p><strong>Lý do:</strong> {Enc(reason)}</p>";
         return (subject, Wrap("Buổi học đã được hủy", content, "Xem lịch học", actionUrl));
     }
+
+    public static (string Subject, string Body) ForClassroomClosedByTutor(
+        string recipientName,
+        string tutorName,
+        string className,
+        string actionUrl,
+        bool isPendingRequest = false)
+    {
+        var subject = isPendingRequest
+            ? $"[OTSP] Lớp {className} đã đóng tuyển sinh"
+            : $"[OTSP] Lớp {className} đã được gia sư đóng";
+        var content = isPendingRequest
+            ? $"<p>Xin chào <strong>{Enc(recipientName)}</strong>,</p><p>Gia sư <strong>{Enc(tutorName)}</strong> đã đóng lớp <strong>{Enc(className)}</strong> nên yêu cầu đăng ký của bạn không thể tiếp tục.</p>"
+            : $"<p>Xin chào <strong>{Enc(recipientName)}</strong>,</p><p>Gia sư <strong>{Enc(tutorName)}</strong> đã đóng lớp <strong>{Enc(className)}</strong>. Các buổi học sắp tới và khoản học phí chờ thanh toán (nếu có) đã được hủy tương ứng.</p>";
+        return (subject, Wrap(isPendingRequest ? "Yêu cầu đăng ký lớp đã đóng" : "Lớp học đã được đóng", content, "Xem lớp học của tôi", actionUrl));
+    }
+
+    public static (string Subject, string Body) ForTutorPayoutSettled(
+        string tutorName,
+        string period,
+        string netAmountStr,
+        string actionUrl)
+    {
+        var subject = $"[OTSP] Quyết toán thu nhập kỳ {period}";
+        var content = $"<p>Kính gửi <strong>{Enc(tutorName)}</strong>,</p><p>Quản trị viên đã hoàn tất quyết toán và giải ngân thu nhập kỳ <strong>{Enc(period)}</strong> của bạn.</p><p>Số tiền thực nhận: <strong style='color:#16a34a'>{Enc(netAmountStr)}</strong>.</p><p>Vui lòng truy cập trang Thu nhập trên OTSP để đối chiếu chi tiết.</p>";
+        return (subject, Wrap($"Quyết toán thu nhập kỳ {period}", content, "Xem thu nhập", actionUrl));
+    }
+
+    public static (string Subject, string Body) ForQualificationReviewed(
+        string tutorName,
+        string qualificationTitle,
+        bool approved,
+        string? reason,
+        string actionUrl)
+    {
+        var subject = approved
+            ? $"[OTSP] Bằng cấp/Chứng chỉ \"{qualificationTitle}\" đã được duyệt"
+            : $"[OTSP] Bằng cấp/Chứng chỉ \"{qualificationTitle}\" chưa được duyệt";
+        var reasonHtml = (!approved && !string.IsNullOrWhiteSpace(reason))
+            ? $"<p style='background:#fef2f2;border-left:3px solid #dc2626;padding:8px 12px;margin:12px 0'><strong>Lý do:</strong> {Enc(reason.Trim())}</p>"
+            : "";
+        var content = approved
+            ? $"<p>Xin chào <strong>{Enc(tutorName)}</strong>,</p><p>Tài liệu bằng cấp/chứng chỉ <strong>{Enc(qualificationTitle)}</strong> của bạn đã được quản trị viên phê duyệt.</p>"
+            : $"<p>Xin chào <strong>{Enc(tutorName)}</strong>,</p><p>Tài liệu bằng cấp/chứng chỉ <strong>{Enc(qualificationTitle)}</strong> của bạn chưa được duyệt.</p>{reasonHtml}<p>Vui lòng cập nhật lại hồ sơ để được thẩm định lại.</p>";
+        return (subject, Wrap(approved ? "Bằng cấp đã được duyệt" : "Bằng cấp chưa được duyệt", content, "Quản lý hồ sơ", actionUrl));
+    }
+
+    public static (string Subject, string Body) ForLearningDocumentReviewed(
+        string tutorName,
+        string documentTitle,
+        bool approved,
+        string? reason,
+        string actionUrl)
+    {
+        var subject = approved
+            ? $"[OTSP] Tài liệu công khai \"{documentTitle}\" đã được duyệt"
+            : $"[OTSP] Tài liệu công khai \"{documentTitle}\" đã bị gỡ / từ chối";
+        var reasonHtml = (!approved && !string.IsNullOrWhiteSpace(reason))
+            ? $"<p style='background:#fef2f2;border-left:3px solid #dc2626;padding:8px 12px;margin:12px 0'><strong>Lý do:</strong> {Enc(reason.Trim())}</p>"
+            : "";
+        var content = approved
+            ? $"<p>Xin chào <strong>{Enc(tutorName)}</strong>,</p><p>Tài liệu <strong>{Enc(documentTitle)}</strong> của bạn đã được duyệt và hiển thị công khai cho học viên trên OTSP.</p>"
+            : $"<p>Xin chào <strong>{Enc(tutorName)}</strong>,</p><p>Tài liệu <strong>{Enc(documentTitle)}</strong> của bạn đã bị gỡ khỏi mục công khai hoặc chưa được duyệt.</p>{reasonHtml}";
+        return (subject, Wrap(approved ? "Tài liệu công khai đã được duyệt" : "Tài liệu công khai chưa được duyệt", content, "Xem tài liệu của tôi", actionUrl));
+    }
+
+    public static (string Subject, string Body) ForNewTutorRegisteredToAdmin(
+        string tutorName,
+        string tutorEmail,
+        string authMethod,
+        string actionUrl)
+    {
+        var subject = $"[OTSP] Gia sư mới đăng ký chờ duyệt: {tutorName}";
+        var content = $"<p>Hệ thống vừa ghi nhận một tài khoản <strong>Gia sư</strong> mới đăng ký qua <strong>{Enc(authMethod)}</strong>:</p><ul style='padding-left:18px'><li>Họ tên: <strong>{Enc(tutorName)}</strong></li><li>Email: <strong>{Enc(tutorEmail)}</strong></li></ul><p>Vui lòng vào trang Duyệt hồ sơ gia sư để kiểm tra thông tin và bằng cấp.</p>";
+        return (subject, Wrap("Gia sư mới đăng ký chờ duyệt", content, "Duyệt hồ sơ gia sư", actionUrl));
+    }
 }

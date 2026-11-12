@@ -5,13 +5,14 @@ using Microsoft.EntityFrameworkCore;
 using Backend_Project_OTSP.Data;
 using Backend_Project_OTSP.Models;
 using static Backend_Project_OTSP.Models.Enums;
+using Backend_Project_OTSP.Security;
 using Backend_Project_OTSP.Services.Sessions;
 
 namespace Backend_Project_OTSP.Controllers.Api.Student;
 
 [ApiController]
 [Route("api/student/dashboard")]
-[Authorize(Roles = "Student_Parent")]
+[Authorize(Roles = AppRoles.StudentAccess)]
 public class StudentDashboardApiController : ControllerBase
 {
     private const int VietnamUtcOffsetHours = 7;
@@ -73,7 +74,9 @@ public class StudentDashboardApiController : ControllerBase
 
         var pendingPayments = await _db.Payments
             .AsNoTracking()
-            .Where(p => p.StudentId == studentId && p.Status == PaymentStatus.Pending)
+            .Where(p => p.StudentId == studentId
+                     && p.Status == PaymentStatus.Pending
+                     && p.Classroom.Status == ClassroomStatus.Active)
             .OrderByDescending(p => p.Id)
             .Select(p => new
             {

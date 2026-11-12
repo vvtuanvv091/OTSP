@@ -135,6 +135,8 @@ public sealed class AdminClassroomManagementService : IAdminClassroomManagementS
         var now = DateTime.UtcNow;
         var reasonText = reason.Trim();
 
+        await ClassroomLifecycleHelper.CancelPendingPaymentsForClassroomsAsync(_db, [classroomId], cancellationToken);
+
         var futureSessions = await _db.ClassSessions
             .Where(session => session.ClassroomId == classroomId && session.Status == SessionStatus.Scheduled && session.ScheduledAt >= now)
             .ToListAsync(cancellationToken);
@@ -327,25 +329,47 @@ public sealed class AdminClassroomManagementService : IAdminClassroomManagementS
         var classroom = await _db.Classrooms.FirstOrDefaultAsync(c => c.Id == classroomId, cancellationToken);
         if (classroom == null) return (false, true, "Không tìm thấy lớp học.");
 
+        var blockers = new List<string>();
+        if (await _db.ClassroomStudents.AsNoTracking().AnyAsync(cs => cs.ClassroomId == classroomId, cancellationToken))
+            blockers.Add("học viên ghi danh");
+        if (await _db.ClassSessions.AsNoTracking().AnyAsync(s => s.ClassroomId == classroomId, cancellationToken))
+            blockers.Add("buổi học");
+        if (await _db.Payments.AsNoTracking().AnyAsync(p => p.ClassroomId == classroomId, cancellationToken))
+            blockers.Add("giao dịch học phí");
+        if (await _db.ConnectionRequests.AsNoTracking().AnyAsync(cr => cr.ClassroomId == classroomId, cancellationToken))
+            blockers.Add("yêu cầu kết nối");
+        if (await _db.Messagers.AsNoTracking().AnyAsync(m => m.ClassroomId == classroomId, cancellationToken))
+            blockers.Add("tin nhắn lớp học");
+        if (await _db.LearningDocuments.AsNoTracking().AnyAsync(d => d.ClassroomId == classroomId, cancellationToken))
+            blockers.Add("tài liệu học tập");
+
+        if (blockers.Count > 0)
+        {
+            return (false, false, $"Không thể xóa lớp học này vì đã có dữ liệu liên kết ({string.Join(", ", blockers)}). Vui lòng dùng chức năng Đóng lớp thay thế.");
+        }
+
         try
         {
+            var schedules = await _db.ClassroomWeeklySchedules
+                .Where(w => w.ClassroomId == classroomId)
+                .ToListAsync(cancellationToken);
+            if (schedules.Count > 0)
+                _db.ClassroomWeeklySchedules.RemoveRange(schedules);
+
             _db.Classrooms.Remove(classroom);
+            _db.AuditLogs.Add(new AuditLog
+            {
+                UserId = adminUserId,
+                IpAddress = ipAddress,
+                Action = $"AdminDeleteClassroom:{classroomId}"
+            });
             await _db.SaveChangesAsync(cancellationToken);
+            return (true, false, null);
         }
-        catch
+        catch (DbUpdateException)
         {
-            classroom.Status = ClassroomStatus.Cancelled;
-            await _db.SaveChangesAsync(cancellationToken);
+            _db.ChangeTracker.Clear();
+            return (false, false, "Không thể xóa lớp học này vì đang có dữ liệu ràng buộc. Vui lòng dùng chức năng Đóng lớp thay thế.");
         }
-
-        _db.AuditLogs.Add(new AuditLog
-        {
-            UserId = adminUserId,
-            IpAddress = ipAddress,
-            Action = $"AdminDeleteClassroom:{classroomId}"
-        });
-        await _db.SaveChangesAsync(cancellationToken);
-
-        return (true, false, null);
     }
 }

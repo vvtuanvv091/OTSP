@@ -27,7 +27,9 @@ public sealed record BookingAcceptedNotificationEvent(
     string SubjectName,
     int RequestId,
     int? ClassroomId,
-    bool IsTrial
+    bool IsTrial,
+    string? CustomTitle = null,
+    string? CustomContent = null
 );
 
 public sealed record BookingRejectedNotificationEvent(

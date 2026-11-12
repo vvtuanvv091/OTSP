@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.Extensions.DependencyInjection;
 using Backend_Project_OTSP.Data;
 using Backend_Project_OTSP.Dtos.Common.Notification;
 using Backend_Project_OTSP.Hubs;
@@ -16,6 +17,7 @@ public class NotificationService : INotificationService, INotificationDispatcher
     private readonly IEmailSenderService? _emailSender;
     private readonly ILogger<NotificationService> _logger;
     private readonly IConfiguration? _configuration;
+    private readonly IServiceScopeFactory? _scopeFactory;
 
     public NotificationService(
         ApplicationDbContext db,
@@ -24,7 +26,8 @@ public class NotificationService : INotificationService, INotificationDispatcher
         ILogger<NotificationService> logger,
         IEmailQueue? emailQueue = null,
         IEmailSenderService? emailSender = null,
-        IConfiguration? configuration = null)
+        IConfiguration? configuration = null,
+        IServiceScopeFactory? scopeFactory = null)
     {
         _db = db;
         _connectionRequestHub = connectionRequestHub;
@@ -33,6 +36,7 @@ public class NotificationService : INotificationService, INotificationDispatcher
         _emailQueue = emailQueue;
         _emailSender = emailSender;
         _configuration = configuration;
+        _scopeFactory = scopeFactory;
     }
 
     private string FrontendBaseUrl =>
@@ -82,6 +86,27 @@ public class NotificationService : INotificationService, INotificationDispatcher
         if (_emailQueue != null)
         {
             _emailQueue.Enqueue(new EmailQueueItemDto(toEmail, subject, bodyHtml));
+            return;
+        }
+
+        if (_scopeFactory != null)
+        {
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await using var scope = _scopeFactory.CreateAsyncScope();
+                    var scopedSender = scope.ServiceProvider.GetService<IEmailSenderService>();
+                    if (scopedSender != null)
+                    {
+                        await scopedSender.SendNotificationEmailAsync(toEmail, subject, bodyHtml, CancellationToken.None);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Lỗi khi gửi email chạy nền tới {Email}", toEmail);
+                }
+            });
             return;
         }
 
@@ -148,6 +173,16 @@ public class NotificationService : INotificationService, INotificationDispatcher
 
     public async Task DispatchBookingAcceptedAsync(BookingAcceptedNotificationEvent evt, CancellationToken ct = default)
     {
+        var title = !string.IsNullOrWhiteSpace(evt.CustomTitle)
+            ? evt.CustomTitle
+            : (evt.IsTrial ? "Gia sư đã đồng ý lịch học thử" : "Yêu cầu học đã được chấp nhận");
+        var content = !string.IsNullOrWhiteSpace(evt.CustomContent)
+            ? evt.CustomContent
+            : (evt.IsTrial
+                ? $"Gia sư {evt.TutorName} đã đồng ý buổi học thử môn {evt.SubjectName} của bạn. [url:/student/schedule]"
+                : $"Gia sư {evt.TutorName} đã chấp nhận yêu cầu học môn {evt.SubjectName} của bạn. [url:/student/classrooms]");
+        await CreateInAppNotificationAsync(evt.StudentUserId, title, content, ct);
+
         await BroadcastSignalRAsync(
             "ConnectionRequestHub",
             evt.StudentUserId,

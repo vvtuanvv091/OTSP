@@ -6,12 +6,13 @@ using Backend_Project_OTSP.Data;
 using Backend_Project_OTSP.Models;
 using static Backend_Project_OTSP.Models.Enums;
 using Backend_Project_OTSP.Dtos.StudentParent;
+using Backend_Project_OTSP.Security;
 
 namespace Backend_Project_OTSP.Controllers.Api.Student;
 
 [ApiController]
 [Route("api/student/classrooms")]
-[Authorize(Roles = "Student_Parent")]
+[Authorize(Roles = AppRoles.StudentAccess)]
 public class StudentClassroomApiController : ControllerBase
 {
     private const int VietnamUtcOffsetHours = 7;
@@ -154,7 +155,11 @@ public class StudentClassroomApiController : ControllerBase
                 : "Chưa cố định";
 
             var hasPaid = paidClassroomIds.Contains(e.ClassroomId);
-            pendingPaymentsByClassroom.TryGetValue(e.ClassroomId, out var pendingPayment);
+            Payment? pendingPayment = null;
+            if (e.Classroom.Status == ClassroomStatus.Active)
+            {
+                pendingPaymentsByClassroom.TryGetValue(e.ClassroomId, out pendingPayment);
+            }
 
             var visibleSessions = e.Classroom.Type == ClassroomType.Group
                 ? e.Sessions.Where(s => s.ScheduledAt >= e.JoinedAt).ToList()

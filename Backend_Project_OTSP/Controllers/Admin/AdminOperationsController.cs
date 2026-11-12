@@ -31,7 +31,10 @@ public sealed class AdminOperationsController : ControllerBase
     public async Task<IActionResult> DeleteReview(int id, CancellationToken ct)
     {
         var result = await _service.DeleteReviewAsync(id, AdminUserId ?? "", ClientIp, ct);
-        return result.Success ? Ok(new { success = true }) : NotFound(new { message = result.Error });
+        if (result.Success) return Ok(new { success = true });
+        return result.Error?.StartsWith("Không tìm thấy", StringComparison.OrdinalIgnoreCase) == true
+            ? NotFound(new { message = result.Error })
+            : Conflict(new { message = result.Error });
     }
 
     [HttpPost("reviews/{id:int}/flag")]
@@ -54,7 +57,10 @@ public sealed class AdminOperationsController : ControllerBase
     public async Task<IActionResult> DeleteComplaint(int id, CancellationToken ct)
     {
         var result = await _service.DeleteComplaintAsync(id, AdminUserId ?? "", ClientIp, ct);
-        return result.Success ? Ok(new { success = true }) : NotFound(new { message = result.Error });
+        if (result.Success) return Ok(new { success = true });
+        return result.Error?.StartsWith("Không tìm thấy", StringComparison.OrdinalIgnoreCase) == true
+            ? NotFound(new { message = result.Error })
+            : Conflict(new { message = result.Error });
     }
 
     [HttpGet("news")]
@@ -71,7 +77,10 @@ public sealed class AdminOperationsController : ControllerBase
     public async Task<IActionResult> DeleteNews(int id, CancellationToken ct)
     {
         var result = await _service.DeleteNewsAsync(id, AdminUserId ?? "", ClientIp, ct);
-        return result.Success ? Ok(new { success = true }) : NotFound(new { message = result.Error });
+        if (result.Success) return Ok(new { success = true });
+        return result.Error?.StartsWith("Không tìm thấy", StringComparison.OrdinalIgnoreCase) == true
+            ? NotFound(new { message = result.Error })
+            : Conflict(new { message = result.Error });
     }
 
     [HttpGet("payments")]

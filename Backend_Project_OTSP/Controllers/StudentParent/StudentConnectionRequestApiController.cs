@@ -8,6 +8,8 @@ using Backend_Project_OTSP.Dtos.StudentParent;
 using Backend_Project_OTSP.Services;
 using static Backend_Project_OTSP.Models.Enums;
 using Backend_Project_OTSP.Dtos.Tutor;
+using Backend_Project_OTSP.Security;
+using Backend_Project_OTSP.Services.Common;
 using Backend_Project_OTSP.Services.StudentParent;
 using Backend_Project_OTSP.Services.Tutor;
 using System.Reflection.Metadata.Ecma335;
@@ -16,7 +18,7 @@ namespace BACKEND_PROJECT_OTSP.Controllers.Api.Student;
 
 [ApiController]
 [Route("api/student/connection-requests")]
-[Authorize(Roles = "Student_Parent")]
+[Authorize(Roles = AppRoles.StudentAccess)]
 public class StudentConnectionRequestApiController : ControllerBase
 {
     private readonly ApplicationDbContext _db;
@@ -41,41 +43,22 @@ public class StudentConnectionRequestApiController : ControllerBase
     [HttpGet("tutors/{tutorId:int}")]
     public async Task<IActionResult> GetTutorBookingDetails(int tutorId, CancellationToken cancellationToken)
     {
-        var tutor = await _db.TutorProfiles.AsNoTracking()
-            .Include(t => t.User)
-            .Include(t => t.Qualifications.Where(q => q.Status == VerificationStatus.Approved))
-            .Include(t => t.TutorSubjects)
-                .ThenInclude(ts => ts.Subject)
-            .Include(t => t.TutorSubjects)
-                .ThenInclude(ts => ts.GradeLevel)
-            .FirstOrDefaultAsync(t => t.Id == tutorId
-                                   && t.VerificationStatus == VerificationStatus.Approved
-                                   && t.User.Status == AccountStatus.Active, cancellationToken);
-
-        if (tutor == null) return NotFound(new { message = "Không tìm thấy hồ sơ gia sư." });
-
         var userId = CurrentUserId;
         if (string.IsNullOrEmpty(userId)) return Unauthorized();
         var student = await _db.StudentProfiles.AsNoTracking()
             .FirstOrDefaultAsync(s => s.UserId == userId, cancellationToken);
         if (student == null) return NotFound(new { message = "Không tìm thấy hồ sơ học viên." });
 
-        var reviews = await _db.Reviews.AsNoTracking()
-            .Where(r => r.ClassSession.Classroom.TutorId == tutorId)
-            .OrderByDescending(r => r.ReviewedAt)
-            .Take(20)
-            .Select(r => new TutorReviewDto
-            {
-                Id = r.Id,
-                StudentName = r.Student.User.FullName ?? string.Empty,
-                StudentAvatarUrl = r.Student.User.AvatarUrl,
-                Score = r.Score,
-                Comment = r.Comment,
-                ReviewedAt = r.ReviewedAt
-            })
-            .ToListAsync(cancellationToken);
+        var details = await TutorDetailQueryHelper.BuildPublicTutorDetailAsync(
+            _db,
+            tutorId,
+            _openGroupClassroomService,
+            userId,
+            isAdminViewer: false,
+            cancellationToken);
 
-        var classrooms = await _openGroupClassroomService.GetOpenGroupClassroomsAsync(tutorId, cancellationToken);
+        if (details == null) return NotFound(new { message = "Không tìm thấy hồ sơ gia sư." });
+
         var availableSlots = await _availabilitySlotService.GetAvailableSlotsForStudentAsync(
             tutorId,
             student.Id,
@@ -85,42 +68,6 @@ public class StudentConnectionRequestApiController : ControllerBase
             userId,
             tutorId,
             cancellationToken);
-
-        var completedSessions = await _db.ClassSessions.AsNoTracking()
-            .CountAsync(s => s.Classroom.TutorId == tutorId && s.Status == SessionStatus.Done, cancellationToken);
-
-        var studentCount = await _db.ClassroomStudents.AsNoTracking()
-            .Where(cs => cs.Classroom.TutorId == tutorId)
-            .Select(cs => cs.StudentId)
-            .Distinct()
-            .CountAsync(cancellationToken);
-
-        var dayVnNames = new Dictionary<DayOfWeek, string>
-        {
-            [DayOfWeek.Monday] = "Thứ 2",
-            [DayOfWeek.Tuesday] = "Thứ 3",
-            [DayOfWeek.Wednesday] = "Thứ 4",
-            [DayOfWeek.Thursday] = "Thứ 5",
-            [DayOfWeek.Friday] = "Thứ 6",
-            [DayOfWeek.Saturday] = "Thứ 7",
-            [DayOfWeek.Sunday] = "Chủ nhật"
-        };
-
-        var availabilitiesList = await _db.TutorAvailabilities.AsNoTracking()
-            .Where(a => a.TutorId == tutorId)
-            .OrderBy(a => a.DayOfWeek)
-            .ThenBy(a => a.StartTime)
-            .ToListAsync(cancellationToken);
-
-        var availabilities = availabilitiesList.Select(a => new
-        {
-            a.Id,
-            DayOfWeek = (int)a.DayOfWeek,
-            DayOfWeekName = dayVnNames.TryGetValue(a.DayOfWeek, out var name) ? name : a.DayOfWeek.ToString(),
-            TimeRange = $"{a.StartTime:HH\\:mm} - {a.EndTime:HH\\:mm}",
-            StartTime = $"{a.StartTime:HH\\:mm}",
-            EndTime = $"{a.EndTime:HH\\:mm}"
-        }).ToList();
 
         var existingRequest = await _db.ConnectionRequests.AsNoTracking()
             .Where(cr => cr.Student.UserId == userId
@@ -132,75 +79,32 @@ public class StudentConnectionRequestApiController : ControllerBase
             .Select(cr => new { cr.Id, cr.Status, cr.CreatedAt, SubjectName = cr.Subject.Name })
             .FirstOrDefaultAsync(cancellationToken);
 
-        var enrolledClassroomIds = new List<int>();
-        var activeOneToOneSubjectIds = new List<int>();
-        var pendingSubjectIds = new List<int>();
-        var pendingClassroomIds = new List<int>();
-
-        if (!string.IsNullOrEmpty(userId))
-        {
-            enrolledClassroomIds = await _db.ClassroomStudents.AsNoTracking()
-                    .Where(cs => cs.StudentId == student.Id && cs.Classroom.TutorId == tutorId && cs.Classroom.Status == ClassroomStatus.Active)
-                    .Select(cs => cs.ClassroomId)
-                    .ToListAsync(cancellationToken);
-
-            activeOneToOneSubjectIds = await _db.ClassroomStudents.AsNoTracking()
-                    .Where(cs => cs.StudentId == student.Id && cs.Classroom.TutorId == tutorId && cs.Classroom.Type == ClassroomType.OneToOne && cs.Classroom.Status == ClassroomStatus.Active)
-                    .Select(cs => cs.Classroom.SubjectId)
-                    .Distinct()
-                    .ToListAsync(cancellationToken);
-
-            var pendingRequests = await _db.ConnectionRequests.AsNoTracking()
-                .Where(cr => cr.StudentId == student.Id && cr.TutorId == tutorId && cr.Status == RequestStatus.Pending)
-                .ToListAsync(cancellationToken);
-
-            pendingSubjectIds = pendingRequests.Select(r => r.SubjectId).Distinct().ToList();
-            pendingClassroomIds = pendingRequests.Where(r => r.ClassroomId.HasValue).Select(r => r.ClassroomId!.Value).Distinct().ToList();
-        }
-
-        var allTutorScores = await _db.Reviews.AsNoTracking()
-            .Where(r => r.ClassSession.Classroom.TutorId == tutorId)
-            .Select(r => (double)r.Score)
+        var enrolledClassroomIds = await _db.ClassroomStudents.AsNoTracking()
+            .Where(cs => cs.StudentId == student.Id && cs.Classroom.TutorId == tutorId && cs.Classroom.Status == ClassroomStatus.Active)
+            .Select(cs => cs.ClassroomId)
             .ToListAsync(cancellationToken);
 
-        var actualAverageRating = allTutorScores.Count > 0
-            ? Math.Round(allTutorScores.Average(), 1)
-            : (tutor.AverageRating > 0 ? Math.Round(tutor.AverageRating, 1) : 0);
+        var activeOneToOneSubjectIds = await _db.ClassroomStudents.AsNoTracking()
+            .Where(cs => cs.StudentId == student.Id && cs.Classroom.TutorId == tutorId && cs.Classroom.Type == ClassroomType.OneToOne && cs.Classroom.Status == ClassroomStatus.Active)
+            .Select(cs => cs.Classroom.SubjectId)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+
+        var pendingRequests = await _db.ConnectionRequests.AsNoTracking()
+            .Where(cr => cr.StudentId == student.Id && cr.TutorId == tutorId && cr.Status == RequestStatus.Pending)
+            .ToListAsync(cancellationToken);
+
+        var pendingSubjectIds = pendingRequests.Select(r => r.SubjectId).Distinct().ToList();
+        var pendingClassroomIds = pendingRequests.Where(r => r.ClassroomId.HasValue).Select(r => r.ClassroomId!.Value).Distinct().ToList();
 
         return Ok(new
         {
-            tutor = new
-            {
-                tutor.Id,
-                UserId = tutor.UserId,
-                FullName = tutor.User.FullName,
-                AvatarUrl = tutor.User.AvatarUrl,
-                Area = tutor.User.Address,
-                TeachingFormat = tutor.TeachingFormat.ToString(),
-                tutor.HourlyFee,
-                tutor.Introduction,
-                AverageRating = actualAverageRating,
-                TotalReviews = allTutorScores.Count,
-                TotalCompletedSessions = completedSessions,
-                TotalStudents = studentCount
-            },
-            subjects = tutor.TutorSubjects.Select(ts => new
-            {
-                ts.SubjectId,
-                SubjectName = ts.Subject.Name,
-                ts.GradeLevelId,
-                GradeName = ts.GradeLevel.Name,
-                HourlyFee = ts.HourlyFee > 0 ? ts.HourlyFee : tutor.HourlyFee
-            }),
-            qualifications = tutor.Qualifications.Select(q => new
-            {
-                q.Id,
-                q.Title,
-                q.FileUrl
-            }),
-            availabilities,
-            reviews,
-            classrooms,
+            tutor = details.Tutor,
+            subjects = details.Subjects,
+            qualifications = details.Qualifications,
+            availabilities = details.Availabilities,
+            reviews = details.Reviews,
+            classrooms = details.Classrooms,
             availableSlots,
             bookingEligibility,
             existingRequest,

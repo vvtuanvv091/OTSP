@@ -5,7 +5,10 @@ using Microsoft.EntityFrameworkCore;
 using Backend_Project_OTSP.Data;
 using Backend_Project_OTSP.Dtos;
 using Backend_Project_OTSP.Models;
+using Backend_Project_OTSP.Security;
 using Backend_Project_OTSP.Services;
+using Backend_Project_OTSP.Services.Common;
+using Backend_Project_OTSP.Services.Tutor;
 using static Backend_Project_OTSP.Models.Enums;
 
 namespace Backend_Project_OTSP.Controllers.Common;
@@ -18,15 +21,21 @@ public class SearchApiController : ControllerBase
     private readonly ISearchService _search;
     private readonly ApplicationDbContext _db;
     private readonly ILogger<SearchApiController> _logger;
+    private readonly IOpenGroupClassroomService? _openGroupClassroomService;
+    private readonly IAvailabilitySlotService? _availabilitySlotService;
 
     public SearchApiController(
         ISearchService search,
         ApplicationDbContext db,
-        ILogger<SearchApiController> logger)
+        ILogger<SearchApiController> logger,
+        IOpenGroupClassroomService? openGroupClassroomService = null,
+        IAvailabilitySlotService? availabilitySlotService = null)
     {
         _search = search;
         _db = db;
         _logger = logger;
+        _openGroupClassroomService = openGroupClassroomService;
+        _availabilitySlotService = availabilitySlotService;
     }
 
     [HttpGet("filters")]
@@ -52,6 +61,47 @@ public class SearchApiController : ControllerBase
         {
             _logger.LogError(ex, "Lỗi tìm gia sư: {@Query}", q);
             return StatusCode(500, new { message = "Lỗi khi tìm kiếm gia sư." });
+        }
+    }
+
+    [HttpGet("tutors/{id:int}")]
+    public async Task<IActionResult> GetTutorDetails(int id, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var viewerUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var isAdminViewer = User.IsInRole(AppRoles.Admin);
+
+            var details = await TutorDetailQueryHelper.BuildPublicTutorDetailAsync(
+                _db,
+                id,
+                _openGroupClassroomService,
+                viewerUserId,
+                isAdminViewer,
+                cancellationToken);
+
+            if (details == null)
+                return NotFound(new { message = "Không tìm thấy hồ sơ gia sư." });
+
+            var availableSlots = _availabilitySlotService != null
+                ? await _availabilitySlotService.GetAvailableSlotsAsync(id, 14, cancellationToken)
+                : [];
+
+            return Ok(new
+            {
+                tutor = details.Tutor,
+                subjects = details.Subjects,
+                qualifications = details.Qualifications,
+                availabilities = details.Availabilities,
+                reviews = details.Reviews,
+                classrooms = details.Classrooms,
+                availableSlots
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Lỗi lấy chi tiết gia sư {Id}", id);
+            return StatusCode(500, new { message = "Lỗi khi lấy chi tiết gia sư." });
         }
     }
 

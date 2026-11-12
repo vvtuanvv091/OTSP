@@ -117,12 +117,22 @@ public class StudentProfileService : IStudentProfileService
             return (false, "Nơi ở tối đa 500 ký tự.");
         }
 
+        if (request.DateOfBirth.HasValue)
+        {
+            var todayVn = DateOnly.FromDateTime(DateTime.UtcNow.AddHours(7));
+            if (request.DateOfBirth.Value < new DateOnly(1920, 1, 1) || request.DateOfBirth.Value > todayVn)
+            {
+                return (false, "Ngày sinh phải từ 01/01/1920 đến hiện tại.");
+            }
+        }
+
         if (profile.User != null)
         {
             profile.User.FullName = fullName;
             if (!string.IsNullOrEmpty(citizenId)) profile.User.CitizenIdNumber = citizenId;
             if (!string.IsNullOrEmpty(address)) profile.User.ResidenceAddress = address;
             if (!string.IsNullOrEmpty(request.PhoneNumber)) profile.User.PhoneNumber = request.PhoneNumber.Trim();
+            if (request.DateOfBirth.HasValue) profile.User.DateOfBirth = request.DateOfBirth.Value;
         }
 
         profile.InterestedSubjects = string.IsNullOrWhiteSpace(request.InterestedSubjects) ? null : request.InterestedSubjects.Trim();

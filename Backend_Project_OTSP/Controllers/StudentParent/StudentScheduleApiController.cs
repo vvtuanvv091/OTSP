@@ -6,13 +6,14 @@ using Backend_Project_OTSP.Data;
 using Backend_Project_OTSP.Models;
 using static Backend_Project_OTSP.Models.Enums;
 using Backend_Project_OTSP.Dtos.StudentParent;
+using Backend_Project_OTSP.Security;
 using Backend_Project_OTSP.Services.Sessions;
 
 namespace Backend_Project_OTSP.Controllers.Api.Student;
 
 [ApiController]
 [Route("api/student/schedules")]
-[Authorize(Roles = "Student_Parent")]
+[Authorize(Roles = AppRoles.StudentAccess)]
 public class StudentScheduleApiController : ControllerBase
 {
     private const int VietnamUtcOffsetHours = 7;
@@ -82,7 +83,9 @@ public class StudentScheduleApiController : ControllerBase
 
         var pendingPayments = await _db.Payments
             .AsNoTracking()
-            .Where(p => p.StudentId == studentId && p.Status == PaymentStatus.Pending)
+            .Where(p => p.StudentId == studentId
+                     && p.Status == PaymentStatus.Pending
+                     && p.Classroom.Status == ClassroomStatus.Active)
             .Select(p => new PendingPaymentAlertDto
             {
                 PaymentId = p.Id,

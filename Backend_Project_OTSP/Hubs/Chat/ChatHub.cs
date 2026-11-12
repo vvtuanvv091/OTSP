@@ -93,8 +93,15 @@ public sealed class ChatHub : Hub
         if (receiverUserId.StartsWith("class_") && int.TryParse(receiverUserId[6..], out var cId))
         {
             var classMsg = await _chatService.SendMessageToUserAsync(userId, receiverUserId, content, Context.ConnectionAborted);
+            await Groups.AddToGroupAsync(Context.ConnectionId, $"classroom:{cId}", Context.ConnectionAborted);
             await Clients.Group($"classroom:{cId}").SendAsync("ReceiveDirectMessage", classMsg, Context.ConnectionAborted);
             await Clients.Group($"classroom:{cId}").SendAsync("ReceiveMessage", classMsg, Context.ConnectionAborted);
+            await Clients.Group($"classroom:{cId}").SendAsync("ConversationUpdated", new
+            {
+                contactId = receiverUserId,
+                lastMessage = $"{classMsg.SenderName}: {classMsg.Content}",
+                sentAt = classMsg.SentAtUtc
+            }, Context.ConnectionAborted);
             return;
         }
 
@@ -153,7 +160,6 @@ public sealed class ChatHub : Hub
         try
         {
             var msg = await _chatService.EditMessageAsync(messageId, userId, newContent, Context.ConnectionAborted);
-            var directRoom = GetDirectRoomName(msg.SenderId, msg.ReceiverId);
 
             var payload = new
             {
@@ -162,6 +168,7 @@ public sealed class ChatHub : Hub
                 newContent = msg.Content,
                 senderId = msg.SenderId,
                 receiverId = msg.ReceiverId,
+                classroomId = msg.ClassroomId,
                 sentAt = msg.SentAtUtc,
                 editedAtUtc = msg.EditedAtUtc,
                 isEdited = true,
@@ -169,6 +176,20 @@ public sealed class ChatHub : Hub
                 lastMessage = msg.LastMessageContent
             };
 
+            if (msg.ClassroomId.HasValue)
+            {
+                var groupName = $"classroom:{msg.ClassroomId.Value}";
+                await Clients.Group(groupName).SendAsync("MessageEdited", payload, Context.ConnectionAborted);
+                await Clients.Group(groupName).SendAsync("ConversationUpdated", new
+                {
+                    contactId = msg.ReceiverId,
+                    lastMessage = msg.Content,
+                    sentAt = msg.SentAtUtc
+                }, Context.ConnectionAborted);
+                return;
+            }
+
+            var directRoom = GetDirectRoomName(msg.SenderId, msg.ReceiverId);
             await Clients.Group(directRoom).SendAsync("MessageEdited", payload, Context.ConnectionAborted);
             await Clients.Group($"user:{msg.ReceiverId}").SendAsync("MessageEdited", payload, Context.ConnectionAborted);
             await Clients.Group($"user:{userId}").SendAsync("MessageEdited", payload, Context.ConnectionAborted);
@@ -202,7 +223,6 @@ public sealed class ChatHub : Hub
         try
         {
             var res = await _chatService.DeleteMessageAsync(messageId, userId, Context.ConnectionAborted);
-            var directRoom = GetDirectRoomName(res.SenderId, res.ReceiverId);
 
             var payload = new
             {
@@ -210,11 +230,26 @@ public sealed class ChatHub : Hub
                 content = "Tin nhắn đã được thu hồi",
                 senderId = res.SenderId,
                 receiverId = res.ReceiverId,
+                classroomId = res.ClassroomId,
                 isDeleted = true,
                 lastMessage = res.LastRemainingMessageContent ?? "Bắt đầu cuộc trò chuyện...",
                 sentAt = res.LastRemainingMessageTimeUtc
             };
 
+            if (res.ClassroomId.HasValue)
+            {
+                var groupName = $"classroom:{res.ClassroomId.Value}";
+                await Clients.Group(groupName).SendAsync("MessageDeleted", payload, Context.ConnectionAborted);
+                await Clients.Group(groupName).SendAsync("ConversationUpdated", new
+                {
+                    contactId = res.ReceiverId,
+                    lastMessage = payload.lastMessage,
+                    sentAt = payload.sentAt
+                }, Context.ConnectionAborted);
+                return;
+            }
+
+            var directRoom = GetDirectRoomName(res.SenderId, res.ReceiverId);
             await Clients.Group(directRoom).SendAsync("MessageDeleted", payload, Context.ConnectionAborted);
             await Clients.Group($"user:{res.ReceiverId}").SendAsync("MessageDeleted", payload, Context.ConnectionAborted);
             await Clients.Group($"user:{userId}").SendAsync("MessageDeleted", payload, Context.ConnectionAborted);

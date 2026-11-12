@@ -47,7 +47,7 @@ namespace Backend_Project_OTSP.Services.Chat
             {
                 foreach (var item in cached)
                 {
-                    item.IsOnline = _presenceService.IsUserOnline(item.ContactUserId);
+                    item.IsOnline = !item.IsGroupClass && _presenceService.IsUserOnline(item.ContactUserId);
                 }
                 return cached;
             }
@@ -89,10 +89,10 @@ namespace Backend_Project_OTSP.Services.Chat
 
             if (isCurrentAdmin)
             {
-                // Admin: Xem được tất cả người dùng từng gửi tin nhắn hoặc được gửi tin nhắn
+                // Admin: Xem được tất cả người dùng từng gửi tin nhắn hoặc được gửi tin nhắn 1-1
                 var partnersFromMessages = await _db.Messagers
                     .AsNoTracking()
-                    .Where(m => m.SenderId == currentUserId || m.ReceiverId == currentUserId)
+                    .Where(m => !m.ClassroomId.HasValue && (m.SenderId == currentUserId || m.ReceiverId == currentUserId))
                     .Select(m => m.SenderId == currentUserId ? m.ReceiverId : m.SenderId)
                     .Distinct()
                     .ToListAsync(cancellationToken);
@@ -171,10 +171,10 @@ namespace Backend_Project_OTSP.Services.Chat
 
                 // 5. Học viên: TUYỆT ĐỐI KHÔNG thêm bạn cùng lớp ("Bạn cùng lớp"). Học viên chỉ được phép trao đổi với Gia sư và Quản trị viên.
 
-                // 6. Những người đã từng nhắn tin trước đây: Phải thỏa mãn nghiêm ngặt phân quyền (Học viên không chat với học viên khác)
+                // 6. Những người đã từng nhắn tin 1-1 trước đây: Phải thỏa mãn nghiêm ngặt phân quyền (Học viên không chat với học viên khác)
                 var pastPartnerIds = await _db.Messagers
                     .AsNoTracking()
-                    .Where(m => m.SenderId == currentUserId || m.ReceiverId == currentUserId)
+                    .Where(m => !m.ClassroomId.HasValue && (m.SenderId == currentUserId || m.ReceiverId == currentUserId))
                     .Select(m => m.SenderId == currentUserId ? m.ReceiverId : m.SenderId)
                     .Distinct()
                     .ToListAsync(cancellationToken);
@@ -224,73 +224,149 @@ namespace Backend_Project_OTSP.Services.Chat
             }
 
             var partnerIds = partnerRoleMap.Keys.ToList();
-            if (partnerIds.Count == 0)
+            var conversations = new List<ChatConversationItemDto>(partnerIds.Count);
+
+            if (partnerIds.Count > 0)
             {
-                return Array.Empty<ChatConversationItemDto>();
+                // 7. Lấy thông tin User đối tác (1 truy vấn duy nhất)
+                var partnerUsers = await _db.Users
+                    .AsNoTracking()
+                    .Where(u => partnerIds.Contains(u.Id))
+                    .Select(u => new
+                    {
+                        u.Id,
+                        FullName = !string.IsNullOrWhiteSpace(u.FullName) ? u.FullName : u.UserName,
+                        u.AvatarUrl
+                    })
+                    .ToDictionaryAsync(u => u.Id, cancellationToken);
+
+                // 8. Tối ưu cực hạn Neon PostgreSQL: 1 TRUY VẤN DUY NHẤT lấy toàn bộ tin nhắn 1-1 liên quan
+                var recentMessages = await _db.Messagers
+                    .AsNoTracking()
+                    .Where(m => !m.ClassroomId.HasValue
+                             && ((m.SenderId == currentUserId && partnerIds.Contains(m.ReceiverId))
+                              || (partnerIds.Contains(m.SenderId) && m.ReceiverId == currentUserId)))
+                    .OrderByDescending(m => m.SentAt)
+                    .Select(m => new
+                    {
+                        m.SenderId,
+                        m.ReceiverId,
+                        Content = m.IsDeleted ? DeletedMessageText : m.Content,
+                        m.SentAt,
+                        m.IsRead,
+                        m.IsDeleted
+                    })
+                    .ToListAsync(cancellationToken);
+
+                var messageStats = recentMessages
+                    .GroupBy(m => m.SenderId == currentUserId ? m.ReceiverId : m.SenderId)
+                    .ToDictionary(
+                        g => g.Key,
+                        g => new
+                        {
+                            LastMessage = g.First(),
+                            UnreadCount = g.Count(m => !m.IsDeleted && m.ReceiverId == currentUserId && !m.IsRead)
+                        }
+                    );
+
+                // 9. Ghép danh sách cuộc trò chuyện 1-1
+                foreach (var partnerId in partnerIds)
+                {
+                    if (!partnerUsers.TryGetValue(partnerId, out var partner))
+                        continue;
+
+                    var roleInfo = partnerRoleMap[partnerId];
+                    messageStats.TryGetValue(partnerId, out var stats);
+
+                    conversations.Add(new ChatConversationItemDto
+                    {
+                        ContactUserId = partnerId,
+                        ContactName = partner.FullName ?? "Người dùng OTSP",
+                        ContactAvatarUrl = partner.AvatarUrl,
+                        RoleLabel = roleInfo.RoleLabel,
+                        LastMessageContent = stats?.LastMessage.Content ?? "Bắt đầu cuộc trò chuyện...",
+                        LastMessageTimeUtc = stats?.LastMessage.SentAt,
+                        UnreadCount = stats?.UnreadCount ?? 0,
+                        IsOnline = _presenceService.IsUserOnline(partnerId),
+                        RequestId = roleInfo.RequestId
+                    });
+                }
             }
 
-            // 7. Lấy thông tin User đối tác (1 truy vấn duy nhất)
-            var partnerUsers = await _db.Users
+            // 10. Ghép kênh Chat Nhóm Lớp Học cho các lớp nhóm mà người dùng là Gia sư hoặc Học viên
+            var groupClassrooms = await _db.Classrooms
                 .AsNoTracking()
-                .Where(u => partnerIds.Contains(u.Id))
-                .Select(u => new
+                .Where(c => c.Type == ClassroomType.Group
+                         && c.Status != ClassroomStatus.Cancelled
+                         && (c.Tutor.UserId == currentUserId || c.ClassroomStudents.Any(cs => cs.Student.UserId == currentUserId)))
+                .Select(c => new
                 {
-                    u.Id,
-                    FullName = !string.IsNullOrWhiteSpace(u.FullName) ? u.FullName : u.UserName,
-                    u.AvatarUrl
-                })
-                .ToDictionaryAsync(u => u.Id, cancellationToken);
-
-            // 8. Tối ưu cực hạn Neon PostgreSQL: 1 TRUY VẤN DUY NHẤT lấy toàn bộ tin nhắn liên quan
-            var recentMessages = await _db.Messagers
-                .AsNoTracking()
-                .Where(m => (m.SenderId == currentUserId && partnerIds.Contains(m.ReceiverId))
-                         || (partnerIds.Contains(m.SenderId) && m.ReceiverId == currentUserId))
-                .OrderByDescending(m => m.SentAt)
-                .Select(m => new
-                {
-                    m.SenderId,
-                    m.ReceiverId,
-                    Content = m.IsDeleted ? DeletedMessageText : m.Content,
-                    m.SentAt,
-                    m.IsRead,
-                    m.IsDeleted
+                    c.Id,
+                    c.NameClass,
+                    c.CoverImageUrl,
+                    StudentCount = c.ClassroomStudents.Count()
                 })
                 .ToListAsync(cancellationToken);
 
-            var messageStats = recentMessages
-                .GroupBy(m => m.SenderId == currentUserId ? m.ReceiverId : m.SenderId)
-                .ToDictionary(
-                    g => g.Key,
-                    g => new
-                    {
-                        LastMessage = g.First(),
-                        UnreadCount = g.Count(m => !m.IsDeleted && m.ReceiverId == currentUserId && !m.IsRead)
-                    }
-                );
-
-            // 9. Ghép danh sách cuộc trò chuyện
-            var conversations = new List<ChatConversationItemDto>(partnerIds.Count);
-            foreach (var partnerId in partnerIds)
+            if (groupClassrooms.Count > 0)
             {
-                if (!partnerUsers.TryGetValue(partnerId, out var partner))
-                    continue;
+                var groupClassIds = groupClassrooms.Select(c => c.Id).ToList();
+                var rawGroupMessages = await _db.Messagers
+                    .AsNoTracking()
+                    .Where(m => m.ClassroomId.HasValue && groupClassIds.Contains(m.ClassroomId.Value))
+                    .OrderByDescending(m => m.SentAt)
+                    .ThenByDescending(m => m.Id)
+                    .Select(m => new
+                    {
+                        ClassroomId = m.ClassroomId!.Value,
+                        SenderName = m.Sender.FullName ?? m.Sender.UserName ?? "Thành viên",
+                        Content = m.IsDeleted ? DeletedMessageText : m.Content,
+                        m.SentAt,
+                        m.IsDeleted
+                    })
+                    .ToListAsync(cancellationToken);
 
-                var roleInfo = partnerRoleMap[partnerId];
-                messageStats.TryGetValue(partnerId, out var stats);
+                var lastGroupMsgByClass = rawGroupMessages
+                    .GroupBy(m => m.ClassroomId)
+                    .ToDictionary(g => g.Key, g => g.First());
 
-                conversations.Add(new ChatConversationItemDto
+                var unreadGroupNotifs = await _db.Notifications
+                    .AsNoTracking()
+                    .Where(n => n.UserId == currentUserId && !n.IsRead && n.Content.Contains("[url:/Chat?contactId=class_"))
+                    .Select(n => n.Content)
+                    .ToListAsync(cancellationToken);
+
+                foreach (var gc in groupClassrooms)
                 {
-                    ContactUserId = partnerId,
-                    ContactName = partner.FullName ?? "Người dùng OTSP",
-                    ContactAvatarUrl = partner.AvatarUrl,
-                    RoleLabel = roleInfo.RoleLabel,
-                    LastMessageContent = stats?.LastMessage.Content ?? "Bắt đầu cuộc trò chuyện...",
-                    LastMessageTimeUtc = stats?.LastMessage.SentAt,
-                    UnreadCount = stats?.UnreadCount ?? 0,
-                    IsOnline = _presenceService.IsUserOnline(partnerId),
-                    RequestId = roleInfo.RequestId
-                });
+                    var classContactId = $"class_{gc.Id}";
+                    var tag = $"[url:/Chat?contactId={classContactId}]";
+                    var unreadCount = unreadGroupNotifs.Count(c => c.Contains(tag, StringComparison.OrdinalIgnoreCase));
+                    lastGroupMsgByClass.TryGetValue(gc.Id, out var lastGroupMsg);
+
+                    conversations.Add(new ChatConversationItemDto
+                    {
+                        ContactUserId = classContactId,
+                        ContactName = gc.NameClass,
+                        ContactAvatarUrl = gc.CoverImageUrl,
+                        RoleLabel = "Lớp nhóm",
+                        LastMessageContent = lastGroupMsg == null
+                            ? "Bắt đầu trao đổi cùng cả lớp..."
+                            : lastGroupMsg.IsDeleted
+                                ? DeletedMessageText
+                                : $"{lastGroupMsg.SenderName}: {lastGroupMsg.Content}",
+                        LastMessageTimeUtc = lastGroupMsg?.SentAt,
+                        UnreadCount = unreadCount,
+                        IsOnline = false,
+                        ClassroomId = gc.Id,
+                        IsGroupClass = true,
+                        MemberCount = 1 + gc.StudentCount
+                    });
+                }
+            }
+
+            if (conversations.Count == 0)
+            {
+                return Array.Empty<ChatConversationItemDto>();
             }
 
             // Sắp xếp: có tin chưa đọc -> tin mới nhất -> chưa chat -> theo tên
@@ -322,6 +398,12 @@ namespace Backend_Project_OTSP.Services.Chat
                     throw new UnauthorizedAccessException("Bạn không phải thành viên của lớp học này.");
                 }
 
+                var tutorUserId = await _db.Classrooms
+                    .AsNoTracking()
+                    .Where(c => c.Id == classroomId)
+                    .Select(c => c.Tutor.UserId)
+                    .FirstOrDefaultAsync(cancellationToken);
+
                 var rawClassMessages = await _db.Messagers
                     .AsNoTracking()
                     .Where(m => m.ClassroomId == classroomId)
@@ -348,6 +430,7 @@ namespace Backend_Project_OTSP.Services.Chat
                     SenderId = m.SenderId,
                     SenderName = m.SenderName,
                     SenderAvatarUrl = m.SenderAvatar,
+                    SenderRole = m.SenderId == tutorUserId ? "Gia sư" : "Học viên",
                     ReceiverId = contactUserId,
                     Content = m.Content,
                     SentAtUtc = m.SentAt,
@@ -456,7 +539,77 @@ namespace Backend_Project_OTSP.Services.Chat
                 };
 
                 _db.Messagers.Add(classMsg);
+
+                var memberIds = classroom.ClassroomStudents
+                    .Select(cs => cs.Student.UserId)
+                    .Append(classroom.Tutor.UserId)
+                    .Where(id => !string.IsNullOrWhiteSpace(id))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+
+                var recipientIds = memberIds
+                    .Where(id => !string.Equals(id, senderUserId, StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+
+                if (recipientIds.Count > 0)
+                {
+                    var classSnippet = classMsg.Content.Length > 80 ? classMsg.Content[..80] + "..." : classMsg.Content;
+                    var classUrlTag = $"[url:/Chat?contactId={receiverUserId}]";
+                    var classNotifTitle = $"Tin nhắn mới: {classroom.NameClass}";
+
+                    var existingClassNotifs = await _db.Notifications
+                        .Where(n => recipientIds.Contains(n.UserId) && !n.IsRead && n.Title == classNotifTitle)
+                        .ToListAsync(cancellationToken);
+                    var existingByUser = existingClassNotifs
+                        .GroupBy(n => n.UserId)
+                        .ToDictionary(g => g.Key, g => g.First());
+
+                    foreach (var recipientId in recipientIds)
+                    {
+                        var notifContent = $"\"{sName}: {classSnippet}\" {classUrlTag}";
+                        if (existingByUser.TryGetValue(recipientId, out var existing))
+                        {
+                            existing.Content = notifContent;
+                            existing.CreatedAt = DateTime.UtcNow;
+                        }
+                        else
+                        {
+                            _db.Notifications.Add(new Notification
+                            {
+                                UserId = recipientId,
+                                Title = classNotifTitle,
+                                Content = notifContent,
+                                CreatedAt = DateTime.UtcNow,
+                                IsRead = false
+                            });
+                        }
+                    }
+                }
+
                 await _db.SaveChangesAsync(cancellationToken);
+
+                foreach (var memberId in memberIds)
+                {
+                    _cache.Remove($"chat_convs_{memberId}");
+                    _cache.Remove($"hdr_summary_{memberId}");
+                }
+
+                if (_eventBus != null)
+                {
+                    foreach (var recipientId in recipientIds)
+                    {
+                        await _eventBus.PublishAsync(new ChatMessageCreatedEvent(
+                            classMsg.Id,
+                            senderUserId,
+                            sName,
+                            recipientId,
+                            classMsg.Content,
+                            classMsg.SentAt,
+                            classroomId,
+                            classroom.NameClass
+                        ), cancellationToken);
+                    }
+                }
 
                 return new ChatMessageDto
                 {
@@ -693,12 +846,29 @@ namespace Backend_Project_OTSP.Services.Chat
             string contactUserId,
             CancellationToken cancellationToken = default)
         {
+            if (string.IsNullOrWhiteSpace(contactUserId))
+                return 0;
+
+            var notifTag = $"[url:/Chat?contactId={contactUserId}]";
+            if (contactUserId.StartsWith("class_") && int.TryParse(contactUserId[6..], out _))
+            {
+                var updatedNotifs = await _db.Notifications
+                    .Where(n => n.UserId == currentUserId && !n.IsRead && n.Content.Contains(notifTag))
+                    .ExecuteUpdateAsync(s => s.SetProperty(n => n.IsRead, true), cancellationToken);
+
+                if (updatedNotifs > 0)
+                {
+                    _cache.Remove($"chat_convs_{currentUserId}");
+                    _cache.Remove($"hdr_summary_{currentUserId}");
+                }
+                return updatedNotifs;
+            }
+
             var updated = await _db.Messagers
-                .Where(m => m.ReceiverId == currentUserId && m.SenderId == contactUserId && !m.IsRead)
+                .Where(m => !m.ClassroomId.HasValue && m.ReceiverId == currentUserId && m.SenderId == contactUserId && !m.IsRead)
                 .ExecuteUpdateAsync(s => s.SetProperty(m => m.IsRead, true), cancellationToken);
 
             // Đồng thời đánh dấu đã đọc các thông báo tin nhắn từ người này trong bảng Notifications
-            var notifTag = $"[url:/Chat?contactId={contactUserId}]";
             await _db.Notifications
                 .Where(n => n.UserId == currentUserId && !n.IsRead && n.Content.Contains(notifTag))
                 .ExecuteUpdateAsync(s => s.SetProperty(n => n.IsRead, true), cancellationToken);
@@ -771,33 +941,52 @@ namespace Backend_Project_OTSP.Services.Chat
             message.EditedAt = DateTime.UtcNow;
             await _db.SaveChangesAsync(cancellationToken);
 
-            _cache.Remove($"chat_convs_{message.SenderId}");
-            _cache.Remove($"chat_convs_{message.ReceiverId}");
-            _cache.Remove($"hdr_summary_{message.SenderId}");
-            _cache.Remove($"hdr_summary_{message.ReceiverId}");
-            var lastMessageContent = await _db.Messagers
-                .AsNoTracking()
-                .Where(m => !m.IsDeleted &&
-                    ((m.SenderId == message.SenderId && m.ReceiverId == message.ReceiverId) ||
-                     (m.SenderId == message.ReceiverId && m.ReceiverId == message.SenderId)))
-                .OrderByDescending(m => m.SentAt)
-                .ThenByDescending(m => m.Id)
-                .Select(m => m.Content)
-                .FirstAsync(cancellationToken);
+            string? lastMessageContent;
+            var effectiveReceiverId = message.ReceiverId;
+
+            if (message.ClassroomId.HasValue)
+            {
+                effectiveReceiverId = $"class_{message.ClassroomId.Value}";
+                await InvalidateClassroomChatCacheAsync(message.ClassroomId.Value, cancellationToken);
+                lastMessageContent = await _db.Messagers
+                    .AsNoTracking()
+                    .Where(m => !m.IsDeleted && m.ClassroomId == message.ClassroomId.Value)
+                    .OrderByDescending(m => m.SentAt)
+                    .ThenByDescending(m => m.Id)
+                    .Select(m => m.Content)
+                    .FirstOrDefaultAsync(cancellationToken);
+            }
+            else
+            {
+                _cache.Remove($"chat_convs_{message.SenderId}");
+                _cache.Remove($"chat_convs_{message.ReceiverId}");
+                _cache.Remove($"hdr_summary_{message.SenderId}");
+                _cache.Remove($"hdr_summary_{message.ReceiverId}");
+                lastMessageContent = await _db.Messagers
+                    .AsNoTracking()
+                    .Where(m => !m.ClassroomId.HasValue && !m.IsDeleted &&
+                        ((m.SenderId == message.SenderId && m.ReceiverId == message.ReceiverId) ||
+                         (m.SenderId == message.ReceiverId && m.ReceiverId == message.SenderId)))
+                    .OrderByDescending(m => m.SentAt)
+                    .ThenByDescending(m => m.Id)
+                    .Select(m => m.Content)
+                    .FirstOrDefaultAsync(cancellationToken);
+            }
 
             return new ChatMessageDto
             {
                 Id = message.Id,
                 SenderId = message.SenderId,
                 SenderName = message.Sender?.FullName ?? message.Sender?.UserName ?? "Tôi",
-                ReceiverId = message.ReceiverId,
+                ReceiverId = effectiveReceiverId,
                 Content = message.Content,
                 SentAtUtc = message.SentAt,
                 IsOwn = true,
                 IsEdited = true,
                 EditedAtUtc = message.EditedAt,
                 CanEdit = CanEditMessage(message.IsDeleted, message.SentAt, message.SenderId, senderUserId, message.Content),
-                LastMessageContent = lastMessageContent
+                LastMessageContent = lastMessageContent,
+                ClassroomId = message.ClassroomId
             };
         }
 
@@ -822,34 +1011,77 @@ namespace Backend_Project_OTSP.Services.Chat
                 throw new InvalidOperationException("Tin nhắn đã được thu hồi.");
 
             var senderId = message.SenderId;
-            var receiverId = message.ReceiverId;
+            var receiverId = message.ClassroomId.HasValue ? $"class_{message.ClassroomId.Value}" : message.ReceiverId;
 
             message.IsDeleted = true;
             message.DeletedAt = DateTime.UtcNow;
             await _db.SaveChangesAsync(cancellationToken);
 
-            _cache.Remove($"chat_convs_{senderId}");
-            _cache.Remove($"chat_convs_{receiverId}");
-            _cache.Remove($"hdr_summary_{senderId}");
-            _cache.Remove($"hdr_summary_{receiverId}");
+            string? lastRemainingContent;
+            DateTime? lastRemainingTime;
 
-            var lastMsg = await _db.Messagers
-                .AsNoTracking()
-                .Where(m => !m.IsDeleted && ((m.SenderId == senderId && m.ReceiverId == receiverId) ||
-                            (m.SenderId == receiverId && m.ReceiverId == senderId)))
-                .OrderByDescending(m => m.SentAt)
-                .ThenByDescending(m => m.Id)
-                .Select(m => new { m.Content, m.SentAt })
-                .FirstOrDefaultAsync(cancellationToken);
+            if (message.ClassroomId.HasValue)
+            {
+                await InvalidateClassroomChatCacheAsync(message.ClassroomId.Value, cancellationToken);
+                var lastClassMsg = await _db.Messagers
+                    .AsNoTracking()
+                    .Where(m => !m.IsDeleted && m.ClassroomId == message.ClassroomId.Value)
+                    .OrderByDescending(m => m.SentAt)
+                    .ThenByDescending(m => m.Id)
+                    .Select(m => new { m.Content, m.SentAt })
+                    .FirstOrDefaultAsync(cancellationToken);
+                lastRemainingContent = lastClassMsg?.Content;
+                lastRemainingTime = lastClassMsg?.SentAt;
+            }
+            else
+            {
+                _cache.Remove($"chat_convs_{senderId}");
+                _cache.Remove($"chat_convs_{receiverId}");
+                _cache.Remove($"hdr_summary_{senderId}");
+                _cache.Remove($"hdr_summary_{receiverId}");
+
+                var lastMsg = await _db.Messagers
+                    .AsNoTracking()
+                    .Where(m => !m.ClassroomId.HasValue && !m.IsDeleted &&
+                                ((m.SenderId == senderId && m.ReceiverId == receiverId) ||
+                                 (m.SenderId == receiverId && m.ReceiverId == senderId)))
+                    .OrderByDescending(m => m.SentAt)
+                    .ThenByDescending(m => m.Id)
+                    .Select(m => new { m.Content, m.SentAt })
+                    .FirstOrDefaultAsync(cancellationToken);
+                lastRemainingContent = lastMsg?.Content;
+                lastRemainingTime = lastMsg?.SentAt;
+            }
 
             return new ChatMessageDeleteResult
             {
                 MessageId = messageId,
                 SenderId = senderId,
                 ReceiverId = receiverId,
-                LastRemainingMessageContent = lastMsg?.Content ?? DeletedMessageText,
-                LastRemainingMessageTimeUtc = lastMsg?.SentAt ?? message.SentAt
+                ClassroomId = message.ClassroomId,
+                LastRemainingMessageContent = lastRemainingContent ?? DeletedMessageText,
+                LastRemainingMessageTimeUtc = lastRemainingTime ?? message.SentAt
             };
+        }
+
+        private async Task InvalidateClassroomChatCacheAsync(int classroomId, CancellationToken cancellationToken)
+        {
+            var tutorUid = await _db.Classrooms
+                .AsNoTracking()
+                .Where(c => c.Id == classroomId)
+                .Select(c => c.Tutor.UserId)
+                .FirstOrDefaultAsync(cancellationToken);
+            var studentUids = await _db.ClassroomStudents
+                .AsNoTracking()
+                .Where(cs => cs.ClassroomId == classroomId)
+                .Select(cs => cs.Student.UserId)
+                .ToListAsync(cancellationToken);
+
+            foreach (var uid in studentUids.Append(tutorUid ?? string.Empty).Where(id => !string.IsNullOrWhiteSpace(id)).Distinct())
+            {
+                _cache.Remove($"chat_convs_{uid}");
+                _cache.Remove($"hdr_summary_{uid}");
+            }
         }
 
         private bool CanEditMessage(

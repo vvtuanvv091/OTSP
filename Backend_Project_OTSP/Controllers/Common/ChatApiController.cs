@@ -160,13 +160,14 @@ public class ChatApiController : ControllerBase
                 newContent = message.Content,
                 senderId = message.SenderId,
                 receiverId = message.ReceiverId,
+                classroomId = message.ClassroomId,
                 sentAt = message.SentAtUtc,
                 editedAtUtc = message.EditedAtUtc,
                 isEdited = true,
                 canEdit = message.CanEdit,
                 lastMessage = message.LastMessageContent
             };
-            await PublishMessageEventAsync(message.SenderId, message.ReceiverId, "MessageEdited", payload, cancellationToken);
+            await PublishMessageEventAsync(message.SenderId, message.ReceiverId, message.ClassroomId, "MessageEdited", payload, cancellationToken);
             return Ok(message);
         }
         catch (ArgumentException ex)
@@ -202,11 +203,12 @@ public class ChatApiController : ControllerBase
                 content = "Tin nhắn đã được thu hồi",
                 senderId = result.SenderId,
                 receiverId = result.ReceiverId,
+                classroomId = result.ClassroomId,
                 isDeleted = true,
                 lastMessage = result.LastRemainingMessageContent,
                 sentAt = result.LastRemainingMessageTimeUtc
             };
-            await PublishMessageEventAsync(result.SenderId, result.ReceiverId, "MessageDeleted", payload, cancellationToken);
+            await PublishMessageEventAsync(result.SenderId, result.ReceiverId, result.ClassroomId, "MessageDeleted", payload, cancellationToken);
             return Ok(payload);
         }
         catch (ArgumentException ex)
@@ -230,10 +232,17 @@ public class ChatApiController : ControllerBase
     private async Task PublishMessageEventAsync(
         string senderId,
         string receiverId,
+        int? classroomId,
         string eventName,
         object payload,
         CancellationToken cancellationToken)
     {
+        if (classroomId.HasValue)
+        {
+            await _hubContext.Clients.Group($"classroom:{classroomId.Value}").SendAsync(eventName, payload, cancellationToken);
+            return;
+        }
+
         var room = ChatHub.GetDirectRoomName(senderId, receiverId);
         await _hubContext.Clients.Group(room).SendAsync(eventName, payload, cancellationToken);
         await _hubContext.Clients.Group($"user:{senderId}").SendAsync(eventName, payload, cancellationToken);

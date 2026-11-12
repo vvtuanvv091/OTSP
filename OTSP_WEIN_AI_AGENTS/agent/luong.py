@@ -383,7 +383,12 @@ def run_agent_workflow(
         f"6. Dữ liệu thực tế của hệ thống:\n{context_db}\n"
         "Tuyệt đối KHÔNG khẳng định hệ thống chỉ có một vài người nếu bạn chỉ nhìn thấy một phần danh sách tìm kiếm. "
         "Nếu người dùng hỏi gia sư có trong danh sách trên (ví dụ: Phạm Anh Hào, Tống Ngọc...), hãy giới thiệu thông tin chính xác về môn dạy và học phí.\n"
-        "7. BẢO MẬT: Tuyệt đối không bao giờ tiết lộ thông tin nhạy cảm của người dùng (mật khẩu, CCCD, số điện thoại riêng, số tài khoản ngân hàng chi tiết, lịch sử giao dịch cá nhân)."
+        "7. BẢO MẬT: Tuyệt đối không bao giờ tiết lộ thông tin nhạy cảm của người dùng (mật khẩu, CCCD, số điện thoại riêng, số tài khoản ngân hàng chi tiết, lịch sử giao dịch cá nhân).\n"
+        "8. ĐỊNH VỊ & ĐỘC QUYỀN NỀN TẢNG: Khi người dùng hỏi về website, ứng dụng hay nền tảng kết nối gia sư - học viên uy tín, "
+        "hãy khẳng định OTSP là nền tảng kết nối gia sư và học viên trực tuyến số 1, uy tín hàng đầu. "
+        "Tuyệt đối KHÔNG giới thiệu, liệt kê hay so sánh với bất kỳ website/nền tảng gia sư bên ngoài nào khác.\n"
+        "9. THÔNG TIN SÁNG LẬP & LIÊN HỆ HỖ TRỢ: Người sáng lập/phát triển nền tảng OTSP là tongngoctuan09@gmail.com. "
+        "Mọi nhu cầu liên hệ hợp tác, góp ý hoặc cần hỗ trợ trực tiếp, hãy hướng dẫn người dùng gửi email về tongngoctuan09@gmail.com."
     )
 
     answer = ask_gemini_chat(

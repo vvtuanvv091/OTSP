@@ -5,6 +5,7 @@ using Backend_Project_OTSP.Dtos;
 using Backend_Project_OTSP.Dtos.Admin;
 using Backend_Project_OTSP.Models;
 using Backend_Project_OTSP.Services.Common;
+using Backend_Project_OTSP.Services.Notifications;
 using static Backend_Project_OTSP.Models.Enums;
 using BACKEND_PROJECT_OTSP.Services.Admin;
 
@@ -15,15 +16,24 @@ public sealed class AdminLearningDocumentService : IAdminLearningDocumentService
     private readonly ApplicationDbContext _db;
     private readonly IImageStorageService? _imageStorage;
     private readonly ILogger<AdminLearningDocumentService>? _logger;
+    private readonly IEmailQueue? _emailQueue;
+    private readonly IEmailSenderService? _emailSender;
+    private readonly IConfiguration? _configuration;
 
     public AdminLearningDocumentService(
         ApplicationDbContext db,
         IImageStorageService? imageStorage = null,
-        ILogger<AdminLearningDocumentService>? logger = null)
+        ILogger<AdminLearningDocumentService>? logger = null,
+        IEmailQueue? emailQueue = null,
+        IEmailSenderService? emailSender = null,
+        IConfiguration? configuration = null)
     {
         _db = db;
         _imageStorage = imageStorage;
         _logger = logger;
+        _emailQueue = emailQueue;
+        _emailSender = emailSender;
+        _configuration = configuration;
     }
 
     public async Task<AdminLearningDocumentDashboardDto> GetDocumentsAsync(AdminLearningDocumentQuery query, CancellationToken cancellationToken = default)
@@ -147,9 +157,9 @@ public sealed class AdminLearningDocumentService : IAdminLearningDocumentService
         {
             UserId = document.Tutor.UserId,
             Title = approved ? "Tài liệu công khai đã được duyệt" : "Tài liệu công khai chưa được duyệt",
-            Content = approved
+            Content = (approved
                 ? $"Tài liệu ‘{document.Title}’ đã được duyệt và hiển thị công khai."
-                : $"Tài liệu ‘{document.Title}’ đã bị gỡ khỏi mục công khai. Lý do: {reasonText}"
+                : $"Tài liệu ‘{document.Title}’ đã bị gỡ khỏi mục công khai. Lý do: {reasonText}") + " [url:/tutor/documents]"
         });
         _db.AuditLogs.Add(new AuditLog
         {
@@ -159,6 +169,27 @@ public sealed class AdminLearningDocumentService : IAdminLearningDocumentService
         });
 
         await _db.SaveChangesAsync(cancellationToken);
+
+        if (!string.IsNullOrWhiteSpace(document.Tutor?.User?.Email))
+        {
+            var frontendBase = _configuration?["App:FrontendUrl"]?.TrimEnd('/') is { Length: > 0 } configuredUrl
+                ? configuredUrl
+                : "https://otsp-giasu.vercel.app";
+            var (subject, bodyHtml) = NotificationEmailTemplates.ForLearningDocumentReviewed(
+                document.Tutor.User.FullName ?? "Gia sư",
+                document.Title,
+                approved,
+                reasonText,
+                $"{frontendBase}/tutor/documents");
+            await AdminNotificationHelper.DispatchEmailToManyAsync(
+                new[] { document.Tutor.User.Email },
+                subject,
+                bodyHtml,
+                _emailQueue,
+                _emailSender,
+                cancellationToken);
+        }
+
         return (true, false, null);
     }
 
@@ -168,14 +199,7 @@ public sealed class AdminLearningDocumentService : IAdminLearningDocumentService
         var doc = await _db.LearningDocuments.FirstOrDefaultAsync(d => d.Id == documentId, cancellationToken);
         if (doc == null) return (false, true, "Không tìm thấy tài liệu.");
 
-        if (!string.IsNullOrWhiteSpace(doc.FileUrl) &&
-            (doc.FileUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
-             doc.FileUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase)) &&
-            _imageStorage != null)
-        {
-            await _imageStorage.DeleteAsync(doc.FileUrl, cancellationToken);
-        }
-
+        var fileUrl = doc.FileUrl;
         _db.LearningDocuments.Remove(doc);
         _db.AuditLogs.Add(new AuditLog
         {
@@ -184,7 +208,32 @@ public sealed class AdminLearningDocumentService : IAdminLearningDocumentService
             Action = $"AdminDeleteDocument:{documentId}"
         });
 
-        await _db.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex)
+        {
+            _db.ChangeTracker.Clear();
+            _logger?.LogWarning(ex, "Không thể xóa tài liệu {DocumentId} do ràng buộc dữ liệu.", documentId);
+            return (false, false, "Không thể xóa tài liệu này vì đang được dữ liệu khác tham chiếu.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(fileUrl) &&
+            (fileUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+             fileUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase)) &&
+            _imageStorage != null)
+        {
+            try
+            {
+                await _imageStorage.DeleteAsync(fileUrl, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "Đã xóa bản ghi tài liệu {DocumentId}, nhưng không thể dọn file trên storage: {FileUrl}", documentId, fileUrl);
+            }
+        }
+
         return (true, false, null);
     }
 

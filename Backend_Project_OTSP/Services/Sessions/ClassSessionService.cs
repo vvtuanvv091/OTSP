@@ -578,6 +578,7 @@ public sealed class ClassSessionService : IClassSessionService
             .ToListAsync(cancellationToken);
 
         var changed = false;
+        var closedWithoutCompletedSessions = new List<int>();
         foreach (var classroom in classrooms)
         {
             var sessions = classroom.ClassSessions;
@@ -598,7 +599,16 @@ public sealed class ClassSessionService : IClassSessionService
             {
                 classroom.Status = ClassroomStatus.Completed;
                 changed = true;
+                if (doneCount == 0)
+                {
+                    closedWithoutCompletedSessions.Add(classroom.Id);
+                }
             }
+        }
+
+        if (closedWithoutCompletedSessions.Count > 0)
+        {
+            await ClassroomLifecycleHelper.CancelPendingPaymentsForClassroomsAsync(db, closedWithoutCompletedSessions, cancellationToken);
         }
 
         if (changed)

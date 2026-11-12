@@ -342,38 +342,57 @@ public sealed class AdminDirectoryService : IAdminDirectoryService
     public async Task<(bool Success, string? ErrorMessage)> DeleteStudentAsync(
         string userId, string adminUserId, string? ipAddress, CancellationToken cancellationToken = default)
     {
+        if (string.Equals(userId, adminUserId, StringComparison.Ordinal))
+            return (false, "Không thể tự xóa tài khoản quản trị đang đăng nhập.");
+
         var student = await _db.StudentProfiles
             .Include(s => s.User)
-            .Include(s => s.Guardians)
             .FirstOrDefaultAsync(s => s.UserId == userId, cancellationToken);
 
         if (student == null)
             return (false, "Không tìm thấy hồ sơ học viên.");
 
-        try
+        var blockers = new List<string>();
+        if (await _db.ClassroomStudents.AsNoTracking().AnyAsync(cs => cs.StudentId == student.Id, cancellationToken))
+            blockers.Add("lớp học đã tham gia");
+        if (await _db.Payments.AsNoTracking().AnyAsync(p => p.StudentId == student.Id, cancellationToken))
+            blockers.Add("giao dịch học phí");
+        if (await _db.ConnectionRequests.AsNoTracking().AnyAsync(cr => cr.StudentId == student.Id, cancellationToken))
+            blockers.Add("yêu cầu kết nối");
+        if (await _db.Reviews.AsNoTracking().AnyAsync(r => r.StudentId == student.Id, cancellationToken))
+            blockers.Add("đánh giá khóa học");
+        await AddCommonUserDependenciesAsync(userId, blockers, cancellationToken);
+
+        if (blockers.Count > 0)
         {
-            _db.StudentProfiles.Remove(student);
-            await _db.SaveChangesAsync(cancellationToken);
-            await _userManager.DeleteAsync(student.User);
-        }
-        catch
-        {
-            // Nếu có ràng buộc khóa ngoại (ví dụ đã từng giao dịch), chuyển sang khóa và ẩn tài khoản an toàn
-            student.User.Status = AccountStatus.Locked;
-            student.User.LockoutEnabled = true;
-            student.User.LockoutEnd = DateTimeOffset.UtcNow.AddYears(100);
-            await _db.SaveChangesAsync(cancellationToken);
+            return (false, $"Không thể xóa học viên này vì đã phát sinh dữ liệu liên kết ({string.Join(", ", blockers)}). Vui lòng dùng chức năng Khóa tài khoản thay thế.");
         }
 
-        _db.AuditLogs.Add(new AuditLog
-        {
-            UserId = adminUserId,
-            IpAddress = ipAddress,
-            Action = $"AdminDeleteStudent:{userId}"
-        });
-        await _db.SaveChangesAsync(cancellationToken);
+        if (student.User is not { } studentUser)
+            return (false, "Không tìm thấy tài khoản người dùng của học viên.");
 
-        return (true, null);
+        var result = await HardDeleteAccountAsync(
+            studentUser,
+            async () =>
+            {
+                var guardians = await _db.Guardians.Where(g => g.StudentProfileId == student.Id).ToListAsync(cancellationToken);
+                if (guardians.Count > 0) _db.Guardians.RemoveRange(guardians);
+
+                var aiSessions = await _db.AiStudySessions.Where(a => a.StudentId == student.Id).ToListAsync(cancellationToken);
+                if (aiSessions.Count > 0) _db.AiStudySessions.RemoveRange(aiSessions);
+
+                _db.StudentProfiles.Remove(student);
+            },
+            adminUserId,
+            ipAddress,
+            $"AdminDeleteStudent:{userId}",
+            "Không thể xóa học viên này vì đang có dữ liệu ràng buộc trong hệ thống. Vui lòng dùng chức năng Khóa tài khoản thay thế.",
+            cancellationToken);
+
+        if (result.Success)
+            _cache?.Remove(HomeApiController.HomeCacheKey);
+
+        return result;
     }
 
     public async Task<(bool Success, string? ErrorMessage)> UpdateTutorAsync(
@@ -412,6 +431,9 @@ public sealed class AdminDirectoryService : IAdminDirectoryService
     public async Task<(bool Success, string? ErrorMessage)> DeleteTutorAsync(
         string userId, string adminUserId, string? ipAddress, CancellationToken cancellationToken = default)
     {
+        if (string.Equals(userId, adminUserId, StringComparison.Ordinal))
+            return (false, "Không thể tự xóa tài khoản quản trị đang đăng nhập.");
+
         var tutor = await _db.TutorProfiles
             .Include(t => t.User)
             .FirstOrDefaultAsync(t => t.UserId == userId, cancellationToken);
@@ -419,31 +441,120 @@ public sealed class AdminDirectoryService : IAdminDirectoryService
         if (tutor == null)
             return (false, "Không tìm thấy hồ sơ gia sư.");
 
+        var blockers = new List<string>();
+        if (await _db.Classrooms.AsNoTracking().AnyAsync(c => c.TutorId == tutor.Id, cancellationToken))
+            blockers.Add("lớp học");
+        if (await _db.ConnectionRequests.AsNoTracking().AnyAsync(cr => cr.TutorId == tutor.Id, cancellationToken))
+            blockers.Add("yêu cầu kết nối");
+        if (await _db.LearningDocuments.AsNoTracking().AnyAsync(d => d.TutorId == tutor.Id, cancellationToken))
+            blockers.Add("tài liệu học tập");
+        if (await _db.Reconciliations.AsNoTracking().AnyAsync(r => r.TutorId == tutor.Id, cancellationToken))
+            blockers.Add("bản đối soát thu nhập");
+        await AddCommonUserDependenciesAsync(userId, blockers, cancellationToken);
+
+        if (blockers.Count > 0)
+        {
+            return (false, $"Không thể xóa gia sư này vì đã phát sinh dữ liệu liên kết ({string.Join(", ", blockers)}). Vui lòng dùng chức năng Khóa tài khoản thay thế.");
+        }
+
+        if (tutor.User is not { } tutorUser)
+            return (false, "Không tìm thấy tài khoản người dùng của gia sư.");
+
+        var result = await HardDeleteAccountAsync(
+            tutorUser,
+            async () =>
+            {
+                var tutorSubjects = await _db.TutorSubjects.Where(ts => ts.TutorId == tutor.Id).ToListAsync(cancellationToken);
+                if (tutorSubjects.Count > 0) _db.TutorSubjects.RemoveRange(tutorSubjects);
+
+                var availabilities = await _db.TutorAvailabilities.Where(ta => ta.TutorId == tutor.Id).ToListAsync(cancellationToken);
+                if (availabilities.Count > 0) _db.TutorAvailabilities.RemoveRange(availabilities);
+
+                var qualifications = await _db.Qualifications.Where(q => q.TutorId == tutor.Id).ToListAsync(cancellationToken);
+                if (qualifications.Count > 0) _db.Qualifications.RemoveRange(qualifications);
+
+                var verifications = await _db.ProfileVerifications.Where(pv => pv.TutorId == tutor.Id).ToListAsync(cancellationToken);
+                if (verifications.Count > 0) _db.ProfileVerifications.RemoveRange(verifications);
+
+                _db.TutorProfiles.Remove(tutor);
+            },
+            adminUserId,
+            ipAddress,
+            $"AdminDeleteTutor:{userId}",
+            "Không thể xóa gia sư này vì đang có dữ liệu ràng buộc trong hệ thống. Vui lòng dùng chức năng Khóa tài khoản thay thế.",
+            cancellationToken);
+
+        if (result.Success)
+            _cache?.Remove(HomeApiController.HomeCacheKey);
+
+        return result;
+    }
+
+    private async Task<(bool Success, string? ErrorMessage)> HardDeleteAccountAsync(
+        ApplicationUser user,
+        Func<Task> removeProfileAndChildrenAsync,
+        string adminUserId,
+        string? ipAddress,
+        string auditAction,
+        string conflictMessage,
+        CancellationToken cancellationToken)
+    {
+        await using var tx = _db.Database.IsRelational()
+            ? await _db.Database.BeginTransactionAsync(cancellationToken)
+            : null;
         try
         {
-            _db.TutorProfiles.Remove(tutor);
+            await removeProfileAndChildrenAsync();
+
+            var notifications = await _db.Notifications.Where(n => n.UserId == user.Id).ToListAsync(cancellationToken);
+            if (notifications.Count > 0) _db.Notifications.RemoveRange(notifications);
+
+            var webVisits = await _db.WebVisits.Where(v => v.UserId == user.Id).ToListAsync(cancellationToken);
+            foreach (var visit in webVisits)
+            {
+                visit.UserId = null;
+            }
+
+            var authAuditLogs = await _db.AuditLogs.Where(a => a.UserId == user.Id && a.Category == "Auth").ToListAsync(cancellationToken);
+            if (authAuditLogs.Count > 0) _db.AuditLogs.RemoveRange(authAuditLogs);
+
             await _db.SaveChangesAsync(cancellationToken);
-            await _userManager.DeleteAsync(tutor.User);
+
+            var userDeleteResult = await _userManager.DeleteAsync(user);
+            if (!userDeleteResult.Succeeded)
+            {
+                throw new InvalidOperationException(string.Join("; ", userDeleteResult.Errors.Select(e => e.Description)));
+            }
+
+            _db.AuditLogs.Add(new AuditLog
+            {
+                UserId = adminUserId,
+                IpAddress = ipAddress,
+                Action = auditAction
+            });
+            await _db.SaveChangesAsync(cancellationToken);
+
+            if (tx != null) await tx.CommitAsync(cancellationToken);
+            return (true, null);
         }
         catch
         {
-            // Ràng buộc khóa ngoại: chuyển trạng thái thành Bị khóa & Bị từ chối
-            tutor.VerificationStatus = VerificationStatus.Rejected;
-            tutor.User.Status = AccountStatus.Locked;
-            tutor.User.LockoutEnabled = true;
-            tutor.User.LockoutEnd = DateTimeOffset.UtcNow.AddYears(100);
-            await _db.SaveChangesAsync(cancellationToken);
+            if (tx != null) await tx.RollbackAsync(cancellationToken);
+            _db.ChangeTracker.Clear();
+            return (false, conflictMessage);
         }
+    }
 
-        _db.AuditLogs.Add(new AuditLog
-        {
-            UserId = adminUserId,
-            IpAddress = ipAddress,
-            Action = $"AdminDeleteTutor:{userId}"
-        });
-        await _db.SaveChangesAsync(cancellationToken);
-
-        return (true, null);
+    private async Task AddCommonUserDependenciesAsync(string userId, List<string> blockers, CancellationToken cancellationToken)
+    {
+        if (await _db.Messagers.AsNoTracking().AnyAsync(m => m.SenderId == userId || m.ReceiverId == userId, cancellationToken))
+            blockers.Add("tin nhắn trao đổi");
+        if (await _db.Complaints.AsNoTracking().AnyAsync(c => c.SenderId == userId || c.TargetUserId == userId, cancellationToken))
+            blockers.Add("khiếu nại");
+        if (await _db.ClassSessionAttendances.AsNoTracking().AnyAsync(a => a.UserId == userId, cancellationToken))
+            blockers.Add("lịch sử tham gia buổi học");
+        if (await _db.AuditLogs.AsNoTracking().AnyAsync(a => a.UserId == userId && a.Category != "Auth", cancellationToken))
+            blockers.Add("nhật ký thao tác nghiệp vụ");
     }
 
     private static int? CalculateAge(DateOnly? dateOfBirth, DateOnly today)

@@ -19,17 +19,23 @@ public class AdminTutorApprovalService : IAdminTutorApprovalService
     private readonly IAiService _aiService;
     private readonly IEmailSenderService? _emailSender;
     private readonly INotificationDispatcher? _dispatcher;
+    private readonly IEmailQueue? _emailQueue;
+    private readonly IConfiguration? _configuration;
 
     public AdminTutorApprovalService(
         ApplicationDbContext db,
         IAiService aiService,
         IEmailSenderService? emailSender = null,
-        INotificationDispatcher? dispatcher = null)
+        INotificationDispatcher? dispatcher = null,
+        IEmailQueue? emailQueue = null,
+        IConfiguration? configuration = null)
     {
         _db = db;
         _aiService = aiService;
         _emailSender = emailSender;
         _dispatcher = dispatcher;
+        _emailQueue = emailQueue;
+        _configuration = configuration;
     }
 
     public async Task<List<TutorApprovalViewModel>> GetPendingTutorsAsync(CancellationToken cancellationToken = default)
@@ -256,7 +262,7 @@ public class AdminTutorApprovalService : IAdminTutorApprovalService
             return (false, "Vui lòng nhập lý do từ chối bằng cấp/chứng chỉ.");
 
         var qualification = await _db.Qualifications
-            .Include(item => item.Tutor)
+            .Include(item => item.Tutor).ThenInclude(tutor => tutor.User)
             .SingleOrDefaultAsync(item => item.Id == qualificationId, cancellationToken);
         if (qualification == null)
             return (false, "Không tìm thấy bằng cấp/chứng chỉ.");
@@ -269,9 +275,9 @@ public class AdminTutorApprovalService : IAdminTutorApprovalService
         {
             UserId = qualification.Tutor.UserId,
             Title = approved ? "Bằng cấp/chứng chỉ đã được duyệt" : "Bằng cấp/chứng chỉ chưa được duyệt",
-            Content = approved
+            Content = (approved
                 ? $"Tài liệu ‘{qualification.Title}’ đã được quản trị viên duyệt."
-                : $"Tài liệu ‘{qualification.Title}’ chưa được duyệt. Lý do: {reason!.Trim()}"
+                : $"Tài liệu ‘{qualification.Title}’ chưa được duyệt. Lý do: {reason!.Trim()}") + " [url:/tutor/profile]"
         });
         _db.AuditLogs.Add(new AuditLog
         {
@@ -281,6 +287,27 @@ public class AdminTutorApprovalService : IAdminTutorApprovalService
         });
 
         await _db.SaveChangesAsync(cancellationToken);
+
+        if (!string.IsNullOrWhiteSpace(qualification.Tutor?.User?.Email))
+        {
+            var frontendBase = _configuration?["App:FrontendUrl"]?.TrimEnd('/') is { Length: > 0 } configuredUrl
+                ? configuredUrl
+                : "https://otsp-giasu.vercel.app";
+            var (subject, bodyHtml) = NotificationEmailTemplates.ForQualificationReviewed(
+                qualification.Tutor.User.FullName ?? "Gia sư",
+                qualification.Title,
+                approved,
+                reason,
+                $"{frontendBase}/tutor/profile");
+            await AdminNotificationHelper.DispatchEmailToManyAsync(
+                new[] { qualification.Tutor.User.Email },
+                subject,
+                bodyHtml,
+                _emailQueue,
+                _emailSender,
+                cancellationToken);
+        }
+
         return (true, null);
     }
 

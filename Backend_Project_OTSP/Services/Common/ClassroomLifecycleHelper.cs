@@ -1,4 +1,6 @@
+using Backend_Project_OTSP.Data;
 using Backend_Project_OTSP.Models;
+using Microsoft.EntityFrameworkCore;
 using static Backend_Project_OTSP.Models.Enums;
 
 namespace Backend_Project_OTSP.Services.Common;
@@ -292,5 +294,28 @@ public static class ClassroomLifecycleHelper
         }
 
         return results;
+    }
+
+    /// <summary>
+    /// Chuyển các khoản thanh toán đang chờ (Pending) sang Failed khi lớp học bị đóng/hủy.
+    /// </summary>
+    public static async Task<int> CancelPendingPaymentsForClassroomsAsync(
+        ApplicationDbContext db,
+        IEnumerable<int> classroomIds,
+        CancellationToken cancellationToken = default)
+    {
+        var ids = classroomIds.Distinct().ToList();
+        if (ids.Count == 0) return 0;
+
+        var pendingPayments = await db.Payments
+            .Where(p => ids.Contains(p.ClassroomId) && p.Status == PaymentStatus.Pending)
+            .ToListAsync(cancellationToken);
+
+        foreach (var payment in pendingPayments)
+        {
+            payment.Status = PaymentStatus.Failed;
+        }
+
+        return pendingPayments.Count;
     }
 }

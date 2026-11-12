@@ -57,9 +57,14 @@ public sealed class AdminStudentsController : ControllerBase
 
         var (success, error) = await _directoryService.DeleteStudentAsync(
             userId, adminUserId, HttpContext.Connection.RemoteIpAddress?.ToString(), cancellationToken);
-        if (!success) return BadRequest(new { message = error });
+        if (!success)
+        {
+            if (error?.StartsWith("Không tìm thấy", StringComparison.OrdinalIgnoreCase) == true)
+                return NotFound(new { message = error });
+            return Conflict(new { message = error });
+        }
 
-        return Ok(new { success = true, message = "Đã xóa học viên thành công." });
+        return Ok(new { success = true, message = "Đã xóa vĩnh viễn học viên khỏi hệ thống." });
     }
 
     private async Task<IActionResult> SetLockAsync(string userId, bool locked, CancellationToken cancellationToken)
