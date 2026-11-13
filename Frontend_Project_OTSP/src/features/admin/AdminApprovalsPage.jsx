@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import adminApi from '../../api/adminApi';
 import { resolveAssetUrl } from '../../api/config';
 import { useConfirm } from '../../context/confirmHooks';
+import { useSignalREvent } from '../../context/signalRHooks';
 import { AdminFeedback, AdminLoadingRows, AdminPageHeader, AdminPagination, AdminStats } from './AdminPageShared';
 
 const PAGE_SIZE = 10;
@@ -51,6 +52,10 @@ export default function AdminApprovalsPage() {
   const [teachingFormat, setTeachingFormat] = useState('all');
   const [page, setPage] = useState(1);
   const [reload, setReload] = useState(0);
+
+  // Cập nhật danh sách chờ duyệt tức thì khi có xét duyệt mới theo thời gian thực (Zero-Reload)
+  useSignalREvent('TutorApprovalStatusChanged', () => setReload((v) => v + 1));
+  useSignalREvent('AdminTutorApprovalProcessed', () => setReload((v) => v + 1));
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('tutors'); // 'tutors' | 'qualifications'
   const [qualPage, setQualPage] = useState(1);

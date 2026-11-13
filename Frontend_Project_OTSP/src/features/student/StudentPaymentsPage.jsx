@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useSignalREvent } from '../../context/signalRHooks';
 import studentApi from '../../api/studentApi';
 import InvoiceModal from '../../components/payment/InvoiceModal';
 import OtspPagination from '../../components/common/OtspPagination';
@@ -13,6 +14,10 @@ export default function StudentPaymentsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [selectedPayment, setSelectedPayment] = useState(null);
+  const [reloadKey, setReloadKey] = useState(0);
+
+  // Tự động làm mới khi thanh toán thành công theo thời gian thực (Zero-Reload)
+  useSignalREvent('PaymentStatusChanged', () => setReloadKey((k) => k + 1));
   const [data, setData] = useState({
     isMinor: false,
     guardianName: '',
@@ -54,7 +59,7 @@ export default function StudentPaymentsPage() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [reloadKey]);
 
   const pendingPayments = data?.pendingPayments || [];
   const historyPayments = data?.historyPayments || [];

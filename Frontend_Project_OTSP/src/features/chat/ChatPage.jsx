@@ -1,12 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
-import { hubUrl, resolveAssetUrl } from '../../api/config';
+import { resolveAssetUrl } from '../../api/config';
 import { useSearchParams } from 'react-router-dom';
-import { HubConnectionBuilder, LogLevel } from '@microsoft/signalr';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/toastHooks';
 import { useConfirm } from '../../context/confirmHooks';
+import { useSignalR } from '../../context/signalRHooks';
 import chatApi from '../../api/chatApi';
-import { getStoredToken } from '../../utils/authStorage';
 import '../../styles/chat/ChatPage.css';
 
 // Hàm helper hợp nhất và chuẩn hóa tin nhắn chống trùng lặp / race condition khi 2 người gửi cùng lúc
@@ -58,6 +57,7 @@ function upsertChatMessage(prevList, incoming, currentUserId) {
 
 export default function ChatPage() {
   const { user } = useAuth();
+  const { connection, isConnected } = useSignalR();
   const toast = useToast();
   const confirm = useConfirm();
   const [searchParams] = useSearchParams();
@@ -81,7 +81,7 @@ export default function ChatPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [isMobileChatActive, setIsMobileChatActive] = useState(false);
-  const [hubConnected, setHubConnected] = useState(false);
+  const hubConnected = isConnected;
   const [editingMessageId, setEditingMessageId] = useState(null);
   const [editText, setEditText] = useState('');
 
@@ -257,21 +257,11 @@ export default function ChatPage() {
     });
   }, [conversations, hubConnected]);
 
-  // 3. Kết nối Hub chat thời gian thực qua SignalR
+  // 3. Kết nối Hub chat thời gian thực qua SignalR dùng chung (Zero extra WebSocket)
   useEffect(() => {
-    let isMounted = true;
-    const token = getStoredToken();
-    if (!token) return undefined;
-
-    const connection = new HubConnectionBuilder()
-      .withUrl(hubUrl('/hubs/chat'), {
-        accessTokenFactory: () => getStoredToken(),
-      })
-      .withAutomaticReconnect()
-      .configureLogging(LogLevel.Warning)
-      .build();
-
     hubConnectionRef.current = connection;
+
+    if (!connection || !isConnected) return undefined;
 
     const handleIncomingMessage = (newMsg) => {
       if (!newMsg) return;
@@ -324,9 +314,7 @@ export default function ChatPage() {
       );
     };
 
-    connection.on('ReceiveMessage', handleIncomingMessage);
-
-    connection.on('MessageEdited', (event) => {
+    const handleMessageEdited = (event) => {
       const eventClassContactId = event.classroomId
         ? `class_${event.classroomId}`
         : (String(event.receiverId || '').startsWith('class_') ? String(event.receiverId).toLowerCase() : '');
@@ -348,9 +336,9 @@ export default function ChatPage() {
           ? { ...conversation, lastMessageContent: event.lastMessage ?? event.content ?? event.newContent }
           : conversation;
       }));
-    });
+    };
 
-    connection.on('MessageDeleted', (event) => {
+    const handleMessageDeleted = (event) => {
       const eventClassContactId = event.classroomId
         ? `class_${event.classroomId}`
         : (String(event.receiverId || '').startsWith('class_') ? String(event.receiverId).toLowerCase() : '');
@@ -366,10 +354,9 @@ export default function ChatPage() {
           ? { ...conversation, lastMessageContent: event.lastMessage || 'Tin nhắn đã được thu hồi' }
           : conversation;
       }));
-    });
+    };
 
-    // Lắng nghe cập nhật trạng thái Online / Offline tức thì qua SignalR (0 delay)
-    connection.on('UserPresenceChanged', (changedUserId, isOnline) => {
+    const handleUserPresenceChanged = (changedUserId, isOnline) => {
       if (!changedUserId) return;
       const targetId = String(changedUserId).trim().toLowerCase();
       const statusBool = Boolean(isOnline);
@@ -390,36 +377,35 @@ export default function ChatPage() {
         }
         return curr;
       });
-    });
+    };
 
-    connection
-      .start()
-      .then(() => {
-        if (isMounted) {
-          setHubConnected(true);
-          const currentContactId = selectedContactRef.current?.contactUserId;
-          if (currentContactId) {
-            if (String(currentContactId).startsWith('class_')) {
-              const cid = Number.parseInt(String(currentContactId).slice(6), 10);
-              if (Number.isFinite(cid) && cid > 0) {
-                connection.invoke('JoinClassroomRoom', cid).catch(() => { });
-              }
-            } else {
-              connection.invoke('JoinUserRoom', currentContactId).catch(() => { });
-            }
-          }
+    connection.on('ReceiveMessage', handleIncomingMessage);
+    connection.on('ReceiveDirectMessage', handleIncomingMessage);
+    connection.on('MessageEdited', handleMessageEdited);
+    connection.on('MessageDeleted', handleMessageDeleted);
+    connection.on('UserPresenceChanged', handleUserPresenceChanged);
+
+    // Tự động tham gia phòng hội thoại đang chọn (nếu có)
+    const currentContactId = selectedContactRef.current?.contactUserId;
+    if (currentContactId) {
+      if (String(currentContactId).startsWith('class_')) {
+        const cid = Number.parseInt(String(currentContactId).slice(6), 10);
+        if (Number.isFinite(cid) && cid > 0) {
+          connection.invoke('JoinClassroomRoom', cid).catch(() => { });
         }
-      })
-      .catch((err) => {
-        console.warn('SignalR chat connection warning:', err);
-      });
+      } else {
+        connection.invoke('JoinUserRoom', currentContactId).catch(() => { });
+      }
+    }
 
     return () => {
-      isMounted = false;
-      hubConnectionRef.current = null;
-      connection.stop().catch(() => { });
+      connection.off('ReceiveMessage', handleIncomingMessage);
+      connection.off('ReceiveDirectMessage', handleIncomingMessage);
+      connection.off('MessageEdited', handleMessageEdited);
+      connection.off('MessageDeleted', handleMessageDeleted);
+      connection.off('UserPresenceChanged', handleUserPresenceChanged);
     };
-  }, [user?.id]);
+  }, [connection, isConnected, user?.id]);
 
   // 3.1 Gửi heartbeat hoạt động (TouchActivity) khi người dùng thao tác chuột/phím (giãn cách 45s)
   useEffect(() => {

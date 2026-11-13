@@ -1,10 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import * as signalR from '@microsoft/signalr';
 import tutorApi from '../../api/tutorApi';
-import { hubUrl, resolveAssetUrl } from '../../api/config';
-import { getStoredToken } from '../../utils/authStorage';
+import { resolveAssetUrl } from '../../api/config';
 import { useConfirm } from '../../context/confirmHooks';
+import { useSignalREvent } from '../../context/signalRHooks';
 import OtspPagination from '../../components/common/OtspPagination';
 
 export default function TutorConnectionRequestsPage() {
@@ -45,34 +44,17 @@ export default function TutorConnectionRequestsPage() {
     };
   }, [page, statusFilter, reloadKey]);
 
-  useEffect(() => {
-    const token = getStoredToken();
-    if (!token) return undefined;
+  // Lắng nghe yêu cầu kết nối mới và thay đổi trạng thái theo thời gian thực (Zero-Reload)
+  useSignalREvent('ConnectionRequestCreated', (evt) => {
+    const studentName = evt?.studentName || 'Một học viên';
+    const subjectName = evt?.subjectName || 'môn học';
+    setMessage(`${studentName} vừa gửi yêu cầu kết nối mới (${subjectName}).`);
+    setReloadKey((k) => k + 1);
+  });
 
-    let active = true;
-    const connection = new signalR.HubConnectionBuilder()
-      .withUrl(hubUrl('/hubs/connection-requests'), {
-        accessTokenFactory: getStoredToken,
-      })
-      .withAutomaticReconnect()
-      .configureLogging(signalR.LogLevel.Warning)
-      .build();
-
-    connection.on('ConnectionRequestCreated', (evt) => {
-      if (!active) return;
-      const studentName = evt?.studentName || 'Một học viên';
-      const subjectName = evt?.subjectName || 'môn học';
-      setMessage(`${studentName} vừa gửi yêu cầu kết nối mới (${subjectName}).`);
-      setReloadKey((k) => k + 1);
-    });
-
-    connection.start().catch(() => {});
-
-    return () => {
-      active = false;
-      connection.stop().catch(() => {});
-    };
-  }, []);
+  useSignalREvent('ConnectionRequestStatusChanged', () => {
+    setReloadKey((k) => k + 1);
+  });
 
   const handleTabChange = (status) => {
     setStatusFilter(status);

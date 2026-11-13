@@ -1,13 +1,13 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { hubUrl, API_BASE_URL } from '../../api/config';
+import { API_BASE_URL } from '../../api/config';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
-import * as signalR from '@microsoft/signalr';
 import classroomApi from '../../api/classroomApi';
 import studentApi from '../../api/studentApi';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/toastHooks';
 import { useConfirm } from '../../context/confirmHooks';
 import { getStoredToken } from '../../utils/authStorage';
+import { useSignalR, useSignalREvent } from '../../context/signalRHooks';
 
 /**
  * Trang điều khiển phòng học trực tuyến.
@@ -167,31 +167,29 @@ export default function RoomPage() {
     }
   };
 
-  // 4. SignalR: nhận thông báo buổi học kết thúc theo thời gian thực
+  const { joinClassroom, leaveClassroom } = useSignalR();
+
+  // 4. Gia nhập phòng lớp học SignalR dùng chung
   useEffect(() => {
-    const token = getStoredToken();
-    if (!token) return undefined;
+    if (session?.classroomId) {
+      joinClassroom(session.classroomId);
+      return () => leaveClassroom(session.classroomId);
+    }
+    return undefined;
+  }, [session?.classroomId, joinClassroom, leaveClassroom]);
 
-    const connection = new signalR.HubConnectionBuilder()
-      .withUrl(hubUrl('/hubs/connection-requests'), { accessTokenFactory: () => token })
-      .withAutomaticReconnect()
-      .build();
+  // Nhận thông báo buổi học kết thúc theo thời gian thực từ SignalR dùng chung (0 delay)
+  useSignalREvent('ClassSessionEnded', (data) => {
+    const id = data?.sessionId ?? data?.classSessionId;
+    if (Number(id) === Number(sessionId)) triggerSessionEnded();
+  });
 
-    connection.on('ClassSessionEnded', (data) => {
-      const id = data?.sessionId ?? data?.classSessionId;
-      if (id === Number(sessionId)) triggerSessionEnded();
-    });
-
-    connection.on('ClassSessionStatusChanged', (data) => {
-      const id = data?.sessionId ?? data?.classSessionId;
-      if (id === Number(sessionId) && (data?.status === 'Done' || data?.status === 'Completed')) {
-        triggerSessionEnded();
-      }
-    });
-
-    connection.start().catch((err) => { console.warn('SignalR error:', err); });
-    return () => { connection.stop(); };
-  }, [sessionId, triggerSessionEnded]);
+  useSignalREvent('ClassSessionStatusChanged', (data) => {
+    const id = data?.sessionId ?? data?.classSessionId;
+    if (Number(id) === Number(sessionId) && (data?.status === 'Done' || data?.status === 'Completed')) {
+      triggerSessionEnded();
+    }
+  });
 
   // 5. Dự phòng khi SignalR mất kết nối: hỏi trạng thái buổi học mỗi 30 giây
   useEffect(() => {

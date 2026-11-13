@@ -449,7 +449,7 @@ app.Use(async (context, next) =>
             presence.MarkOffline(userId);
             try
             {
-                var hubContext = context.RequestServices.GetRequiredService<Microsoft.AspNetCore.SignalR.IHubContext<Backend_Project_OTSP.Hubs.ChatHub>>();
+                var hubContext = context.RequestServices.GetRequiredService<Microsoft.AspNetCore.SignalR.IHubContext<Backend_Project_OTSP.Hubs.AppHub>>();
                 await hubContext.Clients.All.SendAsync("UserPresenceChanged", userId, false);
             }
             catch (Exception ex)
@@ -471,9 +471,10 @@ app.Use(async (context, next) =>
 
 app.UseAuthorization();
 
-// SignalR Hubs
+// SignalR Hubs - Unified Gateway cho toàn bộ hệ thống OTSP
+app.MapHub<AppHub>("/hubs/app");
+app.MapHub<AppHub>("/hubs/chat");
 app.MapHub<ConnectionRequestHub>("/hubs/connection-requests");
-app.MapHub<ChatHub>("/hubs/chat");
 
 // Health check endpoint cho Render & UptimeRobot (chống ngủ)
 app.MapGet("/api/health", () => Results.Ok(new { status = "healthy", time = DateTime.UtcNow }));

@@ -4,6 +4,7 @@ import complaintApi from '../../api/complaintApi';
 import { resolveAssetUrl } from '../../api/config';
 import { useToast } from '../../context/toastHooks';
 import { useConfirm } from '../../context/confirmHooks';
+import { useSignalREvent } from '../../context/signalRHooks';
 import {
   AdminFeedback,
   AdminLoadingRows,
@@ -29,6 +30,10 @@ export default function AdminComplaintsPage() {
   const [status, setStatus] = useState('all');
   const [page, setPage] = useState(1);
   const [reload, setReload] = useState(0);
+
+  // Tự động làm mới khiếu nại theo thời gian thực (Zero-Reload)
+  useSignalREvent('ComplaintStatusChanged', () => setReload((r) => r + 1));
+  useSignalREvent('AdminComplaintUpdated', () => setReload((r) => r + 1));
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState(null);
   const [error, setError] = useState('');

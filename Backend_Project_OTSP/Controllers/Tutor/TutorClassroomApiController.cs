@@ -29,6 +29,7 @@ public class TutorClassroomApiController : ControllerBase
     private readonly IEmailQueue? _emailQueue;
     private readonly IEmailSenderService? _emailSender;
     private readonly IHubContext<ConnectionRequestHub>? _hubContext;
+    private readonly IHubContext<AppHub>? _appHub;
     private readonly IConfiguration? _configuration;
 
     public TutorClassroomApiController(
@@ -38,7 +39,8 @@ public class TutorClassroomApiController : ControllerBase
         IEmailQueue? emailQueue = null,
         IEmailSenderService? emailSender = null,
         IHubContext<ConnectionRequestHub>? hubContext = null,
-        IConfiguration? configuration = null)
+        IConfiguration? configuration = null,
+        IHubContext<AppHub>? appHub = null)
     {
         _db = db;
         _imageStorage = imageStorage;
@@ -47,6 +49,7 @@ public class TutorClassroomApiController : ControllerBase
         _emailSender = emailSender;
         _hubContext = hubContext;
         _configuration = configuration;
+        _appHub = appHub;
     }
 
     private string FrontendBaseUrl =>
@@ -873,6 +876,13 @@ public class TutorClassroomApiController : ControllerBase
                         new { classroomId = classroom.Id, scheduleUpdated = true },
                         cancellationToken);
                 }
+                if (_appHub != null)
+                {
+                    await _appHub.Clients.Group($"user:{member.Student.UserId}").SendAsync(
+                        "ClassSessionStatusChanged",
+                        new { classroomId = classroom.Id, scheduleUpdated = true },
+                        cancellationToken);
+                }
                 if (!string.IsNullOrWhiteSpace(member.Student.User?.Email))
                 {
                     var (subj, body) = NotificationEmailTemplates.ForClassroomScheduleUpdated(
@@ -965,6 +975,13 @@ public class TutorClassroomApiController : ControllerBase
             if (_hubContext != null)
             {
                 await _hubContext.Clients.User(req.Student.UserId).SendAsync(
+                    "ConnectionRequestStatusChanged",
+                    new { requestId = req.Id, status = "Rejected", classroomId = id },
+                    cancellationToken);
+            }
+            if (_appHub != null)
+            {
+                await _appHub.Clients.Group($"user:{req.Student.UserId}").SendAsync(
                     "ConnectionRequestStatusChanged",
                     new { requestId = req.Id, status = "Rejected", classroomId = id },
                     cancellationToken);

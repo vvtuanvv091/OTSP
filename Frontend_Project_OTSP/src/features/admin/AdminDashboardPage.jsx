@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import adminApi from '../../api/adminApi';
 import adminOperationsApi from '../../api/adminOperationsApi';
+import { useSignalREvent } from '../../context/signalRHooks';
 import { ensureVisitTracked } from '../../utils/visitTracker';
 import '../../styles/admin-pages.css';
 import '../../styles/admin/AdminDashboardPage.css';
@@ -136,6 +137,12 @@ export default function AdminDashboardPage() {
     if (isManualRefresh) setRefreshing(true);
     await fetchDashboardData();
   };
+
+  // Tự động cập nhật số liệu Dashboard theo thời gian thực (Zero-Reload)
+  useSignalREvent('PaymentStatusChanged', fetchDashboardData);
+  useSignalREvent('AdminTutorApprovalProcessed', fetchDashboardData);
+  useSignalREvent('AdminComplaintUpdated', fetchDashboardData);
+  useSignalREvent('ClassSessionStatusChanged', fetchDashboardData);
 
   useEffect(() => {
     let active = true;

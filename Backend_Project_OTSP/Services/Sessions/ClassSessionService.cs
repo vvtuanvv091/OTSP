@@ -19,6 +19,7 @@ public sealed class ClassSessionService : IClassSessionService
 
     private readonly ApplicationDbContext _db;
     private readonly IHubContext<ConnectionRequestHub> _hubContext;
+    private readonly IHubContext<AppHub>? _appHub;
     private readonly ILogger<ClassSessionService> _logger;
     private readonly IEmailQueue? _emailQueue;
     private readonly IEmailSenderService? _emailSender;
@@ -28,10 +29,12 @@ public sealed class ClassSessionService : IClassSessionService
         IHubContext<ConnectionRequestHub> hubContext,
         ILogger<ClassSessionService> logger,
         IEmailQueue? emailQueue = null,
-        IEmailSenderService? emailSender = null)
+        IEmailSenderService? emailSender = null,
+        IHubContext<AppHub>? appHub = null)
     {
         _db = db;
         _hubContext = hubContext;
+        _appHub = appHub;
         _logger = logger;
         _emailQueue = emailQueue;
         _emailSender = emailSender;
@@ -388,6 +391,33 @@ public sealed class ClassSessionService : IClassSessionService
         }
 
         await _db.SaveChangesAsync(cancellationToken);
+
+        if (_appHub != null)
+        {
+            try
+            {
+                var classroomId = await _db.ClassSessions
+                    .Where(s => s.Id == sessionId)
+                    .Select(s => s.ClassroomId)
+                    .FirstOrDefaultAsync(cancellationToken);
+
+                if (classroomId > 0)
+                {
+                    await _appHub.Clients.Group($"classroom:{classroomId}")
+                        .SendAsync("ClassSessionAttendanceUpdated", new
+                        {
+                            sessionId,
+                            classroomId = classroomId,
+                            userId,
+                            joinedAtUtc = DateTime.UtcNow
+                        }, cancellationToken);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Lỗi gửi SignalR ClassSessionAttendanceUpdated cho session {SessionId}", sessionId);
+            }
+        }
     }
 
     public async Task<(bool Success, string Message)> CancelSessionAsync(
@@ -458,23 +488,49 @@ public sealed class ClassSessionService : IClassSessionService
         if (!string.IsNullOrEmpty(tutorUserId)) userIds.Add(tutorUserId);
         userIds.AddRange(students.Select(s => s.UserId).Where(id => !string.IsNullOrEmpty(id))!);
 
+        var sessionPayload = new
+        {
+            sessionId,
+            classSessionId = sessionId,
+            classroomId = session?.ClassroomId,
+            status = status.ToString()
+        };
+
         await _hubContext.Clients.Users(userIds.Distinct())
-            .SendAsync("ClassSessionStatusChanged", new
+            .SendAsync("ClassSessionStatusChanged", sessionPayload, cancellationToken);
+
+        if (_appHub != null)
+        {
+            if (session?.ClassroomId > 0)
             {
-                sessionId,
-                classSessionId = sessionId,
-                status = status.ToString()
-            }, cancellationToken);
+                await _appHub.Clients.Group($"classroom:{session.ClassroomId}")
+                    .SendAsync("ClassSessionStatusChanged", sessionPayload, cancellationToken);
+            }
+            foreach (var uid in userIds.Distinct())
+            {
+                await _appHub.Clients.Group($"user:{uid}")
+                    .SendAsync("ClassSessionStatusChanged", sessionPayload, cancellationToken);
+            }
+        }
 
         if (status == SessionStatus.Done)
         {
             await _hubContext.Clients.Users(userIds.Distinct())
-                .SendAsync("ClassSessionEnded", new
+                .SendAsync("ClassSessionEnded", sessionPayload, cancellationToken);
+
+            if (_appHub != null)
+            {
+                if (session?.ClassroomId > 0)
                 {
-                    sessionId,
-                    classSessionId = sessionId,
-                    status = status.ToString()
-                }, cancellationToken);
+                    await _appHub.Clients.Group($"classroom:{session.ClassroomId}")
+                        .SendAsync("ClassSessionEnded", sessionPayload, cancellationToken);
+                }
+                foreach (var uid in userIds.Distinct())
+                {
+                    await _appHub.Clients.Group($"user:{uid}")
+                        .SendAsync("ClassSessionEnded", sessionPayload, cancellationToken);
+                }
+            }
         }
 
         // Tự động tạo Notification và gửi Email tùy theo trạng thái

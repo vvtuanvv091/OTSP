@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import tutorApi from '../../api/tutorApi';
 import { useToast } from '../../context/toastHooks';
 import { useConfirm } from '../../context/confirmHooks';
+import { useSignalREvent } from '../../context/signalRHooks';
 import '../../styles/tutor/TutorSchedulePage.css';
 
 const TIME_BLOCKS = [
@@ -109,6 +110,10 @@ export default function TutorSchedulePage() {
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [reloadKey, setReloadKey] = useState(0);
+
+  // Cập nhật trạng thái buổi học theo thời gian thực (Zero-Reload)
+  useSignalREvent('ClassSessionStatusChanged', () => setReloadKey((k) => k + 1));
+  useSignalREvent('ClassSessionEnded', () => setReloadKey((k) => k + 1));
   const [activeDayMobile, setActiveDayMobile] = useState(
     () => (parseDateOnly(getVietnamTodayStr()).getUTCDay() + 6) % 7
   ); // 0 = Thứ 2, ..., 6 = Chủ nhật

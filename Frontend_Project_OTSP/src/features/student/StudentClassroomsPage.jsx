@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import studentApi from '../../api/studentApi';
 import { useToast } from '../../context/toastHooks';
+import { useSignalREvent } from '../../context/signalRHooks';
 import ComplaintModal from '../../components/common/ComplaintModal';
 import OtspPagination from '../../components/common/OtspPagination';
 import '../../styles/student/StudentClassroomsPage.css';
@@ -23,6 +24,11 @@ export default function StudentClassroomsPage() {
   const [message, setMessage] = useState('');
   const [reloadKey, setReloadKey] = useState(0);
   const reviewTimerRef = useRef(null);
+
+  // Tự động làm mới danh sách lớp học theo thời gian thực (Zero-Reload)
+  useSignalREvent('ConnectionRequestStatusChanged', () => setReloadKey((k) => k + 1));
+  useSignalREvent('ClassSessionStatusChanged', () => setReloadKey((k) => k + 1));
+  useSignalREvent('ClassroomCapacityUpdated', () => setReloadKey((k) => k + 1));
 
   // Trạng thái modal khiếu nại
   const [complaintModalOpen, setComplaintModalOpen] = useState(false);

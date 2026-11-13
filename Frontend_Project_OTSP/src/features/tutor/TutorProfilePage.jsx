@@ -4,6 +4,7 @@ import { resolveAssetUrl } from '../../api/config';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/toastHooks';
 import { useConfirm } from '../../context/confirmHooks';
+import { useSignalREvent } from '../../context/signalRHooks';
 import CollapsibleProfileSection from '../../components/common/CollapsibleProfileSection';
 import ChangePasswordPanel from '../auth/ChangePasswordPanel';
 import compressImageFile from '../../utils/imageCompressor';
@@ -33,6 +34,9 @@ export default function TutorProfilePage() {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [reloadKey, setReloadKey] = useState(0);
+
+  // Tự động cập nhật hồ sơ khi Admin phê duyệt hoặc từ chối theo thời gian thực (Zero-Reload)
+  useSignalREvent('TutorApprovalStatusChanged', () => setReloadKey((k) => k + 1));
 
 
   // Các trường thông tin hồ sơ gia sư

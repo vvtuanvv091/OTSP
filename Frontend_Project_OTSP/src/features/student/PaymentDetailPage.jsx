@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import studentApi from '../../api/studentApi';
+import { useSignalR, useSignalREvent } from '../../context/signalRHooks';
 
 const formatMoney = (val) =>
   new Intl.NumberFormat('vi-VN').format(val || 0) + ' VNĐ';
@@ -51,7 +52,29 @@ export default function PaymentDetailPage() {
     };
   }, [paymentId]);
 
-  // Tự động kiểm tra trạng thái thanh toán mỗi 3 giây
+  const { joinPayment, leavePayment } = useSignalR();
+
+  // Gia nhập phòng thanh toán SignalR thời gian thực
+  useEffect(() => {
+    if (payment?.paymentId) {
+      joinPayment(payment.paymentId);
+      return () => leavePayment(payment.paymentId);
+    }
+    return undefined;
+  }, [payment?.paymentId, joinPayment, leavePayment]);
+
+  // Nhận tín hiệu thanh toán thành công tức thì từ SignalR (0ms delay)
+  useSignalREvent('PaymentStatusChanged', (data) => {
+    if (Number(data?.paymentId) === Number(payment?.paymentId) && data?.isPaid) {
+      setIsPaid(true);
+      if (redirectTimerRef.current) clearTimeout(redirectTimerRef.current);
+      redirectTimerRef.current = setTimeout(() => {
+        navigate('/student/payments?status=success');
+      }, 2500);
+    }
+  });
+
+  // Tự động kiểm tra trạng thái thanh toán dự phòng (polling mỗi 5 giây)
   useEffect(() => {
     if (!payment?.paymentId || isPaid) return undefined;
 
@@ -69,7 +92,7 @@ export default function PaymentDetailPage() {
       } catch {
         // Kiểm tra trạng thái định kỳ ngầm
       }
-    }, 3000);
+    }, 5000);
 
     return () => clearInterval(interval);
   }, [payment?.paymentId, isPaid, navigate]);

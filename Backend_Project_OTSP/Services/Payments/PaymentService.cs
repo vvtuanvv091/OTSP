@@ -10,6 +10,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.AspNetCore.SignalR;
+using Backend_Project_OTSP.Hubs;
 using Backend_Project_OTSP.Data;
 using Backend_Project_OTSP.Dtos.Common.Notification;
 using Backend_Project_OTSP.Dtos.Payment;
@@ -29,6 +31,7 @@ public class PaymentService : IPaymentService
     private readonly IHttpClientFactory? _httpClientFactory;
     private readonly IEmailSenderService? _emailSender;
     private readonly IEmailQueue? _emailQueue;
+    private readonly IHubContext<AppHub>? _appHub;
 
     private readonly string _bankName;
     private readonly string _bankId;
@@ -42,7 +45,8 @@ public class PaymentService : IPaymentService
         ILogger<PaymentService> logger,
         IHttpClientFactory? httpClientFactory = null,
         IEmailSenderService? emailSender = null,
-        IEmailQueue? emailQueue = null)
+        IEmailQueue? emailQueue = null,
+        IHubContext<AppHub>? appHub = null)
     {
         _db = db;
         _config = config;
@@ -51,6 +55,7 @@ public class PaymentService : IPaymentService
         _httpClientFactory = httpClientFactory;
         _emailSender = emailSender;
         _emailQueue = emailQueue;
+        _appHub = appHub;
 
         _bankName = _config["SePay:BankName"] ?? _config["VietQR:BankName"] ?? "MBBank";
         _bankId = _config["SePay:BankId"] ?? _config["VietQR:BankId"] ?? "970422";
@@ -631,6 +636,34 @@ public class PaymentService : IPaymentService
             }
 
             await _db.SaveChangesAsync(ct);
+
+            // 2.1 Bắn sự kiện SignalR Realtime tới Học viên và Gia sư qua Unified AppHub
+            if (_appHub != null)
+            {
+                var paymentEvent = new
+                {
+                    paymentId = p.Id,
+                    status = "Success",
+                    isPaid = true,
+                    classroomId = p.ClassroomId,
+                    amount = p.Amount,
+                    paidAtUtc = p.PaidAt
+                };
+
+                if (!string.IsNullOrEmpty(studentUserId))
+                {
+                    await _appHub.Clients.Group($"user:{studentUserId}").SendAsync("PaymentStatusChanged", paymentEvent, ct);
+                    await _appHub.Clients.Group($"user:{studentUserId}").SendAsync("NotificationReceived", new { type = "Payment", id = p.Id, title = "Học phí đã được ghi nhận" }, ct);
+                }
+
+                await _appHub.Clients.Group($"payment:{p.Id}").SendAsync("PaymentStatusChanged", paymentEvent, ct);
+
+                if (!string.IsNullOrEmpty(tutorUserId))
+                {
+                    await _appHub.Clients.Group($"user:{tutorUserId}").SendAsync("PaymentStatusChanged", paymentEvent, ct);
+                    await _appHub.Clients.Group($"user:{tutorUserId}").SendAsync("NotificationReceived", new { type = "Payment", id = p.Id, title = "Học viên đã nộp học phí" }, ct);
+                }
+            }
 
             // 3. Gửi Email Biên lai điện tử về Gmail cho Học viên qua hàng đợi nền
             if (!string.IsNullOrEmpty(studentEmail) && (_emailQueue != null || _emailSender != null))

@@ -20,14 +20,14 @@ public class ChatApiController : ControllerBase
 {
     private readonly IChatService _chatService;
     private readonly ApplicationDbContext _db;
-    private readonly IHubContext<ChatHub> _hubContext;
+    private readonly IHubContext<AppHub> _hubContext;
     private readonly IImageStorageService _imageStorage;
     private readonly ILogger<ChatApiController>? _logger;
 
     public ChatApiController(
         IChatService chatService,
         ApplicationDbContext db,
-        IHubContext<ChatHub> hubContext,
+        IHubContext<AppHub> hubContext,
         IImageStorageService imageStorage,
         ILogger<ChatApiController>? logger = null)
     {
@@ -119,7 +119,7 @@ public class ChatApiController : ControllerBase
             }
             else
             {
-                var directRoom = ChatHub.GetDirectRoomName(userId, contactUserId);
+                var directRoom = AppHub.GetDirectRoomName(userId, contactUserId);
 
                 // Bắn tín hiệu qua SignalR bằng sự kiện chuẩn ReceiveMessage:
                 // 1. Kênh phòng trò chuyện trực tiếp của 2 người
@@ -243,7 +243,7 @@ public class ChatApiController : ControllerBase
             return;
         }
 
-        var room = ChatHub.GetDirectRoomName(senderId, receiverId);
+        var room = AppHub.GetDirectRoomName(senderId, receiverId);
         await _hubContext.Clients.Group(room).SendAsync(eventName, payload, cancellationToken);
         await _hubContext.Clients.Group($"user:{senderId}").SendAsync(eventName, payload, cancellationToken);
         await _hubContext.Clients.Group($"user:{receiverId}").SendAsync(eventName, payload, cancellationToken);

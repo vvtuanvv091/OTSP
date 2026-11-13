@@ -24,6 +24,7 @@ public class TutorScheduleApiController : ControllerBase
 
     private readonly ApplicationDbContext _db;
     private readonly IHubContext<ConnectionRequestHub> _hubContext;
+    private readonly IHubContext<AppHub>? _appHub;
     private readonly ILogger<TutorScheduleApiController> _logger;
     private readonly IScheduleBlockService _blocks;
     private readonly IClassSessionService? _classSessionService;
@@ -33,13 +34,15 @@ public class TutorScheduleApiController : ControllerBase
         IHubContext<ConnectionRequestHub> hubContext,
         ILogger<TutorScheduleApiController> logger,
         IScheduleBlockService blocks,
-        IClassSessionService? classSessionService = null)
+        IClassSessionService? classSessionService = null,
+        IHubContext<AppHub>? appHub = null)
     {
         _db = db;
         _hubContext = hubContext;
         _logger = logger;
         _blocks = blocks;
         _classSessionService = classSessionService;
+        _appHub = appHub;
     }
 
     private string? CurrentUserId => User.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -188,10 +191,19 @@ public class TutorScheduleApiController : ControllerBase
 
         try
         {
+            var trialPayload = new { requestId = connRequest.Id, scheduledAtUtc, classSessionId = classSession.Id };
             await _hubContext.Clients.User(connRequest.Student.UserId).SendAsync(
                 "TrialScheduleConfirmed",
-                new { requestId = connRequest.Id, scheduledAtUtc, classSessionId = classSession.Id },
+                trialPayload,
                 cancellationToken);
+
+            if (_appHub != null)
+            {
+                await _appHub.Clients.Group($"user:{connRequest.Student.UserId}").SendAsync(
+                    "TrialScheduleConfirmed",
+                    trialPayload,
+                    cancellationToken);
+            }
         }
         catch (Exception ex)
         {

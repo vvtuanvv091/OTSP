@@ -45,14 +45,14 @@ public sealed class ChatNotificationWorker : BackgroundService
                 using var scope = _serviceProvider.CreateScope();
                 var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
                 var cache = scope.ServiceProvider.GetRequiredService<IMemoryCache>();
-                var chatHub = scope.ServiceProvider.GetRequiredService<IHubContext<ChatHub>>();
+                var appHub = scope.ServiceProvider.GetRequiredService<IHubContext<AppHub>>();
                 var emailSender = scope.ServiceProvider.GetService<IEmailSenderService>();
 
                 // 1. Thông báo tin nhắn đã được ghi nhận trong bảng Notifications tại ChatService để hiển thị tập trung tại mục Thông báo theo yêu cầu.
 
                 // 2. Bắn tín hiệu Realtime qua SignalR tới người nhận (0 byte Database)
                 // Cập nhật preview cuộc trò chuyện và báo tin nhắn mới nếu người dùng đang online ở trang khác
-                await chatHub.Clients.Group($"user:{evt.ReceiverId}").SendAsync("ChatMessageReceived", new
+                await appHub.Clients.Group($"user:{evt.ReceiverId}").SendAsync("ChatMessageReceived", new
                 {
                     senderId = evt.SenderId,
                     senderName = evt.SenderName,

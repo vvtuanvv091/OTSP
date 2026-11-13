@@ -1,11 +1,10 @@
 import { useState, useEffect, useMemo } from 'react';
-import { hubUrl, resolveAssetUrl } from '../../api/config';
+import { resolveAssetUrl } from '../../api/config';
 import { Link } from 'react-router-dom';
-import * as signalR from '@microsoft/signalr';
 import studentApi from '../../api/studentApi';
 import { useConfirm } from '../../context/confirmHooks';
 import { useToast } from '../../context/toastHooks';
-import { getStoredToken } from '../../utils/authStorage';
+import { useSignalREvent } from '../../context/signalRHooks';
 
 const formatMoney = (val) =>
   new Intl.NumberFormat('vi-VN').format(val || 0);
@@ -50,73 +49,28 @@ export default function StudentConnectionRequestsPage() {
     };
   }, [statusFilter, reloadTick]);
 
-  // Lắng nghe sự kiện cập nhật thời gian thực qua SignalR
-  useEffect(() => {
-    const token = getStoredToken();
-    if (!token) return undefined;
+  // Lắng nghe sự kiện cập nhật thời gian thực qua SignalR dùng chung (Zero-Reload)
+  useSignalREvent('ConnectionRequestStatusChanged', (update) => {
+    if (!update) return;
+    setRequests((prev) =>
+      prev.map((r) =>
+        r.id === update.requestId ? { ...r, status: update.status } : r
+      )
+    );
+    const statusLabel =
+      update.status === 'Accepted'
+        ? 'Đã chấp nhận'
+        : update.status === 'Rejected'
+        ? 'Đã từ chối'
+        : update.status;
+    setRealtimeNotice(`Gia sư vừa cập nhật phản hồi yêu cầu #${update.requestId}: ${statusLabel}`);
+    setReloadTick((n) => n + 1);
+  });
 
-    let active = true;
-    let hubConnection = null;
-    let isConnected = false;
-
-    try {
-      hubConnection = new signalR.HubConnectionBuilder()
-        .withUrl(hubUrl('/hubs/connection-requests'), {
-          accessTokenFactory: getStoredToken,
-        })
-        .withAutomaticReconnect()
-        .build();
-
-      hubConnection.on('ConnectionRequestStatusChanged', (update) => {
-        if (!active || !update) return;
-        setRequests((prev) =>
-          prev.map((r) =>
-            r.id === update.requestId ? { ...r, status: update.status } : r
-          )
-        );
-        const statusLabel =
-          update.status === 'Accepted'
-            ? 'Đã chấp nhận'
-            : update.status === 'Rejected'
-            ? 'Đã từ chối'
-            : update.status;
-        setRealtimeNotice(`Gia sư vừa cập nhật phản hồi yêu cầu #${update.requestId}: ${statusLabel}`);
-        setReloadTick((n) => n + 1);
-      });
-
-      hubConnection.on('TrialScheduleConfirmed', (update) => {
-        if (!active || !update) return;
-        setRealtimeNotice('Gia sư vừa xếp lịch học cho lớp của bạn. Danh sách đã được cập nhật.');
-        setReloadTick((n) => n + 1);
-      });
-
-      hubConnection
-        .start()
-        .then(() => {
-          isConnected = true;
-          if (!active) {
-            hubConnection.stop().catch(() => {});
-          }
-        })
-        .catch((err) => {
-          if (active) {
-            console.debug('SignalR connection-requests start notice:', err?.message || err);
-          }
-        });
-    } catch (err) {
-      console.warn('SignalR connection-requests init error:', err);
-    }
-
-    return () => {
-      active = false;
-      if (hubConnection) {
-        hubConnection.off('ConnectionRequestStatusChanged');
-        if (isConnected && hubConnection.state === signalR.HubConnectionState.Connected) {
-          hubConnection.stop().catch(() => {});
-        }
-      }
-    };
-  }, []);
+  useSignalREvent('TrialScheduleConfirmed', () => {
+    setRealtimeNotice('Gia sư vừa xếp lịch học cho lớp của bạn. Danh sách đã được cập nhật.');
+    setReloadTick((n) => n + 1);
+  });
 
   const handleCancel = async (id) => {
     const ok = await confirm({

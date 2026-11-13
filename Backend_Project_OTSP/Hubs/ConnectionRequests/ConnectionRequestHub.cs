@@ -21,6 +21,7 @@ public sealed class ConnectionRequestHub : Hub
         if (!string.IsNullOrWhiteSpace(userId))
         {
             _presenceService.OnConnected(userId, Context.ConnectionId);
+            await Groups.AddToGroupAsync(Context.ConnectionId, $"user:{userId}");
         }
         await base.OnConnectedAsync();
     }

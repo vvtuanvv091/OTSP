@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import studentApi from '../../api/studentApi';
+import { useSignalREvent } from '../../context/signalRHooks';
 import '../../styles/student/StudentSchedulePage.css';
 
 const PERIOD_ROWS = [
@@ -94,6 +95,10 @@ export default function StudentSchedulePage() {
   const [sessions, setSessions] = useState([]);
   const [pendingPayments, setPendingPayments] = useState([]);
   const [reloadKey, setReloadKey] = useState(0);
+
+  // Cập nhật trạng thái buổi học theo thời gian thực (Zero-Reload)
+  useSignalREvent('ClassSessionStatusChanged', () => setReloadKey((k) => k + 1));
+  useSignalREvent('ClassSessionEnded', () => setReloadKey((k) => k + 1));
   const [activeDayMobile, setActiveDayMobile] = useState(
     () => (((parseDateOnly(getVietnamToday()).getUTCDay() + 6) % 7) + 1) % 7
   );

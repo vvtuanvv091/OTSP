@@ -12,13 +12,35 @@ public class NotificationService : INotificationService, INotificationDispatcher
 {
     private readonly ApplicationDbContext _db;
     private readonly IHubContext<ConnectionRequestHub> _connectionRequestHub;
-    private readonly IHubContext<ChatHub> _chatHub;
+    private readonly IHubContext<AppHub>? _appHub;
+    private readonly IHubContext<ChatHub>? _legacyChatHub;
     private readonly IEmailQueue? _emailQueue;
     private readonly IEmailSenderService? _emailSender;
     private readonly ILogger<NotificationService> _logger;
     private readonly IConfiguration? _configuration;
     private readonly IServiceScopeFactory? _scopeFactory;
 
+    public NotificationService(
+        ApplicationDbContext db,
+        IHubContext<ConnectionRequestHub> connectionRequestHub,
+        IHubContext<AppHub> appHub,
+        ILogger<NotificationService> logger,
+        IEmailQueue? emailQueue = null,
+        IEmailSenderService? emailSender = null,
+        IConfiguration? configuration = null,
+        IServiceScopeFactory? scopeFactory = null)
+    {
+        _db = db;
+        _connectionRequestHub = connectionRequestHub;
+        _appHub = appHub;
+        _logger = logger;
+        _emailQueue = emailQueue;
+        _emailSender = emailSender;
+        _configuration = configuration;
+        _scopeFactory = scopeFactory;
+    }
+
+    // Overload để tương thích ngược với unit tests và legacy code
     public NotificationService(
         ApplicationDbContext db,
         IHubContext<ConnectionRequestHub> connectionRequestHub,
@@ -31,12 +53,24 @@ public class NotificationService : INotificationService, INotificationDispatcher
     {
         _db = db;
         _connectionRequestHub = connectionRequestHub;
-        _chatHub = chatHub;
+        _legacyChatHub = chatHub;
         _logger = logger;
         _emailQueue = emailQueue;
         _emailSender = emailSender;
         _configuration = configuration;
         _scopeFactory = scopeFactory;
+    }
+
+    private async Task SendToAppHubGroupAsync(string groupName, string method, object arg, CancellationToken ct = default)
+    {
+        if (_appHub != null)
+        {
+            await _appHub.Clients.Group(groupName).SendAsync(method, arg, ct);
+        }
+        else if (_legacyChatHub != null)
+        {
+            await _legacyChatHub.Clients.Group(groupName).SendAsync(method, arg, ct);
+        }
     }
 
     private string FrontendBaseUrl =>
@@ -57,6 +91,22 @@ public class NotificationService : INotificationService, INotificationDispatcher
 
         _db.Notifications.Add(notif);
         await _db.SaveChangesAsync(ct);
+
+        try
+        {
+            await SendToAppHubGroupAsync($"user:{userId}", "NotificationReceived", new
+            {
+                id = notif.Id,
+                title = notif.Title,
+                content = notif.Content,
+                createdAt = notif.CreatedAt
+            }, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Lỗi gửi SignalR NotificationReceived tới user {UserId}", userId);
+        }
+
         return notif;
     }
 
@@ -64,14 +114,8 @@ public class NotificationService : INotificationService, INotificationDispatcher
     {
         try
         {
-            if (string.Equals(hubName, "ConnectionRequestHub", StringComparison.OrdinalIgnoreCase))
-            {
-                await _connectionRequestHub.Clients.User(userId).SendAsync(method, payload, ct);
-            }
-            else if (string.Equals(hubName, "ChatHub", StringComparison.OrdinalIgnoreCase))
-            {
-                await _chatHub.Clients.Group($"user:{userId}").SendAsync(method, payload, ct);
-            }
+            await SendToAppHubGroupAsync($"user:{userId}", method, payload, ct);
+            await _connectionRequestHub.Clients.User(userId).SendAsync(method, payload, ct);
         }
         catch (Exception ex)
         {
@@ -251,6 +295,22 @@ public class NotificationService : INotificationService, INotificationDispatcher
 
         await CreateInAppNotificationAsync(evt.TutorUserId, title, content, ct);
 
+        try
+        {
+            var approvalEvent = new
+            {
+                tutorUserId = evt.TutorUserId,
+                isApproved = evt.IsApproved,
+                reason = evt.Reason
+            };
+            await SendToAppHubGroupAsync($"user:{evt.TutorUserId}", "TutorApprovalStatusChanged", approvalEvent, ct);
+            await SendToAppHubGroupAsync("role:admin", "AdminTutorApprovalProcessed", approvalEvent, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Lỗi gửi SignalR TutorApprovalStatusChanged cho tutor {TutorUserId}", evt.TutorUserId);
+        }
+
         if (!string.IsNullOrWhiteSpace(evt.TutorEmail))
         {
             var (subject, body) = evt.IsApproved
@@ -269,6 +329,22 @@ public class NotificationService : INotificationService, INotificationDispatcher
             : $"Kết quả giải quyết: {evt.Resolution}") + " [url:/complaints]";
 
         await CreateInAppNotificationAsync(evt.SenderUserId, title, content, ct);
+
+        try
+        {
+            var complaintEvent = new
+            {
+                complaintId = evt.ComplaintId,
+                statusText = evt.StatusText,
+                resolution = evt.Resolution
+            };
+            await SendToAppHubGroupAsync($"user:{evt.SenderUserId}", "ComplaintStatusChanged", complaintEvent, ct);
+            await SendToAppHubGroupAsync("role:admin", "AdminComplaintUpdated", complaintEvent, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Lỗi gửi SignalR ComplaintStatusChanged cho user {SenderUserId}", evt.SenderUserId);
+        }
 
         if (!string.IsNullOrWhiteSpace(evt.SenderEmail))
         {

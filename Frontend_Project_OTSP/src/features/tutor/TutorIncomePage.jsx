@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import tutorApi from '../../api/tutorApi';
+import { useSignalREvent } from '../../context/signalRHooks';
 
 const formatCurrency = (value) => `${new Intl.NumberFormat('vi-VN').format(value || 0)} đ`;
 
@@ -11,6 +12,10 @@ export default function TutorIncomePage() {
   const [savingBankAccount, setSavingBankAccount] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
+  const [reloadKey, setReloadKey] = useState(0);
+
+  // Tự động cập nhật thu nhập khi có học viên nộp học phí theo thời gian thực (Zero-Reload)
+  useSignalREvent('PaymentStatusChanged', () => setReloadKey((k) => k + 1));
 
   useEffect(() => {
     let active = true;
@@ -34,7 +39,7 @@ export default function TutorIncomePage() {
     return () => {
       active = false;
     };
-  }, [requestedMonth]);
+  }, [requestedMonth, reloadKey]);
 
   const progress = Math.min(100, Math.max(0, income?.completionPercentage || 0));
   const saveBankAccount = async (event) => {

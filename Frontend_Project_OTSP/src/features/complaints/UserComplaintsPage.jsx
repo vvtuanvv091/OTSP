@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { resolveAssetUrl } from '../../api/config';
 import complaintApi from '../../api/complaintApi';
+import { useSignalREvent } from '../../context/signalRHooks';
 import ComplaintModal from '../../components/common/ComplaintModal';
 
 export default function UserComplaintsPage() {
@@ -12,6 +13,9 @@ export default function UserComplaintsPage() {
   const [alertMsg, setAlertMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [reloadKey, setReloadKey] = useState(0);
+
+  // Tự động làm mới danh sách khiếu nại khi Admin phân xử theo thời gian thực (Zero-Reload)
+  useSignalREvent('ComplaintStatusChanged', () => setReloadKey((k) => k + 1));
 
   const alertTimerRef = useRef(null);
 
