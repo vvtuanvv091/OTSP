@@ -2,6 +2,7 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using Backend_Project_OTSP.Data;
 using Backend_Project_OTSP.Dtos;
 using Backend_Project_OTSP.Models;
@@ -17,9 +18,9 @@ public class AiService : IAiService
     private readonly ILogger<AiService> _logger;
     private readonly IHttpContextAccessor? _httpContextAccessor;
     private readonly IHttpClientFactory? _httpClientFactory;
+    private readonly IMemoryCache? _cache;
     private readonly string _baseUrl;
     private readonly string _apiKey;
-    private static readonly HttpClient SharedGeminiFallbackClient = new() { Timeout = TimeSpan.FromSeconds(25) };
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -32,7 +33,8 @@ public class AiService : IAiService
         IConfiguration config,
         ILogger<AiService> logger,
         IHttpContextAccessor? httpContextAccessor = null,
-        IHttpClientFactory? httpClientFactory = null)
+        IHttpClientFactory? httpClientFactory = null,
+        IMemoryCache? cache = null)
     {
         _http = http;
         _db = db;
@@ -40,20 +42,20 @@ public class AiService : IAiService
         _logger = logger;
         _httpContextAccessor = httpContextAccessor;
         _httpClientFactory = httpClientFactory;
+        _cache = cache;
 
         _baseUrl = _config["AiService:BaseUrl"] ?? "http://localhost:8000";
         _apiKey = _config["AiService:InternalApiKey"] ?? string.Empty;
         if (string.IsNullOrWhiteSpace(_apiKey))
         {
-            _logger.LogWarning("AiService:InternalApiKey is not configured; internal AI calls will fall back if rejected.");
+            _logger.LogWarning("AiService:InternalApiKey is not configured; internal AI calls may be rejected.");
         }
 
         if (Uri.TryCreate(_baseUrl, UriKind.Absolute, out var uri))
         {
             _http.BaseAddress = uri;
         }
-        // Timeout 8s: vừa đủ cho service Python phản hồi nhanh, nếu quá 8s sẽ fallback sang Gemini trực tiếp
-        _http.Timeout = TimeSpan.FromSeconds(8);
+        _http.Timeout = TimeSpan.FromSeconds(30);
     }
 
     private HttpRequestMessage CreateAuthorizedRequest(HttpMethod method, string path, object? body = null)
@@ -73,6 +75,13 @@ public class AiService : IAiService
 
     public async Task<AgentChatResponseDto> ChatWithAgentAsync(AgentChatRequestDto request, string? currentUserId, CancellationToken ct = default)
     {
+        // 0. Kiểm tra hạn mức câu hỏi trong ngày theo vai trò (Khách: 10, Học viên/Gia sư: 50, Admin: 500)
+        var (allowed, currentCount, maxLimit, userRole, quotaCacheKey) = await CheckDailyQuotaAsync(currentUserId, ct);
+        if (!allowed)
+        {
+            return BuildQuotaExceededResponse(userRole, maxLimit);
+        }
+
         // 1. Enrich context if user is authenticated (lấy đúng vai trò hiện tại từ UserRoles)
         if (!string.IsNullOrWhiteSpace(currentUserId))
         {
@@ -163,6 +172,7 @@ public class AiService : IAiService
 
                         var pythonTokens = EstimateTokens(request.Message, result.Reply);
                         await RecordAiUsageAsync(currentUserId, "Hỏi AI Wein (Chat)", request.Message, pythonTokens, null, ct);
+                        IncrementDailyQuotaCache(quotaCacheKey, currentCount + 1);
                         return result;
                     }
                 }
@@ -173,18 +183,35 @@ public class AiService : IAiService
             }
             catch (Exception ex)
             {
-                _logger.LogWarning("Python AI agent service offline or unreachable ({Msg}), falling back to direct Gemini", ex.Message);
+                _logger.LogWarning("Python AI agent service offline or unreachable ({Msg})", ex.Message);
             }
         }
 
-        // 3. Fallback sang Direct Gemini API tốc độ cao, luôn chạy mượt cả trên Render & Vercel
-        var (fallbackResult, geminiTokens) = await CallDirectGeminiFallbackAsync(request, ct);
-        await RecordAiUsageAsync(currentUserId, "Hỏi AI Wein (Chat)", request.Message, geminiTokens, null, ct);
-        return fallbackResult;
+        return new AgentChatResponseDto
+        {
+            Reply = "Xin lỗi bạn, Wein đang bận xử lý dữ liệu. Bạn vui lòng thử lại sau giây lát hoặc truy cập [Tìm gia sư](/search) nhé!",
+            Intent = "GENERAL",
+            AutoExecute = false,
+            SuggestedPrompts = new List<string> { "Tìm gia sư môn Toán", "Xem lớp học đang mở" }
+        };
     }
 
     public async Task<StudyAssistantResponseDto> AskStudyAssistantAsync(StudyAssistantRequestDto request, string currentUserId, CancellationToken ct = default)
     {
+        // 0. Kiểm tra hạn mức câu hỏi học tập trong ngày (50 câu/ngày)
+        var (allowed, currentCount, maxLimit, userRole, quotaCacheKey) = await CheckDailyQuotaAsync(currentUserId, ct);
+        if (!allowed)
+        {
+            return new StudyAssistantResponseDto
+            {
+                Answer = $"Bạn đã sử dụng hết hạn mức **{maxLimit} câu hỏi/ngày** của tài khoản hôm nay (hạn mức sẽ tự động làm mới vào lúc 00:00 ngày mai).\n\n" +
+                         FounderContactMarkdown,
+                ConceptSummary = "Hạn mức câu hỏi trong ngày",
+                PracticeQuestion = "",
+                PracticeSolution = ""
+            };
+        }
+
         var student = await _db.StudentProfiles.FirstOrDefaultAsync(s => s.UserId == currentUserId, ct);
         var studentId = student?.Id ?? 0;
 
@@ -222,15 +249,9 @@ public class AiService : IAiService
             }
         }
 
-        // Fallback sang Gemini giải bài tập trực tiếp nếu Python service chưa bật
-        if (result == null || string.IsNullOrWhiteSpace(result.Answer))
-        {
-            (result, tokensUsed) = await SolveStudyQuestionWithGeminiAsync(request, ct);
-        }
-
         result ??= new StudyAssistantResponseDto
         {
-            Answer = "Hệ thống đã tiếp nhận câu hỏi của bạn. Vui lòng thử lại trong giây lát hoặc tham khảo tài liệu học tập trong mục Tài liệu.",
+            Answer = "Hệ thống AI đang bận xử lý. Vui lòng thử lại trong giây lát hoặc tham khảo tài liệu học tập trong mục Tài liệu.",
             ConceptSummary = "Kiến thức môn học",
             PracticeQuestion = "",
             PracticeSolution = ""
@@ -265,6 +286,7 @@ public class AiService : IAiService
         }
 
         await RecordAiUsageAsync(currentUserId, "Trợ lý giải bài tập AI", request.Question, tokensUsed, savedSessionId, ct);
+        IncrementDailyQuotaCache(quotaCacheKey, currentCount + 1);
 
         return result;
     }
@@ -384,450 +406,6 @@ public class AiService : IAiService
         };
     }
 
-    private string GetGeminiApiKey()
-    {
-        var apiKey = _config["AiService:GeminiApiKey"];
-        if (!string.IsNullOrWhiteSpace(apiKey)) return apiKey;
-
-        apiKey = _config["GEMINI_API_KEY"];
-        if (!string.IsNullOrWhiteSpace(apiKey)) return apiKey;
-
-        apiKey = Environment.GetEnvironmentVariable("GEMINI_API_KEY");
-        if (!string.IsNullOrWhiteSpace(apiKey)) return apiKey;
-
-        // Tự động tìm nạp từ file .env nếu có (local hoặc trên Render)
-        var paths = new[]
-        {
-            Path.Combine(Directory.GetCurrentDirectory(), ".env"),
-            Path.Combine(Directory.GetCurrentDirectory(), "..", ".env"),
-            Path.Combine(Directory.GetCurrentDirectory(), "..", "OTSP_WEIN_AI_AGENTS", ".env")
-        };
-        foreach (var p in paths)
-        {
-            try
-            {
-                if (File.Exists(p))
-                {
-                    foreach (var line in File.ReadAllLines(p))
-                    {
-                        var trimmed = line.Trim();
-                        if (trimmed.StartsWith("GEMINI_API_KEY=", StringComparison.OrdinalIgnoreCase))
-                        {
-                            var val = trimmed.Substring("GEMINI_API_KEY=".Length).Trim(' ', '"', '\'');
-                            if (!string.IsNullOrWhiteSpace(val)) return val;
-                        }
-                    }
-                }
-            }
-            catch { }
-        }
-
-        return "";
-    }
-
-    private async Task<(AgentChatResponseDto Response, int TokensUsed)> CallDirectGeminiFallbackAsync(AgentChatRequestDto request, CancellationToken ct)
-    {
-        try
-        {
-            var apiKey = GetGeminiApiKey();
-
-            if (string.IsNullOrWhiteSpace(apiKey))
-            {
-                _logger.LogWarning("Gemini API key is not configured. Please set GEMINI_API_KEY in environment variables or appsettings.json");
-            }
-            else
-            {
-
-            var model = _config["AiService:GeminiModel"];
-            if (string.IsNullOrWhiteSpace(model)) model = _config["GEMINI_MODEL"];
-            if (string.IsNullOrWhiteSpace(model)) model = "gemini-3.5-flash-lite";
-
-            // Làm giàu ngữ cảnh bằng dữ liệu thực tế từ PostgreSQL (Toàn diện, thông minh & bảo mật tuyệt đối)
-            var lowerMsg = (request.Message ?? "").ToLower();
-            var liveContextBuilder = new StringBuilder();
-
-            try
-            {
-                // 1. Thống kê tổng quan hệ thống để AI hiểu đúng quy mô thực tế của OTSP
-                var enforceRole = await _db.Roles.AsNoTracking().AnyAsync(ct);
-                var activeTutorProfiles = _db.TutorProfiles.AsNoTracking()
-                    .Where(t => t.User.Status == AccountStatus.Active
-                             && (!enforceRole || _db.UserRoles.Any(ur =>
-                                 ur.UserId == t.UserId && _db.Roles.Any(r => r.Id == ur.RoleId && r.Name == "Tutor"))));
-
-                var totalTutors = await activeTutorProfiles.CountAsync(t => t.VerificationStatus == VerificationStatus.Approved, ct);
-                var totalClasses = await _db.Classrooms.CountAsync(c => c.Status == ClassroomStatus.Active, ct);
-
-                liveContextBuilder.AppendLine("\n[Dữ liệu hệ thống OTSP thời gian thực]:");
-                liveContextBuilder.AppendLine($"- Tổng số gia sư chính thức đã kiểm duyệt trên nền tảng: {totalTutors} gia sư.");
-                liveContextBuilder.AppendLine($"- Tổng số lớp học nhóm đang mở đăng ký: {totalClasses} lớp.");
-
-                // 2. Tải toàn bộ danh sách gia sư trên hệ thống (CHỈ LẤY CÁC TRƯỜNG CÔNG KHAI - BẢO MẬT TUYỆT ĐỐI)
-                // Lưu ý: Tuyệt đối không lấy Password, CCCD, Email, Phone, BankAccount để đảm bảo an toàn.
-                var rawTutors = await activeTutorProfiles
-                    .Include(t => t.User)
-                    .Include(t => t.TutorSubjects).ThenInclude(ts => ts.Subject)
-                    .Select(t => new
-                    {
-                        t.Id,
-                        Name = t.User.FullName ?? "",
-                        Status = t.VerificationStatus,
-                        HourlyRate = t.HourlyFee,
-                        Rating = t.AverageRating,
-                        Format = t.TeachingFormat == TeachingFormat.Online ? "Online" :
-                                 t.TeachingFormat == TeachingFormat.Offline ? "Trực tiếp" : "Online & Trực tiếp",
-                        SubjectNames = t.TutorSubjects.Select(ts => ts.Subject.Name).ToList()
-                    })
-                    .ToListAsync(ct);
-
-                var allTutors = rawTutors.Select(t => new
-                {
-                    t.Id,
-                    t.Name,
-                    t.Status,
-                    t.HourlyRate,
-                    t.Rating,
-                    t.Format,
-                    Subjects = string.Join(", ", t.SubjectNames.Distinct())
-                }).ToList();
-
-                var unaccentMsg = RemoveDiacritics(lowerMsg);
-
-                // Tìm gia sư khớp với câu hỏi người dùng (theo tên, môn học, từ khóa - hỗ trợ cả có dấu & không dấu)
-                var matchedTutors = allTutors.Where(t =>
-                {
-                    var nameLower = (t.Name ?? "").ToLower();
-                    var nameUnaccent = RemoveDiacritics(nameLower);
-                    if (!string.IsNullOrEmpty(nameLower))
-                    {
-                        if (lowerMsg.Contains(nameLower) || unaccentMsg.Contains(nameUnaccent)) return true;
-                        var parts = nameLower.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-                        if (parts.Any(p => p.Length >= 2 && lowerMsg.Contains(p))) return true;
-                        var partsUnaccent = nameUnaccent.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-                        if (partsUnaccent.Any(p => p.Length >= 2 && unaccentMsg.Contains(p))) return true;
-                    }
-
-                    var subLower = (t.Subjects ?? "").ToLower();
-                    var subUnaccent = RemoveDiacritics(subLower);
-                    if (!string.IsNullOrEmpty(subLower))
-                    {
-                        var subs = subLower.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries);
-                        if (subs.Any(s => lowerMsg.Contains(s.Trim()) || unaccentMsg.Contains(RemoveDiacritics(s.Trim())))) return true;
-                    }
-
-                    return false;
-                }).ToList();
-
-                // Nếu không khớp tên/môn cụ thể, nhưng người dùng hỏi về gia sư nói chung thì lấy top gia sư tiêu biểu đã duyệt
-                if (!matchedTutors.Any() && (lowerMsg.Contains("gia sư") || lowerMsg.Contains("thầy") || lowerMsg.Contains("cô") || lowerMsg.Contains("học") || lowerMsg.Contains("dạy")))
-                {
-                    matchedTutors = allTutors.Where(t => t.Status == VerificationStatus.Approved).OrderByDescending(t => t.Rating).ThenBy(t => t.HourlyRate).Take(5).ToList();
-                }
-
-                if (matchedTutors.Any())
-                {
-                    liveContextBuilder.AppendLine("\n[Danh sách Gia sư thực tế liên quan trong hệ thống]:");
-                    foreach (var t in matchedTutors.Take(8))
-                    {
-                        var subjectsText = string.IsNullOrWhiteSpace(t.Subjects) ? "Đang cập nhật" : t.Subjects;
-                        var statusText = t.Status == VerificationStatus.Approved ? "Đã duyệt chính thức" : "Hồ sơ đang chờ duyệt";
-                        liveContextBuilder.AppendLine($"- Gia sư: {t.Name} | Trạng thái: {statusText} | Môn dạy: {subjectsText} | Học phí: {t.HourlyRate:N0} đ/giờ | Đánh giá: {t.Rating:F1}★ | Hình thức: {t.Format}");
-                    }
-                }
-
-                // 3. Tải danh sách lớp học nhóm (CHỈ LẤY CÁC TRƯỜNG CÔNG KHAI)
-                var allClasses = await _db.Classrooms
-                    .AsNoTracking()
-                    .Include(c => c.Subject)
-                    .Include(c => c.Tutor).ThenInclude(t => t.User)
-                    .Where(c => c.Status == ClassroomStatus.Active)
-                    .Select(c => new
-                    {
-                        c.Id,
-                        c.NameClass,
-                        Subject = c.Subject.Name,
-                        Tutor = c.Tutor.User.FullName,
-                        c.Fee,
-                        StudentCount = c.ClassroomStudents.Count,
-                        c.MaxStudents
-                    })
-                    .ToListAsync(ct);
-
-                var matchedClasses = allClasses.Where(c =>
-                {
-                    var cName = (c.NameClass ?? "").ToLower();
-                    var cSub = (c.Subject ?? "").ToLower();
-                    var cTutor = (c.Tutor ?? "").ToLower();
-                    return lowerMsg.Contains(cName) ||
-                           lowerMsg.Contains(cSub) ||
-                           lowerMsg.Contains(cTutor) ||
-                           cName.Split(' ', StringSplitOptions.RemoveEmptyEntries).Any(w => w.Length >= 3 && lowerMsg.Contains(w));
-                }).ToList();
-
-                if (!matchedClasses.Any() && (lowerMsg.Contains("lớp") || lowerMsg.Contains("nhóm") || lowerMsg.Contains("khoá") || lowerMsg.Contains("tuyển sinh")))
-                {
-                    matchedClasses = allClasses.Take(5).ToList();
-                }
-
-                if (matchedClasses.Any())
-                {
-                    liveContextBuilder.AppendLine("\n[Dữ liệu lớp học nhóm thực tế trên OTSP]:");
-                    foreach (var c in matchedClasses.Take(6))
-                    {
-                        liveContextBuilder.AppendLine($"- Lớp: {c.NameClass} | Môn: {c.Subject} | Gia sư phụ trách: {c.Tutor} | Học phí: {c.Fee:N0} đ | Sĩ số: {c.StudentCount}/{c.MaxStudents}");
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning("Không thể nạp dữ liệu DB vào AI Context: {Msg}", ex.Message);
-            }
-
-            var systemPrompt = $@"Bạn là WEIN - Trợ lý AI thông minh và thân thiện của nền tảng kết nối gia sư và lớp học trực tuyến OTSP (Online Tutor Student Platform).
-Phong cách: Thân thiện, tận tình, xưng 'mình' hoặc 'WEIN', gọi người dùng là 'bạn'. Có thể dùng emoji nhẹ nhàng, văn phong sư phạm chuẩn mực.
-Nhiệm vụ:
-- Giải đáp thắc mắc về tìm gia sư, đăng ký lớp học, học phí, lịch học trực tuyến, chính sách học thử và thanh toán VietQR trên OTSP.
-- Trả lời bài tập toán, lý, hóa, văn, anh, công nghệ hoặc các thắc mắc học tập rõ ràng, mạch lạc theo từng bước.
-- NGUYÊN TẮC VỀ DỮ LIỆU THỰC TẾ:
-  + Căn cứ vào dữ liệu hệ thống được cung cấp bên dưới để trả lời chính xác.
-  + OTSP có nhiều gia sư và lớp học trên toàn quốc. Tuyệt đối KHÔNG khẳng định hệ thống chỉ có vài gia sư nếu chỉ nhìn thấy một phần danh sách gợi ý.
-  + Khi người dùng hỏi đích danh một gia sư (ví dụ: Phạm Anh Hào, Tống Ngọc...), nếu có trong danh sách nạp bên dưới thì giới thiệu rõ môn dạy, học phí và điểm đánh giá của gia sư đó.
-  + Nếu người dùng hỏi một gia sư hoàn toàn không có trong hệ thống, hãy trả lời lịch sự rằng chưa tìm thấy hồ sơ đó và gợi ý tìm theo môn học hoặc liên hệ hỗ trợ.
-- BẢO MẬT: Tuyệt đối KHÔNG tiết lộ thông tin nhạy cảm của người dùng (mật khẩu, CCCD, số điện thoại cá nhân, số tài khoản ngân hàng chi tiết, lịch sử giao dịch cá nhân).
-- ĐIỀU HƯỚNG: KHÔNG tự động chuyển trang web của người dùng. Chỉ gợi ý liên kết dạng Markdown [Tên nút](/duong-dan) hoặc nút hành động khi cần.
-{liveContextBuilder}";
-
-            var contents = new List<object>();
-
-            // Nạp tối đa 6 tin nhắn lịch sử gần nhất nếu có
-            if (request.ConversationHistory != null && request.ConversationHistory.Count > 0)
-            {
-                foreach (var h in request.ConversationHistory.TakeLast(6))
-                {
-                    if (string.IsNullOrWhiteSpace(h.Content)) continue;
-                    var role = (h.Role == "assistant" || h.Role == "model") ? "model" : "user";
-                    contents.Add(new { role = role, parts = new[] { new { text = h.Content } } });
-                }
-            }
-
-            contents.Add(new { role = "user", parts = new[] { new { text = request.Message } } });
-
-            var payload = new
-            {
-                system_instruction = new
-                {
-                    parts = new[] { new { text = systemPrompt } }
-                },
-                contents = contents,
-                generationConfig = new
-                {
-                    maxOutputTokens = 1200,
-                    temperature = 0.7
-                }
-            };
-
-            var directHttp = _httpClientFactory?.CreateClient("Gemini") ?? SharedGeminiFallbackClient;
-            var json = JsonSerializer.Serialize(payload);
-
-            var url = $"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent";
-            using var reqMsg = new HttpRequestMessage(HttpMethod.Post, url)
-            {
-                Content = new StringContent(json, Encoding.UTF8, "application/json")
-            };
-            reqMsg.Headers.TryAddWithoutValidation("x-goog-api-key", apiKey);
-
-            var res = await directHttp.SendAsync(reqMsg, ct);
-
-            // Nếu model 3.5 gặp lỗi, thử tiếp fallback qua gemini-2.5-flash
-            if (!res.IsSuccessStatusCode && model != "gemini-2.5-flash")
-            {
-                var retryUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
-                using var retryMsg = new HttpRequestMessage(HttpMethod.Post, retryUrl)
-                {
-                    Content = new StringContent(json, Encoding.UTF8, "application/json")
-                };
-                retryMsg.Headers.TryAddWithoutValidation("x-goog-api-key", apiKey);
-                res = await directHttp.SendAsync(retryMsg, ct);
-            }
-
-            if (res.IsSuccessStatusCode)
-            {
-                var body = await res.Content.ReadAsStringAsync(ct);
-                using var doc = JsonDocument.Parse(body);
-                var candidates = doc.RootElement.GetProperty("candidates");
-                if (candidates.GetArrayLength() > 0)
-                {
-                    var first = candidates[0];
-                    var parts = first.GetProperty("content").GetProperty("parts");
-                    if (parts.GetArrayLength() > 0)
-                    {
-                        var text = parts[0].GetProperty("text").GetString() ?? "";
-                        if (!string.IsNullOrWhiteSpace(text))
-                        {
-                            var lower = (request.Message ?? string.Empty).ToLower();
-                            UIActionDto uiAction = new UIActionDto { Type = "NONE", AutoExecute = false };
-                            if (lower.Contains("gia sư") || lower.Contains("tìm"))
-                            {
-                                uiAction = new UIActionDto { Type = "NAVIGATE", Target = "/search", Label = "Tìm kiếm gia sư", AutoExecute = false };
-                            }
-                            else if (lower.Contains("lớp") || lower.Contains("khóa"))
-                            {
-                                uiAction = new UIActionDto { Type = "NAVIGATE", Target = "/search?tab=classes", Label = "Xem danh sách lớp", AutoExecute = false };
-                            }
-                            else if (lower.Contains("lịch") || lower.Contains("thời khóa biểu"))
-                            {
-                                uiAction = new UIActionDto { Type = "NAVIGATE", Target = "/student/schedule", Label = "Xem thời khóa biểu", AutoExecute = false };
-                            }
-
-                            var realTokens = ExtractGeminiTokens(doc, systemPrompt + "\n" + request.Message, text);
-                            return (new AgentChatResponseDto
-                            {
-                                Reply = text,
-                                Intent = "GENERAL",
-                                UiAction = uiAction,
-                                AutoExecute = false,
-                                SuggestedPrompts = new List<string> { "Tìm gia sư môn Toán", "Xem danh sách lớp học mới", "Xem thời khóa biểu của tôi" }
-                            }, realTokens);
-                        }
-                    }
-                }
-            }
-            else
-            {
-                var err = await res.Content.ReadAsStringAsync(ct);
-                _logger.LogWarning("Direct Gemini fallback returned status {StatusCode}: {Error}", res.StatusCode, err);
-            }
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error in Direct Gemini fallback");
-        }
-
-        var defaultReply = "Chào bạn! Mình là WEIN, trợ lý AI của OTSP đây ạ. 😊 Bạn cần tìm gia sư môn nào hay muốn tham khảo lớp học nào hôm nay? Mình luôn sẵn sàng hỗ trợ bạn!";
-        return (new AgentChatResponseDto
-        {
-            Reply = defaultReply,
-            Intent = "GENERAL",
-            UiAction = new UIActionDto { Type = "NAVIGATE", Target = "/search", Label = "Tìm kiếm gia sư", AutoExecute = false },
-            AutoExecute = false,
-            SuggestedPrompts = new List<string> { "Tìm gia sư môn Toán", "Xem các lớp học mới", "Xem thời khóa biểu" }
-        }, EstimateTokens(request.Message, defaultReply));
-    }
-
-    private async Task<(StudyAssistantResponseDto Response, int TokensUsed)> SolveStudyQuestionWithGeminiAsync(StudyAssistantRequestDto request, CancellationToken ct)
-    {
-        try
-        {
-            var apiKey = GetGeminiApiKey();
-            if (string.IsNullOrWhiteSpace(apiKey))
-            {
-                _logger.LogWarning("Gemini API key is not configured for Study Assistant.");
-                return (new StudyAssistantResponseDto
-                {
-                    Answer = "Hệ thống AI đang được bảo trì. Vui lòng thử lại sau.",
-                    ConceptSummary = "Kiến thức",
-                    PracticeQuestion = "",
-                    PracticeSolution = ""
-                }, 0);
-            }
-
-            var model = _config["AiService:GeminiModel"];
-            if (string.IsNullOrWhiteSpace(model)) model = _config["GEMINI_MODEL"];
-            if (string.IsNullOrWhiteSpace(model)) model = "gemini-3.5-flash-lite";
-
-            var systemPrompt = @"Bạn là Chuyên gia Sư phạm & Trợ lý Giải bài tập WEIN của nền tảng OTSP.
-Nhiệm vụ: Giải bài tập cho học sinh theo phương pháp sư phạm mẫu mực:
-1. Nêu rõ phương pháp / kiến thức trọng tâm cần dùng.
-2. Trình bày lời giải chi tiết, từng bước kèm giải thích dễ hiểu.
-3. Đưa ra kết luận cuối cùng rõ ràng.
-4. Gợi ý 1 bài tập tương tự để học sinh tự luyện tập.";
-
-            var promptText = $"Môn học: {request.Subject ?? "Chung"}, Khối lớp: {request.GradeLevel ?? "Phổ thông"}\nĐề bài / Câu hỏi: {request.Question}";
-
-            var payload = new
-            {
-                system_instruction = new { parts = new[] { new { text = systemPrompt } } },
-                contents = new[] { new { role = "user", parts = new[] { new { text = promptText } } } },
-                generationConfig = new { maxOutputTokens = 1500, temperature = 0.5 }
-            };
-
-            var url = $"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent";
-            var directHttp = _httpClientFactory?.CreateClient("Gemini") ?? SharedGeminiFallbackClient;
-            var json = JsonSerializer.Serialize(payload);
-            using var reqMsg = new HttpRequestMessage(HttpMethod.Post, url)
-            {
-                Content = new StringContent(json, Encoding.UTF8, "application/json")
-            };
-            reqMsg.Headers.TryAddWithoutValidation("x-goog-api-key", apiKey);
-
-            var res = await directHttp.SendAsync(reqMsg, ct);
-            if (res.IsSuccessStatusCode)
-            {
-                var body = await res.Content.ReadAsStringAsync(ct);
-                using var doc = JsonDocument.Parse(body);
-                var candidates = doc.RootElement.GetProperty("candidates");
-                if (candidates.GetArrayLength() > 0)
-                {
-                    var first = candidates[0];
-                    var parts = first.GetProperty("content").GetProperty("parts");
-                    if (parts.GetArrayLength() > 0)
-                    {
-                        var text = parts[0].GetProperty("text").GetString() ?? "";
-                        if (!string.IsNullOrWhiteSpace(text))
-                        {
-                            var realTokens = ExtractGeminiTokens(doc, systemPrompt + "\n" + promptText, text);
-                            return (new StudyAssistantResponseDto
-                            {
-                                Answer = text,
-                                ConceptSummary = $"Kiến thức trọng tâm môn {request.Subject ?? "Học tập"}",
-                                PracticeQuestion = "Bạn có muốn luyện thêm một bài tập tương tự dạng này không?",
-                                PracticeSolution = ""
-                            }, realTokens);
-                        }
-                    }
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to solve study question with direct Gemini");
-        }
-
-        var fallbackAnswer = "Hệ thống đã tiếp nhận câu hỏi của bạn. Vui lòng thử lại trong giây lát hoặc tham khảo tài liệu học tập trong mục Tài liệu.";
-        return (new StudyAssistantResponseDto
-        {
-            Answer = fallbackAnswer,
-            ConceptSummary = "Kiến thức môn học",
-            PracticeQuestion = "",
-            PracticeSolution = ""
-        }, EstimateTokens(request.Question, fallbackAnswer));
-    }
-
-    private static int ExtractGeminiTokens(JsonDocument doc, string prompt, string reply)
-    {
-        try
-        {
-            if (doc.RootElement.TryGetProperty("usageMetadata", out var usage))
-            {
-                if (usage.TryGetProperty("totalTokenCount", out var totalProp) && totalProp.TryGetInt32(out var total) && total > 0)
-                {
-                    return total;
-                }
-
-                int promptTok = usage.TryGetProperty("promptTokenCount", out var p) && p.TryGetInt32(out var pt) ? pt : 0;
-                int candTok = usage.TryGetProperty("candidatesTokenCount", out var c) && c.TryGetInt32(out var ctVal) ? ctVal : 0;
-                if (promptTok + candTok > 0)
-                {
-                    return promptTok + candTok;
-                }
-            }
-        }
-        catch { }
-
-        return EstimateTokens(prompt, reply);
-    }
-
     private static int EstimateTokens(string? prompt, string? reply)
     {
         var chars = (prompt?.Length ?? 0) + (reply?.Length ?? 0);
@@ -869,20 +447,113 @@ Nhiệm vụ: Giải bài tập cho học sinh theo phương pháp sư phạm m�
         }
     }
 
-    private static string RemoveDiacritics(string text)
+    private static readonly string FounderContactMarkdown =
+        "---\n" +
+        "📞 **THÔNG TIN SÁNG LẬP & LIÊN HỆ HỖ TRỢ:**\n" +
+        "Người sáng lập và phát triển nền tảng OTSP là **Ngọc Tuấn (Tống Ngọc Tuấn)**.\n" +
+        "Khi người dùng muốn liên hệ hợp tác, góp ý hoặc cần người hỗ trợ gấp, hãy cung cấp đầy đủ và thân thiện các kênh liên hệ chính thức sau:\n" +
+        "- ✉️ **Email:** tongngoctuan09@gmail.com\n" +
+        "- 📱 **Hotline / Zalo hỗ trợ gấp:** 0984391940 (Ngọc Tuấn)\n" +
+        "- 🌐 **Facebook trao đổi trực tiếp:** [Facebook Ngọc Tuấn](https://www.facebook.com/tuan.ngoc.639510)\n\n" +
+        "Luôn động viên, chào đón người dùng kết nối khi gặp khó khăn hoặc cần trợ giúp khẩn cấp.";
+
+    private async Task<(bool allowed, int currentCount, int maxLimit, string role, string cacheKey)> CheckDailyQuotaAsync(string? userId, CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(text)) return text ?? "";
-        var normalizedString = text.Normalize(System.Text.NormalizationForm.FormD);
-        var sb = new System.Text.StringBuilder();
-        foreach (var c in normalizedString)
+        var httpCtx = _httpContextAccessor?.HttpContext;
+        var clientIp = httpCtx?.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        var todayUtc = DateTime.UtcNow.Date;
+        var todayStr = todayUtc.ToString("yyyyMMdd");
+
+        string role = "Guest";
+        int maxLimit = 10; // Khách vãng lai: 10 câu / ngày (theo IP)
+        string cacheKey = string.IsNullOrWhiteSpace(userId)
+            ? $"ai_quota:ip:{clientIp}:{todayStr}"
+            : $"ai_quota:user:{userId}:{todayStr}";
+
+        if (!string.IsNullOrWhiteSpace(userId))
         {
-            var unicodeCategory = System.Globalization.CharUnicodeInfo.GetUnicodeCategory(c);
-            if (unicodeCategory != System.Globalization.UnicodeCategory.NonSpacingMark)
+            var roleNames = await _db.UserRoles.AsNoTracking()
+                .Where(ur => ur.UserId == userId)
+                .Join(_db.Roles.AsNoTracking(), ur => ur.RoleId, r => r.Id, (_, r) => r.Name!)
+                .ToListAsync(ct);
+
+            if (roleNames.Contains("Admin"))
             {
-                sb.Append(c);
+                role = "Admin";
+                maxLimit = 500; // Admin: 500 câu / ngày
+            }
+            else if (roleNames.Contains("Tutor"))
+            {
+                role = "Tutor";
+                maxLimit = 50; // Gia sư: 50 câu / ngày
+            }
+            else
+            {
+                role = "Student";
+                maxLimit = 50; // Học viên / Phụ huynh: 50 câu / ngày
             }
         }
-        return sb.ToString().Normalize(System.Text.NormalizationForm.FormC).ToLowerInvariant();
+
+        int currentCount = 0;
+        if (_cache != null && _cache.TryGetValue<int>(cacheKey, out var cachedCount))
+        {
+            currentCount = cachedCount;
+        }
+        else
+        {
+            currentCount = await _db.AuditLogs.AsNoTracking()
+                .CountAsync(x => x.Category == "AiUsage" &&
+                                 (string.IsNullOrWhiteSpace(userId) ? (x.UserId == null && x.IpAddress == clientIp) : x.UserId == userId) &&
+                                 x.Timestamp >= todayUtc, ct);
+
+            var timeUntilMidnight = todayUtc.AddDays(1) - DateTime.UtcNow;
+            if (timeUntilMidnight <= TimeSpan.Zero) timeUntilMidnight = TimeSpan.FromHours(1);
+            _cache?.Set(cacheKey, currentCount, timeUntilMidnight);
+        }
+
+        bool allowed = currentCount < maxLimit;
+        return (allowed, currentCount, maxLimit, role, cacheKey);
+    }
+
+    private void IncrementDailyQuotaCache(string cacheKey, int newCount)
+    {
+        var todayUtc = DateTime.UtcNow.Date;
+        var timeUntilMidnight = todayUtc.AddDays(1) - DateTime.UtcNow;
+        if (timeUntilMidnight <= TimeSpan.Zero) timeUntilMidnight = TimeSpan.FromHours(1);
+        _cache?.Set(cacheKey, newCount, timeUntilMidnight);
+    }
+
+    private static AgentChatResponseDto BuildQuotaExceededResponse(string role, int maxLimit)
+    {
+        if (role == "Guest")
+        {
+            return new AgentChatResponseDto
+            {
+                Reply = $"Bạn đã sử dụng hết hạn mức **{maxLimit} câu hỏi miễn phí/ngày** dành cho khách vãng lai.\n\n" +
+                        "💡 **Mẹo:** Bạn hãy **[Đăng nhập](/login)** hoặc **[Đăng ký tài khoản](/register)** để nhận ngay **50 câu hỏi/ngày** và lưu lại lịch sử trao đổi nhé!\n\n" +
+                        FounderContactMarkdown,
+                Intent = "GENERAL",
+                AutoExecute = false,
+                UiAction = new UIActionDto
+                {
+                    Type = "NAVIGATE",
+                    Target = "/login",
+                    Label = "Đăng nhập để nhận thêm lượt",
+                    AutoExecute = false
+                },
+                SuggestedPrompts = new List<string> { "Đăng nhập tài khoản", "Đăng ký thành viên", "Tìm gia sư OTSP" }
+            };
+        }
+
+        return new AgentChatResponseDto
+        {
+            Reply = $"Bạn đã sử dụng hết hạn mức **{maxLimit} câu hỏi/ngày** của tài khoản hôm nay. Hạn mức sẽ tự động được làm mới vào lúc **00:00 ngày mai**.\n\n" +
+                    "Nếu bạn đang cần người hỗ trợ gấp, muốn nâng hạn mức trải nghiệm hoặc liên hệ hợp tác:\n\n" +
+                    FounderContactMarkdown,
+            Intent = "GENERAL",
+            AutoExecute = false,
+            SuggestedPrompts = new List<string> { "Xem lớp học của tôi", "Tìm kiếm gia sư", "Lịch học hôm nay" }
+        };
     }
 }
 

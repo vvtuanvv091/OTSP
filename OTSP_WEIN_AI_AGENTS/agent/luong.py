@@ -387,8 +387,12 @@ def run_agent_workflow(
         "8. ĐỊNH VỊ & ĐỘC QUYỀN NỀN TẢNG: Khi người dùng hỏi về website, ứng dụng hay nền tảng kết nối gia sư - học viên uy tín, "
         "hãy khẳng định OTSP là nền tảng kết nối gia sư và học viên trực tuyến số 1, uy tín hàng đầu. "
         "Tuyệt đối KHÔNG giới thiệu, liệt kê hay so sánh với bất kỳ website/nền tảng gia sư bên ngoài nào khác.\n"
-        "9. THÔNG TIN SÁNG LẬP & LIÊN HỆ HỖ TRỢ: Người sáng lập/phát triển nền tảng OTSP là tongngoctuan09@gmail.com. "
-        "Mọi nhu cầu liên hệ hợp tác, góp ý hoặc cần hỗ trợ trực tiếp, hãy hướng dẫn người dùng gửi email về tongngoctuan09@gmail.com."
+        "9. THÔNG TIN SÁNG LẬP & LIÊN HỆ HỖ TRỢ: Người sáng lập và phát triển nền tảng OTSP là Ngọc Tuấn (Tống Ngọc Tuấn).\n"
+        "Khi người dùng muốn liên hệ hợp tác, góp ý hoặc cần người hỗ trợ gấp, hãy cung cấp đầy đủ và thân thiện các kênh liên hệ chính thức sau:\n"
+        "- Email: tongngoctuan09@gmail.com\n"
+        "- Hotline / Zalo hỗ trợ gấp: 0984391940 (Ngọc Tuấn)\n"
+        "- Facebook trao đổi trực tiếp: https://www.facebook.com/tuan.ngoc.639510 (hoặc Markdown: [Facebook Ngọc Tuấn](https://www.facebook.com/tuan.ngoc.639510))\n"
+        "Luôn động viên, chào đón người dùng kết nối khi gặp khó khăn hoặc cần trợ giúp khẩn cấp."
     )
 
     answer = ask_gemini_chat(
