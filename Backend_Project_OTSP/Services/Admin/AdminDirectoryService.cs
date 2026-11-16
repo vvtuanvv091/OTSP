@@ -42,7 +42,7 @@ public sealed class AdminDirectoryService : IAdminDirectoryService
                 ur.UserId == student.UserId &&
                 _db.Roles.Any(r => r.Id == ur.RoleId && r.Name == "Student_Parent")));
 
-        // Aggregate by account state so all dashboard totals are returned in one SQL query.
+        // Gom nhóm theo trạng thái tài khoản để lấy đủ số liệu dashboard trong 1 truy vấn SQL.
         var groupedStats = await studentProfiles
             .GroupBy(student => student.User.Status)
             .Select(group => new
@@ -142,7 +142,7 @@ public sealed class AdminDirectoryService : IAdminDirectoryService
                              ur.UserId == tutor.UserId &&
                              _db.Roles.Any(r => r.Id == ur.RoleId && r.Name == "Tutor"))));
 
-        // Counts are grouped by format and account state to avoid loading tutors into memory.
+        // Đếm trực tiếp theo hình thức dạy và trạng thái trong SQL để khỏi tải danh sách gia sư lên RAM.
         var groupedStats = await approvedTutors
             .GroupBy(tutor => new { tutor.TeachingFormat, tutor.User.Status })
             .Select(group => new { group.Key.TeachingFormat, group.Key.Status, Total = group.Count() })

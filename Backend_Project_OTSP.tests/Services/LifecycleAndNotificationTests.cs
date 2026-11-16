@@ -106,7 +106,7 @@ public class LifecycleAndNotificationTests
         Assert.Equal(1.5, ClassroomLifecycleHelper.NormalizeHoursPerSession(90));
         Assert.Equal(2.0, ClassroomLifecycleHelper.NormalizeHoursPerSession(2.0));
 
-        var start = new DateOnly(2027, 1, 5); // Tuesday
+        var start = new DateOnly(2027, 1, 5); // Thứ Ba
         var schedules = new[]
         {
             new ClassroomWeeklySchedule { DayOfWeek = DayOfWeek.Tuesday, StartTime = new TimeOnly(18, 0), EndTime = new TimeOnly(20, 0) },
@@ -166,7 +166,7 @@ public class LifecycleAndNotificationTests
             Fee = 1_600_000m,
             SessionsPerWeek = 2,
             TotalSessions = 8,
-            HoursPerSession = 20, // legacy locale bug stored 20 meaning 2h
+            HoursPerSession = 20, // dữ liệu cũ do lỗi locale lưu 20 thay vì 2 giờ
             Status = ClassroomStatus.Active
         };
         var nextYear = DateTime.UtcNow.AddYears(1);
@@ -261,7 +261,7 @@ public class LifecycleAndNotificationTests
             Mock.Of<INotificationDispatcher>(),
             Mock.Of<ILogger<ConnectionRequestService>>());
 
-        // Booking into expired deadline group fails
+        // Đăng ký vào lớp nhóm đã quá hạn sẽ thất bại
         var createExpired = await service.CreateRequestAsync(new SendConnectionRequestDto
         {
             TutorId = 1,
@@ -272,7 +272,7 @@ public class LifecycleAndNotificationTests
         }, "st-1");
         Assert.False(createExpired.Success);
 
-        // Pending request whose deadline later passes cannot be accepted (anti-late-join)
+        // Yêu cầu đang chờ nhưng lớp đã quá hạn đăng ký thì không được duyệt vào muộn
         var pendingExpiredReq = new ConnectionRequest
         {
             Id = 77,
@@ -369,7 +369,7 @@ public class LifecycleAndNotificationTests
             TutorId = 1,
             DayOfWeek = nextDay.DayOfWeek,
             StartTime = new TimeOnly(8, 0),
-            EndTime = new TimeOnly(12, 0) // 4-hour continuous block -> should yield 08-10 and 10-12
+            EndTime = new TimeOnly(12, 0) // Khối 4 giờ liên tiếp -> tách thành 08-10 và 10-12
         });
         await db.SaveChangesAsync();
 
@@ -520,7 +520,7 @@ public class LifecycleAndNotificationTests
             ]
         };
 
-        // Another active classroom where the same student learns on Thursday 18:00-20:00
+        // Một lớp khác đang hoạt động mà học viên này cũng học vào Thứ 5 18:00-20:00
         var conflictClassroom = new Classroom
         {
             Id = 11,
@@ -597,7 +597,7 @@ public class LifecycleAndNotificationTests
             }
         };
 
-        // 1. Moving classroom 10 to Thursday 18:00-20:00 collides with student's classroom 11
+        // 1. Chuyển lớp 10 sang Thứ 5 18:00-20:00 sẽ trùng lịch lớp 11 của học viên
         var conflictResult = await controller.Update(
             10,
             new UpdateClassroomRequest
@@ -609,7 +609,7 @@ public class LifecycleAndNotificationTests
         Assert.IsType<BadRequestObjectResult>(conflictResult);
         Assert.NotNull(db.ClassSessions.SingleOrDefault(s => s.Id == 403));
 
-        // 2. Moving classroom 10 to Saturday 14:00-16:00 succeeds, keeps Done & IsMakeup, replaces future regular sessions without doubling
+        // 2. Chuyển lớp 10 sang Thứ 7 14:00-16:00 thành công, giữ buổi Done & IsMakeup và thay thế lịch thường tương lai mà không sinh trùng
         var okResult = await controller.Update(
             10,
             new UpdateClassroomRequest
@@ -654,7 +654,7 @@ public class LifecycleAndNotificationTests
             Status = ClassroomStatus.Active,
             HoursPerSession = 2.0
         };
-        var baseSlotUtc = DateTime.UtcNow.AddDays(3).Date.AddHours(11); // 18:00 VN
+        var baseSlotUtc = DateTime.UtcNow.AddDays(3).Date.AddHours(11); // 18:00 giờ VN
         var existingSession = new ClassSession
         {
             Id = 501,
@@ -690,7 +690,7 @@ public class LifecycleAndNotificationTests
             CancellationToken.None);
         Assert.IsType<BadRequestObjectResult>(overlapRes);
 
-        var cleanSlotUtc = baseSlotUtc.AddDays(1).AddHours(-8); // next day 10:00 VN
+        var cleanSlotUtc = baseSlotUtc.AddDays(1).AddHours(-8); // 10:00 giờ VN ngày hôm sau
         var okRes = await controller.CreateSession(
             new CreateSessionRequest { ClassroomId = 12, ScheduledAtUtc = cleanSlotUtc, DurationHours = 2.0 },
             CancellationToken.None);
@@ -813,7 +813,7 @@ public class LifecycleAndNotificationTests
 
         var service = new AdminOperationsService(db, userMgr.Object, IdentityMockHelper.MockRoleManager().Object, cache: cache);
 
-        // 1. Clean Student -> Tutor deletes StudentProfile + Guardians + AiStudySessions and creates Pending TutorProfile
+        // 1. Đổi Học viên -> Gia sư sẽ xóa StudentProfile, Guardians, AiStudySessions và tạo TutorProfile chờ duyệt
         var stSwitch = await service.ChangeRoleAsync(cleanStudentUser.Id, "Tutor", adminUser.Id, "127.0.0.1", CancellationToken.None);
         Assert.True(stSwitch.Success, stSwitch.Error);
         Assert.False(cache.TryGetValue("home_index_viewmodel", out _));
@@ -825,7 +825,7 @@ public class LifecycleAndNotificationTests
         var newTuProfile = Assert.Single(db.TutorProfiles.Where(x => x.UserId == cleanStudentUser.Id));
         Assert.Equal(VerificationStatus.Pending, newTuProfile.VerificationStatus);
 
-        // 2. Clean Tutor -> Admin deletes TutorProfile + TutorSubjects + TutorAvailabilities + Qualifications + ProfileVerifications
+        // 2. Đổi Gia sư -> Admin sẽ xóa TutorProfile, TutorSubjects, TutorAvailabilities, Qualifications, ProfileVerifications
         var tuSwitch = await service.ChangeRoleAsync(cleanTutorUser.Id, "Admin", adminUser.Id, "127.0.0.1", CancellationToken.None);
         Assert.True(tuSwitch.Success, tuSwitch.Error);
         Assert.Equal("Admin", Assert.Single(userRoles[cleanTutorUser.Id]));
@@ -856,7 +856,7 @@ public class LifecycleAndNotificationTests
             var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
             db.Database.EnsureCreated();
 
-            // Production-style bootstrap on wiped empty DB seeds Roles, Subjects, GradeLevels, Admin & default News
+            // Chạy seed trên DB trống sẽ khởi tạo Roles, Subjects, GradeLevels, tài khoản Admin và tin tức mặc định
             await DbSeeder.SeedBootstrapAsync(scope.ServiceProvider, syncDefaultAdminPasswords: false);
 
             Assert.True(await db.Roles.AnyAsync(r => r.Name == "Admin"));
@@ -867,7 +867,7 @@ public class LifecycleAndNotificationTests
             Assert.NotEmpty(db.AdminProfiles);
             Assert.NotEmpty(db.NewsArticles);
 
-            // Stale Approved TutorProfile belonging to an Admin user must be excluded from SearchService
+            // TutorProfile cũ dù Approved nhưng thuộc tài khoản Admin vẫn phải bị loại khỏi SearchService
             var adminRole = await db.Roles.SingleAsync(r => r.Name == "Admin");
             var tutorRole = await db.Roles.SingleAsync(r => r.Name == "Tutor");
             var realTutorUser = new ApplicationUser { Id = "u-real-t", Email = "real@otsp.vn", UserName = "real@otsp.vn", FullName = "Real Tutor", Status = AccountStatus.Active };
@@ -1174,7 +1174,7 @@ public class LifecycleAndNotificationTests
         db.StudentProfiles.Add(freshStudent);
         db.TutorProfiles.AddRange(freshTutor, ownerTutor);
         db.TutorSubjects.Add(new TutorSubject { TutorId = freshTutor.Id, SubjectId = subject.Id, GradeLevelId = grade.Id, HourlyFee = 120000m });
-        // Simulate normal login auth logs & system notifications on brand-new accounts
+        // Giả lập log đăng nhập và thông báo hệ thống trên các tài khoản mới
         db.AuditLogs.AddRange(
             new AuditLog { UserId = freshStudentUser.Id, Category = "Auth", Action = "Login" },
             new AuditLog { UserId = freshTutorUser.Id, Category = "Auth", Action = "Register" });
@@ -1428,5 +1428,254 @@ public class LifecycleAndNotificationTests
         var deleted = await chatService.DeleteMessageAsync(groupMsg.Id, student1User.Id);
         Assert.Equal(91, deleted.ClassroomId);
         Assert.Equal("class_91", deleted.ReceiverId);
+    }
+
+    [Fact]
+    public async Task T10_TutorCreateGroupClassroom_EnforcesDeadlineRangeAndPostDeadlineStartDate()
+    {
+        var db = TestDbContextFactory.Create();
+        var todayVn = ClassroomLifecycleHelper.GetVietnamToday();
+        var tutorUser = new ApplicationUser { Id = "tu-g10", FullName = "Cô Hạnh", Status = AccountStatus.Active };
+        var subject = new Subject { Id = 101, Code = "TOAN10", Name = "Toán" };
+        var grade = new GradeLevel { Id = 101, Name = "Lớp 10" };
+        var tutor = new TutorProfile { Id = 101, UserId = tutorUser.Id, User = tutorUser, VerificationStatus = VerificationStatus.Approved };
+        db.AddRange(tutorUser, subject, grade, tutor, new TutorSubject { TutorId = 101, SubjectId = 101, GradeLevelId = 101, HourlyFee = 200000m });
+        await db.SaveChangesAsync();
+
+        var controller = new TutorClassroomApiController(
+            db,
+            Mock.Of<IImageStorageService>(),
+            Mock.Of<ILogger<TutorClassroomApiController>>())
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext { User = CreatePrincipal("tu-g10", "Tutor") }
+            }
+        };
+
+        var day1 = todayVn.AddDays(3);
+        var day2 = todayVn.AddDays(6);
+        var scheduleJson = System.Text.Json.JsonSerializer.Serialize(new[]
+        {
+            new { dayOfWeek = (int)day1.DayOfWeek, startTime = "19:00", endTime = "21:00" },
+            new { dayOfWeek = (int)day2.DayOfWeek, startTime = "19:00", endTime = "21:00" }
+        });
+
+        // 1. Hạn chót ngay hôm nay (< today + 1) bị từ chối
+        var sameDayDeadline = await controller.Create(new CreateClassroomRequest
+        {
+            Name = "Nhóm Toán 10",
+            SubjectId = 101,
+            GradeLevelId = 101,
+            Fee = 500000m,
+            MaxStudents = 5,
+            Type = ClassroomType.Group,
+            RegistrationDeadline = todayVn,
+            StartDate = todayVn.AddDays(2),
+            TotalSessions = 4,
+            WeeklySchedulesJson = scheduleJson
+        }, null, CancellationToken.None);
+        Assert.IsType<BadRequestObjectResult>(sameDayDeadline);
+
+        // 2. Hạn chót quá 7 ngày bị từ chối
+        var tooFarDeadline = await controller.Create(new CreateClassroomRequest
+        {
+            Name = "Nhóm Toán 10",
+            SubjectId = 101,
+            GradeLevelId = 101,
+            Fee = 500000m,
+            MaxStudents = 5,
+            Type = ClassroomType.Group,
+            RegistrationDeadline = todayVn.AddDays(8),
+            StartDate = todayVn.AddDays(9),
+            TotalSessions = 4,
+            WeeklySchedulesJson = scheduleJson
+        }, null, CancellationToken.None);
+        Assert.IsType<BadRequestObjectResult>(tooFarDeadline);
+
+        // 3. Ngày bắt đầu bằng hạn chót (<= deadline) bị từ chối
+        var sameStartAndDeadline = await controller.Create(new CreateClassroomRequest
+        {
+            Name = "Nhóm Toán 10",
+            SubjectId = 101,
+            GradeLevelId = 101,
+            Fee = 500000m,
+            MaxStudents = 5,
+            Type = ClassroomType.Group,
+            RegistrationDeadline = todayVn.AddDays(2),
+            StartDate = todayVn.AddDays(2),
+            TotalSessions = 4,
+            WeeklySchedulesJson = scheduleJson
+        }, null, CancellationToken.None);
+        Assert.IsType<BadRequestObjectResult>(sameStartAndDeadline);
+
+        // 4. Hạn chót +2 ngày, bắt đầu +3 ngày -> hợp lệ, sinh đủ 4 buổi sau hạn chót
+        var okRes = await controller.Create(new CreateClassroomRequest
+        {
+            Name = "Nhóm Toán 10",
+            SubjectId = 101,
+            GradeLevelId = 101,
+            Fee = 500000m,
+            MaxStudents = 5,
+            Type = ClassroomType.Group,
+            RegistrationDeadline = todayVn.AddDays(2),
+            StartDate = todayVn.AddDays(3),
+            TotalSessions = 4,
+            WeeklySchedulesJson = scheduleJson
+        }, null, CancellationToken.None);
+        Assert.IsType<OkObjectResult>(okRes);
+
+        var created = db.Classrooms.Single(c => c.TutorId == 101);
+        var sessions = db.ClassSessions.Where(s => s.ClassroomId == created.Id).OrderBy(s => s.ScheduledAt).ToList();
+        Assert.Equal(4, sessions.Count);
+        Assert.All(sessions, s => Assert.True(DateOnly.FromDateTime(ClassroomLifecycleHelper.ToVietnamTime(s.ScheduledAt)) > created.RegistrationDeadline!.Value));
+    }
+
+    [Fact]
+    public async Task T11_TutorCreateGroupClassroom_RejectsOverlapWithPendingOneToOneRequest()
+    {
+        var db = TestDbContextFactory.Create();
+        var todayVn = ClassroomLifecycleHelper.GetVietnamToday();
+        var targetDateVn = todayVn.AddDays(4);
+        var targetSlotUtc = ClassroomLifecycleHelper.VietnamDateTimeToUtc(targetDateVn, new TimeOnly(19, 0));
+
+        var tutorUser = new ApplicationUser { Id = "tu-g11", FullName = "Thầy Bình", Status = AccountStatus.Active };
+        var studentUser = new ApplicationUser { Id = "st-g11", FullName = "Bạn Minh", Status = AccountStatus.Active };
+        var subject = new Subject { Id = 102, Code = "ANH11", Name = "Tiếng Anh" };
+        var grade = new GradeLevel { Id = 102, Name = "Lớp 11" };
+        var tutor = new TutorProfile { Id = 102, UserId = tutorUser.Id, User = tutorUser, VerificationStatus = VerificationStatus.Approved };
+        var student = new StudentProfile { Id = 102, UserId = studentUser.Id, User = studentUser };
+        var pendingReq = new ConnectionRequest
+        {
+            Id = 501,
+            StudentId = 102,
+            TutorId = 102,
+            SubjectId = 102,
+            GradeLevelId = 102,
+            PreferredType = ClassroomType.OneToOne,
+            IsTrial = true,
+            ProposedTrialSlotUtc = targetSlotUtc,
+            Status = RequestStatus.Pending
+        };
+        pendingReq.TrialSchedules.Add(new TrialSchedule
+        {
+            ConnectionRequestId = 501,
+            ScheduledAt = targetSlotUtc,
+            Status = ScheduleStatus.Pending
+        });
+
+        db.AddRange(tutorUser, studentUser, subject, grade, tutor, student, pendingReq,
+            new TutorSubject { TutorId = 102, SubjectId = 102, GradeLevelId = 102, HourlyFee = 200000m });
+        await db.SaveChangesAsync();
+
+        var controller = new TutorClassroomApiController(
+            db,
+            Mock.Of<IImageStorageService>(),
+            Mock.Of<ILogger<TutorClassroomApiController>>())
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext { User = CreatePrincipal("tu-g11", "Tutor") }
+            }
+        };
+
+        var scheduleJson = System.Text.Json.JsonSerializer.Serialize(new[]
+        {
+            new { dayOfWeek = (int)targetDateVn.DayOfWeek, startTime = "19:00", endTime = "21:00" }
+        });
+
+        var res = await controller.Create(new CreateClassroomRequest
+        {
+            Name = "Nhóm Anh Trùng Lịch",
+            SubjectId = 102,
+            GradeLevelId = 102,
+            Fee = 400000m,
+            MaxStudents = 5,
+            Type = ClassroomType.Group,
+            RegistrationDeadline = todayVn.AddDays(2),
+            StartDate = todayVn.AddDays(3),
+            TotalSessions = 4,
+            WeeklySchedulesJson = scheduleJson
+        }, null, CancellationToken.None);
+
+        Assert.IsType<BadRequestObjectResult>(res);
+    }
+
+    [Fact]
+    public async Task T12_AcceptGroupRequest_RejectsWhenStudentHasOverlappingOneToOneClass()
+    {
+        var db = TestDbContextFactory.Create();
+        var todayVn = ClassroomLifecycleHelper.GetVietnamToday();
+        var sharedDay = todayVn.AddDays(4).DayOfWeek;
+
+        var tutor1User = new ApplicationUser { Id = "tu1-g12", FullName = "Thầy Một", Email = "t1@otsp.vn", Status = AccountStatus.Active };
+        var tutor2User = new ApplicationUser { Id = "tu2-g12", FullName = "Cô Hai", Email = "t2@otsp.vn", Status = AccountStatus.Active };
+        var studentUser = new ApplicationUser { Id = "st-g12", FullName = "Bạn Lan", Email = "lan@otsp.vn", Status = AccountStatus.Active };
+        var subject = new Subject { Id = 103, Code = "HOA12", Name = "Hóa" };
+        var grade = new GradeLevel { Id = 103, Name = "Lớp 12" };
+        var tutor1 = new TutorProfile { Id = 103, UserId = tutor1User.Id, User = tutor1User, VerificationStatus = VerificationStatus.Approved };
+        var tutor2 = new TutorProfile { Id = 104, UserId = tutor2User.Id, User = tutor2User, VerificationStatus = VerificationStatus.Approved };
+        var student = new StudentProfile { Id = 103, UserId = studentUser.Id, User = studentUser };
+
+        var oneToOneClass = new Classroom
+        {
+            Id = 201,
+            NameClass = "Lớp 1-1 Hóa",
+            Type = ClassroomType.OneToOne,
+            Status = ClassroomStatus.Active,
+            MaxStudents = 1,
+            TutorId = 103,
+            SubjectId = 103,
+            GradeLevelId = 103,
+            StartDate = todayVn.AddDays(1),
+            EndDate = todayVn.AddDays(30),
+            WeeklySchedules = [new ClassroomWeeklySchedule { SessionIndex = 1, DayOfWeek = sharedDay, StartTime = new TimeOnly(19, 0), EndTime = new TimeOnly(21, 0) }]
+        };
+        var groupClass = new Classroom
+        {
+            Id = 202,
+            NameClass = "Nhóm Hóa 12",
+            Type = ClassroomType.Group,
+            Status = ClassroomStatus.Active,
+            MaxStudents = 5,
+            TutorId = 104,
+            SubjectId = 103,
+            GradeLevelId = 103,
+            RegistrationDeadline = todayVn.AddDays(2),
+            StartDate = todayVn.AddDays(3),
+            EndDate = todayVn.AddDays(30),
+            WeeklySchedules = [new ClassroomWeeklySchedule { SessionIndex = 1, DayOfWeek = sharedDay, StartTime = new TimeOnly(19, 0), EndTime = new TimeOnly(21, 0) }]
+        };
+        var req = new ConnectionRequest
+        {
+            Id = 601,
+            StudentId = 103,
+            TutorId = 104,
+            SubjectId = 103,
+            GradeLevelId = 103,
+            PreferredType = ClassroomType.Group,
+            ClassroomId = 202,
+            Status = RequestStatus.Pending
+        };
+
+        db.AddRange(
+            tutor1User, tutor2User, studentUser, subject, grade, tutor1, tutor2, student,
+            oneToOneClass, groupClass,
+            new ClassroomStudent { ClassroomId = 201, StudentId = 103, JoinedAt = DateTime.UtcNow },
+            req);
+        await db.SaveChangesAsync();
+
+        var (hub, _) = CreateHubMock();
+        var service = new ConnectionRequestService(
+            db,
+            new OpenGroupClassroomService(db),
+            new AvailabilitySlotService(db),
+            hub.Object,
+            Mock.Of<INotificationDispatcher>(),
+            Mock.Of<ILogger<ConnectionRequestService>>());
+
+        var result = await service.AcceptRequestAsync(601, "tu2-g12");
+        Assert.True(result.SlotConflict);
+        Assert.False(db.ClassroomStudents.Any(cs => cs.ClassroomId == 202 && cs.StudentId == 103));
     }
 }

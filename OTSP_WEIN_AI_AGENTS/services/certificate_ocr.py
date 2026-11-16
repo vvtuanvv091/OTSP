@@ -18,7 +18,7 @@ class VerifyCertificateRequest(BaseModel):
     qualificationType: str | None = Field(default=None, description="Loại văn bằng khai báo (Cử nhân, IELTS...)")
 
 class VerifyCertificateResponse(BaseModel):
-    """Kết quả kiểm định trả về khớp 100% với VerifyCertificateResponseDto trong C#"""
+    """Kết quả kiểm tra trả về theo đúng cấu trúc VerifyCertificateResponseDto ở backend C#."""
     tutorName: str = Field(default="", description="Họ tên đọc được trên mặt bằng")
     certificateType: str = Field(default="", description="Loại văn bằng / chứng chỉ")
     issuingOrganization: str = Field(default="", description="Cơ quan / Trường đại học cấp bằng")

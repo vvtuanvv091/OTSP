@@ -100,7 +100,7 @@ public class StudentAuthTrackingTests
         var studentRole = await roleManager.FindByNameAsync("Student_Parent");
         Assert.NotNull(studentRole);
 
-        // Seed 12 older users alphabetically BEFORE "Tống Ngọc Tuấn" so pagination & CreatedAt DESC are tested
+        // Tạo sẵn 12 người dùng cũ hơn xếp trước "Tống Ngọc Tuấn" theo bảng chữ cái để kiểm tra phân trang theo CreatedAt DESC
         for (var i = 1; i <= 12; i++)
         {
             var oldUser = new ApplicationUser
@@ -118,7 +118,7 @@ public class StudentAuthTrackingTests
 
         var authService = scope.ServiceProvider.GetRequiredService<IAuthService>();
 
-        // 1. Register new student
+        // 1. Đăng ký học viên mới
         var regResult = await authService.RegisterAsync(new RegisterRequest
         {
             Role = "Student_Parent",
@@ -132,7 +132,7 @@ public class StudentAuthTrackingTests
         Assert.NotNull(regResult.Data);
         Assert.Contains("Student_Parent", regResult.Data.User.Roles);
 
-        // 2. Login as that student
+        // 2. Đăng nhập bằng tài khoản học viên vừa tạo
         var loginResult = await authService.LoginAsync(new LoginRequest
         {
             Email = "tongngoctuan09@gmail.com",
@@ -141,7 +141,7 @@ public class StudentAuthTrackingTests
         });
         Assert.True(loginResult.Success, loginResult.ErrorMessage);
 
-        // 3. Verify AdminOperationsController (Admin role) returns student at top of Accounts (Page 1) AND both Auth logs in AuditLogs
+        // 3. Kiểm tra AdminOperationsController trả về học viên mới ở đầu trang 1 danh sách Accounts và đủ 2 bản ghi Auth trong AuditLogs
         var adminOps = scope.ServiceProvider.GetRequiredService<IAdminOperationsService>();
         var controller = new AdminOperationsController(adminOps)
         {
@@ -198,7 +198,7 @@ public class StudentAuthTrackingTests
 
         Assert.Contains(actions, a => a.Action == "Đăng ký tài khoản" && a.Category == "Auth" && a.Email == "tongngoctuan09@gmail.com" && a.Role == "Student_Parent");
 
-        // Verify Category filter "Auth" works identically
+        // Kiểm tra bộ lọc Category = "Auth" hoạt động đúng
         var authLogsAction = Assert.IsType<OkObjectResult>(await controller.AuditLogs(new AdminOperationsQuery { Status = "Auth", Page = 1, PageSize = 10 }, CancellationToken.None));
         using var authLogsDoc = JsonDocument.Parse(JsonSerializer.Serialize(authLogsAction.Value, webJson));
         Assert.Equal(2, authLogsDoc.RootElement.GetProperty("logs").GetProperty("total").GetInt32());

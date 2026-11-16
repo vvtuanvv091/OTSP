@@ -22,7 +22,7 @@
     --tutor-amber-light: #fef9c3;
 }
 
-/* body styles overridden by _Layout.cshtml */
+/* Ghi đè lại kiểu body mặc định của template cũ */
 .tutor-legacy-body {
     background-color: var(--tutor-bg-body);
     color: var(--tutor-text-body);
@@ -32,7 +32,7 @@
     -webkit-font-smoothing: antialiased;
 }
 
-/* ==================== 1. TOP HEADER ==================== */
+/* ==================== 1. THANH HEADER TRÊN CÙNG ==================== */
 .tutor-header {
     background: #ffffff;
     border-bottom: 1px solid var(--tutor-border);
@@ -210,7 +210,7 @@
     color: #9ca3af;
 }
 
-/* ==================== 2. MAIN SHELL & SIDEBAR ==================== */
+/* ==================== 2. KHUNG CHÍNH VÀ THANH BÊN ==================== */
 .tutor-dashboard-shell {
     display: grid;
     grid-template-columns: var(--tutor-sidebar-width) minmax(0, 1fr);
@@ -318,7 +318,7 @@
     transition: opacity 0.2s ease;
 }
 
-/* ==================== 3. PAGE CONTENT CONTAINER ==================== */
+/* ==================== 3. VÙNG NỘI DUNG CHÍNH ==================== */
 .tutor-page-container {
     padding: 32px 40px;
     max-width: 1280px;
@@ -342,7 +342,7 @@
     margin: 0;
 }
 
-/* ==================== 4. DESKTOP TABLE VIEW ==================== */
+/* ==================== 4. BẢNG DỮ LIỆU DESKTOP ==================== */
 .tutor-card-table-wrapper {
     background: #ffffff;
     border: 1px solid var(--tutor-border);
@@ -424,7 +424,7 @@
     font-weight: 700;
 }
 
-/* ==================== 5. PILL BADGES ==================== */
+/* ==================== 5. NHÃN TRẠNG THÁI ==================== */
 .tutor-pill-badge {
     display: inline-block;
     padding: 4px 14px;
@@ -456,7 +456,7 @@
     color: #ef4444;
 }
 
-/* ==================== 6. BUTTONS & ACTIONS ==================== */
+/* ==================== 6. NÚT BẤM VÀ THAO TÁC ==================== */
 .btn-tutor-outline-red {
     display: inline-flex;
     align-items: center;
@@ -535,7 +535,7 @@
     white-space: nowrap;
 }
 
-/* ==================== 7. MOBILE ADAPTIVE CARDS ==================== */
+/* ==================== 7. THẺ HIỂN THỊ TRÊN MOBILE ==================== */
 .tutor-mobile-list {
     display: flex;
     flex-direction: column;
@@ -620,7 +620,7 @@
     font-size: 13.5px;
 }
 
-/* ==================== 8. PROGRESS INDICATOR ==================== */
+/* ==================== 8. THANH TIẾN ĐỘ ==================== */
 .tutor-progress-badge {
     display: inline-flex;
     align-items: center;
@@ -643,7 +643,7 @@
     border-radius: 999px;
 }
 
-/* ==================== 9. RESPONSIVE BREAKPOINTS ==================== */
+/* ==================== 9. RESPONSIVE TRÊN CÁC KÍCH THƯỚC MÀN HÌNH ==================== */
 .tutor-menu-toggle {
     display: none;
     background: transparent;
@@ -710,7 +710,7 @@
     }
 }
 
-/* ==================== NOTIFICATIONS DROPDOWN ==================== */
+/* ==================== MENU THẢ XUỐNG THÔNG BÁO ==================== */
 .header-notifications {
     position: relative;
 }

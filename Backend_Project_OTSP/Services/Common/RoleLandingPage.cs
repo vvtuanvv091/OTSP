@@ -1,6 +1,6 @@
 namespace Backend_Project_OTSP.Services.Common;
 
-/// <summary>Resolves a user's first page after sign-in without crossing role areas.</summary>
+/// <summary>Xác định trang mặc định sau khi đăng nhập đúng theo khu vực vai trò của người dùng.</summary>
 public static class RoleLandingPage
 {
     public static string Resolve(

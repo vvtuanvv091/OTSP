@@ -166,7 +166,7 @@ export default function AdminLearningDocumentsPage() {
           const parsed = JSON.parse(text);
           if (parsed?.message) errorMsg = parsed.message;
         } catch {
-          // fallback
+          // Dùng thông báo lỗi mặc định nếu nội dung Blob không phải JSON
         }
       } else if (requestError.response?.data?.message) {
         errorMsg = requestError.response.data.message;

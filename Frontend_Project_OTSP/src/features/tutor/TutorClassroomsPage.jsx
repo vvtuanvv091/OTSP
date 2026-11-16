@@ -24,7 +24,7 @@ export default function TutorClassroomsPage() {
   const [message, setMessage] = useState('');
   const [reloadKey, setReloadKey] = useState(0);
 
-  // Tự động làm mới danh sách lớp học theo thời gian thực (Zero-Reload)
+  // Tự làm mới danh sách lớp khi có cập nhật qua SignalR
   useSignalREvent('ConnectionRequestStatusChanged', () => setReloadKey((k) => k + 1));
   useSignalREvent('ClassSessionStatusChanged', () => setReloadKey((k) => k + 1));
   useSignalREvent('ClassroomCapacityUpdated', () => setReloadKey((k) => k + 1));
@@ -91,7 +91,7 @@ export default function TutorClassroomsPage() {
   return (
     <>
       <div className="container-fluid py-4">
-        {/* Header */}
+        {/* Tiêu đề trang */}
         <div className="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
           <div>
             <h1 className="h3 fw-bold mb-1 text-dark">Quản lý lớp học</h1>
@@ -102,7 +102,7 @@ export default function TutorClassroomsPage() {
           </Link>
         </div>
 
-        {/* Alerts */}
+        {/* Thông báo hệ thống */}
         {user?.verificationStatus === 'Pending' && (
           <div className="alert alert-warning border border-warning-subtle rounded-3 p-3 mb-4 d-flex align-items-center gap-3">
             <i className="bi bi-hourglass-split fs-3 text-warning flex-shrink-0"></i>
@@ -129,7 +129,7 @@ export default function TutorClassroomsPage() {
           </div>
         )}
 
-        {/* Filter Box */}
+        {/* Bộ lọc tìm kiếm */}
         <div className="card border-0 shadow-sm rounded-3 mb-4">
           <div className="card-body py-3">
             <div className="row g-2 align-items-center">
@@ -169,7 +169,7 @@ export default function TutorClassroomsPage() {
           </div>
         </div>
 
-        {/* Grid 3x3 Card */}
+        {/* Lưới danh sách lớp học */}
         {loading ? (
           <div className="text-center py-5">
             <div className="spinner-border text-danger" role="status"></div>
@@ -208,11 +208,11 @@ export default function TutorClassroomsPage() {
                 const hasLifecycleDates = Boolean(c.startDate || c.endDate || c.registrationDeadline);
 
                 return (
-                  <div key={c.id} className="col" style={{ maxWidth: classrooms.length === 1 ? 460 : undefined }}>
-                    <div className="card tutor-classroom-card h-100 rounded-3 p-3 p-sm-3.5 d-flex flex-column justify-content-between shadow-sm">
-                      <div>
-                        {/* Header: Avatar/Icon + Title + Badges */}
-                        <div className="d-flex align-items-start gap-3">
+                  <div key={c.id} className="col min-w-0" style={{ maxWidth: classrooms.length === 1 ? 460 : undefined }}>
+                    <div className="card tutor-classroom-card h-100 rounded-3 p-3 p-sm-3.5 d-flex flex-column justify-content-between shadow-sm overflow-hidden min-w-0">
+                      <div className="min-w-0">
+                        {/* Phần đầu thẻ: biểu tượng, tên lớp và nhãn trạng thái */}
+                        <div className="d-flex align-items-start gap-3 min-w-0">
                           {c.coverImageUrl ? (
                             <div className="position-relative flex-shrink-0" style={{ width: 56, height: 56 }}>
                               <img
@@ -236,16 +236,20 @@ export default function TutorClassroomsPage() {
                               {cleanDisplayName}
                             </h3>
 
-                            {/* Badges row matching mockup */}
-                            <div className="d-flex align-items-center gap-1 flex-wrap mt-1">
+                            {/* Hàng nhãn phân loại lớp */}
+                            <div className="d-flex align-items-center gap-1 flex-wrap mt-1 min-w-0">
                               <span className="badge fw-semibold d-inline-flex align-items-center gap-1 px-2 py-1 rounded-pill text-white" style={{ backgroundColor: '#dc2626', fontSize: '0.72rem' }}>
                                 <i className="bi bi-tag-fill" style={{ fontSize: '0.65rem' }}></i>
                                 {formatPrice(c.fee)} đ
                               </span>
 
-                              <span className="badge fw-semibold d-inline-flex align-items-center gap-1 px-2 py-1 rounded-pill text-white" style={{ backgroundColor: '#0284c7', fontSize: '0.72rem' }}>
-                                <i className="bi bi-book-half" style={{ fontSize: '0.65rem' }}></i>
-                                {c.subjectName} - {c.gradeLevelName || 'Tiểu học'}
+                              <span
+                                className="badge fw-semibold d-inline-flex align-items-center gap-1 px-2 py-1 rounded-pill text-white text-truncate"
+                                style={{ backgroundColor: '#0284c7', fontSize: '0.72rem', maxWidth: '100%' }}
+                                title={`${c.subjectName} - ${c.gradeLevelName || 'Tiểu học'}`}
+                              >
+                                <i className="bi bi-book-half flex-shrink-0" style={{ fontSize: '0.65rem' }}></i>
+                                <span className="text-truncate">{c.subjectName} - {c.gradeLevelName || 'Tiểu học'}</span>
                               </span>
 
                               <span className="badge fw-semibold d-inline-flex align-items-center gap-1 px-2 py-1 rounded-pill text-white" style={{ backgroundColor: '#6366f1', fontSize: '0.72rem' }}>
@@ -261,43 +265,49 @@ export default function TutorClassroomsPage() {
                           </div>
                         </div>
 
-                        {/* Middle Box: Lịch học + Sĩ số */}
-                        <div className="p-2 rounded-3 mt-3" style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0' }}>
-                          <div className="d-flex align-items-center justify-content-between gap-2">
-                            <div className="d-flex align-items-center gap-2 min-w-0" style={{ flex: '1 1 55%' }}>
-                              <i className="bi bi-calendar3 fs-4 text-secondary flex-shrink-0"></i>
-                              <div className="min-w-0">
-                                <div className="text-muted" style={{ fontSize: '0.72rem', lineHeight: 1.1 }}>Lịch học</div>
-                                <div className="fw-bold text-dark text-truncate" style={{ fontSize: '0.825rem' }} title={cleanSchedule}>
-                                  {cleanSchedule}
-                                </div>
-                              </div>
-                            </div>
-
-                            <div className="d-flex align-items-center gap-2 flex-shrink-0" style={{ flex: '1 1 45%', justifyContent: 'flex-end' }}>
-                              <i className="bi bi-people fs-4 text-secondary flex-shrink-0"></i>
-                              <div>
-                                <div className="text-muted" style={{ fontSize: '0.72rem', lineHeight: 1.1 }}>Sĩ số</div>
-                                <div className="fw-bold text-dark" style={{ fontSize: '0.825rem', fontVariantNumeric: 'tabular-nums' }}>
-                                  {c.studentCount}/{isGroup ? (c.maxStudents || 5) : 1} học viên
-                                </div>
+                        {/* Phần giữa thẻ: lịch học và sĩ số */}
+                        <div className="p-2.5 rounded-3 mt-3 min-w-0" style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0' }}>
+                          <div className="d-flex align-items-start gap-2 min-w-0">
+                            <i className="bi bi-calendar3 text-secondary flex-shrink-0 mt-0.5" style={{ fontSize: '1.05rem' }}></i>
+                            <div className="min-w-0 flex-grow-1">
+                              <div className="text-muted" style={{ fontSize: '0.72rem', lineHeight: 1.1 }}>Lịch học</div>
+                              <div
+                                className="fw-bold text-dark text-break mt-0.5"
+                                style={{
+                                  fontSize: '0.82rem',
+                                  lineHeight: 1.35,
+                                  display: '-webkit-box',
+                                  WebkitLineClamp: 2,
+                                  WebkitBoxOrient: 'vertical',
+                                  overflow: 'hidden',
+                                }}
+                                title={cleanSchedule}
+                              >
+                                {cleanSchedule}
                               </div>
                             </div>
                           </div>
 
-                          {hasLifecycleDates && (
-                            <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 mt-2 pt-2 border-top small text-secondary" style={{ fontSize: '0.76rem', fontVariantNumeric: 'tabular-nums' }}>
-                              <span>
-                                <i className="bi bi-calendar-range me-1 text-danger"></i>
-                                {formatShortDate(c.startDate)} → {formatShortDate(c.endDate)}
-                              </span>
+                          <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 mt-2 pt-2 border-top small text-secondary min-w-0" style={{ fontSize: '0.76rem', fontVariantNumeric: 'tabular-nums' }}>
+                            <div className="d-flex flex-wrap align-items-center gap-2 min-w-0">
+                              {hasLifecycleDates && (
+                                <span>
+                                  <i className="bi bi-calendar-range me-1 text-danger"></i>
+                                  {formatShortDate(c.startDate)} → {formatShortDate(c.endDate)}
+                                </span>
+                              )}
                               {isGroup && c.registrationDeadline && (
                                 <span className="text-dark fw-medium">
-                                  Hạn ĐK: {formatShortDate(c.registrationDeadline)}
+                                  · Hạn ĐK: {formatShortDate(c.registrationDeadline)}
                                 </span>
                               )}
                             </div>
-                          )}
+
+                            <span className="d-inline-flex align-items-center gap-1 fw-bold text-dark flex-shrink-0 ms-auto" title="Sĩ số hiện tại">
+                              <i className="bi bi-people text-secondary"></i>
+                              <span>Sĩ số: {c.studentCount}/{isGroup ? (c.maxStudents || 5) : 1}</span>
+                            </span>
+                          </div>
                         </div>
 
                         {/* Tiến độ giảng dạy */}
@@ -321,23 +331,23 @@ export default function TutorClassroomsPage() {
                         </div>
                       </div>
 
-                      {/* Footer Actions */}
-                      <div className="d-flex align-items-center justify-content-between gap-2 mt-3 pt-3 border-top">
+                      {/* Chân thẻ: các nút thao tác */}
+                      <div className="d-flex flex-wrap align-items-center justify-content-between gap-1.5 mt-3 pt-3 border-top">
                         <Link
                           to={`/tutor/documents?classroomId=${c.id}`}
-                          className="btn btn-sm btn-outline-secondary px-2.5 px-sm-3 py-1.5 d-inline-flex align-items-center gap-1.5 rounded-2 text-nowrap flex-shrink-0"
-                          style={{ fontSize: '0.825rem', borderColor: '#cbd5e1' }}
+                          className="btn btn-sm btn-outline-secondary px-2.5 py-1.5 d-inline-flex align-items-center gap-1 rounded-2 text-nowrap flex-shrink-0"
+                          style={{ fontSize: '0.8rem', borderColor: '#cbd5e1' }}
                           title="Xem tài liệu lớp học"
                         >
-                          <i className="bi bi-folder2-open"></i><span>Tài liệu lớp</span>
+                          <i className="bi bi-folder2-open"></i><span>Tài liệu</span>
                         </Link>
 
-                        <div className="d-flex align-items-center gap-1.5">
+                        <div className="d-flex align-items-center gap-1.5 ms-auto flex-wrap">
                           {c.status === 'Active' && (
                             <Link
                               to={`/tutor/classrooms/edit/${c.id}`}
-                              className="btn btn-sm btn-outline-secondary px-2.5 px-sm-3 py-1.5 rounded-2 text-nowrap fw-medium"
-                              style={{ fontSize: '0.825rem', borderColor: '#cbd5e1' }}
+                              className="btn btn-sm btn-outline-secondary px-2.5 py-1.5 rounded-2 text-nowrap fw-medium"
+                              style={{ fontSize: '0.8rem', borderColor: '#cbd5e1' }}
                             >
                               Sửa lớp
                             </Link>
@@ -345,13 +355,13 @@ export default function TutorClassroomsPage() {
 
                           <Link
                             to="/tutor/schedule"
-                            className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1 px-2.5 px-sm-3 py-1.5 rounded-2 text-nowrap fw-medium"
-                            style={{ fontSize: '0.825rem', borderColor: '#cbd5e1' }}
+                            className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1 px-2.5 py-1.5 rounded-2 text-nowrap fw-medium"
+                            style={{ fontSize: '0.8rem', borderColor: '#cbd5e1' }}
                           >
                             <i className="bi bi-calendar3"></i><span>Lịch dạy</span>
                           </Link>
 
-                          {/* Dropdown menu */}
+                          {/* Menu thao tác mở rộng */}
                           <div className="dropdown">
                             <button
                               className="btn btn-sm btn-outline-secondary px-2 py-1.5 rounded-2 text-secondary d-flex align-items-center justify-content-center"
@@ -416,7 +426,7 @@ export default function TutorClassroomsPage() {
               })}
             </div>
 
-            {/* Pagination - Luôn hiển thị thanh phân trang chuẩn khi có dữ liệu */}
+            {/* Phân trang */}
             {total > 0 && (
               <OtspPagination
                 page={page}

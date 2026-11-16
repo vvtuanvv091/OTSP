@@ -82,7 +82,7 @@ public class AiService : IAiService
             return BuildQuotaExceededResponse(userRole, maxLimit);
         }
 
-        // 1. Enrich context if user is authenticated (lấy đúng vai trò hiện tại từ UserRoles)
+        // 1. Nếu người dùng đã đăng nhập thì lấy thêm ngữ cảnh theo vai trò hiện tại từ UserRoles
         if (!string.IsNullOrWhiteSpace(currentUserId))
         {
             var user = await _db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == currentUserId, ct);
@@ -166,7 +166,7 @@ public class AiService : IAiService
                     var result = JsonSerializer.Deserialize<AgentChatResponseDto>(content, JsonOptions);
                     if (result != null)
                     {
-                        // Đảm bảo tuyệt đối tắt tự động chuyển trang theo yêu cầu
+                        // Không tự động chuyển trang khi không được phép
                         result.AutoExecute = false;
                         if (result.UiAction != null) result.UiAction.AutoExecute = false;
 
@@ -261,7 +261,7 @@ public class AiService : IAiService
             tokensUsed = EstimateTokens(request.Question, result.Answer);
         }
 
-        // Automatically persist into AiStudySessions table for Admin metrics and student history!
+        // Lưu lại vào bảng AiStudySessions để thống kê và xem lại lịch sử học tập.
         int? savedSessionId = null;
         if (student != null)
         {
@@ -329,7 +329,7 @@ public class AiService : IAiService
             SuggestedAction = "Approve"
         };
 
-        // If AI flagged review as abnormal, automatically generate ReviewAlert for Admin!
+        // Nếu AI đánh dấu nhận xét bất thường thì tạo cảnh báo ReviewAlert cho admin xem xét.
         if (result.IsAbnormal && reviewId > 0)
         {
             try

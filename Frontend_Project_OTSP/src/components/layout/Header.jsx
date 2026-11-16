@@ -294,7 +294,7 @@ export default function Header() {
 
                       <div className="dropdown-divider"></div>
 
-                      {/* 8. Logout */}
+                      {/* 8. Đăng xuất */}
                       <button
                         type="button"
                         className="dropdown-item d-flex align-items-center gap-3 text-danger fw-semibold"

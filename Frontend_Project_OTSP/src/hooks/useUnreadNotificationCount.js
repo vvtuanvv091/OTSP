@@ -15,7 +15,7 @@ export default function useUnreadNotificationCount(user) {
     }
   }, [user]);
 
-  // Lắng nghe các sự kiện SignalR dùng chung từ SignalRContext (0 kết nối WebSocket phụ)
+  // Lắng nghe sự kiện từ kết nối SignalR dùng chung trong SignalRContext
   useSignalREvent('NotificationReceived', refresh);
   useSignalREvent('ChatMessageReceived', refresh);
   useSignalREvent('ConnectionRequestCreated', refresh);

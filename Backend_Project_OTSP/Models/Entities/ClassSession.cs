@@ -8,11 +8,11 @@ namespace Backend_Project_OTSP.Models
     {   
         [Key]
         public int Id { get; set; }
-        public DateTime ScheduledAt { get; set; }//thời điểm
-        // Trạng tháii: Scheduled, Done, Cancelled
+        public DateTime ScheduledAt { get; set; } // Thời điểm diễn ra buổi học (UTC)
+        // Trạng thái: Scheduled, Done, Cancelled
         public SessionStatus Status { get; set; } = SessionStatus.Scheduled;
         public string? VideoRoom { get; set; }
-        public string? RecordingUrl { get; set; }//ghi hình
+        public string? RecordingUrl { get; set; } // Link video ghi hình buổi học (nếu có)
         public bool IsMakeup { get; set; } = false;
         public double? DurationHours { get; set; }
         [ForeignKey("Classroom")]

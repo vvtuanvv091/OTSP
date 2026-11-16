@@ -13,7 +13,7 @@ function upsertChatMessage(prevList, incoming, currentUserId) {
   if (!incoming || !incoming.id) return prevList;
   const currentUidStr = String(currentUserId || '').trim().toLowerCase();
   const incomingSenderStr = String(incoming.senderId || '').trim().toLowerCase();
-  // CHỈ tính isMine dựa trên ID người gửi thực tế khớp với user hiện tại (TUYỆT ĐỐI không dùng incoming.isOwn vì SignalR broadcast chung)
+  // Tính isMine theo ID người gửi thực tế thay vì incoming.isOwn vì SignalR phát chung cho các bên
   const isMine = Boolean(currentUidStr) && incomingSenderStr === currentUidStr;
 
   // 1. Kiểm tra nếu tin nhắn đã tồn tại theo ID thực
@@ -257,7 +257,7 @@ export default function ChatPage() {
     });
   }, [conversations, hubConnected]);
 
-  // 3. Kết nối Hub chat thời gian thực qua SignalR dùng chung (Zero extra WebSocket)
+  // 3. Lắng nghe tin nhắn mới qua kết nối SignalR dùng chung
   useEffect(() => {
     hubConnectionRef.current = connection;
 
@@ -553,7 +553,7 @@ export default function ChatPage() {
     }
 
     if (!imageMsg) {
-      // Fallback base64 nếu upload lỗi
+      // Dùng tạm ảnh base64 nếu upload lên server bị lỗi
       const dataUrl = await new Promise((resolve) => {
         const reader = new FileReader();
         reader.onload = (ev) => resolve(ev.target.result);

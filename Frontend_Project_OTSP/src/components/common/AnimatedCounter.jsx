@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 
 /**
- * AnimatedCounter counts smoothly from 0 to end value when rendered or when value changes.
+ * Bộ đếm số chạy tăng dần từ 0 đến giá trị đích khi render hoặc khi giá trị thay đổi.
  */
 export default function AnimatedCounter({ end = 0, duration = 1800, prefix = '', suffix = '' }) {
   const [count, setCount] = useState(0);

@@ -16,7 +16,7 @@ export default function StudentPaymentsPage() {
   const [selectedPayment, setSelectedPayment] = useState(null);
   const [reloadKey, setReloadKey] = useState(0);
 
-  // Tự động làm mới khi thanh toán thành công theo thời gian thực (Zero-Reload)
+  // Tự làm mới danh sách khi có thanh toán thành công qua SignalR
   useSignalREvent('PaymentStatusChanged', () => setReloadKey((k) => k + 1));
   const [data, setData] = useState({
     isMinor: false,

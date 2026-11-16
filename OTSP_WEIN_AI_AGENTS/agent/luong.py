@@ -23,10 +23,8 @@ def _make_response(
     recommended_tutor_ids: list[int] | None = None,
 ) -> AgentResponse:
     """
-    Hàm tiện ích chuẩn hóa phản hồi AgentResponse:
-    - Tuyệt đối tắt auto_execute theo yêu cầu người dùng
-    - Đồng bộ cả uiAction (dành cho Frontend React)
-    - Đồng bộ cả 2 trường root: autoExecute, actionType (khớp 100% với Backend .NET AiDtos.cs)
+    Đóng gói phản hồi AgentResponse cho cả frontend (uiAction) và backend .NET (autoExecute, actionType),
+    đồng thời giữ auto_execute luôn tắt.
     """
     auto_execute = False  # Đảm bảo không bao giờ tự động chuyển trang
 
@@ -61,10 +59,10 @@ def run_agent_workflow(
     user_id: int | None = None
 ) -> AgentResponse:
     """
-    LUỒNG XỬ LÝ CHÍNH CỦA TÁC TỬ WEIN AI:
-    1. Nhận diện ngữ cảnh cá nhân hóa (Họ tên user, Role, Lịch học sắp tới).
-    2. Kiểm tra các ý định cần can thiệp UI (Xem lịch, thanh toán, phân trang, đổi tab, tìm kiếm).
-    3. Nếu là câu hỏi trò chuyện / kiến thức / giải bài: Kích hoạt Gemini đa lượt (giữ trọn vẹn lịch sử chat).
+    Luồng xử lý chính khi nhận tin nhắn chat:
+    1. Lấy ngữ cảnh người dùng (tên, vai trò, lịch học sắp tới).
+    2. Bắt các ý định thao tác giao diện/tra cứu nhanh (lịch học, phân trang, thanh toán, lớp học, tìm gia sư...).
+    3. Còn lại chuyển cho Gemini trả lời kèm lịch sử hội thoại.
     """
     msg_low = user_message.lower().strip()
     system_context = system_context or {}
@@ -339,7 +337,7 @@ def run_agent_workflow(
     # =========================================================================
     # 9. CHAT TỰ DO / GIẢI TOÁN / HỎI ĐÁP ĐA LƯỢT VỚI GEMINI
     # =========================================================================
-    # 👉 Nạp dữ liệu thực tế từ Neon DB qua RAM Cache để AI luôn nắm toàn bộ gia sư & lớp học
+    # Lấy danh sách gia sư và lớp học từ cache trong RAM để làm ngữ cảnh cho AI
     all_ram_tutors = get_tutors_from_ram(limit=60)
     all_ram_classes = get_classrooms_from_ram(limit=20)
 

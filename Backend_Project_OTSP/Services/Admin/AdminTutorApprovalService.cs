@@ -361,7 +361,7 @@ public class AdminTutorApprovalService : IAdminTutorApprovalService
 
         await _db.SaveChangesAsync(cancellationToken);
 
-        // Phân phối thông báo (In-App + Gmail) qua Central Dispatcher
+        // Gửi thông báo (In-App + Gmail) tới gia sư
         if (_dispatcher != null)
         {
             await _dispatcher.DispatchTutorApprovalAsync(new TutorApprovalNotificationEvent(

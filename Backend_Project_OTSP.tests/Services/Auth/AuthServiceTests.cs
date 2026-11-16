@@ -54,7 +54,7 @@ public class AuthServiceTests
             _mockLogger.Object);
     }
 
-    // ==================== LOGIN TESTS ====================
+    // ==================== KIỂM THỬ ĐĂNG NHẬP ====================
 
     [Theory]
     [InlineData("", "password")]
@@ -216,7 +216,7 @@ public class AuthServiceTests
         Assert.Equal("valid-jwt-token", data.Token);
     }
 
-    // ==================== REGISTER TESTS ====================
+    // ==================== KIỂM THỬ ĐĂNG KÝ ====================
 
     [Fact]
     public async Task RegisterAsync_WhenInvalidRole_ReturnsFalse()
@@ -308,7 +308,7 @@ public class AuthServiceTests
             Email = "test@test.com",
             Password = "Password123!",
             ConfirmPassword = "Password123!",
-            CitizenIdNumber = "12345" // Not 12 digits
+            CitizenIdNumber = "12345" // Sai định dạng: không đủ 12 chữ số
         };
 
         // Act
@@ -332,7 +332,7 @@ public class AuthServiceTests
             Email = "youngtutor@test.com",
             Password = "Password123!",
             ConfirmPassword = "Password123!",
-            DateOfBirth = DateTime.Today.AddYears(-16).ToString("yyyy-MM-dd") // 16 years old
+            DateOfBirth = DateTime.Today.AddYears(-16).ToString("yyyy-MM-dd") // Chưa đủ 18 tuổi
         };
 
         // Act
@@ -411,7 +411,7 @@ public class AuthServiceTests
         Assert.NotNull(data);
         Assert.Equal("registered-token", data.Token);
 
-        // Check StudentProfile created in DB
+        // Kiểm tra StudentProfile đã được tạo trong DB
         Assert.Equal(1, db.StudentProfiles.Count());
         Assert.Equal("Quan 1", db.StudentProfiles.First().Area);
     }
@@ -459,13 +459,13 @@ public class AuthServiceTests
         Assert.Null(error);
         Assert.NotNull(data);
 
-        // Check TutorProfile created in DB
+        // Kiểm tra TutorProfile đã được tạo trong DB
         Assert.Equal(1, db.TutorProfiles.Count());
         Assert.Equal(250000, db.TutorProfiles.First().HourlyFee);
         Assert.Equal(VerificationStatus.Pending, db.TutorProfiles.First().VerificationStatus);
     }
 
-    // ==================== FORGOT & RESET PASSWORD ====================
+    // ==================== QUÊN VÀ ĐẶT LẠI MẬT KHẨU ====================
 
     [Fact]
     public async Task ForgotPasswordAsync_WhenUserNotFound_ReturnsUniformSuccessWithoutToken()
@@ -531,7 +531,7 @@ public class AuthServiceTests
         Assert.Contains("không khớp", error);
     }
 
-    // ==================== CHANGE PASSWORD & GET USER ====================
+    // ==================== ĐỔI MẬT KHẨU VÀ LẤY THÔNG TIN USER ====================
 
     [Fact]
     public async Task ChangePasswordAsync_WhenPasswordMismatch_ReturnsFalse()

@@ -105,7 +105,7 @@ export function SignalRProvider({ children }) {
 
     let isCancelled = false;
 
-    // Khởi tạo DUY NHẤT 1 kết nối WebSocket cho toàn bộ ứng dụng qua Unified AppHub
+    // Khởi tạo 1 kết nối WebSocket dùng chung cho toàn bộ ứng dụng qua AppHub
     const conn = new signalR.HubConnectionBuilder()
       .withUrl(hubUrl('/hubs/app'), {
         accessTokenFactory: () => getStoredToken() || ''

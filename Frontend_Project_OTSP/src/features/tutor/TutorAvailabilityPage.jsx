@@ -211,7 +211,7 @@ export default function TutorAvailabilityPage() {
   return (
     <>
       <div className="container-fluid py-4 availability-page">
-        {/* Header */}
+        {/* Tiêu đề trang */}
         <div className="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
           <div>
             <h1 className="h3 mb-1 fw-bold text-dark">Cài đặt lịch rảnh hàng tuần</h1>
@@ -260,7 +260,7 @@ export default function TutorAvailabilityPage() {
 
           <div className="availability-layout">
             <section className="availability-card p-3 shadow-sm" aria-label="Bảng lịch rảnh hàng tuần">
-              {/* Mobile day picker */}
+              {/* Bộ chọn ngày trên mobile */}
               <div className="availability-mobile-day-picker" role="group" aria-label="Chọn ngày trong tuần">
                 {DAYS.map((d) => (
                   <button
@@ -378,7 +378,7 @@ export default function TutorAvailabilityPage() {
               )}
             </section>
 
-            {/* Sidebar Controls */}
+            {/* Thanh công cụ thao tác nhanh */}
             <aside className="availability-card p-3.5 shadow-sm" aria-label="Tóm tắt lịch rảnh">
               <h2 className="h6 fw-bold text-dark mb-2">Tóm tắt lịch rảnh</h2>
 

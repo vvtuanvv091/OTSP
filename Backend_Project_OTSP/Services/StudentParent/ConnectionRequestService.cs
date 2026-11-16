@@ -692,7 +692,7 @@ public class ConnectionRequestService : IConnectionRequestService
 
                 if (isRelational)
                 {
-                    // Khóa bi quan (Pessimistic Row Lock) trên lớp học để ngăn chặn race condition khi 2 yêu cầu duyệt cùng lúc
+                    // Khóa dòng lớp học ở mức DB để tránh vượt sĩ số khi hai yêu cầu được duyệt cùng lúc
                     await _db.Database.ExecuteSqlRawAsync(
                         "SELECT \"Id\" FROM \"Classrooms\" WHERE \"Id\" = {0} FOR UPDATE",
                         new object[] { groupClass.Id },
@@ -721,6 +721,26 @@ public class ConnectionRequestService : IConnectionRequestService
                     if (currentCount >= groupClass.MaxStudents)
                     {
                         return await RollbackAndReturnAsync(new AcceptConnectionRequestResult { ClassroomFull = true, Message = "Lớp nhóm đã đủ sĩ số tối đa. Không thể nhận thêm học viên!" });
+                    }
+
+                    if (groupClass.WeeklySchedules.Count > 0)
+                    {
+                        var groupSlots = groupClass.WeeklySchedules
+                            .Select(w => new ScheduleConflictHelper.ScheduleSlotCandidate(w.DayOfWeek, w.StartTime, w.EndTime))
+                            .ToList();
+                        var studentConflict = await ScheduleConflictHelper.FindStudentScheduleConflictAsync(
+                            _db,
+                            groupClass.Id,
+                            groupClass.StartDate ?? todayVn,
+                            groupClass.EndDate,
+                            groupSlots,
+                            new[] { request.StudentId },
+                            Array.Empty<(DateTime, double)>(),
+                            cancellationToken);
+                        if (studentConflict != null)
+                        {
+                            return await RollbackAndReturnAsync(new AcceptConnectionRequestResult { SlotConflict = true, Message = studentConflict });
+                        }
                     }
 
                     _db.ClassroomStudents.Add(new ClassroomStudent
@@ -938,6 +958,11 @@ public class ConnectionRequestService : IConnectionRequestService
                         });
                     }
 
+                    startDateVn = ClassroomLifecycleHelper.AdvanceStartDateToFirstFutureSlot(
+                        startDateVn,
+                        distinctWeekly,
+                        DateTime.UtcNow);
+
                     var sessionsCount = Math.Clamp(distinctWeekly.Count, 1, 3);
                     int expectedTotal;
                     DateOnly? resolvedEndDate;
@@ -1097,7 +1122,7 @@ public class ConnectionRequestService : IConnectionRequestService
                 await transaction.CommitAsync(cancellationToken);
             }
 
-            // Phân phối thông báo (In-App + SignalR + Gmail) qua Central Dispatcher
+            // Gửi thông báo chấp nhận yêu cầu qua In-App, SignalR và email
             await _dispatcher.DispatchBookingAcceptedAsync(new BookingAcceptedNotificationEvent(
                 StudentUserId: studentUserId,
                 StudentEmail: request.Student?.User?.Email,
@@ -1159,7 +1184,7 @@ public class ConnectionRequestService : IConnectionRequestService
 
         await _db.SaveChangesAsync(cancellationToken);
 
-        // Phân phối thông báo từ chối (In-App + SignalR + Gmail) qua Central Dispatcher
+        // Gửi thông báo từ chối yêu cầu qua In-App, SignalR và email
         await _dispatcher.DispatchBookingRejectedAsync(new BookingRejectedNotificationEvent(
             StudentUserId: studentUserId,
             StudentEmail: request.Student?.User?.Email,

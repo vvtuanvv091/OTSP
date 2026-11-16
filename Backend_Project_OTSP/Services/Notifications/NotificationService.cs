@@ -40,7 +40,7 @@ public class NotificationService : INotificationService, INotificationDispatcher
         _scopeFactory = scopeFactory;
     }
 
-    // Overload để tương thích ngược với unit tests và legacy code
+    // Hàm overload giữ lại để tương thích với unit test và code cũ
     public NotificationService(
         ApplicationDbContext db,
         IHubContext<ConnectionRequestHub> connectionRequestHub,

@@ -1,4 +1,4 @@
-/* OTSP Brand Theme & Dark/Light Mode Layer. Loaded after Bootstrap and page stylesheets. */
+/* Giao diện màu thương hiệu OTSP và chế độ Sáng/Tối (nạp sau Bootstrap và stylesheet từng trang). */
 :root,
 [data-bs-theme="light"] {
     --bs-font-sans-serif: "Open Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
@@ -7,14 +7,14 @@
     --bs-primary-rgb: 219, 48, 58;
     --bs-danger: #DB303A;
     --bs-danger-rgb: 219, 48, 58;
-    /* Green color matching user specification (#15803D) */
+    /* Màu xanh lá (#15803D) */
     --bs-success: #166534;
     --bs-success-rgb: 22, 101, 52;
     --bs-success-text-emphasis: #14532D;
     --bs-success-bg-subtle: #DCFCE7;
     --bs-success-red: #DB303A;
     --bs-success-border-subtle: #86EFAC;
-    /* Deep Rich Amber / Gold for Stars & Warning (#E8A317 / #D97706) */
+    /* Màu vàng hổ phách cho sao đánh giá và cảnh báo (#E8A317 / #D97706) */
     --bs-warning: #D97706;
     --bs-warning-rgb: 217, 119, 6;
     --bs-warning-text-emphasis: #B45309;
@@ -68,14 +68,14 @@
   --bs-danger-bg-subtle: rgba(239, 68, 68, 0.2);
   --bs-danger-border-subtle: rgba(239, 68, 68, 0.35);
 
-  /* Dark mode green */
+  /* Màu xanh lá trong chế độ tối */
   --bs-success: #22C55E;
   --bs-success-rgb: 34, 197, 94;
   --bs-success-text-emphasis: #86EFAC;
   --bs-success-bg-subtle: rgba(22, 101, 52, 0.35);
   --bs-success-border-subtle: rgba(34, 197, 94, 0.4);
 
-  /* Dark mode deep amber */
+  /* Màu vàng hổ phách trong chế độ tối */
   --bs-warning: #F59E0B;
   --bs-warning-rgb: 245, 158, 11;
   --bs-warning-text-emphasis: #FBBF24;
@@ -89,13 +89,13 @@
   --bs-info-border-subtle: rgba(56, 189, 248, 0.35);
 }
 
-/* ==================== GLOBAL DARK THEME FIXES (UNIFIED CONTRAST) ==================== */
+/* ==================== CHỈNH ĐỘ TƯƠNG PHẢN CHẾ ĐỘ TỐI ==================== */
 html[data-bs-theme="dark"] body {
   background-color: #0f172a !important;
   color: #e2e8f0 !important;
 }
 
-/* Text and Headings */
+/* Chữ và tiêu đề */
 html[data-bs-theme="dark"] .text-dark,
 [data-bs-theme="dark"] .text-dark {
   color: #f8fafc !important;
@@ -117,7 +117,7 @@ html[data-bs-theme="dark"] h6 {
   color: #f8fafc;
 }
 
-/* Cards & Containers across Student and Tutor dashboards */
+/* Thẻ và khung chứa trong bảng điều khiển học viên & gia sư */
 html[data-bs-theme="dark"] .card,
 html[data-bs-theme="dark"] .bg-white,
 html[data-bs-theme="dark"] .bg-body,
@@ -161,7 +161,7 @@ html[data-bs-theme="dark"] .bg-body-tertiary,
   color: #cbd5e1 !important;
 }
 
-/* Badges */
+/* Huy hiệu trạng thái */
 html[data-bs-theme="dark"] .badge.bg-light,
 html[data-bs-theme="dark"] .badge.text-bg-light,
 [data-bs-theme="dark"] .badge.bg-light,
@@ -171,7 +171,7 @@ html[data-bs-theme="dark"] .badge.text-bg-light,
   border-color: #475569 !important;
 }
 
-/* Table styling for dark theme */
+/* Bảng dữ liệu trong chế độ tối */
 html[data-bs-theme="dark"] .table,
 [data-bs-theme="dark"] .table {
   --bs-table-bg: transparent;
@@ -209,7 +209,7 @@ html[data-bs-theme="dark"] .student-avatar-circle,
   color: #f1f5f9 !important;
 }
 
-/* Sidebars and Navigation in Dark Mode */
+/* Thanh bên và thanh điều hướng trong chế độ tối */
 html[data-bs-theme="dark"] .student-sidebar,
 html[data-bs-theme="dark"] .tutor-sidebar,
 [data-bs-theme="dark"] .student-sidebar,
@@ -259,7 +259,7 @@ html[data-bs-theme="dark"] .footer,
   border-top-color: #2D305D !important;
 }
 
-/* Form Controls in Dark Mode */
+/* Ô nhập liệu trong chế độ tối */
 html[data-bs-theme="dark"] .form-control,
 html[data-bs-theme="dark"] .form-select,
 [data-bs-theme="dark"] .form-control,
@@ -292,8 +292,8 @@ html[data-bs-theme="dark"] .dropdown-divider,
   border-color: #2D305D !important;
 }
 
-/* ==================== BUTTONS & UTILITIES ==================== */
-/* Primary & Danger buttons (Red brand) */
+/* ==================== NÚT BẤM VÀ TIỆN ÍCH ==================== */
+/* Nút chính và nút cảnh báo (màu đỏ chủ đạo) */
 .btn-primary, .btn-danger {
   --bs-btn-color: #fff;
   --bs-btn-bg: #DB303A;
@@ -324,7 +324,7 @@ html[data-bs-theme="dark"] .dropdown-divider,
   --bs-btn-disabled-border-color: #DB303A;
 }
 
-/* Success Buttons (Green #15803D as specified by user) */
+/* Nút thành công (xanh lá #15803D) */
 .btn-success {
   --bs-btn-color: #fff;
   --bs-btn-bg: #166534;
@@ -355,7 +355,7 @@ html[data-bs-theme="dark"] .dropdown-divider,
   --bs-btn-disabled-border-color: #166534;
 }
 
-/* Colors and Links */
+/* Màu chữ và liên kết */
 .text-primary, .text-danger,
 .link-primary, .link-danger {
   color: #B7212B !important;
@@ -364,7 +364,7 @@ html[data-bs-theme="dark"] .dropdown-divider,
 .bg-primary, .bg-danger { background-color: #DB303A !important; }
 .border-primary, .border-danger { border-color: #DB303A !important; }
 
-/* GREEN SPECIFICATION (#166534) FOR SUCCESS, ACCEPTED & STATUS BADGES */
+/* MÀU XANH LÁ (#166534) CHO TRẠNG THÁI THÀNH CÔNG / ĐÃ DUYỆT */
 .text-success, .link-success {
   color: #166534 !important;
 }
@@ -373,7 +373,7 @@ html[data-bs-theme="dark"] .dropdown-divider,
   color: #4ADE80 !important;
 }
 
-/* SOLID GREEN ELEMENTS: Deep forest green #166534 background with ALWAYS crisp white text */
+/* Nền xanh lá đậm #166534 đi kèm chữ trắng */
 .bg-success,
 .text-bg-success,
 .badge-done,
@@ -426,7 +426,7 @@ html[data-bs-theme="dark"] .dropdown-divider,
   color: #ffffff !important;
 }
 
-/* SUBTLE SUCCESS ELEMENTS: Light pastel green #DCFCE7 background with dark forest green #14532D text */
+/* Nền xanh lá nhạt #DCFCE7 đi kèm chữ xanh đậm #14532D */
 .bg-success-subtle,
 .alert-success {
   background-color: #DCFCE7 !important;
@@ -469,7 +469,7 @@ html[data-bs-theme="dark"] .dropdown-divider,
   color: #14532D !important;
 }
 
-/* DARK MODE OVERRIDES */
+/* GHI ĐÈ CHO CHẾ ĐỘ TỐI */
 [data-bs-theme="dark"] .bg-success,
 [data-bs-theme="dark"] .text-bg-success,
 [data-bs-theme="dark"] .badge-done,
@@ -545,7 +545,7 @@ html[data-bs-theme="dark"] .dropdown-divider,
   border-color: #22C55E !important;
 }
 
-/* DEEP GOLD / AMBER (#E8A317) FOR STARS & WARNING */
+/* MÀU VÀNG HỔ PHÁCH (#E8A317) CHO SAO ĐÁNH GIÁ VÀ CẢNH BÁO */
 .star-gold,
 .text-warning,
 .bi-star-fill.text-warning,
@@ -577,7 +577,7 @@ i.bi-star-fill {
 .form-range::-moz-range-thumb { background-color: #DB303A; }
 .progress-bar { background-color: #DB303A; }
 
-/* Shared OTSP brand elements. */
+/* Các thành phần dùng chung mang màu nhận diện OTSP */
 .header .logo .otsp-brand-mark {
   background: linear-gradient(145deg, #E95760, #DB303A);
   box-shadow: 0 7px 16px rgba(219, 48, 58, .22);
@@ -603,7 +603,7 @@ i.bi-star-fill {
 .otsp-hero-trust i { color: #FF9097; }
 .features-item > i { color: #DB303A !important; }
 
-/* Account and notification pages use the same red accent in both themes. */
+/* Trang tài khoản và thông báo giữ cùng tông đỏ ở cả hai chế độ sáng/tối */
 .student-dashboard { background: linear-gradient(135deg, #FFF7F7, #FAF8F8); }
 .student-dashboard-card { border-color: rgba(183, 33, 43, .1); box-shadow: 0 24px 70px rgba(75, 28, 32, .08); }
 .student-dashboard-icon { background: #FFF0F1; color: #DB303A; }
@@ -625,7 +625,7 @@ html[data-bs-theme="dark"] .student-dashboard-icon,
 html[data-bs-theme="dark"] .notifications-card-icon,
 html[data-bs-theme="dark"] .notifications-empty-state > span { background: #49272A; color: #FF9CA2; }
 
-/* Public pages: replace mint/green accents with brand red and soft rose. */
+/* Các trang công khai: thay tông xanh lá mặc định sang đỏ và hồng nhạt */
 .portal-page { --portal-green: #DB303A; --portal-green-dark: #B7212B; --portal-wash: #FAF8F8; }
 .portal-hero { background: radial-gradient(circle at 88% 12%, rgba(219, 48, 58, .1), transparent 26%), linear-gradient(130deg, #FFF8F8, #FFF1F2 62%, #FBF9F9); }
 .portal-hero::after { border-color: rgba(219, 48, 58, .12); box-shadow: 0 0 0 42px rgba(219, 48, 58, .035), 0 0 0 90px rgba(219, 48, 58, .025); }
@@ -650,12 +650,12 @@ html[data-bs-theme="dark"] .notifications-empty-state > span { background: #4927
 .portal-callout { background: linear-gradient(110deg, #B7212B, #DB303A); }
 .portal-callout .portal-button { border-color: #fff; background: #fff; color: #B7212B !important; }
 
-/* Tutor workspace accents. */
+/* Điểm nhấn màu cho khu vực gia sư */
 .tutor-sidebar-avatar { background: rgba(219, 48, 58, .12); color: #B7212B; }
 .tutor-sidebar-link.active { background: rgba(219, 48, 58, .09); color: #B7212B; }
 .tutor-sidebar-link.active i { color: #DB303A; }
 
-/* Shared Font, Brand Button & Tabular Number Normalization */
+/* Chuẩn hóa font chữ, nút chính và số căn thẳng hàng */
 body {
   font-family: var(--default-font, "Open Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif);
 }
@@ -695,7 +695,7 @@ body {
   --bs-btn-active-border-color: #B7212B;
 }
 
-/* Micro-animations & Skeleton Effects */
+/* Hiệu ứng chuyển động nhẹ và skeleton loader */
 @keyframes otsp-shimmer {
     0% { background-position: -200% 0; }
     100% { background-position: 200% 0; }

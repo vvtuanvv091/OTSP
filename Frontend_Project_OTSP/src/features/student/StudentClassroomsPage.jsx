@@ -25,7 +25,7 @@ export default function StudentClassroomsPage() {
   const [reloadKey, setReloadKey] = useState(0);
   const reviewTimerRef = useRef(null);
 
-  // Tự động làm mới danh sách lớp học theo thời gian thực (Zero-Reload)
+  // Tự làm mới danh sách lớp khi có cập nhật qua SignalR
   useSignalREvent('ConnectionRequestStatusChanged', () => setReloadKey((k) => k + 1));
   useSignalREvent('ClassSessionStatusChanged', () => setReloadKey((k) => k + 1));
   useSignalREvent('ClassroomCapacityUpdated', () => setReloadKey((k) => k + 1));
@@ -309,12 +309,12 @@ export default function StudentClassroomsPage() {
               key={classId}
               className="card border shadow-sm rounded-4 mb-4 overflow-hidden bg-white"
             >
-              {/* Row 1: Header info (Tên gia sư, Môn, Tên lớp, Badge loại lớp) */}
+              {/* Hàng 1: Thông tin lớp (gia sư, môn học, tên lớp, nhãn loại lớp) */}
               <div className="p-3.5 px-4 border-bottom bg-light bg-opacity-40">
-                <div className="d-flex flex-wrap justify-content-between align-items-center gap-3">
-                  <div>
-                    <div className="d-flex align-items-center gap-2 flex-wrap mb-1">
-                      <h2 className="h5 fw-bold mb-0 text-dark">
+                <div className="d-flex flex-wrap justify-content-between align-items-center gap-3 min-w-0">
+                  <div className="min-w-0 flex-grow-1">
+                    <div className="d-flex align-items-center gap-2 flex-wrap mb-1 min-w-0">
+                      <h2 className="h5 fw-bold mb-0 text-dark text-break">
                         {cls.tutorName} · {cls.subjectName}
                       </h2>
                       {(() => {
@@ -390,7 +390,7 @@ export default function StudentClassroomsPage() {
                 </div>
               )}
 
-              {/* Row 2: Tiến độ học tập & Nhóm nút hành động (Dãn ra xuống hàng riêng, cách viền thông thoáng) */}
+              {/* Hàng 2: Tiến độ học tập và nhóm nút thao tác */}
               <div className="px-4 py-3 d-flex flex-wrap justify-content-between align-items-center gap-3">
                 <div className="d-flex align-items-center gap-3 flex-wrap">
                   <div>

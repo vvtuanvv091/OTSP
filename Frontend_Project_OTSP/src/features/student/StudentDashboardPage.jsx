@@ -148,7 +148,7 @@ export default function StudentDashboardPage() {
         </p>
       </div>
 
-      {/* 1. Banner Người Giám Hộ (Hiển thị nếu học viên dưới 18 tuổi hoặc đã có người giám hộ từ Neon) */}
+      {/* 1. Banner người giám hộ (hiển thị khi học viên dưới 18 tuổi hoặc đã khai báo người giám hộ) */}
       {(dashboard.isMinor || dashboard.guardianName) && (
         <div className="student-guardian-alert-card mb-4 shadow-sm d-flex align-items-center justify-content-between flex-wrap gap-2">
           <div>
@@ -208,9 +208,9 @@ export default function StudentDashboardPage() {
         )}
       </div>
 
-      {/* 3. 4 KPI Metric Cards (Đổ từ Neon Database) */}
+      {/* 3. 4 thẻ thống kê tổng quan */}
       <div className="row g-3 mb-4">
-        {/* Card 1: Buổi hôm nay */}
+        {/* Thẻ 1: Buổi hôm nay */}
         <div className="col-6 col-md-3">
           <div className="student-kpi-card shadow-sm">
             <div className="student-kpi-title">BUỔI HÔM NAY</div>
@@ -221,7 +221,7 @@ export default function StudentDashboardPage() {
           </div>
         </div>
 
-        {/* Card 2: Lớp đang học */}
+        {/* Thẻ 2: Lớp đang học */}
         <div className="col-6 col-md-3">
           <div className="student-kpi-card shadow-sm">
             <div className="student-kpi-title">LỚP ĐANG HỌC</div>
@@ -232,7 +232,7 @@ export default function StudentDashboardPage() {
           </div>
         </div>
 
-        {/* Card 3: Học phí còn lại */}
+        {/* Thẻ 3: Học phí còn lại */}
         <div className="col-6 col-md-3">
           <div className="student-kpi-card shadow-sm">
             <div className="student-kpi-title">HỌC PHÍ CÒN LẠI</div>
@@ -245,7 +245,7 @@ export default function StudentDashboardPage() {
           </div>
         </div>
 
-        {/* Card 4: Yêu cầu đang chờ */}
+        {/* Thẻ 4: Yêu cầu đang chờ */}
         <div className="col-6 col-md-3">
           <div className="student-kpi-card shadow-sm">
             <div className="student-kpi-title">YÊU CẦU ĐANG CHỜ</div>
@@ -257,7 +257,7 @@ export default function StudentDashboardPage() {
         </div>
       </div>
 
-      {/* 4. Hai Cột: Lịch sắp tới (Left) & Học phí cần thanh toán (Right) */}
+      {/* 4. Hai cột: Lịch sắp tới (trái) & Học phí cần thanh toán (phải) */}
       <div className="row g-4">
         {/* Cột trái: Lịch sắp tới */}
         <div className="col-12 col-lg-7">
@@ -295,7 +295,7 @@ export default function StudentDashboardPage() {
                   ></i>
                 </div>
 
-                {/* Nút Thu gọn / Ẩn hiện lịch học */}
+                {/* Nút thu gọn / mở rộng lịch học */}
                 <button
                   type="button"
                   className="btn btn-toggle-schedule rounded-pill d-inline-flex align-items-center gap-1"
@@ -343,7 +343,7 @@ export default function StudentDashboardPage() {
                       </table>
                     </div>
 
-                    {/* Phân trang chuẩn OTSP */}
+                    {/* Phân trang */}
                     {filteredSessions.length > 0 && (
                       <OtspPagination
                         page={currentPage}

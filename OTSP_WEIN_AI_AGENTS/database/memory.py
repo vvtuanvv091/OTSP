@@ -9,7 +9,7 @@ from database.postgresql import (
 
 logger = logging.getLogger("wein-agent.memory")
 
-# Bộ nhớ RAM lưu trữ dữ liệu siêu tốc (< 1ms)
+# Cache dữ liệu trong RAM để phục vụ tra cứu nhanh
 _CACHE = {
     "tutors": [],
     "classrooms": [],
@@ -41,7 +41,7 @@ def get_tutors_from_ram(
     max_price: int | None = None,
     limit: int = 10
 ) -> list[dict]:
-    """Tìm gia sư trong RAM trong < 2 mili-giây"""
+    """Tìm gia sư khớp từ khóa trong cache RAM."""
     if time.time() - _CACHE["last_updated"] > CACHE_TTL_SECONDS:
         warmup_cache()
 

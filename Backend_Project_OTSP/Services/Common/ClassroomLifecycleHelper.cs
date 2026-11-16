@@ -34,9 +34,9 @@ public static class ClassroomLifecycleHelper
 
         double hours;
         if (rawHours >= 45.0)
-            hours = rawHours / 60.0; // Stored in minutes (e.g. 60, 90, 120)
+            hours = rawHours / 60.0; // Dữ liệu cũ lưu theo phút (ví dụ 60, 90, 120)
         else if (rawHours >= 10.0)
-            hours = rawHours / 10.0; // Legacy FormData locale dot-strip (e.g. 15 -> 1.5, 20 -> 2.0)
+            hours = rawHours / 10.0; // Xử lý dữ liệu FormData cũ bị mất dấu thập phân (ví dụ 15 -> 1.5, 20 -> 2.0)
         else
             hours = rawHours;
 
@@ -139,6 +139,32 @@ public static class ClassroomLifecycleHelper
                 total += countForDay;
         }
         return total;
+    }
+
+    public static DateOnly AdvanceStartDateToFirstFutureSlot(
+        DateOnly startDate,
+        IReadOnlyList<ClassroomWeeklySchedule> schedules,
+        DateTime utcNow)
+    {
+        if (schedules.Count == 0)
+            return startDate;
+
+        var todayVn = GetVietnamToday(utcNow);
+        if (startDate > todayVn)
+            return startDate;
+
+        var scanStart = startDate < todayVn ? todayVn : startDate;
+        for (var offset = 0; offset <= 14; offset++)
+        {
+            var candidate = scanStart.AddDays(offset);
+            var hasFutureSlot = schedules.Any(s =>
+                s.DayOfWeek == candidate.DayOfWeek
+                && VietnamDateTimeToUtc(candidate, s.StartTime) > utcNow);
+            if (hasFutureSlot)
+                return candidate;
+        }
+
+        return startDate;
     }
 
     public static DateOnly? CalculateEndDateFromTotalSessions(

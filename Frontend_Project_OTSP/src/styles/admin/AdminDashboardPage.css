@@ -42,7 +42,7 @@
   box-shadow: var(--dash-card-shadow);
 }
 
-/* 2. Bento KPI Cards */
+/* 2. Các thẻ KPI tổng quan */
 .dash-kpi-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -112,7 +112,7 @@
   margin-right: 10px;
 }
 
-/* 4. SƠ ĐỒ LUỒNG DÒNG TIỀN (Sankey / Financial Flow Architecture) */
+/* 4. Sơ đồ luồng dòng tiền */
 .flow-architecture-stage {
   background: var(--dash-subtle);
   border: 1px solid var(--dash-border);
@@ -141,7 +141,7 @@
   font-size: 18px;
 }
 
-/* 5. SƠ ĐỒ QUY TRÌNH KIỂM DUYỆT (Quality Pipeline Steps) */
+/* 5. Sơ đồ quy trình kiểm duyệt */
 .pipeline-track {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -167,7 +167,7 @@
   margin-bottom: 8px;
 }
 
-/* 6. SƠ ĐỒ BIỂU ĐỒ SÓNG MƯỢT (SVG Smooth Area Chart) */
+/* 6. Biểu đồ đường 7 ngày */
 .chart-svg-wrap {
   background: var(--dash-subtle);
   border: 1px solid var(--dash-border);
@@ -228,7 +228,7 @@
   100% { r: 5px; opacity: 0.6; }
 }
 
-/* 7. SƠ ĐỒ CỘT 7 NGÀY (Daily Bars Diagram) */
+/* 7. Biểu đồ cột 7 ngày */
 .daily-bars-container {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
@@ -256,7 +256,7 @@
   -webkit-overflow-scrolling: touch;
 }
 
-/* 8. Modern Table */
+/* 8. Bảng xếp hạng và giao dịch */
 .modern-diagram-table {
   width: 100%;
   border-collapse: separate;

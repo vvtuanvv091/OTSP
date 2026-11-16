@@ -73,7 +73,7 @@ public class AgentChatResponseDto
     // [JsonPropertyName("recommendedTutorIds")]
     // public List<int> RecommendedTutorIds { get; set; } = new();
 
-        //2 DÒNG NÀY ĐỂ ĐÓN LỆNH TỰ HÀNH:
+        // Hai trường dùng khi cần trả về hành động điều hướng hoặc dữ liệu đính kèm
     [JsonPropertyName("autoExecute")]
     public bool AutoExecute { get; set; } = false;
     [JsonPropertyName("actionType")]

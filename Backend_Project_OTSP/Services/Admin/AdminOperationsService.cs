@@ -399,7 +399,7 @@ public sealed class AdminOperationsService : IAdminOperationsService
             tutorProfiles.TryGetValue(x.tutorId, out var tp);
             var bankName = !string.IsNullOrWhiteSpace(tp?.BankName) ? tp.BankName : defaultBank;
             var accountNo = !string.IsNullOrWhiteSpace(tp?.BankAccountNumber) ? tp.BankAccountNumber : defaultAccountNo;
-            // ƯU TIÊN LẤY TÊN CHỦ TÀI KHOẢN DO GIA SƯ ĐĂNG KÝ THỰC TẾ TRÊN HỆ THỐNG
+            // Ưu tiên lấy tên chủ tài khoản ngân hàng do gia sư tự khai báo
             var accountHolder = !string.IsNullOrWhiteSpace(tp?.BankAccountHolder)
                 ? tp.BankAccountHolder.ToUpperInvariant()
                 : (!string.IsNullOrWhiteSpace(x.tutorName) ? x.tutorName.ToUpperInvariant() : "TONG NGOC TUAN");

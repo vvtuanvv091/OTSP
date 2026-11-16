@@ -82,7 +82,9 @@ public class TutorClassroomApiController : ControllerBase
     }
 
     [HttpGet("options")]
-    public async Task<IActionResult> GetFormOptions(CancellationToken cancellationToken)
+    public async Task<IActionResult> GetFormOptions(
+        [FromQuery] int? excludeClassroomId = null,
+        CancellationToken cancellationToken = default)
     {
         var tutorId = await GetApprovedTutorIdAsync(cancellationToken);
         if (tutorId == null)
@@ -113,7 +115,114 @@ public class TutorClassroomApiController : ControllerBase
             })
             .ToListAsync(cancellationToken);
 
-        return Ok(new { subjectGradeOptions = subjects });
+        var busySchedules = await LoadTutorBusySchedulesAsync(tutorId.Value, excludeClassroomId, cancellationToken);
+
+        return Ok(new { subjectGradeOptions = subjects, busySchedules });
+    }
+
+    private async Task<List<object>> LoadTutorBusySchedulesAsync(
+        int tutorId,
+        int? excludeClassroomId,
+        CancellationToken cancellationToken)
+    {
+        var items = new List<object>();
+        var nowUtc = DateTime.UtcNow;
+
+        var activeClasses = await _db.Classrooms
+            .AsNoTracking()
+            .Where(c => c.TutorId == tutorId
+                        && c.Status == ClassroomStatus.Active
+                        && (!excludeClassroomId.HasValue || c.Id != excludeClassroomId.Value))
+            .Select(c => new
+            {
+                c.Id,
+                c.NameClass,
+                Type = c.Type.ToString(),
+                c.StartDate,
+                c.EndDate,
+                WeeklySchedules = c.WeeklySchedules.OrderBy(w => w.SessionIndex).Select(w => new
+                {
+                    w.DayOfWeek,
+                    w.StartTime,
+                    w.EndTime
+                }).ToList()
+            })
+            .ToListAsync(cancellationToken);
+
+        foreach (var cls in activeClasses)
+        {
+            foreach (var ws in cls.WeeklySchedules)
+            {
+                items.Add(new
+                {
+                    sourceType = cls.Type,
+                    classroomId = cls.Id,
+                    title = cls.NameClass,
+                    dayOfWeek = (int)ws.DayOfWeek,
+                    dayLabel = ClassroomLifecycleHelper.FormatDayVn(ws.DayOfWeek),
+                    startTime = $"{ws.StartTime:HH\\:mm}",
+                    endTime = $"{ws.EndTime:HH\\:mm}",
+                    startDate = cls.StartDate,
+                    endDate = cls.EndDate,
+                    specificDate = (DateOnly?)null,
+                    isPending = false
+                });
+            }
+        }
+
+        var pendingOneToOnes = await _db.ConnectionRequests
+            .AsNoTracking()
+            .Where(cr => cr.TutorId == tutorId
+                         && cr.Status == RequestStatus.Pending
+                         && cr.PreferredType == ClassroomType.OneToOne)
+            .Select(cr => new
+            {
+                cr.Id,
+                StudentName = cr.Student.User.FullName ?? "Học viên",
+                cr.IsTrial,
+                cr.ProposedTrialSlotUtc,
+                cr.RequestedStartDate,
+                cr.RequestedEndDate,
+                TrialSlots = cr.TrialSchedules.Select(ts => ts.ScheduledAt).ToList()
+            })
+            .ToListAsync(cancellationToken);
+
+        foreach (var req in pendingOneToOnes)
+        {
+            var slotList = req.TrialSlots
+                .Where(s => DateTime.SpecifyKind(s, DateTimeKind.Utc) > nowUtc)
+                .ToList();
+            if (slotList.Count == 0 && req.ProposedTrialSlotUtc.HasValue
+                && DateTime.SpecifyKind(req.ProposedTrialSlotUtc.Value, DateTimeKind.Utc) > nowUtc)
+            {
+                slotList.Add(req.ProposedTrialSlotUtc.Value);
+            }
+
+            var isOfficial = !req.IsTrial && (slotList.Count > 1 || req.RequestedStartDate.HasValue || req.RequestedEndDate.HasValue);
+            foreach (var slotUtc in slotList)
+            {
+                var slotVn = ClassroomLifecycleHelper.ToVietnamTime(slotUtc);
+                var slotDate = DateOnly.FromDateTime(slotVn);
+                var slotStart = TimeOnly.FromDateTime(slotVn);
+                var slotEnd = slotStart.AddHours(2);
+                items.Add(new
+                {
+                    sourceType = "PendingOneToOne",
+                    classroomId = (int?)null,
+                    title = $"Chờ duyệt 1-1: {req.StudentName}",
+                    dayOfWeek = (int)slotVn.DayOfWeek,
+                    dayLabel = ClassroomLifecycleHelper.FormatDayVn(slotVn.DayOfWeek),
+                    startTime = $"{slotStart:HH\\:mm}",
+                    endTime = $"{slotEnd:HH\\:mm}",
+                    startDate = isOfficial ? (req.RequestedStartDate ?? slotDate) : slotDate,
+                    endDate = isOfficial ? req.RequestedEndDate : slotDate,
+                    specificDate = isOfficial ? (DateOnly?)null : slotDate,
+                    isPending = true
+                });
+            }
+        }
+
+        return items;
     }
 
     [HttpGet]
@@ -403,10 +512,28 @@ public class TutorClassroomApiController : ControllerBase
         }
 
         var todayVn = ClassroomLifecycleHelper.GetVietnamToday();
-        var startDate = request.StartDate ?? todayVn;
+        DateOnly? regDeadline = null;
+        if (request.Type == ClassroomType.Group)
+        {
+            regDeadline = request.RegistrationDeadline ?? todayVn.AddDays(2);
+            if (regDeadline.Value < todayVn.AddDays(1))
+            {
+                return BadRequest(new { message = "Hạn chót đăng ký lớp nhóm phải từ ngày mai trở đi (tối thiểu 1 ngày để học viên đăng ký)." });
+            }
+            if (regDeadline.Value > todayVn.AddDays(7))
+            {
+                return BadRequest(new { message = "Hạn chót đăng ký lớp nhóm chỉ được chọn tối đa 7 ngày kể từ hôm nay." });
+            }
+        }
+
+        var startDate = request.StartDate ?? (regDeadline.HasValue ? regDeadline.Value.AddDays(1) : todayVn);
         if (startDate < todayVn)
         {
             return BadRequest(new { message = "Ngày bắt đầu lớp học không được nằm trong quá khứ." });
+        }
+        if (regDeadline.HasValue && startDate <= regDeadline.Value)
+        {
+            return BadRequest(new { message = "Ngày bắt đầu học phải sau hạn chót đăng ký ít nhất 1 ngày để không trùng với thời gian nhận đăng ký." });
         }
 
         if (request.TotalSessions.HasValue && request.TotalSessions.Value <= 0)
@@ -429,20 +556,6 @@ public class TutorClassroomApiController : ControllerBase
         var maxStudents = request.Type == ClassroomType.OneToOne
             ? 1
             : Math.Clamp(request.MaxStudents > 0 ? request.MaxStudents : 10, 1, 100);
-
-        DateOnly? regDeadline = null;
-        if (request.Type == ClassroomType.Group)
-        {
-            regDeadline = request.RegistrationDeadline ?? startDate;
-            if (regDeadline.Value > startDate)
-            {
-                return BadRequest(new { message = "Hạn đăng ký lớp nhóm không được sau ngày bắt đầu." });
-            }
-            if (regDeadline.Value < todayVn)
-            {
-                return BadRequest(new { message = "Hạn đăng ký lớp nhóm không được nằm trong quá khứ." });
-            }
-        }
 
         var (lifecycleOk, lifecycleError, resolvedEndDate, resolvedTotalSessions) = ResolveLifecyclePlan(
             startDate,
@@ -671,14 +784,30 @@ public class TutorClassroomApiController : ControllerBase
         }
 
         DateOnly? nextRegDeadline = classroom.Type == ClassroomType.Group
-            ? (request.RegistrationDeadline ?? classroom.RegistrationDeadline ?? nextStartDate)
+            ? (request.RegistrationDeadline ?? classroom.RegistrationDeadline)
             : null;
         if (classroom.Type == ClassroomType.Group && nextRegDeadline.HasValue)
         {
-            if (hasStartedOrCompletedSession && request.RegistrationDeadline.HasValue && request.RegistrationDeadline.Value != classroom.RegistrationDeadline)
+            var regDeadlineChanged = request.RegistrationDeadline.HasValue && request.RegistrationDeadline.Value != classroom.RegistrationDeadline;
+            var startDateChanged = request.StartDate.HasValue && request.StartDate.Value != classroom.StartDate;
+            var canStillEditDates = !hasPaidPayments && !hasStartedOrCompletedSession && enrolledStudents.Count == 0;
+
+            if (hasStartedOrCompletedSession && regDeadlineChanged)
                 return BadRequest(new { message = "Không thể thay đổi hạn đăng ký sau khi lớp đã bắt đầu học." });
-            if (nextRegDeadline.Value > nextStartDate)
+
+            if (!hasStartedOrCompletedSession && (regDeadlineChanged || startDateChanged || canStillEditDates))
+            {
+                if (nextRegDeadline.Value < todayVn.AddDays(1))
+                    return BadRequest(new { message = "Hạn chót đăng ký lớp nhóm phải từ ngày mai trở đi (tối thiểu 1 ngày để học viên đăng ký)." });
+                if (nextRegDeadline.Value > todayVn.AddDays(7))
+                    return BadRequest(new { message = "Hạn chót đăng ký lớp nhóm chỉ được chọn tối đa 7 ngày kể từ hôm nay." });
+                if (nextStartDate <= nextRegDeadline.Value)
+                    return BadRequest(new { message = "Ngày bắt đầu học phải sau hạn chót đăng ký ít nhất 1 ngày để không trùng với thời gian nhận đăng ký." });
+            }
+            else if (nextRegDeadline.Value > nextStartDate)
+            {
                 return BadRequest(new { message = "Hạn đăng ký lớp nhóm không được sau ngày bắt đầu." });
+            }
         }
 
         if (request.TotalSessions.HasValue && request.TotalSessions.Value <= 0)
@@ -703,7 +832,7 @@ public class TutorClassroomApiController : ControllerBase
             return BadRequest(new { message = "Không thể thay đổi tổng số buổi hoặc ngày kết thúc khi lớp đã có giao dịch thanh toán." });
         }
 
-        // Preserve Done, InProgress, Cancelled, and manual IsMakeup sessions
+        // Giữ lại các buổi đã xong, đang học, đã hủy hoặc buổi học bù thêm tay
         var nowUtc = DateTime.UtcNow;
         var preservedNonCancelled = classroom.ClassSessions
             .Where(s => s.Status != SessionStatus.Cancelled && (s.Status != SessionStatus.Scheduled || s.IsMakeup || s.ScheduledAt < nowUtc))
@@ -771,7 +900,7 @@ public class TutorClassroomApiController : ControllerBase
             }
         }
 
-        // Cover image handling
+        // Xử lý ảnh bìa lớp học
         if (coverImageFile != null && coverImageFile.Length > 0)
         {
             try

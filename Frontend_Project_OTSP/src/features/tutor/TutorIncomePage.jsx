@@ -14,7 +14,7 @@ export default function TutorIncomePage() {
   const [message, setMessage] = useState('');
   const [reloadKey, setReloadKey] = useState(0);
 
-  // Tự động cập nhật thu nhập khi có học viên nộp học phí theo thời gian thực (Zero-Reload)
+  // Tự tải lại doanh thu khi có học viên thanh toán qua SignalR
   useSignalREvent('PaymentStatusChanged', () => setReloadKey((k) => k + 1));
 
   useEffect(() => {

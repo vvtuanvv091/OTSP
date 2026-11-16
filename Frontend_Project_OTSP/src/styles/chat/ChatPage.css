@@ -59,7 +59,7 @@
 .chat-conv-item:hover {
   background-color: var(--bs-tertiary-bg, #f8fafc);
 }
-/* Unified OTSP Red Theme for Active Chat (NO PURPLE) */
+/* Dùng tông đỏ chủ đạo cho khung chat đang chọn */
 .chat-conv-item.is-active {
   background-color: rgba(219, 48, 58, 0.08) !important;
   border-color: rgba(219, 48, 58, 0.28) !important;
@@ -96,7 +96,7 @@
   font-size: 12px;
   color: var(--bs-secondary-color, #64748b);
 }
-/* Unified Red Badge for Unread Messages */
+/* Huy hiệu đỏ cho tin nhắn chưa đọc */
 .chat-unread-badge {
   background-color: #DB303A;
   color: #ffffff;

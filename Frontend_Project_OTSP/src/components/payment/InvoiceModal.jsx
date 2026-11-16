@@ -93,14 +93,14 @@ export default function InvoiceModal({ payment, currentUser, guardianName, isOpe
 
   return (
     <>
-      {/* Backdrop */}
+      {/* Lớp nền mờ */}
       <div
         className="modal-backdrop fade show no-print"
         style={{ zIndex: 1060 }}
         onClick={onClose}
       ></div>
 
-      {/* Modal Dialog */}
+      {/* Khung hộp thoại hóa đơn */}
       <div
         className="modal fade show d-block"
         tabIndex={-1}
@@ -112,7 +112,7 @@ export default function InvoiceModal({ payment, currentUser, guardianName, isOpe
       >
         <div className="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable" role="document">
           <div className="modal-content border-0 shadow-lg rounded-4 overflow-hidden bg-white">
-            {/* Modal Header */}
+            {/* Tiêu đề hóa đơn */}
             <div className="modal-header border-bottom py-3 px-4 bg-white d-flex justify-content-between align-items-center no-print">
               <div className="d-flex align-items-center gap-2">
                 <span
@@ -143,7 +143,7 @@ export default function InvoiceModal({ payment, currentUser, guardianName, isOpe
               </div>
             </div>
 
-            {/* Modal Body */}
+            {/* Nội dung hóa đơn */}
             <div className="modal-body p-3 p-md-4 bg-light">
               {/* KHU VỰC HÓA ĐƠN ĐƯỢC IN / XUẤT PDF */}
               <div
@@ -311,7 +311,7 @@ export default function InvoiceModal({ payment, currentUser, guardianName, isOpe
               </div>
             </div>
 
-            {/* Modal Footer */}
+            {/* Chân hộp thoại nút thao tác */}
             <div className="modal-footer border-top py-2.5 px-4 bg-white d-flex justify-content-end gap-2 no-print">
               <button
                 type="button"

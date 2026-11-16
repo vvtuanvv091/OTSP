@@ -22,8 +22,8 @@ public class AiController : ControllerBase
     }
 
     /// <summary>
-    /// Master Autonomous AI Agent Chat. Accessible by anyone (Student, Tutor, Admin, Guest).
-    /// Returns Markdown answer + UI Navigation Action + Follow-up prompt pills.
+    /// Trò chuyện với trợ lý AI chung (dùng được cho cả khách, học viên, gia sư và admin).
+    /// Trả về câu trả lời Markdown kèm gợi ý điều hướng trang và câu hỏi tiếp theo nếu có.
     /// </summary>
     [HttpPost("agent/chat")]
     [AllowAnonymous]
@@ -41,8 +41,7 @@ public class AiController : ControllerBase
     }
 
     /// <summary>
-    /// Dedicated Step-by-Step Study Assistant for Students.
-    /// Solves exercises and automatically saves the question & suggestion into AiStudySessions.
+    /// Trợ lý giải bài tập từng bước cho học viên; tự lưu câu hỏi và gợi ý vào bảng AiStudySessions.
     /// </summary>
     [HttpPost("study-assistant")]
     [Authorize]
@@ -64,7 +63,7 @@ public class AiController : ControllerBase
     }
 
     /// <summary>
-    /// Submit user feedback (Thumbs Up / Down) for continuous self-learning.
+    /// Ghi nhận đánh giá thích/không thích của người dùng đối với câu trả lời của AI.
     /// </summary>
     [HttpPost("feedback")]
     [AllowAnonymous]
@@ -76,8 +75,7 @@ public class AiController : ControllerBase
     }
 
     /// <summary>
-    /// Multimodal AI OCR & Automated Verification of Tutor Qualification Certificates.
-    /// Accessible by authenticated Tutors and Admins.
+    /// Đọc và kiểm tra ảnh bằng cấp/chứng chỉ gia sư bằng AI (dành cho gia sư và admin đã đăng nhập).
     /// </summary>
     [HttpPost("tutor/verify-certificate")]
     [Authorize(Roles = "Tutor,Admin")]

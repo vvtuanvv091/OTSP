@@ -14,7 +14,7 @@ namespace Backend_Project_OTSP.Models
         public string? CoverImageUrl { get; set; }
         [MaxLength(255)]
         public string? CoverImagePublicId { get; set; }   
-        //tổng 18 o thập phân, 0 số thập phân, ví dụ: 15000000.00=> 1.500.000 VNĐ
+        // Học phí kiểu số thực cố định (18 chữ số), ví dụ: 1500000
         [Precision(18, 0)]
         public decimal Fee { get; set; }
         [MaxLength(1000)]
@@ -29,7 +29,7 @@ namespace Backend_Project_OTSP.Models
         public ClassroomType Type { get; set; } = ClassroomType.OneToOne;
         public int MaxStudents { get; set; } = 1;
         public int SessionsPerWeek { get; set; } = 1; // Số buổi học mỗi tuần (ví dụ: 1, 2, 3 buổi/tuần)
-        public double HoursPerSession { get; set; } = 2.0;//số giờ học
+        public double HoursPerSession { get; set; } = 2.0; // Số giờ học mỗi buổi
         // Chi tiết lịch cố định các buổi trong tuần (Buổi 1, 2, 3...)
         public ICollection<ClassroomWeeklySchedule> WeeklySchedules { get; set; } = new List<ClassroomWeeklySchedule>();
 

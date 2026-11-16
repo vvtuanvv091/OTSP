@@ -111,7 +111,7 @@ export default function TutorSchedulePage() {
   const [message, setMessage] = useState('');
   const [reloadKey, setReloadKey] = useState(0);
 
-  // Cập nhật trạng thái buổi học theo thời gian thực (Zero-Reload)
+  // Lắng nghe SignalR để tự cập nhật trạng thái buổi học
   useSignalREvent('ClassSessionStatusChanged', () => setReloadKey((k) => k + 1));
   useSignalREvent('ClassSessionEnded', () => setReloadKey((k) => k + 1));
   const [activeDayMobile, setActiveDayMobile] = useState(

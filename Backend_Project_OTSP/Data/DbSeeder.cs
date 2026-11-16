@@ -36,7 +36,7 @@ namespace Backend_Project_OTSP.Data
             ILogger logger,
             bool syncDefaultAdminPasswords = true)
         {
-            //1 lấy danh sách role
+            // 1. Tạo sẵn các vai trò mặc định nếu chưa có
             var roleNames = new[] { "Admin", "Tutor", "Student_Parent" };
             var existingRoleNames = await roleManager.Roles
             .Where(r => r.Name != null && roleNames.Contains(r.Name))

@@ -9,18 +9,18 @@ namespace Backend_Project_OTSP.Models
         public int Id { get; set; }
         [Required]
         public string Content { get; set; } = "";
-        public string? EvidenceUrl { get; set; }//đường dẫn file bằng url
+        public string? EvidenceUrl { get; set; } // Link file bằng chứng (nếu có)
 
         // Trạng thái xử lý khiếu nại: New, Processing, Resolved, Rejected
         public ComplaintStatus Status { get; set; } = ComplaintStatus.New;
-        public string? Resolution { get; set; }//kq giải quyết
+        public string? Resolution { get; set; } // Kết quả xử lý khiếu nại
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-        // Nguười gửi
+        // Người gửi khiếu nại
         [Required]
         [ForeignKey("Sender")]
         public string SenderId { get; set; } = "";
         public ApplicationUser Sender { get; set; } = null!;
-        //người bị khiếu nạ
+        // Người bị khiếu nại
         [ForeignKey("TargetUser")]
         public string? TargetUserId { get; set; }
         public ApplicationUser? TargetUser { get; set; }

@@ -15,7 +15,7 @@ export default function StudentConnectionRequestsPage() {
   const [loading, setLoading] = useState(true);
   const [requests, setRequests] = useState([]);
   const [totalCount, setTotalCount] = useState(0);
-  const [statusFilter, setStatusFilter] = useState(''); // '' (All), 'Pending', 'Accepted', 'Rejected'
+  const [statusFilter, setStatusFilter] = useState(''); // '' (Tất cả), 'Pending', 'Accepted', 'Rejected'
   const [realtimeNotice, setRealtimeNotice] = useState('');
   const [actionMsg, setActionMsg] = useState({ type: '', text: '' });
   const [reloadTick, setReloadTick] = useState(0);
@@ -49,7 +49,7 @@ export default function StudentConnectionRequestsPage() {
     };
   }, [statusFilter, reloadTick]);
 
-  // Lắng nghe sự kiện cập nhật thời gian thực qua SignalR dùng chung (Zero-Reload)
+  // Lắng nghe sự kiện qua SignalR để tự tải lại danh sách yêu cầu
   useSignalREvent('ConnectionRequestStatusChanged', (update) => {
     if (!update) return;
     setRequests((prev) =>
@@ -147,7 +147,7 @@ export default function StudentConnectionRequestsPage() {
         </div>
       )}
 
-      {/* Bộ lọc trạng thái (Matching Image 4 pills) */}
+      {/* Bộ lọc trạng thái */}
       <div className="d-flex flex-wrap gap-2 mb-4 nav-filter" style={{ gap: '10px' }}>
         <button
           type="button"
@@ -207,7 +207,7 @@ export default function StudentConnectionRequestsPage() {
                 style={{ borderRadius: '1rem' }}
               >
                 <div>
-                  {/* Header thẻ: Avatar + Name + Fee + Status Badge */}
+                  {/* Phần đầu thẻ: ảnh đại diện, tên, học phí và trạng thái */}
                   <div className="d-flex justify-content-between align-items-start mb-3">
                     <div className="d-flex align-items-center gap-2" style={{ gap: '10px' }}>
                       {item.tutorAvatarUrl ? (
@@ -271,7 +271,7 @@ export default function StudentConnectionRequestsPage() {
                     )}
                   </div>
 
-                  {/* Badges môn học & cấp học */}
+                  {/* Nhãn môn học và cấp học */}
                   <div className="mb-2.5 d-flex flex-wrap gap-2" style={{ gap: '8px' }}>
                     <span className="badge bg-body-secondary text-body border" style={{ fontSize: 11, fontWeight: 500 }}>
                       <i className="bi bi-book me-1 text-danger"></i>
@@ -289,7 +289,7 @@ export default function StudentConnectionRequestsPage() {
                     </div>
                   )}
 
-                  {/* Lời nhắn box */}
+                  {/* Khung lời nhắn */}
                   <div className="bg-body-tertiary p-2.5 rounded-2 small text-secondary mb-3 border">
                     <span className="fw-semibold text-body">Lời nhắn:</span> "{item.message || (item.isTrial ? '[Mục đích: Đăng ký học thử 1 buổi]' : '[Mục đích: Học chính thức]')}"
                   </div>

@@ -708,7 +708,7 @@ public sealed class ClassSessionService : IClassSessionService
         if (rangeEndVn < effectiveStartVn)
             return;
 
-        // Giới hạn không tự động sinh lịch quá xa vượt quá chân trời hợp lý nếu lớp chưa đặt EndDate
+        // Tránh sinh lịch tự động quá xa nếu lớp chưa đặt ngày kết thúc (EndDate)
         var maxRollingHorizonVn = todayVn.AddDays(ClassroomLifecycleHelper.RollingPreGenerateWeeks * 7);
         var boundedRangeEndVn = rangeEndVn > maxRollingHorizonVn ? maxRollingHorizonVn : rangeEndVn;
 

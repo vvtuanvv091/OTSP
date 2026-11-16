@@ -250,7 +250,7 @@ builder.Services.AddMemoryCache();
 builder.Services.AddDistributedMemoryCache();
 
 
-// ===== 5. CORS & Rate Limiting =====
+// ===== 5. Cấu hình CORS và giới hạn tần suất gọi API =====
 var configuredOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
 var configuredCsv = builder.Configuration["Cors:AllowedOriginsCsv"];
 var frontendUrl = builder.Configuration["App:FrontendUrl"];
@@ -471,7 +471,7 @@ app.Use(async (context, next) =>
 
 app.UseAuthorization();
 
-// SignalR Hubs - Unified Gateway cho toàn bộ hệ thống OTSP
+// Khai báo các endpoint SignalR hub dùng chung cho toàn hệ thống
 app.MapHub<AppHub>("/hubs/app");
 app.MapHub<AppHub>("/hubs/chat");
 app.MapHub<ConnectionRequestHub>("/hubs/connection-requests");
@@ -479,7 +479,7 @@ app.MapHub<ConnectionRequestHub>("/hubs/connection-requests");
 // Health check endpoint cho Render & UptimeRobot (chống ngủ)
 app.MapGet("/api/health", () => Results.Ok(new { status = "healthy", time = DateTime.UtcNow }));
 
-// Map Web API Controllers
+// Ánh xạ các route cho Web API controller
 app.MapControllers();
 
 app.Run();

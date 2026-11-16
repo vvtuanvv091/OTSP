@@ -35,7 +35,7 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(() => {
     const hasToken = Boolean(getStoredToken());
     const hasSavedUser = Boolean(getStoredUserRaw());
-    // Tải tức thì không trắng trang: nếu không có token hoặc đã có sẵn cache user thì không block giao diện
+    // Nếu chưa có token hoặc đã có sẵn user trong cache thì không chặn render màn hình loading
     return hasToken && !hasSavedUser;
   });
 
@@ -136,7 +136,7 @@ export const AuthProvider = ({ children }) => {
       try {
         window.dispatchEvent(new CustomEvent('otsp:user-updated', { detail: nextUser }));
       } catch {
-        // Safe fallback
+        // Giá trị mặc định an toàn nếu parse lỗi
       }
       return nextUser;
     });

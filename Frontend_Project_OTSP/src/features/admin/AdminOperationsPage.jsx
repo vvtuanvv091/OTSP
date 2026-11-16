@@ -1116,7 +1116,7 @@ export default function AdminOperationsPage() {
                       </div>
                     </div>
 
-                    {/* QR Code container */}
+                    {/* Khung hiển thị mã QR */}
                     <div className="text-center p-3 rounded-3 mb-3" style={{ background: '#fff', border: '1px dashed #cbd5e1' }}>
                       {selectedPayout.bankAccount?.qrImageUrl ? (
                         <div>
@@ -1192,7 +1192,7 @@ export default function AdminOperationsPage() {
         </div>
       )}
 
-      {/* MODAL CHI TIẾT NHẬT KÝ THAO TÁC (t5) */}
+      {/* Modal chi tiết nhật ký thao tác */}
       {selectedLogDetail && (
         <div className="modal show d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.55)', zIndex: 1060 }}>
           <div className="modal-dialog modal-dialog-centered" style={{ maxWidth: 560 }}>
@@ -1254,7 +1254,7 @@ export default function AdminOperationsPage() {
         </div>
       )}
 
-      {/* MODAL CHI TIẾT & XỬ LÝ CẢNH BÁO BẤT THƯỜNG (t6) */}
+      {/* Modal chi tiết và xử lý cảnh báo bất thường */}
       {selectedAlertDetail && (
         <div className="modal show d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.55)', zIndex: 1060 }}>
           <div className="modal-dialog modal-dialog-centered" style={{ maxWidth: 580 }}>

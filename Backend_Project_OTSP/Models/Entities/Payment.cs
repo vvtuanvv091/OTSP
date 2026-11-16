@@ -12,28 +12,28 @@ namespace Backend_Project_OTSP.Models
         public int Id { get; set; }
         [Precision(18, 0)]
         public decimal Amount { get; set; }
-        // Phuong thuc thanh toan
+        // Phương thức thanh toán
         [Required, MaxLength(50)]
         public string Method { get; set; } = "";
-        // Trang thai: Pending, Success, Failed
+        // Trạng thái: Pending, Success, Failed
         public PaymentStatus Status { get; set; } = PaymentStatus.Pending;
-        // Ma giao dich tu cong thanh toan, dat unique de tranh ghi nhan trung
+        // Mã giao dịch từ cổng thanh toán, đặt unique để tránh ghi nhận trùng
         public string? GatewayTransactionCode { get; set; }
 
-        // Th?i di?m thanh to�n th�nh c�ng (UTC), null khi chua thanh to�n
+        // Thời điểm thanh toán thành công (UTC), null khi chưa thanh toán
         public DateTime? PaidAt { get; set; }
 
-        // Kh�a ngo?i t?i h?c vi�n tr? ti?n
+        // Khóa ngoại tới học viên trả tiền
         [ForeignKey("Student")]
         public int StudentId { get; set; }
         public StudentProfile Student { get; set; } = null!;
 
-        // khoa ngoai toi lop hoc thanh toan
+        // Khóa ngoại tới lớp học được thanh toán
         [ForeignKey(nameof(Classroom))]
         public int ClassroomId { get; set; }
         public Classroom Classroom { get; set; } = null!;
 
-        // Hoa don tuong ung (1-1)
+        // Hóa đơn tương ứng (1-1)
         public Invoice? Invoice { get; set; }
 
     }

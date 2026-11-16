@@ -58,7 +58,7 @@ public class JwtServiceTests
         Assert.Equal("tutor@test.com", response.User.Email);
         Assert.Equal("Nguyen Van A", response.User.FullName);
 
-        // Verify token can be read by JwtSecurityTokenHandler
+        // Kiểm tra token có thể đọc lại hợp lệ bằng JwtSecurityTokenHandler
         var handler = new JwtSecurityTokenHandler();
         var token = handler.ReadJwtToken(response.Token);
         Assert.Equal("OTSP_Test_Issuer", token.Issuer);
@@ -81,7 +81,7 @@ public class JwtServiceTests
             FullName = "Gia Su Pro"
         };
 
-        // Add TutorProfile in DB
+        // Thêm sẵn TutorProfile vào DB
         var tutorProfile = new TutorProfile
         {
             Id = 99,

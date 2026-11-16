@@ -11,16 +11,16 @@ namespace Backend_Project_OTSP.Models
         // Tên cấp học, ví dụ: Trung học cơ sở
         [Required, MaxLength(100)]
         public string Name { get; set; } = "";
-        // Gia su day cap nay (1-N)
+        // Gia sư dạy cấp học này (1-N)
         public ICollection<TutorSubject> TutorSubjects { get; set; } = new List<TutorSubject>();
 
-        // Yeu cau ket noi (1-N)
+        // Yêu cầu kết nối thuộc cấp học này (1-N)
         public ICollection<ConnectionRequest> ConnectionRequests { get; set; } = new List<ConnectionRequest>();
 
         // Tài liệu thuộc cấp này (1-N)
         public ICollection<LearningDocument> LearningDocuments { get; set; } = new List<LearningDocument>();
 
-        // ớp học thuộc cấp này (1-N)
+        // Lớp học thuộc cấp học này (1-N)
         public ICollection<Classroom> Classrooms { get; set; } = new List<Classroom>();
 
     }

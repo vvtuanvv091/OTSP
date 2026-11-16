@@ -1,6 +1,5 @@
 /**
- * Skeleton Loader Component
- * Cung cấp hiệu ứng placeholder shimmer hiện đại, loại bỏ giật layout (CLS).
+ * Component khung chờ tải dữ liệu (skeleton loader) giúp giữ ổn định bố cục trang.
  */
 export default function Skeleton({
   variant = 'text', // 'text' | 'circular' | 'rectangular' | 'card' | 'table'

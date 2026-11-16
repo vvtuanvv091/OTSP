@@ -18,7 +18,7 @@ public interface INotificationService
     Task DispatchChatMessageAsync(ChatMessageNotificationEvent evt, CancellationToken ct = default);
 }
 
-// Giữ interface INotificationDispatcher kế thừa INotificationService để tương thích ngược 100%
+// Giữ lại interface INotificationDispatcher kế thừa INotificationService để tương thích với code cũ
 public interface INotificationDispatcher : INotificationService
 {
 }

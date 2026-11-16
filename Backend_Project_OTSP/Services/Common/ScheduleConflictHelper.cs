@@ -136,6 +136,98 @@ public static class ScheduleConflictHelper
             }
         }
 
+        // Kiểm tra thêm lịch học thử đã xác nhận (chưa gắn ClassSession) và yêu cầu 1-1 đang chờ duyệt của gia sư
+        var nowUtc = DateTime.UtcNow;
+        var unlinkedTrials = await db.TrialSchedules
+            .AsNoTracking()
+            .Where(ts => ts.ConnectionRequest.TutorId == tutorId
+                         && ts.Status == ScheduleStatus.Confirmed
+                         && ts.ClassSessionId == null
+                         && ts.ScheduledAt >= minPlannedUtc
+                         && ts.ScheduledAt > nowUtc.AddHours(-2))
+            .Select(ts => new
+            {
+                StudentName = ts.ConnectionRequest.Student.User.FullName ?? "Học viên",
+                ts.ScheduledAt
+            })
+            .ToListAsync(cancellationToken);
+
+        foreach (var trial in unlinkedTrials)
+        {
+            var trialMsg = CheckSlotListConflict(
+                $"lịch học thử đã xác nhận với học viên {trial.StudentName}",
+                [trial.ScheduledAt],
+                startDate,
+                endDate,
+                candidateSlots,
+                plannedSessionsUtc);
+            if (trialMsg != null) return trialMsg;
+        }
+
+        var pendingOneToOnes = await db.ConnectionRequests
+            .AsNoTracking()
+            .Where(cr => cr.TutorId == tutorId
+                         && cr.Status == RequestStatus.Pending
+                         && cr.PreferredType == ClassroomType.OneToOne
+                         && (!excludeClassroomId.HasValue || cr.ClassroomId != excludeClassroomId.Value))
+            .Select(cr => new
+            {
+                StudentName = cr.Student.User.FullName ?? "Học viên",
+                cr.IsTrial,
+                cr.ProposedTrialSlotUtc,
+                cr.RequestedStartDate,
+                cr.RequestedEndDate,
+                TrialSlots = cr.TrialSchedules.Select(ts => ts.ScheduledAt).ToList()
+            })
+            .ToListAsync(cancellationToken);
+
+        foreach (var req in pendingOneToOnes)
+        {
+            var reqSlots = req.TrialSlots
+                .Where(s => DateTime.SpecifyKind(s, DateTimeKind.Utc) > nowUtc)
+                .ToList();
+            if (reqSlots.Count == 0 && req.ProposedTrialSlotUtc.HasValue
+                && DateTime.SpecifyKind(req.ProposedTrialSlotUtc.Value, DateTimeKind.Utc) > nowUtc)
+            {
+                reqSlots.Add(req.ProposedTrialSlotUtc.Value);
+            }
+
+            if (reqSlots.Count == 0)
+                continue;
+
+            var isOfficialPending = !req.IsTrial && (reqSlots.Count > 1 || req.RequestedStartDate.HasValue || req.RequestedEndDate.HasValue);
+            if (isOfficialPending)
+            {
+                var reqStart = req.RequestedStartDate
+                    ?? DateOnly.FromDateTime(reqSlots.Min(s => ClassroomLifecycleHelper.ToVietnamTime(s)));
+                if (DateRangesOverlap(reqStart, req.RequestedEndDate, startDate, endDate))
+                {
+                    foreach (var slotUtc in reqSlots)
+                    {
+                        var slotVn = ClassroomLifecycleHelper.ToVietnamTime(slotUtc);
+                        var slotStart = TimeOnly.FromDateTime(slotVn);
+                        var slotEnd = slotStart.AddHours(2);
+                        var overlap = candidateSlots.FirstOrDefault(cand =>
+                            cand.DayOfWeek == slotVn.DayOfWeek
+                            && TimesOverlap(cand.StartTime, cand.EndTime, slotStart, slotEnd));
+                        if (overlap != null)
+                        {
+                            return $"Khung giờ {ClassroomLifecycleHelper.FormatDayVn(overlap.DayOfWeek)} ({overlap.StartTime:HH\\:mm}–{overlap.EndTime:HH\\:mm}) bị trùng với yêu cầu học 1-1 đang chờ duyệt của học viên {req.StudentName}. Vui lòng xử lý yêu cầu trước.";
+                        }
+                    }
+                }
+            }
+
+            var reqMsg = CheckSlotListConflict(
+                $"yêu cầu đặt lịch 1-1 đang chờ duyệt của học viên {req.StudentName}",
+                reqSlots,
+                startDate,
+                endDate,
+                candidateSlots,
+                plannedSessionsUtc);
+            if (reqMsg != null) return reqMsg;
+        }
+
         if (enrolledStudentIds.Count > 0)
         {
             var studentConflict = await FindStudentScheduleConflictAsync(
@@ -243,6 +335,76 @@ public static class ScheduleConflictHelper
             }
         }
 
+        var studentTrials = await db.TrialSchedules
+            .AsNoTracking()
+            .Where(ts => studentIds.Contains(ts.ConnectionRequest.StudentId)
+                         && ts.Status == ScheduleStatus.Confirmed
+                         && ts.ClassSessionId == null
+                         && ts.ScheduledAt >= minPlannedUtc
+                         && ts.ScheduledAt > DateTime.UtcNow.AddHours(-2))
+            .Select(ts => new
+            {
+                StudentName = ts.ConnectionRequest.Student.User.FullName ?? "Học viên",
+                ts.ScheduledAt
+            })
+            .ToListAsync(cancellationToken);
+
+        foreach (var trial in studentTrials)
+        {
+            var trialMsg = CheckSlotListConflict(
+                $"lịch học thử đã xác nhận của học viên {trial.StudentName}",
+                [trial.ScheduledAt],
+                startDate,
+                endDate,
+                candidateSlots,
+                plannedSessionsUtc);
+            if (trialMsg != null) return trialMsg;
+        }
+
+        return null;
+    }
+
+    private static string? CheckSlotListConflict(
+        string targetLabel,
+        IReadOnlyList<DateTime> slotUtcs,
+        DateOnly startDate,
+        DateOnly? endDate,
+        IReadOnlyList<ScheduleSlotCandidate> candidateSlots,
+        IReadOnlyList<(DateTime ScheduledAtUtc, double DurationHours)> plannedSessionsUtc)
+    {
+        foreach (var rawSlot in slotUtcs)
+        {
+            var slotUtc = DateTime.SpecifyKind(rawSlot, DateTimeKind.Utc);
+            if (plannedSessionsUtc.Count > 0)
+            {
+                foreach (var planned in plannedSessionsUtc)
+                {
+                    if (ClassroomLifecycleHelper.IntervalsOverlap(planned.ScheduledAtUtc, planned.DurationHours, slotUtc, 2.0))
+                    {
+                        var vn = ClassroomLifecycleHelper.ToVietnamTime(planned.ScheduledAtUtc);
+                        return $"Buổi học lúc {vn:HH:mm dd/MM/yyyy} bị trùng với {targetLabel}.";
+                    }
+                }
+            }
+            else if (candidateSlots.Count > 0)
+            {
+                var slotVn = ClassroomLifecycleHelper.ToVietnamTime(slotUtc);
+                var slotDate = DateOnly.FromDateTime(slotVn);
+                if (!DateRangesOverlap(slotDate, slotDate, startDate, endDate))
+                    continue;
+
+                var slotStart = TimeOnly.FromDateTime(slotVn);
+                var slotEnd = slotStart.AddHours(2);
+                var overlap = candidateSlots.FirstOrDefault(cand =>
+                    cand.DayOfWeek == slotVn.DayOfWeek
+                    && TimesOverlap(cand.StartTime, cand.EndTime, slotStart, slotEnd));
+                if (overlap != null)
+                {
+                    return $"Khung giờ {ClassroomLifecycleHelper.FormatDayVn(overlap.DayOfWeek)} ({overlap.StartTime:HH\\:mm}–{overlap.EndTime:HH\\:mm}) ngày {slotDate:dd/MM/yyyy} bị trùng với {targetLabel}.";
+                }
+            }
+        }
+
         return null;
     }
 
@@ -292,6 +454,22 @@ public static class ScheduleConflictHelper
         var vnDate = DateOnly.FromDateTime(vnStartDt);
         var vnStartTime = TimeOnly.FromDateTime(vnStartDt);
         var vnEndTime = vnStartTime.AddHours(safeDuration);
+
+        var tutorTrials = await db.TrialSchedules
+            .AsNoTracking()
+            .Where(ts => ts.ConnectionRequest.TutorId == tutorId
+                         && ts.Status == ScheduleStatus.Confirmed
+                         && ts.ClassSessionId == null
+                         && ts.ScheduledAt >= windowFrom
+                         && ts.ScheduledAt <= windowTo)
+            .Select(ts => ts.ScheduledAt)
+            .ToListAsync(cancellationToken);
+
+        foreach (var trialUtc in tutorTrials)
+        {
+            if (ClassroomLifecycleHelper.IntervalsOverlap(utcStart, safeDuration, trialUtc, 2.0))
+                return "Gia sư đã có lịch học thử trùng khung giờ này.";
+        }
 
         var tutorWeekly = await db.ClassroomWeeklySchedules
             .AsNoTracking()

@@ -1,9 +1,8 @@
 import React from 'react';
 
 /**
- * ErrorBoundary toàn cục cho OTSP
- * Bắt tất cả lỗi render của React, lỗi nạp chunk động (Vite dynamic import) sau khi deploy,
- * và hiển thị giao diện thông báo lỗi trang nhã kèm nút Tải lại trang thay vì màn hình trắng xóa.
+ * ErrorBoundary dùng chung để bắt lỗi render của React hoặc lỗi tải chunk sau khi deploy,
+ * hiển thị màn hình thông báo kèm nút tải lại thay vì để trắng trang.
  */
 export default class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -36,7 +35,7 @@ export default class ErrorBoundary extends React.Component {
     this.setState({ errorInfo });
 
     // Nếu là lỗi không tải được module JS (do Vercel vừa deploy phiên bản mới làm đổi mã hash)
-    // Tự động tải lại trang sạch sẽ sau 500ms (chỉ reload 1 lần để tránh lặp vô tận)
+    // Tự động tải lại trang sau 500ms (chỉ reload 1 lần để tránh lặp vô tận)
     const message = error?.message || '';
     if (
       message.includes('Failed to fetch dynamically imported module') ||

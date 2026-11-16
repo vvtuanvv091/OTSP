@@ -49,7 +49,7 @@ public class AdminDashboardApiController : ControllerBase
         var activeClassrooms = await _db.Classrooms.AsNoTracking()
             .CountAsync(c => c.Status == ClassroomStatus.Active, ct);
 
-        // 2. Tài chính & Doanh thu (Ưu tiên lấy kỳ tháng hiện tại: 9.810.000 đ)
+        // 2. Tài chính & doanh thu (ưu tiên tổng hợp theo tháng hiện tại)
         var nowUtc = DateTime.UtcNow;
         var startOfMonthUtc = new DateTime(nowUtc.Year, nowUtc.Month, 1, 0, 0, 0, DateTimeKind.Utc);
         var monthRevenue = await _db.Payments.AsNoTracking()
@@ -62,7 +62,7 @@ public class AdminDashboardApiController : ControllerBase
             .SumAsync(p => (decimal?)p.Amount, ct) ?? 0m;
         var allTimePlatformFee = decimal.Round(allTimeRevenue * PlatformFeeRate, 0);
 
-        // 3. Tác tử AI Wein (Tổng hợp cả AiStudySessions lẫn AuditLogs Category="AiUsage" để tính đúng cho mọi vai trò & token thực tế)
+        // 3. Thống kê sử dụng AI (gộp cả AiStudySessions lẫn AuditLogs Category="AiUsage" để đếm đủ mọi vai trò)
         var vnNow = DateTime.UtcNow.AddHours(7);
         var todayUtc = DateTime.SpecifyKind(vnNow.Date.AddHours(-7), DateTimeKind.Utc);
         var fourteenDaysAgo = DateTime.SpecifyKind(todayUtc.AddDays(-13), DateTimeKind.Utc);
@@ -210,7 +210,7 @@ public class AdminDashboardApiController : ControllerBase
             })
             .ToListAsync(ct);
 
-        // 9. Thống kê theo ngày trong 7 ngày gần nhất: Truy vấn dữ liệu thực tế 100% từ Database
+        // 9. Thống kê theo ngày trong 7 ngày gần nhất từ dữ liệu database
         // Số thiết bị truy cập web duy nhất mỗi ngày lấy từ bảng riêng WebVisits (tách khỏi AuditLogs)
         var vnToday = DateOnly.FromDateTime(vnNow);
         var sevenDaysAgoDate = vnToday.AddDays(-6);

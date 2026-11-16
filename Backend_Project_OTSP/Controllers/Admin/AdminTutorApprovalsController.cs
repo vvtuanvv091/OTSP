@@ -94,8 +94,7 @@ public class AdminTutorApprovalsController : ControllerBase
     }
 
     /// <summary>
-    /// Multimodal AI OCR & Automated Verification of Tutor Qualification Certificate.
-    /// Admin can click 1-button to have AI analyze authenticity, tutor name, institution, score, and recommendation.
+    /// Nhờ AI đọc ảnh bằng cấp/chứng chỉ và gợi ý duyệt hồ sơ gia sư (tên, nơi cấp, độ tin cậy, lý do đề xuất).
     /// </summary>
     [HttpPost("qualifications/{id:int}/ai-verify")]
     public async Task<IActionResult> AiVerifyQualification(int id, CancellationToken cancellationToken)

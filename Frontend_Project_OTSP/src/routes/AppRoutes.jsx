@@ -180,7 +180,7 @@ export default function AppRoutes() {
   return (
     <Suspense fallback={<RouteFallback />}>
       <Routes>
-      {/* 1. Public Pages with MainLayout */}
+      {/* 1. Các trang công khai dùng MainLayout */}
       <Route element={<MainLayout />}>
         <Route path="/" element={<HomePage />} />
         <Route path="/guide" element={<GuidePage />} />
@@ -199,19 +199,19 @@ export default function AppRoutes() {
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/reset-password" element={<ForgotPasswordPage />} />
 
-        {/* Common Authenticated Routes */}
+        {/* Route chung cho người dùng đã đăng nhập */}
         <Route element={<ProtectedRoute />}>
           <Route path="/account/manage/change-password" element={<ChangePasswordPage />} />
         </Route>
       </Route>
 
-      {/* Adaptive Chat & Notifications Routes (Auto switches to TutorLayout or StudentLayout) */}
+      {/* Tin nhắn & thông báo (tự chọn TutorLayout hoặc StudentLayout theo vai trò) */}
       <Route element={<ProtectedRoute />}>
         <Route path="/chat" element={<AdaptiveChatRoute />} />
         <Route path="/notifications" element={<AdaptiveNotificationsRoute />} />
       </Route>
 
-      {/* Admin portal */}
+      {/* Khu vực quản trị viên */}
       <Route element={<ProtectedRoute allowedRoles={['Admin']} />}>
         <Route path="/admin" element={<AdminLayout />}>
           <Route index element={<AdminDashboardPage />} />
@@ -240,7 +240,7 @@ export default function AppRoutes() {
         </Route>
       </Route>
 
-      {/* 2. Online Classroom Room (Jitsi Meet with Adaptive Layout) */}
+      {/* 2. Phòng học trực tuyến (Jitsi Meet) */}
       <Route element={<ProtectedRoute />}>
         <Route path="/room/:sessionId" element={<AdaptiveRoomRoute />} />
         <Route path="/ClassSession/Room" element={<AdaptiveRoomRoute />} />
@@ -248,7 +248,7 @@ export default function AppRoutes() {
         <Route path="/tutor/room/:sessionId" element={<AdaptiveRoomRoute />} />
       </Route>
 
-      {/* 3. Tutor Portal (Role: Tutor) */}
+      {/* 3. Khu vực gia sư */}
       <Route element={<ProtectedRoute allowedRoles={['Tutor']} />}>
         <Route path="/tutor" element={<TutorLayout />}>
           <Route index element={<Navigate to="/tutor/dashboard" replace />} />
@@ -270,7 +270,7 @@ export default function AppRoutes() {
           <Route path="notifications" element={<NotificationsPage />} />
         </Route>
 
-        {/* Legacy ASP.NET Core URL Aliases for Tutor Portal */}
+        {/* Các đường dẫn cũ cho khu vực gia sư (giữ để tương thích) */}
         <Route element={<TutorLayout />}>
           <Route path="/Tutor" element={<Navigate to="/tutor/dashboard" replace />} />
           <Route path="/Tutor/TutorDashboard" element={<TutorDashboardPage />} />
@@ -301,7 +301,7 @@ export default function AppRoutes() {
         </Route>
       </Route>
 
-      {/* 4. Student & Parent Portal (Role: Student_Parent) */}
+      {/* 4. Khu vực học viên & phụ huynh */}
       <Route element={<ProtectedRoute allowedRoles={['Student_Parent', 'Student']} />}>
         <Route path="/student" element={<StudentLayout />}>
           <Route index element={<Navigate to="/student/dashboard" replace />} />
@@ -319,7 +319,7 @@ export default function AppRoutes() {
           <Route path="notifications" element={<NotificationsPage />} />
         </Route>
 
-        {/* Legacy ASP.NET URLs used by the Student_Parent portal */}
+        {/* Các đường dẫn cũ cho học viên & phụ huynh (giữ để tương thích) */}
         <Route element={<StudentLayout />}>
           <Route path="/Student_Parent/StudentDashboard" element={<StudentDashboardPage />} />
           <Route path="/Student_Parent/StudentSchedule" element={<StudentSchedulePage />} />
@@ -334,7 +334,7 @@ export default function AppRoutes() {
         </Route>
       </Route>
 
-      {/* 5. Tutor Profile & Booking (Adaptive Layout by Role, Open to Guests, Students, and Tutors) */}
+      {/* 5. Xem hồ sơ gia sư & đặt lịch học (tự đổi layout theo vai trò, mở cho cả khách) */}
       <Route path="/tutors/:tutorId" element={<AdaptiveBookingRoute />} />
       <Route path="/tutor-detail/:tutorId" element={<AdaptiveBookingRoute />} />
       <Route path="/student/booking/:tutorId" element={<AdaptiveBookingRoute />} />

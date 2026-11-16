@@ -15,11 +15,11 @@ class StudyAssistantRequest(BaseModel):
 
 class StudyAssistantResponse(BaseModel):
     """
-    Kết quả trả về chuẩn hóa khớp 100% với StudyAssistantResponseDto trong C#
-    - answer: Lời giải chi tiết từng bước, định dạng KaTeX LaTeX cho công thức
-    - conceptSummary: Tóm tắt 1-2 điểm lý thuyết cốt lõi
-    - practiceQuestion: 1 bài tập tương tự đổi số để học sinh tự luyện
-    - practiceSolution: Lời giải và đáp số ngắn gọn của bài tập tự luyện
+    Kết quả trả về theo đúng cấu trúc StudyAssistantResponseDto ở backend C#:
+    - answer: Lời giải từng bước, công thức viết theo định dạng KaTeX/LaTeX
+    - conceptSummary: Tóm tắt ngắn kiến thức trọng tâm
+    - practiceQuestion: Một bài tập tương tự để học sinh tự luyện
+    - practiceSolution: Gợi ý lời giải và đáp số cho bài tập tự luyện
     """
     answer: str = Field(default="", description="Lời giải từng bước chi tiết")
     conceptSummary: str = Field(default="", description="Tóm tắt lý thuyết trọng tâm")

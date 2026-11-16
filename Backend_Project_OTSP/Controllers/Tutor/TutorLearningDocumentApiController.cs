@@ -185,7 +185,7 @@ public class TutorLearningDocumentApiController : ControllerBase
             if (classroom == null)
                 return BadRequest(new { message = "Lớp học không tồn tại, không thuộc quyền quản lý của bạn hoặc đã đóng." });
 
-            // Classroom files inherit the class subject and grade to prevent mismatched metadata.
+            // Tài liệu gắn theo lớp sẽ lấy luôn môn và khối lớp của lớp đó để tránh lệch thông tin.
             request.SubjectId = classroom.SubjectId;
             request.GradeLevelId = classroom.GradeLevelId;
         }
@@ -206,7 +206,7 @@ public class TutorLearningDocumentApiController : ControllerBase
             return BadRequest(new { message = "Hãy chọn môn học và cấp học trong hồ sơ giảng dạy của bạn." });
         }
 
-        // Tải tài liệu lên đám mây Cloudinary để đảm bảo dữ liệu vĩnh viễn trên Server Render / Docker
+        // Đẩy file lên Cloudinary để không bị mất dữ liệu khi container Render/Docker khởi động lại
         StoredImage stored;
         try
         {

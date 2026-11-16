@@ -73,8 +73,8 @@ public class TutorSubjectApiControllerTests
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("ExecuteUpdate"))
         {
-            // EF Core InMemory database provider does not support ExecuteUpdateAsync.
-            // Verify that the TutorSubject was successfully added before ExecuteUpdateAsync was invoked.
+            // EF Core InMemory không hỗ trợ ExecuteUpdateAsync nên sẽ ném lỗi ở bước gọi sau.
+            // Kiểm tra TutorSubject đã được thêm vào DB thành công trước khi gọi ExecuteUpdateAsync.
             var addedSubject = await db.TutorSubjects.FirstOrDefaultAsync(ts => ts.TutorId == tutorProfile.Id);
             Assert.NotNull(addedSubject);
             Assert.Equal(180000, addedSubject.HourlyFee);

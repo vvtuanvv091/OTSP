@@ -24,7 +24,7 @@ namespace Backend_Project_OTSP.Models
         [ForeignKey("Sender")]
         public string SenderId { get; set; } = "";
         public ApplicationUser Sender { get; set; } = null!;
-        // Nguoi nhan
+        // Người nhận
         [Required]
         [ForeignKey("Receiver")]
         public string ReceiverId { get; set; } = "";

@@ -169,7 +169,7 @@ namespace Backend_Project_OTSP.Services.Chat
                     }
                 }
 
-                // 5. Học viên: TUYỆT ĐỐI KHÔNG thêm bạn cùng lớp ("Bạn cùng lớp"). Học viên chỉ được phép trao đổi với Gia sư và Quản trị viên.
+                // 5. Với học viên: chỉ nhắn với gia sư và quản trị viên, không đưa bạn cùng lớp vào danh bạ.
 
                 // 6. Những người đã từng nhắn tin 1-1 trước đây: Phải thỏa mãn nghiêm ngặt phân quyền (Học viên không chat với học viên khác)
                 var pastPartnerIds = await _db.Messagers
@@ -240,7 +240,7 @@ namespace Backend_Project_OTSP.Services.Chat
                     })
                     .ToDictionaryAsync(u => u.Id, cancellationToken);
 
-                // 8. Tối ưu cực hạn Neon PostgreSQL: 1 TRUY VẤN DUY NHẤT lấy toàn bộ tin nhắn 1-1 liên quan
+                // 8. Gom việc lấy toàn bộ tin nhắn 1-1 liên quan vào 1 truy vấn để giảm round-trip xuống PostgreSQL
                 var recentMessages = await _db.Messagers
                     .AsNoTracking()
                     .Where(m => !m.ClassroomId.HasValue
@@ -484,7 +484,7 @@ namespace Backend_Project_OTSP.Services.Chat
 
             messages.Reverse();
 
-            // Đánh dấu đã đọc O(1) bulk update trên Neon Postgres
+            // Cập nhật trạng thái đã đọc hàng loạt trực tiếp dưới PostgreSQL
             await MarkMessagesAsReadAsync(currentUserId, contactUserId, cancellationToken);
 
             return messages;
@@ -783,7 +783,7 @@ namespace Backend_Project_OTSP.Services.Chat
             var isStudentA = roleA == "Student_Parent" || roleA == "Student";
             var isStudentB = roleB == "Student_Parent" || roleB == "Student";
 
-            // TUYỆT ĐỐI CẤM: Hai học viên KHÔNG ĐƯỢC CHAT với nhau dưới mọi hình thức
+            // Quy định nghiệp vụ: hai học viên không được nhắn tin trực tiếp cho nhau
             if (isStudentA && isStudentB)
             {
                 _cache.Set(cacheKey, false, TimeSpan.FromMinutes(10));

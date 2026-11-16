@@ -14,7 +14,7 @@ export default function UserComplaintsPage() {
   const [errorMsg, setErrorMsg] = useState('');
   const [reloadKey, setReloadKey] = useState(0);
 
-  // Tự động làm mới danh sách khiếu nại khi Admin phân xử theo thời gian thực (Zero-Reload)
+  // Tự làm mới danh sách khiếu nại khi admin cập nhật qua SignalR
   useSignalREvent('ComplaintStatusChanged', () => setReloadKey((k) => k + 1));
 
   const alertTimerRef = useRef(null);

@@ -299,8 +299,8 @@ export default function HomePage() {
                 const courseImgIndex = (i % 3) + 1;
                 const isGroup = c.type === 1 || c.type === 'Group';
                 return (
-                  <div key={c.id || i} className="col-lg-4 col-md-6 d-flex align-items-stretch">
-                    <div className="course-item w-100 d-flex flex-column h-100 shadow-sm rounded-4 overflow-hidden border bg-white" style={{ minHeight: '448px' }}>
+                  <div key={c.id || i} className="col-lg-4 col-md-6 d-flex align-items-stretch min-w-0">
+                    <div className="course-item w-100 d-flex flex-column h-100 shadow-sm rounded-4 overflow-hidden border bg-white min-w-0" style={{ minHeight: '448px' }}>
                       <div className="position-relative" style={{ height: '210px', width: '100%', overflow: 'hidden', backgroundColor: '#f1f5f9' }}>
                         <img
                           src={resolveAssetUrl(c.coverImageUrl) || `/assets/img/course-${courseImgIndex}.jpg`}
@@ -325,27 +325,27 @@ export default function HomePage() {
                           {isGroup ? 'Lớp nhóm' : 'Lớp kèm 1-1'}
                         </span>
                       </div>
-                      <div className="course-content d-flex flex-column flex-grow-1 p-3">
-                        <div className="d-flex justify-content-between align-items-center mb-2">
-                          <p className="category mb-0">{c.subjectName} · {c.gradeName}</p>
-                          <p className="price text-danger fw-bold mb-0">{formatPrice(c.fee)} đ</p>
+                      <div className="course-content d-flex flex-column flex-grow-1 p-3 min-w-0">
+                        <div className="d-flex flex-wrap justify-content-between align-items-center gap-1 mb-2 min-w-0">
+                          <p className="category mb-0 text-truncate" style={{ maxWidth: '100%' }} title={`${c.subjectName} · ${c.gradeName}`}>{c.subjectName} · {c.gradeName}</p>
+                          <p className="price text-danger fw-bold mb-0 flex-shrink-0">{formatPrice(c.fee)} đ</p>
                         </div>
-                        <h3 className="fs-5 mb-2 fw-bold">
+                        <h3 className="fs-5 mb-2 fw-bold text-break">
                           <Link to={`/search?tab=classes&keyword=${encodeURIComponent(c.name)}`} className="text-dark text-decoration-none">
                             {c.name}
                           </Link>
                         </h3>
                         <p
-                          className="description text-muted small mb-3 flex-grow-1"
+                          className="description text-muted small mb-3 flex-grow-1 text-break"
                           style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}
                         >
                           {c.description || 'Chưa có mô tả chi tiết cho lớp học này.'}
                         </p>
-                        <div className="trainer d-flex justify-content-between align-items-center pt-2 border-top mt-auto">
-                          <div className="trainer-profile d-flex align-items-center">
+                        <div className="trainer d-flex justify-content-between align-items-center gap-2 pt-2 border-top mt-auto min-w-0">
+                          <div className="trainer-profile d-flex align-items-center min-w-0">
                             <img
                               src={resolveAssetUrl(c.tutorAvatarUrl) || '/assets/img/default-avatar.svg'}
-                              className="rounded-circle border"
+                              className="rounded-circle border flex-shrink-0"
                               style={{ width: 34, height: 34, objectFit: 'cover' }}
                               width="34"
                               height="34"
@@ -354,11 +354,11 @@ export default function HomePage() {
                               alt={c.tutorName}
                               onError={(e) => { e.target.src = '/assets/img/default-avatar.svg'; }}
                             />
-                            <span className="trainer-link ms-2 fw-semibold text-dark small">{c.tutorName}</span>
+                            <span className="trainer-link ms-2 fw-semibold text-dark small text-truncate">{c.tutorName}</span>
                           </div>
-                          <div className="trainer-rank d-flex align-items-center small text-muted">
+                          <div className="trainer-rank d-flex align-items-center small text-muted flex-shrink-0" style={{ fontVariantNumeric: 'tabular-nums' }}>
                             <i className="bi bi-people me-1 text-primary"></i>
-                            <span>{c.studentCount ?? 0}/{c.maxStudents ?? 0} học viên</span>
+                            <span>{c.studentCount ?? 0}/{c.maxStudents ?? 0}</span>
                           </div>
                         </div>
 

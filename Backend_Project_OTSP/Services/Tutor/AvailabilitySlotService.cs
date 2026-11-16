@@ -117,7 +117,7 @@ public sealed class AvailabilitySlotService : IAvailabilitySlotService
 
         busyIntervals = busyIntervals.OrderBy(i => i.Start).ToList();
 
-        // 1. Thuật toán gộp khoảng bận (Interval Merging Algorithm - O(N log N))
+        // 1. Sắp xếp và gộp các khoảng thời gian bận bị chồng lấn với nhau
         var mergedBusy = new List<(DateTime Start, DateTime End)>(busyIntervals.Count);
         foreach (var interval in busyIntervals)
         {
@@ -160,7 +160,7 @@ public sealed class AvailabilitySlotService : IAvailabilitySlotService
                     if (slotStartUtc <= nowUtc || seenSlotKeys.Contains(slotStartUtc))
                         continue;
 
-                    // 2. Binary Search O(log M)
+                    // 2. Tìm kiếm nhị phân kiểm tra slot có đụng khoảng bận nào không
                     bool isConflict = HasConflict(mergedBusy, slotStartUtc, slotEndUtc);
                     if (!isConflict)
                     {
@@ -275,7 +275,7 @@ public sealed class AvailabilitySlotService : IAvailabilitySlotService
     }
 
     /// <summary>
-    /// Thuật toán tìm kiếm nhị phân (Binary Search O(log M)) xác định xem slot có xung đột với khoảng bận nào không.
+    /// Tìm kiếm nhị phân trên danh sách khoảng bận đã gộp để kiểm tra trùng lịch.
     /// </summary>
     private static bool HasConflict(List<(DateTime Start, DateTime End)> sortedIntervals, DateTime slotStart, DateTime slotEnd)
     {

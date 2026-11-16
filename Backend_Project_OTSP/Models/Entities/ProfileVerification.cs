@@ -8,12 +8,12 @@ namespace Backend_Project_OTSP.Models
     {
         [Key]
         public int Id { get; set; }
-        // Ket qua: Approved hoac Rejected
+        // Kết quả: Approved hoặc Rejected
         public VerificationStatus Result { get; set; }
-        // Ly do tu choi
+        // Lý do từ chối
         public string? Reason { get; set; }
         // Kết quả gợi ý từ OCR, chỉ để tham khảo
-         // Thời điểm xử lý (UTC), null khi chưa xử lý
+        // Thời điểm xử lý (UTC), null khi chưa xử lý
         public DateTime? ProcessedAt { get; set; }
         // Khóa ngoại tới gia sư được xác thực
         [ForeignKey(nameof(Tutor))]

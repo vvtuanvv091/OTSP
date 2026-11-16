@@ -17,8 +17,8 @@ namespace Backend_Project_OTSP.Services.Payments
         }
         public string GetQrImageUrl(long amount, string description)
         {
-            // VietQR Quick Link API � ho�n to�n mi?n ph�
-            // T�i li?u: https://www.vietqr.io/danh-sach-api/api-tao-ma-qr/
+            // VietQR Quick Link API (miễn phí)
+            // Tài liệu: https://www.vietqr.io/danh-sach-api/api-tao-ma-qr/
             var encodedDesc = Uri.EscapeDataString(description);
             var encodedName = Uri.EscapeDataString(_accountName);
 
@@ -29,7 +29,7 @@ namespace Backend_Project_OTSP.Services.Payments
         }
         public string GenerateQrData(long amount, string description, string orderCode)
         {
-            // �on gi?n: tr? v? URL VietQR (cung l� QR data h?p l?)
+            // Trả về thẳng URL VietQR để client hiển thị hoặc render mã QR
             return GetQrImageUrl(amount, description);
         }
         public string GetQrImageUrl(string amount, string description)

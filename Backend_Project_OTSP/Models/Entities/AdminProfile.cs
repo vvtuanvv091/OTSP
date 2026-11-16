@@ -12,21 +12,21 @@ namespace Backend_Project_OTSP.Models
         [ForeignKey("User")]
         public string UserId { get; set; } = "";
         public ApplicationUser User { get; set; } = null!;
-        // xác thuc ho so gia su dã xu lý (1-N)
+        // Hồ sơ gia sư mà admin này đã duyệt (1-N)
         public ICollection<ProfileVerification> ProfileVerifications { get; set; } = new List<ProfileVerification>();
-        // Khieu nai dã xu lý (1-N)
+        // Khiếu nại mà admin này đã xử lý (1-N)
         public ICollection<Complaint> HandledComplaints { get; set; } = new List<Complaint>();
 
-        // Tin tuc dã dang (1-N)
+        // Tin tức mà admin này đã đăng (1-N)
         public ICollection<NewsArticle> NewsArticles { get; set; } = new List<NewsArticle>();
 
-        // Ði soát dã lop (1-N)
+        // Đối soát doanh thu đã lập (1-N)
         public ICollection<Reconciliation> Reconciliations { get; set; } = new List<Reconciliation>();
 
-        // Canh báo dánh giá bat thuong dã xem xét (1-N)
+        // Cảnh báo đánh giá bất thường đã xem xét (1-N)
         public ICollection<ReviewAlert> ReviewedAlerts { get; set; } = new List<ReviewAlert>();
 
-        // Báo cáo thong kê dã lap (1-N)
+        // Báo cáo thống kê đã lập (1-N)
         public ICollection<StatisticReport> StatisticReports { get; set; } = new List<StatisticReport>();
     }
     

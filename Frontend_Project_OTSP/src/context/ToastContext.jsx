@@ -34,7 +34,7 @@ export function ToastProvider({ children }) {
   return (
     <ToastContext.Provider value={toast}>
       {children}
-      {/* Toast Notification Container */}
+      {/* Vùng hiển thị thông báo toast */}
       <div
         className="toast-container position-fixed top-0 end-0 p-3"
         style={{ zIndex: 9999, maxWidth: '420px', width: '100%', pointerEvents: 'none' }}

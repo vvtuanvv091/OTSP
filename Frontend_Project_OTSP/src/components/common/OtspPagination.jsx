@@ -17,7 +17,7 @@ export default function OtspPagination({
   const firstItem = total === 0 ? 0 : (page - 1) * pageSize + 1;
   const lastItem = total === 0 ? 0 : Math.min(page * pageSize, total);
 
-  // Thuật toán hiển thị danh sách trang thông minh: tự động co gọn với dấu '...' khi có nhiều trang
+  // Tự động rút gọn danh sách số trang bằng dấu '...' khi tổng số trang nhiều
   const getVisiblePages = () => {
     if (pages <= 5) {
       return Array.from({ length: pages }, (_, i) => i + 1);

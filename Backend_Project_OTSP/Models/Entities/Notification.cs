@@ -3,7 +3,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Backend_Project_OTSP.Models
 {
-    // Thao bao gui den ng dung (ket qua duyet ho so, lich hoc, thanh toan...)
+    // Thông báo gửi đến người dùng (duyệt hồ sơ, lịch học, thanh toán...)
     public class Notification
     {
         [Key]

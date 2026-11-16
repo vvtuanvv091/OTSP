@@ -50,7 +50,7 @@ public class AiRateLimitQuotaTests
         var (db, cache, httpAccessor, config) = CreateDependencies("10.0.0.1");
         var clientIp = "10.0.0.1";
 
-        // Seed 10 existing AI usage logs for this IP today
+        // Tạo sẵn 10 lượt gọi AI trong ngày hôm nay cho IP khách này
         for (int i = 0; i < 10; i++)
         {
             db.AuditLogs.Add(new AuditLog
@@ -78,7 +78,7 @@ public class AiRateLimitQuotaTests
             Message = "Chào Wein, mình muốn hỏi thông tin học tập"
         };
 
-        // Act - 11th request from this guest IP
+        // Thực thi - Gửi request thứ 11 từ cùng IP khách
         var response = await aiService.ChatWithAgentAsync(request, null);
 
         // Assert
@@ -100,7 +100,7 @@ public class AiRateLimitQuotaTests
         var (db, cache, httpAccessor, config) = CreateDependencies("10.0.0.2");
         var studentUserId = "student-user-123";
 
-        // Seed 50 existing AI usage logs for this student today
+        // Tạo sẵn 50 lượt gọi AI trong ngày hôm nay cho học viên này
         for (int i = 0; i < 50; i++)
         {
             db.AuditLogs.Add(new AuditLog
@@ -128,7 +128,7 @@ public class AiRateLimitQuotaTests
             Message = "Bài tập giải tích hôm nay"
         };
 
-        // Act - 51st request
+        // Thực thi - Gửi request thứ 51
         var response = await aiService.ChatWithAgentAsync(request, studentUserId);
 
         // Assert

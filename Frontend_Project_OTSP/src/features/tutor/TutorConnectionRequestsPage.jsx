@@ -44,7 +44,7 @@ export default function TutorConnectionRequestsPage() {
     };
   }, [page, statusFilter, reloadKey]);
 
-  // Lắng nghe yêu cầu kết nối mới và thay đổi trạng thái theo thời gian thực (Zero-Reload)
+  // Lắng nghe SignalR để tự cập nhật khi có yêu cầu kết nối mới hoặc đổi trạng thái
   useSignalREvent('ConnectionRequestCreated', (evt) => {
     const studentName = evt?.studentName || 'Một học viên';
     const subjectName = evt?.subjectName || 'môn học';
@@ -161,7 +161,7 @@ export default function TutorConnectionRequestsPage() {
 
   return (
     <div className="container-fluid py-4" id="tutor-requests-page">
-      {/* Header (Matching 5079) */}
+      {/* Tiêu đề trang */}
       <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
         <div>
           <h1 className="h3 fw-bold mb-1 text-dark">Yêu cầu kết nối</h1>
@@ -250,7 +250,7 @@ export default function TutorConnectionRequestsPage() {
         </div>
       ) : (
         <>
-          {/* ==================== DESKTOP TABLE VIEW (>= 768px) ==================== */}
+          {/* ==================== BẢNG TRÊN DESKTOP (>= 768px) ==================== */}
           <div className="d-none d-md-block card border-0 shadow-sm rounded-3 overflow-hidden">
             <table className="table table-hover align-middle mb-0">
               <thead className="table-light">
@@ -447,7 +447,7 @@ export default function TutorConnectionRequestsPage() {
             </table>
           </div>
 
-          {/* ==================== MOBILE CARD VIEW (< 768px) ==================== */}
+          {/* ==================== THẺ TRÊN MOBILE (< 768px) ==================== */}
           <div className="d-md-none d-flex flex-column gap-3">
             {requests.map((request) => {
               const isTrial = resolveIsTrial(request);

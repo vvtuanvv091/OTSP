@@ -186,7 +186,7 @@ html[data-bs-theme="dark"] .income-progress,
 [data-bs-theme="dark"] .income-progress { background: #263347; }
 html[data-bs-theme="dark"] .tutor-qr-box,
 [data-bs-theme="dark"] .tutor-qr-box { border-color: #334155; background: #0f172a; }
-/* Tutor dashboard profile completion checklist */
+/* Danh sách kiểm tra hoàn thiện hồ sơ gia sư trên dashboard */
 .tutor-profile-progress {
   padding: 20px 22px;
   color: #243247;

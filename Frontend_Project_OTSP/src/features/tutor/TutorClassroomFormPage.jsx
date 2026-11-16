@@ -22,6 +22,7 @@ const DURATION_OPTIONS = [
 ];
 
 const PACKAGE_SESSION_PRESETS = [4, 8, 12, 16, 24];
+const DEADLINE_DAYS_PRESETS = [1, 2, 3, 7];
 
 function getVietnamTodayIso() {
   const now = new Date();
@@ -128,6 +129,51 @@ const INITIAL_DEFAULT_SCHEDULES = [
   { sessionIndex: 2, dayOfWeek: 4, startTime: '19:00', endTime: '21:00' },
 ];
 
+function computeFirstSessionPreview(startIso, weeklySchedules) {
+  if (!startIso || !weeklySchedules || weeklySchedules.length === 0) return null;
+  const [y, m, d] = startIso.split('-').map(Number);
+  const cursor = new Date(Date.UTC(y, (m || 1) - 1, d || 1));
+  for (let i = 0; i < 14; i++) {
+    const dow = cursor.getUTCDay();
+    const matches = weeklySchedules
+      .filter((w) => Number(w.dayOfWeek) === dow)
+      .sort((a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime));
+    if (matches.length > 0) {
+      const slot = matches[0];
+      const dayLabel = DAY_OPTIONS.find((opt) => opt.value === dow)?.label || '';
+      return {
+        isoDate: cursor.toISOString().slice(0, 10),
+        dayLabel,
+        startTime: slot.startTime,
+        endTime: slot.endTime,
+      };
+    }
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+  return null;
+}
+
+function dateRangesOverlapIso(aStart, aEnd, bStart, bEnd) {
+  const s1 = aStart ? String(aStart).slice(0, 10) : '0000-01-01';
+  const e1 = aEnd ? String(aEnd).slice(0, 10) : '9999-12-31';
+  const s2 = bStart ? String(bStart).slice(0, 10) : '0000-01-01';
+  const e2 = bEnd ? String(bEnd).slice(0, 10) : '9999-12-31';
+  return s1 <= e2 && s2 <= e1;
+}
+
+function findBusyMatchesForSlot(slot, startIso, endIso, busySchedules) {
+  if (!slot || !busySchedules || busySchedules.length === 0) return [];
+  const aStart = timeToMinutes(slot.startTime);
+  const aEnd = timeToMinutes(slot.endTime);
+  return busySchedules.filter((b) => {
+    if (Number(b.dayOfWeek) !== Number(slot.dayOfWeek)) return false;
+    if (!dateRangesOverlapIso(b.startDate, b.endDate, startIso, endIso)) return false;
+    const bStart = timeToMinutes(b.startTime);
+    const bEnd = timeToMinutes(b.endTime);
+    return aStart < bEnd && bStart < aEnd;
+  });
+}
+
 function calculateEndTime(startStr, durationH) {
   if (!startStr) return '21:00';
   const [h, m] = startStr.split(':').map(Number);
@@ -184,15 +230,20 @@ export default function TutorClassroomFormPage() {
 
   // Lịch học hàng tuần & vòng đời khóa học
   const todayVnIso = getVietnamTodayIso();
+  const minDeadlineIso = addDaysIso(todayVnIso, 1);
+  const maxDeadlineIso = addDaysIso(todayVnIso, 7);
+  const defaultDeadlineIso = addDaysIso(todayVnIso, 2);
+  const defaultStartIso = addDaysIso(todayVnIso, 3);
   const [sessionsPerWeek, setSessionsPerWeek] = useState(2);
   const [hoursPerSession, setHoursPerSession] = useState(2.0);
   const [weeklySchedules, setWeeklySchedules] = useState(INITIAL_DEFAULT_SCHEDULES);
-  const [startDate, setStartDate] = useState(todayVnIso);
-  const [registrationDeadline, setRegistrationDeadline] = useState(todayVnIso);
+  const [startDate, setStartDate] = useState(defaultStartIso);
+  const [registrationDeadline, setRegistrationDeadline] = useState(defaultDeadlineIso);
   const [totalSessions, setTotalSessions] = useState(8);
   const [endDate, setEndDate] = useState(() =>
-    computeEndDateFromTotalSessions(todayVnIso, INITIAL_DEFAULT_SCHEDULES, 8)
+    computeEndDateFromTotalSessions(defaultStartIso, INITIAL_DEFAULT_SCHEDULES, 8)
   );
+  const [busySchedules, setBusySchedules] = useState([]);
   const [canEditLifecycleDates, setCanEditLifecycleDates] = useState(true);
   const [canEditScheduleStructure, setCanEditScheduleStructure] = useState(true);
   const [hasStartedSession, setHasStartedSession] = useState(false);
@@ -203,10 +254,11 @@ export default function TutorClassroomFormPage() {
 
     async function loadData() {
       try {
-        const optRes = await tutorApi.getClassroomOptions();
+        const optRes = await tutorApi.getClassroomOptions(isEdit ? id : undefined);
         if (isMounted) {
           const opts = optRes.data?.subjectGradeOptions || [];
           setSubjectGradeOptions(opts);
+          setBusySchedules(optRes.data?.busySchedules || []);
           if (!isEdit && opts.length > 0) {
             setSubjectGradeKey(opts[0].key);
           }
@@ -258,12 +310,12 @@ export default function TutorClassroomFormPage() {
               : Math.max(spw * 4, Number(c.plannedSessionsCount) || 8);
             const loadedEnd = toIsoDate(c.endDate)
               || computeEndDateFromTotalSessions(loadedStart, normalizedSchedules, loadedTotal);
-            const loadedDeadline = toIsoDate(c.registrationDeadline) || loadedStart;
+            const loadedDeadline = toIsoDate(c.registrationDeadline) || '';
 
             setStartDate(loadedStart);
             setTotalSessions(loadedTotal);
             setEndDate(loadedEnd);
-            setRegistrationDeadline(loadedDeadline > loadedStart ? loadedStart : loadedDeadline);
+            setRegistrationDeadline(loadedDeadline);
           }
         }
       } catch (err) {
@@ -330,11 +382,25 @@ export default function TutorClassroomFormPage() {
     });
   };
 
+  const handleDeadlinePreset = (days) => {
+    const nextDeadline = addDaysIso(todayVnIso, days);
+    const nextStart = addDaysIso(nextDeadline, 1);
+    setRegistrationDeadline(nextDeadline);
+    setStartDate(nextStart);
+    setEndDate(computeEndDateFromTotalSessions(nextStart, weeklySchedules, totalSessions));
+  };
+
+  const handleRegistrationDeadlineChange = (nextDeadline) => {
+    setRegistrationDeadline(nextDeadline);
+    if (!isOneToOne && nextDeadline && (!startDate || startDate <= nextDeadline)) {
+      const nextStart = addDaysIso(nextDeadline, 1);
+      setStartDate(nextStart);
+      setEndDate(computeEndDateFromTotalSessions(nextStart, weeklySchedules, totalSessions));
+    }
+  };
+
   const handleStartDateChange = (nextStart) => {
     setStartDate(nextStart);
-    if (!isOneToOne && (!registrationDeadline || registrationDeadline > nextStart)) {
-      setRegistrationDeadline(nextStart);
-    }
     if (nextStart) {
       setEndDate(computeEndDateFromTotalSessions(nextStart, weeklySchedules, totalSessions));
     }
@@ -398,7 +464,24 @@ export default function TutorClassroomFormPage() {
       setError('Ngày kết thúc khóa học phải lớn hơn hoặc bằng ngày bắt đầu.');
       return;
     }
-    if (!isOneToOne && registrationDeadline && registrationDeadline > startDate) {
+    if (!isOneToOne && (!isEdit || canEditLifecycleDates)) {
+      if (!registrationDeadline) {
+        setError('Vui lòng chọn hạn chót đăng ký lớp nhóm.');
+        return;
+      }
+      if (registrationDeadline < minDeadlineIso) {
+        setError('Hạn chót đăng ký lớp nhóm phải từ ngày mai trở đi (ít nhất 1 ngày để học viên đăng ký).');
+        return;
+      }
+      if (registrationDeadline > maxDeadlineIso) {
+        setError('Hạn chót đăng ký lớp nhóm chỉ được chọn tối đa 7 ngày kể từ hôm nay.');
+        return;
+      }
+      if (startDate <= registrationDeadline) {
+        setError('Ngày bắt đầu học phải sau hạn chót đăng ký ít nhất 1 ngày để không trùng với thời gian nhận đăng ký.');
+        return;
+      }
+    } else if (!isOneToOne && registrationDeadline && registrationDeadline > startDate) {
       setError('Hạn chót đăng ký lớp nhóm không được sau ngày khai giảng.');
       return;
     }
@@ -463,6 +546,21 @@ export default function TutorClassroomFormPage() {
     }
   };
 
+  const firstSessionPreview = computeFirstSessionPreview(startDate, weeklySchedules);
+  const liveInternalOverlapError = findInternalScheduleOverlap(weeklySchedules);
+  const hasInvalidGroupLifecycleDates = !isOneToOne
+    && canEditLifecycleDates
+    && (
+      !registrationDeadline
+      || registrationDeadline < minDeadlineIso
+      || registrationDeadline > maxDeadlineIso
+      || !startDate
+      || startDate <= registrationDeadline
+    );
+  const liveBusyConflicts = weeklySchedules.map((slot) =>
+    findBusyMatchesForSlot(slot, startDate, endDate, busySchedules)
+  );
+
   if (loading) {
     return (
       <div className="container py-5 text-center">
@@ -474,7 +572,7 @@ export default function TutorClassroomFormPage() {
 
   return (
     <div className="container-fluid py-4" style={{ maxWidth: 960 }}>
-      {/* Breadcrumb & Title */}
+      {/* Điều hướng và tiêu đề */}
       <div className="d-flex align-items-center justify-content-between mb-4">
         <div>
           <Link to="/tutor/classrooms" className="text-secondary text-decoration-none small mb-1 d-inline-block">
@@ -491,7 +589,7 @@ export default function TutorClassroomFormPage() {
         </div>
       </div>
 
-      {/* Alerts */}
+      {/* Thông báo lỗi hoặc thành công */}
       {success && (
         <div className="alert alert-success alert-dismissible fade show" role="alert">
           <i className="bi bi-check-circle me-1"></i> {success}
@@ -503,7 +601,7 @@ export default function TutorClassroomFormPage() {
         </div>
       )}
 
-      {/* Form Card */}
+      {/* Khung biểu mẫu */}
       <div className="card border-0 shadow-sm rounded-4 p-3 p-md-4 bg-white">
         <form onSubmit={handleSubmit}>
           {/* Tên lớp học */}
@@ -565,7 +663,7 @@ export default function TutorClassroomFormPage() {
               </label>
 
               <div className="row g-3 align-items-center">
-                {/* Preview Box */}
+                {/* Xem trước ảnh bìa */}
                 <div className="col-12 col-md-4 text-center">
                   <div
                     className="p-2 bg-light border rounded-3 position-relative d-flex align-items-center justify-content-center"
@@ -611,7 +709,7 @@ export default function TutorClassroomFormPage() {
                   )}
                 </div>
 
-                {/* Upload or URL Controls */}
+                {/* Tùy chọn tải ảnh lên hoặc nhập URL */}
                 <div className="col-12 col-md-8">
                   <div className="btn-group btn-group-sm w-100 mb-2" role="group">
                     <button
@@ -802,27 +900,31 @@ export default function TutorClassroomFormPage() {
                 </div>
               </div>
 
-              <div className="row g-3">
-                <div className={`col-12 ${isOneToOne ? 'col-md-4' : 'col-md-3'}`}>
-                  <label className="form-label small fw-semibold text-dark">
-                    Ngày bắt đầu <span className="text-danger">*</span>
-                  </label>
-                  <input
-                    type="date"
-                    className="form-control form-control-sm"
-                    value={startDate}
-                    min={!isEdit || canEditLifecycleDates ? todayVnIso : undefined}
-                    disabled={isEdit && !canEditLifecycleDates}
-                    onChange={(e) => handleStartDateChange(e.target.value)}
-                    required
-                  />
-                  {isEdit && !canEditLifecycleDates && (
-                    <div className="form-text small text-muted">
-                      Đã khóa do lớp đã có học viên, thanh toán hoặc buổi đã học.
-                    </div>
-                  )}
+              {!isOneToOne && canEditLifecycleDates && (
+                <div className="mb-3">
+                  <span className="small text-muted d-block mb-1">
+                    Chọn nhanh thời gian mở đăng ký (tối đa 7 ngày, chưa tính buổi học cho tới hết hạn):
+                  </span>
+                  <div className="d-flex flex-wrap gap-1">
+                    {DEADLINE_DAYS_PRESETS.map((days) => {
+                      const presetDeadline = addDaysIso(todayVnIso, days);
+                      const isActive = registrationDeadline === presetDeadline;
+                      return (
+                        <button
+                          key={days}
+                          type="button"
+                          className={`btn btn-sm ${isActive ? 'btn-danger' : 'btn-outline-secondary'}`}
+                          onClick={() => handleDeadlinePreset(days)}
+                        >
+                          Nhận ĐK {days} ngày (đến {formatVnDate(presetDeadline).slice(0, 5)})
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
+              )}
 
+              <div className="row g-3">
                 {!isOneToOne && (
                   <div className="col-12 col-md-3">
                     <label className="form-label small fw-semibold text-dark">
@@ -832,18 +934,45 @@ export default function TutorClassroomFormPage() {
                       type="date"
                       className="form-control form-control-sm"
                       value={registrationDeadline}
-                      max={startDate || undefined}
+                      min={canEditLifecycleDates ? minDeadlineIso : todayVnIso}
+                      max={maxDeadlineIso}
                       disabled={isEdit && hasStartedSession}
-                      onChange={(e) => setRegistrationDeadline(e.target.value)}
+                      onChange={(e) => handleRegistrationDeadlineChange(e.target.value)}
                       required
                     />
                     <div className="form-text small text-muted">
                       {isEdit && hasStartedSession
                         ? 'Đã khóa khi lớp bắt đầu học.'
-                        : 'Phải trước hoặc bằng ngày bắt đầu để tránh lệch tiến độ.'}
+                        : 'Chọn từ ngày mai đến tối đa 7 ngày tới.'}
                     </div>
                   </div>
                 )}
+
+                <div className={`col-12 ${isOneToOne ? 'col-md-4' : 'col-md-3'}`}>
+                  <label className="form-label small fw-semibold text-dark">
+                    Ngày bắt đầu học <span className="text-danger">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    className="form-control form-control-sm"
+                    value={startDate}
+                    min={!isEdit || canEditLifecycleDates
+                      ? (isOneToOne ? todayVnIso : addDaysIso(registrationDeadline || todayVnIso, 1))
+                      : undefined}
+                    disabled={isEdit && !canEditLifecycleDates}
+                    onChange={(e) => handleStartDateChange(e.target.value)}
+                    required
+                  />
+                  {isEdit && !canEditLifecycleDates ? (
+                    <div className="form-text small text-muted">
+                      Đã khóa do lớp đã có học viên, thanh toán hoặc buổi đã học.
+                    </div>
+                  ) : !isOneToOne && (
+                    <div className="form-text small text-muted">
+                      Phải sau hạn chót đăng ký ít nhất 1 ngày.
+                    </div>
+                  )}
+                </div>
 
                 <div className={`col-12 ${isOneToOne ? 'col-md-4' : 'col-md-3'}`}>
                   <label className="form-label small fw-semibold text-dark">
@@ -876,16 +1005,68 @@ export default function TutorClassroomFormPage() {
                   <div className="form-text small text-muted">Thay đổi ngày kết thúc sẽ cập nhật số buổi.</div>
                 </div>
               </div>
+
+              {firstSessionPreview && (
+                <div className="mt-2 pt-2 border-top d-flex flex-wrap align-items-center justify-content-between gap-2 small">
+                  <span className="text-secondary">
+                    <i className="bi bi-clock-history text-danger me-1"></i>
+                    Buổi 1 dự kiến: <strong className="text-dark">{firstSessionPreview.dayLabel}, {formatVnDate(firstSessionPreview.isoDate)} ({firstSessionPreview.startTime} - {firstSessionPreview.endTime})</strong>
+                  </span>
+                  {!isOneToOne && registrationDeadline && (
+                    <span className="text-muted">
+                      Các buổi rơi trước/trong hạn ĐK ({formatVnDate(registrationDeadline)}) không tính và chưa hiện lịch.
+                    </span>
+                  )}
+                </div>
+              )}
+
+              {hasInvalidGroupLifecycleDates && (
+                <div className="alert alert-warning py-2 px-3 small mt-2 mb-0">
+                  <i className="bi bi-exclamation-triangle-fill me-1"></i>
+                  Hạn chót đăng ký phải từ ngày mai đến tối đa 7 ngày tới, và ngày bắt đầu học phải sau hạn chót ít nhất 1 ngày.
+                </div>
+              )}
             </div>
+
+            {/* Hiển thị lịch bận 1-1 & lớp khác để gia sư tránh chọn trùng */}
+            {busySchedules.length > 0 && (
+              <div className="p-2.5 bg-white border rounded-3 mb-3 small">
+                <div className="fw-semibold text-dark mb-1.5">
+                  <i className="bi bi-calendar2-x text-danger me-1"></i>
+                  Lịch dạy 1-1 / lớp khác đang có ({busySchedules.length} khung giờ):
+                </div>
+                <div className="d-flex flex-wrap gap-1.5">
+                  {busySchedules.map((b, i) => (
+                    <span
+                      key={i}
+                      className={`badge fw-normal px-2 py-1 ${b.isPending ? 'bg-warning-subtle text-dark border border-warning-subtle' : 'bg-light text-secondary border'}`}
+                      title={b.title}
+                    >
+                      {b.dayLabel} {b.startTime}–{b.endTime} · {b.title}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Chi tiết từng buổi */}
             <label className="form-label fw-semibold mb-2">Chi tiết khung giờ từng buổi trong tuần:</label>
             <div className="d-flex flex-column gap-2">
-              {weeklySchedules.map((schedule, idx) => (
-                <div key={idx} className="p-3 border rounded-3 bg-white shadow-sm">
-                  <div className="d-flex align-items-center justify-content-between mb-2">
+              {weeklySchedules.map((schedule, idx) => {
+                const slotConflicts = liveBusyConflicts[idx] || [];
+                return (
+                <div key={idx} className={`p-3 border rounded-3 bg-white shadow-sm ${slotConflicts.length > 0 ? 'border-danger' : ''}`}>
+                  <div className="d-flex align-items-center justify-content-between mb-2 flex-wrap gap-1">
                     <span className="badge bg-danger-subtle text-danger fw-bold">Buổi {idx + 1}</span>
-                    <span className="small text-muted">{hoursPerSession} giờ</span>
+                    <div className="d-flex align-items-center gap-2">
+                      {slotConflicts.length > 0 && (
+                        <span className="badge bg-danger text-white small">
+                          <i className="bi bi-exclamation-circle me-1"></i>
+                          Trùng với {slotConflicts[0].title} ({slotConflicts[0].startTime}–{slotConflicts[0].endTime})
+                        </span>
+                      )}
+                      <span className="small text-muted">{hoursPerSession} giờ</span>
+                    </div>
                   </div>
 
                   <div className="row g-2">
@@ -895,6 +1076,7 @@ export default function TutorClassroomFormPage() {
                         className="form-select form-select-sm"
                         value={schedule.dayOfWeek}
                         onChange={(e) => handleScheduleChange(idx, 'dayOfWeek', Number(e.target.value))}
+                        disabled={isEdit && !canEditScheduleStructure}
                       >
                         {DAY_OPTIONS.map((d) => (
                           <option key={d.value} value={d.value}>
@@ -911,6 +1093,7 @@ export default function TutorClassroomFormPage() {
                         className="form-control form-control-sm"
                         value={schedule.startTime}
                         onChange={(e) => handleScheduleChange(idx, 'startTime', e.target.value)}
+                        disabled={isEdit && !canEditScheduleStructure}
                         required
                       />
                     </div>
@@ -922,13 +1105,20 @@ export default function TutorClassroomFormPage() {
                         className="form-control form-control-sm bg-light"
                         value={schedule.endTime}
                         onChange={(e) => handleScheduleChange(idx, 'endTime', e.target.value)}
+                        disabled={isEdit && !canEditScheduleStructure}
                         required
                       />
                     </div>
                   </div>
                 </div>
-              ))}
+              );})}
             </div>
+            {liveInternalOverlapError && (
+              <div className="alert alert-danger py-2 px-3 small mt-2 mb-0">
+                <i className="bi bi-exclamation-octagon-fill me-1"></i>
+                {liveInternalOverlapError}
+              </div>
+            )}
           </div>
 
           {/* Mô tả lớp học */}
@@ -943,7 +1133,7 @@ export default function TutorClassroomFormPage() {
             ></textarea>
           </div>
 
-          {/* Action Buttons */}
+          {/* Nút lưu và hủy */}
           <div className="d-flex align-items-center justify-content-end gap-2 pt-3 border-top">
             <Link to="/tutor/classrooms" className="btn btn-outline-secondary px-4 py-2">
               Hủy bỏ

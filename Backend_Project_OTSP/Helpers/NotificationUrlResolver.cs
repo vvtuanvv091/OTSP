@@ -60,7 +60,7 @@ public static class NotificationUrlResolver
                 : "/Student_Parent/StudentProfile";
         }
 
-        // 5. Đánh giá
+        // 6. Đánh giá
         if (t.Contains("đánh giá") || c.Contains("đánh giá"))
         {
             return isTutor 

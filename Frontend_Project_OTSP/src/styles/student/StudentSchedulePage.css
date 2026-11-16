@@ -130,7 +130,7 @@
   font-weight: 600;
 }
 
-/* Clean rounded slot box */
+/* Ô khung giờ bo góc */
 .availability-slot {
   position: relative;
   display: flex;
@@ -167,7 +167,7 @@
   width: 100%;
 }
 
-/* Session Card inside Cell */
+/* Thẻ buổi học bên trong ô lịch */
 .schedule-session-card {
   border: 1px solid var(--availability-border, #E5E7EB);
   border-top: 2px solid var(--otsp-primary, #DB303A);
@@ -205,7 +205,7 @@
   background: #f8fafc;
 }
 
-/* Dark mode overrides for high contrast and beautiful UI */
+/* Ghi đè màu chế độ tối để giữ độ tương phản rõ */
 [data-bs-theme="dark"] .student-schedule-page .schedule-card {
   background: #1B1C38 !important;
   border-color: #2D305D !important;
@@ -282,7 +282,7 @@
   line-height: 1.2;
 }
 
-/* Legend styling */
+/* Chú thích màu sắc */
 .student-schedule-page .availability-legend {
   display: flex;
   flex-wrap: wrap;
@@ -326,7 +326,7 @@
   background: #64748b;
 }
 
-/* Mobile day picker */
+/* Bộ chọn ngày trên mobile */
 .student-schedule-page .availability-mobile-day-picker {
   display: none;
 }

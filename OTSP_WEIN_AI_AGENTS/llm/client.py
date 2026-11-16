@@ -54,10 +54,9 @@ def ask_gemini_chat(
     max_tokens: int = 1500
 ) -> str:
     """
-    Gọi Gemini có ĐẦY ĐỦ TRÍ NHỚ ĐA LƯỢT (Multi-turn Conversation):
-    - Chuyển đổi lịch sử chat (từ Frontend gửi lên) thành mảng `types.Content`.
-    - Vai trò 'assistant' từ FE được map sang 'model' của Gemini.
-    - Đảm bảo AI nhớ được các câu hỏi và câu trả lời trước đó trong phiên hội thoại.
+    Gọi Gemini kèm lịch sử hội thoại nhiều lượt:
+    - Chuyển lịch sử chat từ frontend sang danh sách types.Content.
+    - Map vai trò 'assistant' sang 'model' theo định dạng của Gemini.
     """
     client = get_gemini_client()
 
@@ -107,9 +106,8 @@ def ask_gemini_chat(
 
 def safe_parse_json(text: str) -> dict[str, Any]:
     """
-    Parse JSON an toàn, tự động dọn dẹp markdown và khắc phục lỗi LaTeX escape:
-    Khi Gemini sinh công thức toán như \frac, \cdot... json.loads thường lỗi Invalid \escape.
-    Hàm này tự động chuẩn hóa để nạp JSON mượt mà 100%.
+    Parse JSON trả về từ model: bỏ khung markdown và escape lại dấu gạch chéo trong công thức LaTeX
+    (ví dụ \\frac, \\cdot) để json.loads không bị lỗi cú pháp.
     """
     import re
     clean_text = text.strip()

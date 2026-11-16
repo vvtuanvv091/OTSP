@@ -82,7 +82,7 @@
     font-size: 1.15rem;
 }
 
-/* Đảm bảo ảnh đại diện luôn luôn là 40x40 tròn, không bao giờ bị vỡ tràn giao diện */
+/* Cố định kích thước ảnh đại diện tròn 40x40 để không bị méo */
 img.student-sidebar-avatar,
 .student-sidebar-avatar img {
     width: 40px !important;

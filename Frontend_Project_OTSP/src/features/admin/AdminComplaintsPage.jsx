@@ -31,7 +31,7 @@ export default function AdminComplaintsPage() {
   const [page, setPage] = useState(1);
   const [reload, setReload] = useState(0);
 
-  // Tự động làm mới khiếu nại theo thời gian thực (Zero-Reload)
+  // Tự làm mới danh sách khiếu nại khi có cập nhật qua SignalR
   useSignalREvent('ComplaintStatusChanged', () => setReload((r) => r + 1));
   useSignalREvent('AdminComplaintUpdated', () => setReload((r) => r + 1));
   const [loading, setLoading] = useState(true);

@@ -3,12 +3,12 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Backend_Project_OTSP.Models
 {
-    // Bao cao thng ke do admin 
+    // Báo cáo thống kê do admin tạo
     public class StatisticReport
     {
         [Key]
         public int Id { get; set; }
-        //loi thong ke: doanh thu, so gia su/hoc vien, ti le ghep noi...
+        // Loại thống kê: doanh thu, số gia sư/học viên, tỉ lệ ghép nối...
         [Required]
         public string ReportType { get; set; } = "";
         public DateOnly FromDate { get; set; }

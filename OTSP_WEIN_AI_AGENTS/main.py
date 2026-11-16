@@ -30,7 +30,7 @@ app = FastAPI(
 
 @app.middleware("http")
 async def add_utf8_charset(request: Request, call_next):
-    """Bảo đảm mọi phản hồi JSON đều trả về charset=utf-8 hiển thị tiếng Việt mượt mà"""
+    """Bổ sung charset=utf-8 cho phản hồi JSON để hiển thị đúng tiếng Việt."""
     response = await call_next(request)
     content_type = response.headers.get("content-type", "")
     if content_type.startswith("application/json") and "charset=" not in content_type:
@@ -69,7 +69,7 @@ class AgentChatRequest(BaseModel):
 
 @app.on_event("startup")
 def on_startup():
-    """Khởi động server: Nạp trước dữ liệu DB vào RAM (Gia sư, Lớp học, Tin tức, Tài liệu) để tìm kiếm < 1ms"""
+    """Khi server khởi động, nạp trước dữ liệu gia sư, lớp học, tin tức, tài liệu từ DB vào cache RAM."""
     logger.info("Server đang khởi động: Nạp trước dữ liệu vào RAM...")
     warmup_cache()
 
@@ -86,17 +86,15 @@ def health():
     return {"status": "healthy"}
 
 # =============================================================================
-# ENDPOINT 1: Master Autonomous AI Agent Chat (Chatbot tự hành điều khiển Web)
+# ENDPOINT 1: Trò chuyện trợ lý AI chung
 # =============================================================================
 @app.post("/v1/agent/chat", response_model=AgentResponse, dependencies=[Depends(verify_internal_key)])
 def agent_chat_endpoint(req: AgentChatRequest):
     """
-    Tiếp nhận request từ Backend .NET, chuyển vào luồng Agent workflow xử lý:
-    - Nhận diện cá nhân hóa theo userRole và userName
-    - Tra cứu lịch học sắp tới (upcomingSessions)
-    - Tự động điều hướng trang web (uiAction)
-    - Tra cứu Tin tức và Tài liệu học tập từ RAM
-    - Nhớ lịch sử hội thoại (conversationHistory)
+    Nhận request từ Backend .NET và chạy luồng xử lý chat:
+    - Cá nhân hóa theo userRole, userName và lịch học sắp tới
+    - Tra cứu tin tức, tài liệu từ cache trong RAM
+    - Trả về gợi ý điều hướng (uiAction) kèm giữ ngữ cảnh hội thoại
     """
     result = run_agent_workflow(
         user_message=req.message,
@@ -110,7 +108,7 @@ def agent_chat_endpoint(req: AgentChatRequest):
     return result
 
 # =============================================================================
-# ENDPOINT 2: Study Assistant (Trợ lý giải bài tập sư phạm chuyên sâu)
+# ENDPOINT 2: Trợ lý hỗ trợ giải bài tập
 # =============================================================================
 @app.post("/v1/study-assistant", response_model=StudyAssistantResponse, dependencies=[Depends(verify_internal_key)])
 def study_assistant_endpoint(req: StudyAssistantRequest):
@@ -129,7 +127,7 @@ def study_assistant_endpoint(req: StudyAssistantRequest):
     )
 
 # =============================================================================
-# ENDPOINT 3: Tutor Certificate OCR & Verification (AI Soi và Thẩm định bằng cấp)
+# ENDPOINT 3: Đọc ảnh và gợi ý kiểm tra bằng cấp gia sư
 # =============================================================================
 @app.post("/v1/tutor/verify-certificate", response_model=VerifyCertificateResponse, dependencies=[Depends(verify_internal_key)])
 def verify_certificate_endpoint(req: VerifyCertificateRequest):

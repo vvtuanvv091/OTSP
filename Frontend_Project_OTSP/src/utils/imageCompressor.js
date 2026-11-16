@@ -1,8 +1,6 @@
 /**
- * Tiện ích nén ảnh phía client (Client-side Image Compressor)
- * Giúp tối ưu tốc độ tải lên máy chủ lên tới 10-20 lần bằng cách nén ảnh
- * từ 5-15 MB (ảnh chụp smartphone) xuống còn 200-400 KB mà vẫn giữ nguyên độ nét chuẩn HD (1920px)
- * để AI OCR có thể đọc chuẩn từng chữ số, con dấu và thông tin bằng cấp.
+ * Tiện ích nén ảnh trên trình duyệt trước khi upload
+ * Thu nhỏ ảnh dung lượng lớn (tối đa cạnh 1920px) để tải lên nhanh hơn nhưng vẫn đủ nét cho OCR đọc bằng cấp.
  */
 
 export async function compressImageFile(file, options = {}) {

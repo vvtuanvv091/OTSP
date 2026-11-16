@@ -195,7 +195,7 @@ public class AuthControllerTests
     [Fact]
     public async Task GetCurrentUser_WhenNotAuthenticated_ReturnsUnauthorized()
     {
-        // Arrange: controller has no User claims
+        // Chuẩn bị: controller chưa có thông tin User claims
         var controller = CreateController();
         controller.ControllerContext = new ControllerContext
         {

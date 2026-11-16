@@ -95,7 +95,7 @@ export default function StudentLayout({ children }) {
               </div>
             </div>
 
-            {/* Nút đóng thanh bên - CHỈ hiển thị trên mobile khi mở drawer, ẩn hoàn toàn trên Laptop/Desktop */}
+            {/* Nút đóng thanh bên (chỉ hiện trên mobile khi mở drawer) */}
             <button
               type="button"
               className="student-sidebar-close-btn d-lg-none"

@@ -35,7 +35,7 @@ export default function TutorProfilePage() {
   const [error, setError] = useState('');
   const [reloadKey, setReloadKey] = useState(0);
 
-  // Tự động cập nhật hồ sơ khi Admin phê duyệt hoặc từ chối theo thời gian thực (Zero-Reload)
+  // Tự tải lại hồ sơ khi admin duyệt hoặc từ chối qua SignalR
   useSignalREvent('TutorApprovalStatusChanged', () => setReloadKey((k) => k + 1));
 
 
@@ -220,7 +220,7 @@ export default function TutorProfilePage() {
     setError('');
 
     try {
-      // Tối ưu nén ảnh avatar phía client trước khi upload
+      // Nén ảnh avatar trước khi upload
       const optimizedFile = await compressImageFile(file, { maxWidth: 600, maxHeight: 600, quality: 0.85 });
       const res = await tutorApi.uploadAvatar(optimizedFile);
       if (res.data?.avatarUrl) {
@@ -289,7 +289,7 @@ export default function TutorProfilePage() {
     setError('');
 
     try {
-      // Tối ưu nén ảnh bằng cấp phía client (chuẩn 1920px giữ nguyên từng con số, dấu mộc, chữ ký)
+      // Nén ảnh bằng cấp trước khi upload để tải nhanh mà vẫn giữ độ nét cho OCR
       const optimizedFile = await compressImageFile(qualFile, { maxWidth: 1920, maxHeight: 1920, quality: 0.82 });
       const formData = new FormData();
       formData.append('title', qualTitle.trim());

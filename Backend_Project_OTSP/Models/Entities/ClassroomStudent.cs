@@ -2,7 +2,7 @@ using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 namespace Backend_Project_OTSP.Models
 {
-    //bảng trung gian học viên - lớp học, để quản lý học viên trong lớp học
+    // Bảng trung gian giữa học viên và lớp học
     public class ClassroomStudent
     {
         [ForeignKey(nameof(Classroom))]

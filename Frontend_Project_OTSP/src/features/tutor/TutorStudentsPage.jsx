@@ -119,7 +119,7 @@ export default function TutorStudentsPage() {
         </div>
       ) : (
         <>
-          {/* ==================== DESKTOP TABLE VIEW (>= 768px) ==================== */}
+          {/* ==================== BẢNG TRÊN DESKTOP (>= 768px) ==================== */}
           <div className="d-none d-md-block tutor-card-table-wrapper">
             <table className="tutor-custom-table">
               <thead>
@@ -238,7 +238,7 @@ export default function TutorStudentsPage() {
             </table>
           </div>
 
-          {/* ==================== MOBILE CARD VIEW (< 768px) ==================== */}
+          {/* ==================== THẺ TRÊN MOBILE (< 768px) ==================== */}
           <div className="d-block d-md-none tutor-mobile-list">
             {students.map((student, idx) => (
               <div key={`${student.studentId || 's'}-${student.classroomId || student.requestId || idx}`} className="tutor-mobile-card mb-3 p-3 border rounded-3 bg-white shadow-sm">

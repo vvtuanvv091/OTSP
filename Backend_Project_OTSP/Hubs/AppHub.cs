@@ -8,13 +8,12 @@ using Backend_Project_OTSP.Services.Common;
 namespace Backend_Project_OTSP.Hubs;
 
 /// <summary>
-/// Unified Real-time Application Hub (Central Gateway).
-/// Quản lý duy nhất 1 kết nối WebSocket cho toàn bộ hệ thống OTSP:
-/// - Trạng thái trực tuyến (Presence / Online - Offline)
-/// - Kênh thông báo cá nhân (user:{userId}) và phân quyền (role:admin, role:tutor, role:student)
-/// - Phòng theo dõi thanh toán học phí (payment:{paymentId})
-/// - Phòng lớp học & lịch học (classroom:{classroomId})
-/// - Nhắn tin thời gian thực (Direct Chat & Classroom Chat)
+/// Hub SignalR dùng chung cho toàn hệ thống OTSP qua 1 kết nối WebSocket:
+/// - Theo dõi trạng thái online/offline (Presence)
+/// - Kênh thông báo cá nhân (user:{userId}) và theo vai trò (role:admin, role:tutor, role:student)
+/// - Theo dõi thanh toán học phí (payment:{paymentId})
+/// - Kênh lớp học & lịch học (classroom:{classroomId})
+/// - Nhắn tin trực tiếp 1-1 và chat nhóm lớp học
 /// </summary>
 [Authorize(Roles = AppRoles.AllAuthenticated)]
 public class AppHub : Hub
@@ -28,7 +27,7 @@ public class AppHub : Hub
         _presenceService = presenceService;
     }
 
-    #region 1. Connection Lifecycle & Presence Management
+    #region 1. Quản lý kết nối & trạng thái trực tuyến
 
     public override async Task OnConnectedAsync()
     {
@@ -85,7 +84,7 @@ public class AppHub : Hub
 
     #endregion
 
-    #region 2. Payment Real-time Gateway
+    #region 2. Kênh cập nhật thanh toán
 
     /// <summary>
     /// Tham gia phòng theo dõi giao dịch thanh toán cụ thể.
@@ -112,7 +111,7 @@ public class AppHub : Hub
 
     #endregion
 
-    #region 3. Classroom & Schedule Real-time Gateway
+    #region 3. Kênh lớp học & lịch học
 
     /// <summary>
     /// Tham gia phòng lớp học để nhận thông báo buổi học, điểm danh, kết thúc buổi học hoặc chat chung của lớp.
@@ -144,7 +143,7 @@ public class AppHub : Hub
 
     #endregion
 
-    #region 4. Chat & Direct Messaging Real-time Gateway
+    #region 4. Kênh nhắn tin trực tiếp & lớp học
 
     public async Task JoinUserRoom(string contactUserId)
     {
@@ -195,7 +194,7 @@ public class AppHub : Hub
             // Gửi tin nhắn đến room đang mở của 2 người
             await Clients.Group(directRoom).SendAsync("ReceiveDirectMessage", message, Context.ConnectionAborted);
 
-            // Đồng thời đẩy trực tiếp đến channel user của người nhận và người gửi để nhận tin tức thì
+            // Đồng thời gửi thẳng vào kênh cá nhân của người nhận và người gửi để cập nhật ngay
             await Clients.Group($"user:{receiverUserId}").SendAsync("ReceiveDirectMessage", message, Context.ConnectionAborted);
             await Clients.Group($"user:{userId}").SendAsync("ReceiveDirectMessage", message, Context.ConnectionAborted);
 
@@ -355,7 +354,7 @@ public class AppHub : Hub
 
     #endregion
 
-    #region 5. Backward Compatibility (Theo RequestId)
+    #region 5. Tương thích ngược theo RequestId
 
     public async Task JoinConversation(int requestId)
     {

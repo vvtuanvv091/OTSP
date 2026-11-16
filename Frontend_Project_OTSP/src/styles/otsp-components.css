@@ -3,7 +3,7 @@
    Supports Light & Dark Modes, Mobile, Tablet, and Desktop Devices
    ========================================================================== */
 
-/* --- 1. THEME TOKENS & DESIGN VARIABLES --- */
+/* --- 1. BIẾN MÀU VÀ GIAO DIỆN CHỦ ĐẠO --- */
 :root,
 [data-bs-theme="light"] {
     --otsp-card-bg: #ffffff;
@@ -25,7 +25,7 @@
     --otsp-card-hover-shadow: 0 20px 40px -10px rgba(219, 48, 58, 0.12), 0 8px 16px -4px rgba(24, 39, 32, 0.06);
     --otsp-header-bg: rgba(255, 255, 255, 0.94);
     --otsp-header-border: rgba(30, 41, 59, 0.07);
-    /* Mentor template overrides for light theme */
+    /* Ghi đè màu template Mentor cho chế độ sáng */
     --background-color: #ffffff !important;
     --surface-color: #ffffff !important;
     --heading-color: #1e2923 !important;
@@ -59,7 +59,7 @@
     --otsp-card-hover-shadow: 0 20px 40px -10px rgba(230, 69, 79, 0.25);
     --otsp-header-bg: rgba(18, 25, 21, 0.92);
     --otsp-header-border: rgba(255, 255, 255, 0.08);
-    /* Mentor template overrides for dark theme */
+    /* Ghi đè màu template Mentor cho chế độ tối */
     --background-color: #14152D !important;
     --surface-color: #1B1C38 !important;
     --heading-color: #f1f7f4 !important;
@@ -73,7 +73,7 @@
     --nav-dropdown-hover-color: #ff6b74 !important;
 }
 
-/* Text Muted Helpers for Contrast in Both Modes */
+/* Lớp chữ phụ đảm bảo độ tương phản ở cả hai chế độ sáng/tối */
 [data-bs-theme="light"] .text-muted {
     color: #526058 !important;
 }
@@ -126,12 +126,12 @@
 [data-bs-theme="dark"] .auth-page .text-body-secondary,
 [data-bs-theme="dark"] .auth-page .text-secondary { color: #c0cad7 !important; }
 
-/* Global Smooth Transitions */
+/* Hiệu ứng chuyển đổi màu nền mượt */
 body, .header, .card, .btn, .features-item, .course-item, .member, .stats-item, .why-box, .icon-box {
     transition: background-color 0.25s ease, border-color 0.25s ease, color 0.25s ease, box-shadow 0.25s ease;
 }
 
-/* --- 2. HEADER & NAVIGATION ENHANCEMENTS --- */
+/* --- 2. THANH HEADER VÀ ĐIỀU HƯỚNG --- */
 .header {
     padding: 0;
     background: var(--otsp-header-bg) !important;
@@ -227,7 +227,7 @@ body, .header, .card, .btn, .features-item, .course-item, .member, .stats-item, 
     color: var(--otsp-text-main);
 }
 
-/* User Account & Notifications in Header */
+/* Nút tài khoản và thông báo trên header */
 .header-account-tools {
     display: inline-flex;
     align-items: center;
@@ -317,7 +317,7 @@ body, .header, .card, .btn, .features-item, .course-item, .member, .stats-item, 
     white-space: nowrap;
 }
 
-/* Dropdowns in Header */
+/* Menu thả xuống trên header */
 .header-notification-menu,
 .header-user-menu {
     border: 1px solid var(--otsp-border);
@@ -546,7 +546,7 @@ body, .header, .card, .btn, .features-item, .course-item, .member, .stats-item, 
         background: rgba(239, 68, 68, 0.1) !important;
     }
 
-/* Nav Menu polish */
+/* Tinh chỉnh menu điều hướng */
 .navmenu a {
     font-weight: 600;
     letter-spacing: 0.2px;
@@ -569,7 +569,7 @@ body, .header, .card, .btn, .features-item, .course-item, .member, .stats-item, 
         box-shadow: 0 8px 20px var(--otsp-primary-glow) !important;
     }
 
-/* --- 3. HERO SECTION REDESIGN --- */
+/* --- 3. PHẦN HERO ĐẦU TRANG --- */
 .otsp-hero {
     position: relative;
     min-height: min(720px, calc(100vh - 100px));
@@ -736,7 +736,7 @@ body, .header, .card, .btn, .features-item, .course-item, .member, .stats-item, 
         font-size: 16px;
     }
 
-/* Floating Quick Search Bar */
+/* Thanh tìm kiếm nhanh nổi trên banner */
 .otsp-floating-search {
     margin-top: -38px;
     position: relative;
@@ -770,7 +770,7 @@ body, .header, .card, .btn, .features-item, .course-item, .member, .stats-item, 
             background: var(--otsp-surface);
         }
 
-/* --- 4. COUNTS / STATS SECTION (MENTOR STYLE) --- */
+/* --- 4. KHỐI SỐ LIỆU THỐNG KÊ --- */
 .counts {
     padding: 30px 0 35px;
     background-color: var(--otsp-bg);
@@ -849,7 +849,7 @@ body, .header, .card, .btn, .features-item, .course-item, .member, .stats-item, 
     font-weight: 600;
 }
 
-/* --- 5. WHY US & ABOUT SECTIONS --- */
+/* --- 5. KHỐI LÝ DO CHỌN & GIỚI THIỆU --- */
 .why-us {
     padding: 60px 0;
     background: var(--otsp-surface-subtle);
@@ -955,7 +955,7 @@ body, .header, .card, .btn, .features-item, .course-item, .member, .stats-item, 
             margin: 0;
         }
 
-/* About Section */
+/* Phần giới thiệu */
 .about {
     padding: 70px 0;
     background: var(--otsp-bg);
@@ -984,7 +984,7 @@ body, .header, .card, .btn, .features-item, .course-item, .member, .stats-item, 
         flex-shrink: 0;
     }
 
-/* --- 6. SUBJECTS SECTION REDESIGN --- */
+/* --- 6. KHỐI DANH SÁCH MÔN HỌC --- */
 .features {
     padding: 70px 0;
     background: var(--otsp-bg);
@@ -1016,7 +1016,7 @@ body, .header, .card, .btn, .features-item, .course-item, .member, .stats-item, 
         font-family: var(--heading-font);
     }
 
-/* ==================== MENTOR FEATURES SECTION (SCREENSHOT 2) ==================== */
+/* ==================== KHỐI TÍNH NĂNG NỔI BẬT ==================== */
 .features {
     padding: 50px 0 70px;
     background: var(--otsp-bg);
@@ -1069,7 +1069,7 @@ body, .header, .card, .btn, .features-item, .course-item, .member, .stats-item, 
                 color: var(--otsp-primary) !important;
             }
 
-/* ==================== MENTOR COURSES SECTION (SCREENSHOT 1) ==================== */
+/* ==================== KHỐI LỚP HỌC ĐANG MỞ ==================== */
 .courses {
     padding: 60px 0 80px;
     background: var(--otsp-surface-subtle);
@@ -1213,7 +1213,7 @@ body, .header, .card, .btn, .features-item, .course-item, .member, .stats-item, 
                 color: var(--otsp-primary); /* ĐỎ! */
             }
 
-/* ==================== MENTOR TRAINERS SECTION ==================== */
+/* ==================== KHỐI GIA SƯ TIÊU BIỂU ==================== */
 .trainers-index {
     padding: 60px 0 80px;
     background: var(--otsp-bg);
@@ -1361,7 +1361,7 @@ body, .header, .card, .btn, .features-item, .course-item, .member, .stats-item, 
         color: #fff;
     }
 
-/* --- 9. HOW IT WORKS / 4 STEPS --- */
+/* --- 9. KHỐI 4 BƯỚC BẮT ĐẦU --- */
 .steps-section {
     padding: 70px 0;
     background: var(--otsp-surface-subtle);
@@ -1413,7 +1413,7 @@ body, .header, .card, .btn, .features-item, .course-item, .member, .stats-item, 
     margin: 0;
 }
 
-/* --- 10. CTA BANNER SECTION --- */
+/* --- 10. KHỐI BANNER KÊU GỌI HÀNH ĐỘNG --- */
 .otsp-cta-section {
     padding: 60px 0 80px;
     background: var(--otsp-bg);
@@ -1445,7 +1445,7 @@ body, .header, .card, .btn, .features-item, .course-item, .member, .stats-item, 
         line-height: 1.7;
     }
 
-/* --- 11. FOOTER REFINEMENT --- */
+/* --- 11. TINH CHỈNH CHÂN TRANG --- */
 .footer {
     background: var(--otsp-surface) !important;
     border-top: 1px solid var(--otsp-border);
@@ -1557,7 +1557,7 @@ body, .header, .card, .btn, .features-item, .course-item, .member, .stats-item, 
             transform: translateY(-2px);
         }
 
-/* --- 12. RESPONSIVE BREAKPOINTS (Mobile & Tablet) --- */
+/* --- 12. RESPONSIVE CHO MOBILE & TABLET --- */
 @media (max-width: 1199px) {
     body:not(.mobile-nav-active) .navmenu > ul {
         display: none !important;
@@ -1879,7 +1879,7 @@ body, .header, .card, .btn, .features-item, .course-item, .member, .stats-item, 
 
 
 
-/* ==================== 1-ROW COMPACT HEADER & ACTIONS ==================== */
+/* ==================== HEADER 1 HÀNG GỌN VÀ NÚT THAO TÁC ==================== */
 .header-main-nav {
     display: flex;
     flex-direction: column;
@@ -1925,7 +1925,7 @@ body, .header, .card, .btn, .features-item, .course-item, .member, .stats-item, 
     width: 100% !important;
 }
 
-/* ==================== RESPONSIVE HEADER & DRAWER (< 1200px) ==================== */
+/* ==================== HEADER & MENU NGĂN KÉO TRÊN MÀN HÌNH NHỎ (< 1200px) ==================== */
 @media (max-width: 1199px) {
     .header,
     .header.sticky-top,
@@ -1967,7 +1967,7 @@ body, .header, .card, .btn, .features-item, .course-item, .member, .stats-item, 
         align-items: center !important;
     }
 
-    /* Hide standard nav links on mobile/tablet unless drawer is opened */
+    /* Ẩn danh sách menu trên mobile/tablet cho tới khi mở drawer */
     .navmenu > ul {
         display: none !important;
     }
@@ -1991,7 +1991,7 @@ body, .header, .card, .btn, .features-item, .course-item, .member, .stats-item, 
         color: #f8fafc !important;
     }
 
-    /* Mobile Dropdown Menu dropping down right below header overlaying page layout */
+    /* Menu thả xuống trên mobile hiển thị ngay dưới header */
     .mobile-nav-active .navmenu > ul {
         display: flex !important;
         flex-direction: column !important;
@@ -2021,7 +2021,7 @@ body, .header, .card, .btn, .features-item, .course-item, .member, .stats-item, 
         box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6) !important;
     }
 
-    /* Nested submenus inside mobile dropdown */
+    /* Menu con lồng bên trong menu mobile */
     .mobile-nav-active .navmenu .dropdown > ul {
         display: none !important;
         position: static !important;
@@ -2128,7 +2128,7 @@ body, .header, .card, .btn, .features-item, .course-item, .member, .stats-item, 
 }
 
 
-/* ==================== HEADER TOP TAGLINE & RIGHT TOOLS ==================== */
+/* ==================== DÒNG KHẨU HIỆU VÀ CÔNG CỤ BÊN PHẢI HEADER ==================== */
 .header-top-tagline {
     font-size: 13.5px;
     font-weight: 500;
@@ -2151,7 +2151,7 @@ body, .header, .card, .btn, .features-item, .course-item, .member, .stats-item, 
 }
 
 
-/* ==================== OTSP MODERN PAGINATION BAR ==================== */
+/* ==================== THANH PHÂN TRANG OTSP ==================== */
 .pagination-modern {
     display: flex;
     align-items: center;
@@ -2221,7 +2221,7 @@ body, .header, .card, .btn, .features-item, .course-item, .member, .stats-item, 
     opacity: 0.4;
 }
 
-/* ==================== GLOBAL HEADER USER PILL & AVATAR FIX ==================== */
+/* ==================== ĐỊNH DẠNG NÚT TÀI KHOẢN VÀ ẢNH ĐẠI DIỆN TRÊN HEADER ==================== */
 .header-account-tools {
     display: inline-flex !important;
     align-items: center !important;
@@ -2335,7 +2335,7 @@ body, .header, .card, .btn, .features-item, .course-item, .member, .stats-item, 
     line-height: 1 !important;
 }
 
-/* Custom spacing & filter pill styling */
+/* Khoảng cách và kiểu nút lọc */
 .nav-filter {
     display: flex !important;
     flex-wrap: wrap !important;
@@ -2362,7 +2362,7 @@ body, .header, .card, .btn, .features-item, .course-item, .member, .stats-item, 
     gap: 0.35rem !important;
 }
 
-/* ==================== CLS (CUMULATIVE LAYOUT SHIFT) STABILIZATION ==================== */
+/* ==================== GIỮ ỔN ĐỊNH BỐ CỤC CHỐNG GIẬT TRANG ==================== */
 i.bi {
     display: inline-block;
     min-width: 1em;

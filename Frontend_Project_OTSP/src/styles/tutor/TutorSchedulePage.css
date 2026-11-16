@@ -87,7 +87,7 @@
   font-weight: 600;
 }
 
-/* Clean slot box */
+/* Ô khung giờ bo góc */
 .schedule-cell-slot {
   position: relative;
   display: flex;
@@ -134,7 +134,7 @@
   color: var(--tutor-accent);
 }
 
-/* Teaching Session Card */
+/* Thẻ buổi dạy */
 .session-card-item {
   display: flex;
   flex-direction: column;
@@ -213,7 +213,7 @@
   gap: 4px;
 }
 
-/* Mobile day tabs */
+/* Tab chọn ngày trên mobile */
 .tutor-schedule-page .availability-mobile-day-picker { display: none; }
 @media (max-width: 767.98px) {
   .tutor-schedule-page .availability-mobile-day-picker {

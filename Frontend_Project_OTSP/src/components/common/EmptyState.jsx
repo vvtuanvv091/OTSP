@@ -1,8 +1,7 @@
 import { Link } from 'react-router-dom';
 
 /**
- * EmptyState Component chuẩn hóa toàn hệ thống OTSP
- * Thay thế 85 biến thể empty state tự chế rải rác
+ * Component hiển thị trạng thái trống dùng chung cho các trang/danh sách trong OTSP.
  */
 export default function EmptyState({
   icon = 'bi-inbox',

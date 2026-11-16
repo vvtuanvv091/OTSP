@@ -101,7 +101,7 @@ namespace Backend_Project_OTSP.Data
                 .HasIndex(x => new { x.TutorId, x.Type, x.Status })
                 .HasDatabaseName("IX_Classrooms_TutorId_Type_Status");
 
-            // PostgreSQL system column: concurrency token shadow property, không thêm cột vào Model.
+            // Cột hệ thống của PostgreSQL dùng làm concurrency token (shadow property, không thêm vào model).
             b.Entity<Classroom>()
                 .Property<uint>("xmin")
                 .HasColumnName("xmin")

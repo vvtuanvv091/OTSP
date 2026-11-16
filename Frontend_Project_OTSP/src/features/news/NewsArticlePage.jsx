@@ -124,7 +124,7 @@ export default function NewsArticlePage() {
   return (
     <main className="news-detail-page">
       <div className="container news-detail-container">
-        {/* Breadcrumb */}
+        {/* Điều hướng trang */}
         <nav aria-label="breadcrumb" className="news-detail-breadcrumb">
           <Link to="/">Trang chủ</Link>
           <i className="bi bi-chevron-right" />

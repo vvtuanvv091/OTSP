@@ -32,7 +32,7 @@ namespace Backend_Project_OTSP.Services.Common
             new TimeBlock(21, 23)
         };
 
-        // Bảng tra cứu trực tiếp O(1) theo giờ (0-23h) tránh lặp tuyến tính và cấp phát bộ nhớ
+        // Mảng đánh dấu theo từng giờ trong ngày (0-23h) để kiểm tra nhanh lịch bận
         private readonly TimeBlock?[] _byStart = new TimeBlock?[24];
         private readonly TimeBlock?[] _containing = new TimeBlock?[24];
 

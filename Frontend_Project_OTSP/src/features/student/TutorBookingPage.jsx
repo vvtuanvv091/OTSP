@@ -222,7 +222,7 @@ export default function TutorBookingPage() {
     (classroom) => classroom.classroomId === Number(selectedClassroomId)
   );
 
-  // Bảng tra cứu O(1) CHỈ dựa trên availableSlots thực tế từ máy chủ (đã trừ lịch bận & xung đột)
+  // Gom các khung giờ rảnh máy chủ trả về (đã loại lịch bận) thành map để tra cứu nhanh theo ngày và giờ
   const slotLookupMap = useMemo(() => {
     const map = new Map();
     availableSlots.forEach((slot) => {
@@ -248,7 +248,7 @@ export default function TutorBookingPage() {
     return map;
   }, [availableSlots]);
 
-  // Tìm khung giờ rảnh thực tế cho từng ô (không dùng fallback lịch tuần để tránh báo xanh ảo khi gia sư đang bận)
+  // Tìm khung giờ rảnh thực tế cho từng ô (không lấy theo lịch tuần cố định để tránh báo nhầm khi gia sư đã có lịch)
   const getSlotForCell = (day, block) => {
     const found = slotLookupMap.get(`${day.fullDateIso}_${block.start}`);
     if (!found) return null;
@@ -553,10 +553,10 @@ export default function TutorBookingPage() {
 
       {/* Khung bố cục hai cột: Lịch rảnh gia sư & Biểu mẫu đăng ký */}
       <div className="row g-4">
-        {/* ================= LEFT COLUMN (~68%) ================= */}
+        {/* ================= CỘT TRÁI (~68%) ================= */}
         <div className="col-lg-8">
           <div className="d-flex flex-column gap-4">
-            {/* 1. Profile Header Card */}
+            {/* 1. Thông tin tổng quan gia sư */}
             <div
               className="card border rounded-3 p-4 shadow-sm bg-white"
               style={{
@@ -628,7 +628,7 @@ export default function TutorBookingPage() {
                 </div>
               </div>
 
-              {/* 3 Stats Boxes */}
+              {/* 3 ô thống kê nhanh */}
               <div className="row g-2 mt-3 pt-3 border-top">
                 <div className="col-4">
                   <div className="p-2.5 border rounded-3 bg-light d-flex align-items-center gap-2.5">
@@ -952,10 +952,10 @@ export default function TutorBookingPage() {
               ) : (
                 <div className="row g-3">
                   {groupClasses.map((cls) => (
-                    <div key={cls.id} className="col-md-6">
-                      <div className="card border rounded-3 h-100 overflow-hidden shadow-xs">
+                    <div key={cls.id} className="col-md-6 min-w-0">
+                      <div className="card border rounded-3 h-100 overflow-hidden shadow-xs min-w-0">
                         <img
-                          src={resolveAssetUrl(cls.coverImageUrl) || '/assets/img/course-1.jpg'}
+                          src={resolveAssetUrl(cls.coverImageUrl)}
                           alt={cls.name}
                           className="w-100"
                           style={{ height: 160, objectFit: 'cover' }}
@@ -964,18 +964,22 @@ export default function TutorBookingPage() {
                             e.currentTarget.src = '/assets/img/course-1.jpg';
                           }}
                         />
-                        <div className="card-body p-3 d-flex flex-column justify-content-between">
-                          <div>
-                            <div className="d-flex justify-content-between align-items-center mb-2">
-                              <span className="badge bg-danger text-white rounded-pill px-2.5 py-1 small">
+                        <div className="card-body p-3 d-flex flex-column justify-content-between min-w-0">
+                          <div className="min-w-0">
+                            <div className="d-flex flex-wrap justify-content-between align-items-center gap-1 mb-2 min-w-0">
+                              <span
+                                className="badge bg-danger text-white rounded-pill px-2.5 py-1 small text-truncate"
+                                style={{ maxWidth: '100%' }}
+                                title={`${cls.subjectName} · ${cls.gradeLevelName}`}
+                              >
                                 {cls.subjectName} · {cls.gradeLevelName}
                               </span>
-                              <span className="fw-bold text-danger">{formatMoney(cls.fee)} đ</span>
+                              <span className="fw-bold text-danger flex-shrink-0">{formatMoney(cls.fee)} đ</span>
                             </div>
-                            <h3 className="h6 fw-bold mb-1 text-dark">{cls.name}</h3>
-                            <p className="text-secondary small mb-2">{cls.description || 'Chưa có mô tả chi tiết cho lớp học này.'}</p>
+                            <h3 className="h6 fw-bold mb-1 text-dark text-break">{cls.name}</h3>
+                            <p className="text-secondary small mb-2 text-break">{cls.description || 'Chưa có mô tả chi tiết cho lớp học này.'}</p>
                             {cls.scheduleSummary && (
-                              <div className="p-2 border rounded-2 bg-light small mb-2 text-dark">
+                              <div className="p-2 border rounded-2 bg-light small mb-2 text-dark text-break">
                                 <i className="bi bi-calendar-event text-danger me-1"></i>
                                 <strong>Lịch học:</strong> {cls.scheduleSummary}
                               </div>
@@ -1003,11 +1007,11 @@ export default function TutorBookingPage() {
                           </div>
 
                           <div>
-                            <div className="d-flex justify-content-between align-items-center pt-2 border-top small text-secondary mb-2">
-                              <span>
-                                <i className="bi bi-people me-1"></i> {cls.studentCount ?? 0}/{cls.maxStudents || '—'} học viên
+                            <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 pt-2 border-top small text-secondary mb-2">
+                              <span className="flex-shrink-0" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                                <i className="bi bi-people me-1"></i> {cls.studentCount ?? 0}/{cls.maxStudents || '—'}
                               </span>
-                              <span className={cls.canJoin !== false ? 'text-success fw-semibold' : 'text-danger fw-semibold'}>
+                              <span className={`text-end text-break ${cls.canJoin !== false ? 'text-success fw-semibold' : 'text-danger fw-semibold'}`}>
                                 {cls.canJoin !== false
                                   ? (cls.availableSeats !== undefined
                                     ? `Còn ${cls.availableSeats} chỗ`
@@ -1090,10 +1094,10 @@ export default function TutorBookingPage() {
           </div>
         </div>
 
-        {/* ================= RIGHT COLUMN (~32%) ================= */}
+        {/* ================= CỘT PHẢI (~32%) ================= */}
         <div className="col-lg-4">
           <div className="d-flex flex-column gap-4 sticky-top" style={{ top: 88, zIndex: 10 }}>
-            {/* Card 1: Gửi yêu cầu kết nối */}
+            {/* Khối 1: Gửi yêu cầu kết nối */}
             <div id="booking-form-card" className="card border rounded-3 p-4 shadow-sm bg-white" style={{ borderColor: 'rgba(219, 48, 58, 0.25)' }}>
               <div className="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom">
                 <i className="bi bi-send-check-fill text-danger fs-4"></i>
@@ -1103,7 +1107,7 @@ export default function TutorBookingPage() {
                 </div>
               </div>
 
-              {/* Stepper bar (1 Gửi yêu cầu —— 2 Đặt lịch thử —— 3 Vào lớp) */}
+              {/* Thanh các bước (1 Gửi yêu cầu - 2 Đặt lịch thử - 3 Vào lớp) */}
               <div className="d-flex align-items-center justify-content-between mb-3.5 pb-2.5 border-bottom">
                 <div className="d-flex align-items-center gap-1.5">
                   <span
@@ -1548,7 +1552,7 @@ export default function TutorBookingPage() {
               )}
             </div>
 
-            {/* Card 2: Trò chuyện (Widget) */}
+            {/* Khối 2: Khung nhắn tin nhanh */}
             <div className="card border rounded-3 p-4 shadow-sm bg-white">
               <div className="d-flex align-items-center justify-content-between mb-2">
                 <h3 className="h6 fw-bold mb-0 text-dark d-flex align-items-center gap-2">

@@ -12,7 +12,7 @@ public sealed class ClassSessionJoinResultDto
     public string? RoomName { get; init; }
     public string? DisplayName { get; init; }
 
-    public static ClassSessionJoinResultDto Ok(int sessionId, string roomName, string displayName, string message = "Tham gia phòng học thành công.")     // => new()
+    public static ClassSessionJoinResultDto Ok(int sessionId, string roomName, string displayName, string message = "Tham gia phòng học thành công.")
     {
         ClassSessionJoinResultDto result= new ClassSessionJoinResultDto()
         {

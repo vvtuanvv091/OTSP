@@ -123,7 +123,7 @@ export default function RoomPage() {
     setPopupBlocked(false);
     meetingWindowRef.current = win;
     setMeetingOpened(true);
-    try { win.focus(); } catch { /* ignore */ }
+    try { win.focus(); } catch { /* bỏ qua nếu trình duyệt chặn focus */ }
   }, [meetingUrl, sessionId]);
 
   // 3. Xử lý khi buổi học kết thúc
@@ -132,7 +132,7 @@ export default function RoomPage() {
     endedRef.current = true;
     setSessionEnded(true);
     // Đóng tab họp nếu do chính trang này mở (có thể bị trình duyệt từ chối đối với domain khác)
-    try { meetingWindowRef.current?.close(); } catch { /* ignore */ }
+    try { meetingWindowRef.current?.close(); } catch { /* bỏ qua nếu cửa sổ đã đóng */ }
 
     if (isTutor) {
       let sec = 10;
@@ -178,7 +178,7 @@ export default function RoomPage() {
     return undefined;
   }, [session?.classroomId, joinClassroom, leaveClassroom]);
 
-  // Nhận thông báo buổi học kết thúc theo thời gian thực từ SignalR dùng chung (0 delay)
+  // Lắng nghe sự kiện buổi học kết thúc qua SignalR để đồng bộ trạng thái ngay
   useSignalREvent('ClassSessionEnded', (data) => {
     const id = data?.sessionId ?? data?.classSessionId;
     if (Number(id) === Number(sessionId)) triggerSessionEnded();
@@ -222,7 +222,7 @@ export default function RoomPage() {
           keepalive: true,
           headers: { Authorization: `Bearer ${token}` },
         });
-      } catch { /* ignore */ }
+      } catch { /* bỏ qua lỗi đóng cửa sổ phụ */ }
     };
     window.addEventListener('pagehide', sendLeave);
     return () => window.removeEventListener('pagehide', sendLeave);
@@ -248,8 +248,8 @@ export default function RoomPage() {
   };
 
   const handleLeaveRoom = async () => {
-    try { await classroomApi.leaveSession(sessionId); } catch { /* ignore */ }
-    try { meetingWindowRef.current?.close(); } catch { /* ignore */ }
+    try { await classroomApi.leaveSession(sessionId); } catch { /* bỏ qua lỗi mạng khi rời phòng */ }
+    try { meetingWindowRef.current?.close(); } catch { /* bỏ qua nếu cửa sổ đã đóng */ }
     navigate(backUrl);
   };
 

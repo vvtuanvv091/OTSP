@@ -434,13 +434,17 @@ export default function SearchPage() {
               const isFull = Boolean(c.maxStudents && (c.studentCount || 0) >= c.maxStudents);
 
               return (
-                <div key={c.id || idx} className="col-md-6 col-lg-4">
-                  <div className="card h-100 border rounded-4 shadow-sm p-3 d-flex flex-column" style={{ backgroundColor: 'var(--otsp-card-bg, #fff)' }}>
-                    <div className="d-flex justify-content-between align-items-start mb-2 flex-wrap gap-1">
-                      <span className="badge bg-danger-subtle text-danger border border-danger-subtle">
+                <div key={c.id || idx} className="col-md-6 col-lg-4 min-w-0">
+                  <div className="card h-100 border rounded-4 shadow-sm p-3 d-flex flex-column overflow-hidden min-w-0" style={{ backgroundColor: 'var(--otsp-card-bg, #fff)' }}>
+                    <div className="d-flex justify-content-between align-items-start mb-2 flex-wrap gap-1 min-w-0">
+                      <span
+                        className="badge bg-danger-subtle text-danger border border-danger-subtle text-truncate"
+                        style={{ maxWidth: '100%' }}
+                        title={`${c.subjectName} · ${c.gradeName}`}
+                      >
                         {c.subjectName} · {c.gradeName}
                       </span>
-                      <div className="d-flex gap-1">
+                      <div className="d-flex gap-1 flex-wrap">
                         {isEnrolled && (
                           <span className="badge bg-success text-white">
                             <i className="bi bi-check-circle me-1"></i>Đang học
@@ -457,9 +461,9 @@ export default function SearchPage() {
                       </div>
                     </div>
 
-                    <h5 className="fw-bold mb-2">{c.name}</h5>
+                    <h5 className="fw-bold mb-2 text-break">{c.name}</h5>
                     {c.description ? (
-                      <p className="text-secondary small mb-2 flex-grow-1 line-clamp-2">
+                      <p className="text-secondary small mb-2 flex-grow-1 line-clamp-2 text-break">
                         {c.description}
                       </p>
                     ) : (
@@ -468,24 +472,24 @@ export default function SearchPage() {
 
                     {/* Xem trước lịch học dự kiến nếu có */}
                     {c.weeklySchedules && c.weeklySchedules.length > 0 && (
-                      <div className="small text-muted mb-2 d-flex align-items-center gap-1.5 flex-wrap">
-                        <i className="bi bi-calendar-event text-danger"></i>
-                        <span>{c.weeklySchedules.map((ws) => `${ws.dayOfWeekName} (${ws.timeRange})`).join(', ')}</span>
+                      <div className="small text-muted mb-2 d-flex align-items-start gap-1.5 min-w-0">
+                        <i className="bi bi-calendar-event text-danger flex-shrink-0 mt-0.5"></i>
+                        <span className="text-break">{c.weeklySchedules.map((ws) => `${ws.dayOfWeekName} (${ws.timeRange})`).join(', ')}</span>
                       </div>
                     )}
 
-                    <div className="d-flex align-items-center gap-2 mb-3 text-secondary small">
-                      <i className="bi bi-person-circle"></i>
-                      <span>Gia sư: <strong>{c.tutorName}</strong></span>
+                    <div className="d-flex align-items-center gap-2 mb-3 text-secondary small min-w-0">
+                      <i className="bi bi-person-circle flex-shrink-0"></i>
+                      <span className="text-truncate">Gia sư: <strong>{c.tutorName}</strong></span>
                     </div>
 
-                    <div className="d-flex justify-content-between align-items-center pt-3 border-top mt-auto">
-                      <div>
+                    <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 pt-3 border-top mt-auto">
+                      <div className="min-w-0">
                         <small className="text-muted d-block">Học phí khóa học</small>
                         <strong className="text-danger fs-5">{formatPrice(c.fee)} đ</strong>
                       </div>
-                      <div className="d-flex align-items-center gap-1.5">
-                        <div className="text-muted small me-1">
+                      <div className="d-flex flex-wrap align-items-center gap-1.5 ms-auto">
+                        <div className="text-muted small me-1 flex-shrink-0" style={{ fontVariantNumeric: 'tabular-nums' }}>
                           <i className="bi bi-people me-1"></i>
                           <span>{c.studentCount || 0}{c.maxStudents ? `/${c.maxStudents}` : ''}</span>
                         </div>

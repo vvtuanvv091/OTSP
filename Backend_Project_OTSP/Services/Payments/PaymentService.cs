@@ -121,7 +121,7 @@ public class PaymentService : IPaymentService
             }
         }
 
-        // Load full payment data
+        // Nạp đầy đủ thông tin thanh toán kèm lớp học, học viên và gia sư
         var payments = await _db.Payments
             .AsNoTracking()
             .Include(p => p.Classroom).ThenInclude(c => c.Subject)
@@ -637,7 +637,7 @@ public class PaymentService : IPaymentService
 
             await _db.SaveChangesAsync(ct);
 
-            // 2.1 Bắn sự kiện SignalR Realtime tới Học viên và Gia sư qua Unified AppHub
+            // 2.1 Đẩy thông báo thanh toán thành công qua SignalR cho học viên và gia sư
             if (_appHub != null)
             {
                 var paymentEvent = new

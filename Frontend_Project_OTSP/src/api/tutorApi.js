@@ -47,7 +47,10 @@ export const tutorApi = {
   // Quản lý lớp học
   getClassrooms: (params) => axiosClient.get('/tutor/classrooms', { params }),
   getClassroom: (id) => axiosClient.get(`/tutor/classrooms/${id}`),
-  getClassroomOptions: () => axiosClient.get('/tutor/classrooms/options'),
+  getClassroomOptions: (excludeClassroomId) =>
+    axiosClient.get('/tutor/classrooms/options', {
+      params: excludeClassroomId ? { excludeClassroomId } : undefined,
+    }),
   createClassroom: (formData) => {
     if (formData instanceof FormData) {
       if (formData.has('name') && !formData.has('nameClass')) {

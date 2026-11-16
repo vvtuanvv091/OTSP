@@ -53,7 +53,7 @@ export default function AdminApprovalsPage() {
   const [page, setPage] = useState(1);
   const [reload, setReload] = useState(0);
 
-  // Cập nhật danh sách chờ duyệt tức thì khi có xét duyệt mới theo thời gian thực (Zero-Reload)
+  // Tự tải lại danh sách chờ duyệt khi có sự kiện xét duyệt qua SignalR
   useSignalREvent('TutorApprovalStatusChanged', () => setReload((v) => v + 1));
   useSignalREvent('AdminTutorApprovalProcessed', () => setReload((v) => v + 1));
   const [loading, setLoading] = useState(true);

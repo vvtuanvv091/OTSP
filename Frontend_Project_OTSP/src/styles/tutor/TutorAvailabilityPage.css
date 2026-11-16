@@ -86,7 +86,7 @@
   vertical-align: middle;
 }
 
-/* Pure button slot (Zero label/input recursion bugs) */
+/* Nút chọn khung giờ rảnh */
 button.availability-slot-btn {
   position: relative;
   display: flex;

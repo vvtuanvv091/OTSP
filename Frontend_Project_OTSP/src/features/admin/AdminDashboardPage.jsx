@@ -12,7 +12,7 @@ export default function AdminDashboardPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(new Date());
 
-  // Backend state
+  // Dữ liệu thống kê tổng quan từ backend
   const [tutorApprovalData, setTutorApprovalData] = useState(null);
   const [reconciliationData, setReconciliationData] = useState(null);
   const [aiUsageData, setAiUsageData] = useState(null);
@@ -23,7 +23,7 @@ export default function AdminDashboardPage() {
   const [classroomsCount, setClassroomsCount] = useState(0);
   const [tutorsCount, setTutorsCount] = useState(0);
 
-  // Dynamic lists from backend
+  // Các danh sách xếp hạng và giao dịch gần đây
   const [dailyMetrics, setDailyMetrics] = useState([]);
   const [topTutors, setTopTutors] = useState([]);
   const [topStudents, setTopStudents] = useState([]);
@@ -32,7 +32,7 @@ export default function AdminDashboardPage() {
   const [chartActiveSeries, setChartActiveSeries] = useState('all'); // 'all' | 'revenue' | 'ai' | 'students'
   const [hoveredIdx, setHoveredIdx] = useState(null);
 
-  // Load all data from real backend APIs
+  // Gọi API lấy dữ liệu cho trang dashboard
   const fetchDashboardData = async () => {
     try {
       await ensureVisitTracked(window.location.pathname || '/admin/dashboard');
@@ -81,7 +81,7 @@ export default function AdminDashboardPage() {
         console.warn('API /admin/dashboard/stats fallbacking:', directErr);
       }
 
-      // 2. Fallback đồng thời qua các API Backend lẻ nếu cần
+      // 2. Gọi bổ sung các API lẻ nếu API tổng hợp không trả về
       const [
         approvalsRes,
         reconRes,
@@ -138,7 +138,7 @@ export default function AdminDashboardPage() {
     await fetchDashboardData();
   };
 
-  // Tự động cập nhật số liệu Dashboard theo thời gian thực (Zero-Reload)
+  // Lắng nghe sự kiện SignalR để cập nhật lại số liệu dashboard
   useSignalREvent('PaymentStatusChanged', fetchDashboardData);
   useSignalREvent('AdminTutorApprovalProcessed', fetchDashboardData);
   useSignalREvent('AdminComplaintUpdated', fetchDashboardData);
@@ -158,7 +158,7 @@ export default function AdminDashboardPage() {
     return `${Number(val).toLocaleString('vi-VN')} đ`;
   };
 
-  // Tính toán KPI thực tế khớp 100% Backend
+  // Các chỉ số KPI hiển thị từ dữ liệu backend
   const stats = useMemo(() => {
     const totalRev = Number(reconciliationData?.totals?.totalRevenue ?? 0);
     const platformFee = Number(reconciliationData?.totals?.platformFee ?? Math.round(totalRev * 0.2));
@@ -194,7 +194,7 @@ export default function AdminDashboardPage() {
     };
   }, [tutorApprovalData, reconciliationData, aiUsageData, alertsData, complaintsData, dailyMetrics, tutorsCount]);
 
-  // Dữ liệu sơ đồ tăng trưởng 7 ngày - NẠP TRỰC TIẾP 100% TỪ BACKEND API .NET
+  // Dữ liệu biểu đồ tăng trưởng 7 ngày lấy từ backend
   const chartData = useMemo(() => {
     if (!Array.isArray(dailyMetrics) || dailyMetrics.length === 0) {
       return {
@@ -303,7 +303,7 @@ export default function AdminDashboardPage() {
     return CHART_BOTTOM - ratio * CHART_H;
   };
 
-  // Hàm tạo đường cong Bézier mượt mà chuẩn SVG (Smooth Curved Path)
+  // Tạo chuỗi path SVG đường cong mượt qua các điểm dữ liệu
   const buildSmoothCurve = (points, maxVal = 100) => {
     if (!points || points.length === 0) return '';
     const pts = points.map((val, idx) => ({
@@ -345,7 +345,7 @@ export default function AdminDashboardPage() {
 
   return (
     <div className="admin-dashboard-container py-3 px-2 px-md-4">
-      {/* 1. THANH TIÊU ĐỀ ĐIỀU HÀNH CHUYÊN NGHIỆP */}
+      {/* 1. Tiêu đề trang tổng quan */}
       <div className="admin-exec-header d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between gap-3">
         <div>
           <div className="d-flex align-items-center gap-2 mb-1">
@@ -384,7 +384,7 @@ export default function AdminDashboardPage() {
         </div>
       </div>
 
-      {/* 2. 5 THẺ BENTO KPI TỔNG QUAN */}
+      {/* 2. 5 thẻ KPI tổng quan */}
       <div className="dash-kpi-grid">
         {/* KPI 1: TỔNG DOANH THU */}
         <div className="dash-kpi-box" style={{ borderTop: '2px solid #DB303A' }}>
@@ -437,7 +437,7 @@ export default function AdminDashboardPage() {
           </div>
         </div>
 
-        {/* KPI 4: TÁC TỬ AI WEIN */}
+        {/* KPI 4: TRỢ LÝ AI */}
         <div className="dash-kpi-box" style={{ borderTop: '2px solid #06b6d4' }}>
           <div className="d-flex align-items-start justify-content-between">
             <div>
@@ -472,7 +472,7 @@ export default function AdminDashboardPage() {
         </div>
       </div>
 
-      {/* 3. SƠ ĐỒ 1: SƠ ĐỒ LUỒNG DÒNG TIỀN & ĐỐI SOÁT OTSP (FLOW ARCHITECTURE) */}
+      {/* 3. Sơ đồ luồng tiền học phí & đối soát */}
       <div className="row g-4 mb-4">
         <div className="col-12">
           <div className="diagram-card">
@@ -491,7 +491,7 @@ export default function AdminDashboardPage() {
               </Link>
             </div>
 
-            {/* SƠ ĐỒ DẠNG KHỐI KẾT NỐI (ARCHITECTURAL FLOW DIAGRAM) */}
+            {/* Các khối minh họa luồng phân chia học phí */}
             <div className="flow-architecture-stage">
               <div className="row g-3 align-items-center">
                 {/* Khối 1: Đầu vào Học viên thanh toán */}
@@ -518,7 +518,7 @@ export default function AdminDashboardPage() {
                   </div>
                 </div>
 
-                {/* Khối 2: Trung tâm Ký Quỹ & Bảo Chứng OTSP Escrow */}
+                {/* Khối 2: Nền tảng giữ hộ và đối soát (OTSP) */}
                 <div className="col-12 col-md-4">
                   <div className="flow-node-box border-start border-4 border-primary" style={{ background: 'var(--dash-surface)' }}>
                     <div className="d-flex align-items-center justify-content-between mb-2">
@@ -587,7 +587,7 @@ export default function AdminDashboardPage() {
 
       {/* 4. SƠ ĐỒ 2 & 3: BIỂU ĐỒ SÓNG MƯỢT TĂNG TRƯỞNG & SƠ ĐỒ CỘT 7 NGÀY */}
       <div className="row g-4 mb-4">
-        {/* SƠ ĐỒ TĂNG TRƯỞNG TỔNG QUÁT TƯƠNG TÁC RÊ CHUỘT (INTERACTIVE SVG EXECUTIVE CHART) */}
+        {/* Biểu đồ SVG tăng trưởng 7 ngày có tooltip khi rê chuột */}
         <div className="col-12 col-xl-7">
           <div className="diagram-card d-flex flex-column justify-content-between">
             <div>
@@ -635,7 +635,7 @@ export default function AdminDashboardPage() {
                 </div>
               </div>
 
-              {/* Dải chỉ số tóm tắt nhanh tuần (Executive Summary Strip) */}
+              {/* Tóm tắt nhanh số liệu trong 7 ngày */}
               <div className="d-flex flex-wrap align-items-center gap-2 mb-3 pt-2 border-top">
                 <div className="chart-summary-chip">
                   <span className="text-secondary" style={{ fontSize: 11 }}>Doanh thu tuần:</span>
@@ -657,7 +657,7 @@ export default function AdminDashboardPage() {
                 </div>
               </div>
 
-              {/* KHUNG BIỂU ĐỒ SVG TƯƠNG TÁC RÊ CHUỘT (INSPECTOR READY) */}
+              {/* Khung biểu đồ SVG */}
               <div className="chart-svg-wrap position-relative flex-grow-1 d-flex flex-column justify-content-between">
                 {/* Chú giải góc trên biểu đồ */}
                 <div className="d-flex justify-content-between align-items-center mb-2 px-1 text-secondary" style={{ fontSize: 11 }}>
@@ -693,7 +693,7 @@ export default function AdminDashboardPage() {
                   </span>
                 </div>
 
-                {/* SVG CANVAS */}
+                {/* Vùng vẽ SVG */}
                 {dailyMetrics.length === 0 ? (
                   <div className="text-center py-5 text-secondary">
                     <div className="spinner-border spinner-border-sm text-danger me-2" role="status"></div>
@@ -773,7 +773,7 @@ export default function AdminDashboardPage() {
                           );
                         })}
 
-                        {/* Khi ở chế độ Doanh thu: Vẽ thêm các cột doanh thu ngày (Daily Intake Bars) */}
+                        {/* Ở chế độ Doanh thu: vẽ thêm cột doanh thu từng ngày */}
                         {chartActiveSeries === 'revenue' &&
                           chartData.items.map((it, i) => {
                             const x = getChartX(i);
@@ -831,7 +831,7 @@ export default function AdminDashboardPage() {
                           />
                         )}
 
-                        {/* Đường cong Bézier sắc nét (Smooth Line Curves) */}
+                        {/* Đường biểu diễn các chỉ số */}
                         {(chartActiveSeries === 'all' || chartActiveSeries === 'revenue') && (
                           <path
                             d={buildSmoothCurve(
@@ -876,10 +876,10 @@ export default function AdminDashboardPage() {
                           />
                         )}
 
-                        {/* HIỆU ỨNG RÊ CHUỘT: ĐƯỜNG DÓNG VÀ ĐIỂM CHẠM XUNG NHỊP */}
+                        {/* Đường gióng dọc và điểm đánh dấu khi rê chuột */}
                         {hoveredIdx !== null && (
                           <g>
-                            {/* Đường dóng dọc (Vertical Hairline Guide) */}
+                            {/* Đường gióng dọc */}
                             <line
                               x1={getChartX(hoveredIdx)}
                               y1={CHART_TOP - 6}
@@ -990,7 +990,7 @@ export default function AdminDashboardPage() {
                         )}
                       </svg>
 
-                      {/* BẢNG TOOLTIP NỔI THÔNG MINH KHI RÊ CHUỘT (FLOATING INSPECTOR CARD) */}
+                      {/* Tooltip hiển thị chi tiết theo ngày đang rê chuột */}
                       {hoveredIdx !== null && chartData.items[hoveredIdx] && (
                         <div
                           className="chart-inspector-panel position-absolute"
@@ -1035,7 +1035,7 @@ export default function AdminDashboardPage() {
                               <span className="fw-semibold text-body">{formatVnd(chartData.items[hoveredIdx].cumulativeRevenue)}</span>
                             </div>
 
-                            {/* Tác tử AI */}
+                            {/* Trợ lý AI */}
                             <div className="d-flex align-items-center justify-content-between pt-1 border-top">
                               <span className="d-flex align-items-center gap-1.5 text-secondary">
                                 <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#0284c7' }}></span>
@@ -1199,7 +1199,7 @@ export default function AdminDashboardPage() {
         </div>
       </div>
 
-      {/* 5. SƠ ĐỒ 4: SƠ ĐỒ QUY TRÌNH KIỂM DUYỆT GIA SƯ (QUALITY ASSURANCE PIPELINE) */}
+      {/* 5. Sơ đồ quy trình kiểm duyệt gia sư */}
       <div className="row g-4 mb-4">
         <div className="col-12">
           <div className="diagram-card">

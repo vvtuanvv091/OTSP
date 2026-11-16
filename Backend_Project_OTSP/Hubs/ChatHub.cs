@@ -4,9 +4,8 @@ using Backend_Project_OTSP.Services.Common;
 namespace Backend_Project_OTSP.Hubs;
 
 /// <summary>
-/// ChatHub kế thừa từ AppHub nhằm đảm bảo tương thích ngược 100% với các service, controller và bài test cũ.
-/// Toàn bộ logic thời gian thực của hệ thống (Trạng thái Online, Kênh cá nhân, Thanh toán, Lớp học, Chat)
-/// được quản lý tập trung và chuẩn nghiệp vụ tại Unified Hub: AppHub.
+/// Kế thừa AppHub để giữ tương thích cho các service, controller và unit test cũ.
+/// Phần xử lý realtime chính nằm tập trung ở AppHub.
 /// </summary>
 public class ChatHub : AppHub
 {

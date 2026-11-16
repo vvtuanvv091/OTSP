@@ -54,7 +54,7 @@ export default function PaymentDetailPage() {
 
   const { joinPayment, leavePayment } = useSignalR();
 
-  // Gia nhập phòng thanh toán SignalR thời gian thực
+  // Tham gia phòng theo dõi thanh toán qua SignalR
   useEffect(() => {
     if (payment?.paymentId) {
       joinPayment(payment.paymentId);
@@ -63,7 +63,7 @@ export default function PaymentDetailPage() {
     return undefined;
   }, [payment?.paymentId, joinPayment, leavePayment]);
 
-  // Nhận tín hiệu thanh toán thành công tức thì từ SignalR (0ms delay)
+  // Nhận thông báo thanh toán thành công qua SignalR để chuyển trạng thái ngay
   useSignalREvent('PaymentStatusChanged', (data) => {
     if (Number(data?.paymentId) === Number(payment?.paymentId) && data?.isPaid) {
       setIsPaid(true);

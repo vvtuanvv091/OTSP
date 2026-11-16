@@ -161,7 +161,7 @@ public class StudentDashboardApiController : ControllerBase
 
         var dayNames = new[] { "Chủ Nhật", "Thứ Hai", "Thứ Ba", "Thứ Tư", "Thứ Năm", "Thứ Sáu", "Thứ Bảy" };
 
-        // Next session for banner
+        // Lấy buổi học sắp tới để hiển thị lên banner
         object? nextSession = null;
         var nextCandidate = allUpcomingRaw.FirstOrDefault();
         if (nextCandidate != null)

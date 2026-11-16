@@ -2,6 +2,8 @@
   transition: all 0.2s ease;
   border: 1px solid #E2E8F0;
   background: #FFFFFF;
+  min-width: 0;
+  overflow: hidden;
 }
 .tutor-classroom-card:hover {
   border-color: #CBD5E1;

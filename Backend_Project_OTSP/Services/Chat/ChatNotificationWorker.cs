@@ -11,10 +11,10 @@ using Backend_Project_OTSP.Services.Notifications;
 namespace Backend_Project_OTSP.Services.Chat;
 
 /// <summary>
-/// Worker xử lý sự kiện tin nhắn nền (Event-Driven Background Service):
-/// - KHÔNG lưu mỗi tin nhắn thành 1 dòng trong bảng Notifications để tránh nghẽn dung lượng Neon PostgreSQL (0.5 GB).
-/// - Bắn thông báo Realtime qua SignalR cho người dùng đang online (0 byte DB).
-/// - Gửi email thông báo có giới hạn tần suất (Throttle 30 phút / 1 email) để chống spam hộp thư và tránh cạn quota email.
+/// Worker nền xử lý thông báo khi có tin nhắn mới:
+/// - Không lưu từng tin nhắn thành 1 dòng trong bảng Notifications để tránh phình dung lượng database.
+/// - Đẩy thông báo realtime qua SignalR cho người nhận đang online.
+/// - Giới hạn tần suất gửi email nhắc (tối đa 30 phút một lần) để tránh spam hộp thư và tốn quota email.
 /// </summary>
 public sealed class ChatNotificationWorker : BackgroundService
 {
@@ -50,7 +50,7 @@ public sealed class ChatNotificationWorker : BackgroundService
 
                 // 1. Thông báo tin nhắn đã được ghi nhận trong bảng Notifications tại ChatService để hiển thị tập trung tại mục Thông báo theo yêu cầu.
 
-                // 2. Bắn tín hiệu Realtime qua SignalR tới người nhận (0 byte Database)
+                // 2. Đẩy thông báo realtime qua SignalR tới người nhận (không ghi thêm vào bảng Notifications)
                 // Cập nhật preview cuộc trò chuyện và báo tin nhắn mới nếu người dùng đang online ở trang khác
                 await appHub.Clients.Group($"user:{evt.ReceiverId}").SendAsync("ChatMessageReceived", new
                 {

@@ -90,25 +90,25 @@ public class InvoiceDetailsDto
     public string Status { get; set; } = string.Empty;
     public string? GatewayTransactionCode { get; set; }
 
-    // Student Info
+    // Thông tin học viên
     public int StudentId { get; set; }
     public string StudentName { get; set; } = string.Empty;
     public string StudentEmail { get; set; } = string.Empty;
     public string? StudentPhone { get; set; }
     public string? GuardianName { get; set; }
 
-    // Tutor Info
+    // Thông tin gia sư
     public string TutorName { get; set; } = string.Empty;
     public string? TutorEmail { get; set; }
 
-    // Course Info
+    // Thông tin lớp học
     public int ClassroomId { get; set; }
     public string ClassroomName { get; set; } = string.Empty;
     public string SubjectName { get; set; } = string.Empty;
     public string GradeLevelName { get; set; } = string.Empty;
     public string ClassroomType { get; set; } = string.Empty;
 
-    // Platform Info
+    // Thông tin nền tảng
     public string PlatformName { get; set; } = "Hệ thống kết nối Gia sư OTSP";
     public string PlatformHotline { get; set; } = "098 439 1940";
     public string PlatformEmail { get; set; } = "tongngoctuan09@gmail.com";

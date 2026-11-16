@@ -126,7 +126,7 @@ export default function ClassDetailModal({ classId, initialData = null, onClose,
     >
       <div className="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
         <div className="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
-          {/* Header */}
+          {/* Tiêu đề modal */}
           <div className="modal-header border-bottom px-4 py-3 bg-light d-flex align-items-center justify-content-between">
             <div className="d-flex align-items-center gap-2">
               <span
@@ -210,7 +210,7 @@ export default function ClassDetailModal({ classId, initialData = null, onClose,
                   {c.description || 'Gia sư chưa cập nhật mô tả chi tiết cho lớp học này.'}
                 </p>
 
-                {/* Key Metrics Grid */}
+                {/* Các chỉ số chính của lớp học */}
                 <div className="row g-3 mb-4">
                   <div className="col-6 col-md-3">
                     <div className="p-3 bg-light rounded-3 border text-center h-100">

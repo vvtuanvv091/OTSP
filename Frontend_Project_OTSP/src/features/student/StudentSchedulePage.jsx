@@ -5,14 +5,14 @@ import { useSignalREvent } from '../../context/signalRHooks';
 import '../../styles/student/StudentSchedulePage.css';
 
 const PERIOD_ROWS = [
-  // Sáng (3 blocks)
+  // Buổi sáng (3 ca)
   { period: 'Sáng', start: 6, end: 8, label: '06:00 – 08:00', isFirst: true, span: 3 },
   { period: 'Sáng', start: 8, end: 10, label: '08:00 – 10:00', isFirst: false },
   { period: 'Sáng', start: 10, end: 12, label: '10:00 – 12:00', isFirst: false },
-  // Chiều (2 blocks)
+  // Buổi chiều (2 ca)
   { period: 'Chiều', start: 13, end: 15, label: '13:00 – 15:00', isFirst: true, span: 2 },
   { period: 'Chiều', start: 15, end: 17, label: '15:00 – 17:00', isFirst: false },
-  // Tối (3 blocks)
+  // Buổi tối (3 ca)
   { period: 'Tối', start: 17, end: 19, label: '17:00 – 19:00', isFirst: true, span: 3 },
   { period: 'Tối', start: 19, end: 21, label: '19:00 – 21:00', isFirst: false },
   { period: 'Tối', start: 21, end: 23, label: '21:00 – 23:00', isFirst: false }
@@ -96,7 +96,7 @@ export default function StudentSchedulePage() {
   const [pendingPayments, setPendingPayments] = useState([]);
   const [reloadKey, setReloadKey] = useState(0);
 
-  // Cập nhật trạng thái buổi học theo thời gian thực (Zero-Reload)
+  // Lắng nghe SignalR để tự cập nhật trạng thái buổi học
   useSignalREvent('ClassSessionStatusChanged', () => setReloadKey((k) => k + 1));
   useSignalREvent('ClassSessionEnded', () => setReloadKey((k) => k + 1));
   const [activeDayMobile, setActiveDayMobile] = useState(
@@ -430,7 +430,7 @@ export default function StudentSchedulePage() {
                       </th>
 
                       {weekDates.map((dayDate, i) => {
-                        const dayOfWeek = i; // 0 = Monday, ..., 6 = Sunday
+                        const dayOfWeek = i; // 0 = Thứ 2, ..., 6 = Chủ nhật
                         const rowStartMin = row.start * 60;
                         const rowEndMin = row.end * 60;
                         const daySessions = sessions.filter(

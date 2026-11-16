@@ -11,7 +11,7 @@ namespace Backend_Project_OTSP.Models
         public DayOfWeek DayOfWeek { get; set; }
         public TimeOnly StartTime { get; set; }
         public TimeOnly EndTime { get; set; }
-        //thừi lượng tính bằng giờ
+        // Thời lượng buổi học (tính bằng giờ)
         public double DurationHours=>(EndTime -StartTime).TotalHours>0?(EndTime -StartTime).TotalHours : 2.0;
         [Required]
         [ForeignKey(nameof(Classroom))]

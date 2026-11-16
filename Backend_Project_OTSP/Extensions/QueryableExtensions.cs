@@ -10,8 +10,7 @@ namespace Backend_Project_OTSP.Extensions;
 public static class QueryableExtensions
 {
     /// <summary>
-    /// Phương thức mở rộng phân trang tái sử dụng cho mọi IQueryable trong dự án OTSP.
-    /// Tự động đếm Total và áp dụng Skip/Take chuẩn SQL Server.
+    /// Helper phân trang dùng chung cho IQueryable: tự đếm tổng số bản ghi và áp dụng Skip/Take.
     /// </summary>
     public static async Task<PagedResult<T>> ToPagedResultAsync<T>(
         this IQueryable<T> query,

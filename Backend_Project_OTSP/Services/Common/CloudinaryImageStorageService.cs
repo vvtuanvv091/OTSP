@@ -400,7 +400,7 @@ public sealed class CloudinaryImageStorageService : IImageStorageService
         var remainder = path[(idx + marker.Length)..].TrimStart('/');
         var segments = remainder.Split('/', StringSplitOptions.RemoveEmptyEntries).ToList();
 
-        // Skip Cloudinary transformation segments or version segments (v123456)
+        // Bỏ qua các đoạn transform hoặc version (v123456) trong URL Cloudinary
         while (segments.Count > 1 && !(segments[0].Length > 1 && segments[0][0] == 'v' && segments[0][1..].All(char.IsDigit)) && segments[0].Contains(','))
         {
             segments.RemoveAt(0);
