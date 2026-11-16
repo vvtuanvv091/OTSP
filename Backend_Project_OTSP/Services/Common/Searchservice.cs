@@ -106,7 +106,8 @@ public class SearchService : ISearchService
         }
 
         var items = await query
-            .OrderByDescending(t => t.User.CreatedAt)
+            .OrderByDescending(t => t.AverageRating >= 4.5 ? 2 : (t.AverageRating >= 4.0 ? 1 : 0))
+            .ThenByDescending(t => t.User.CreatedAt)
             .ThenByDescending(t => t.AverageRating)
             .ThenBy(t => t.HourlyFee)
             .ThenByDescending(t => t.Id)
@@ -158,12 +159,7 @@ public class SearchService : ISearchService
                      && c.Tutor.User.Status == AccountStatus.Active
                      && (!enforceRole || _db.UserRoles.Any(ur =>
                          ur.UserId == c.Tutor.UserId && _db.Roles.Any(r => r.Id == ur.RoleId && r.Name == "Tutor")))
-                     && (c.Type != ClassroomType.Group
-                         || (c.ClassroomStudents.Count < c.MaxStudents
-                             && !c.ClassSessions.Any(s => s.Status == SessionStatus.Done || s.Status == SessionStatus.InProgress)
-                             && (c.RegistrationDeadline.HasValue
-                                 ? c.RegistrationDeadline.Value >= todayVn && (!c.StartDate.HasValue || c.StartDate.Value >= todayVn)
-                                 : (!c.StartDate.HasValue || c.StartDate.Value > todayVn)))));
+                     && !c.ClassSessions.Any(s => s.Status == SessionStatus.Done));
 
         if (kw is not null)
             query = query.Where(c => EF.Functions.ILike(c.NameClass, kw)
@@ -187,9 +183,17 @@ public class SearchService : ISearchService
             return new PagedResult<ClassCardDto> { Page = page, PageSize = size, Total = 0, Items = [] };
         }
 
+        // Sắp xếp:
+        // 1. Lớp còn nhận đăng ký (chưa đủ sĩ số, chưa hết hạn, chưa bắt đầu) lên trước (1). Lớp đã đủ/đóng xếp sau (0).
+        // 2. Thời gian mới tạo nhất lên đầu (Id giảm dần).
+        // 3. Số người đã đăng ký chọn (Count giảm dần).
         var items = await query
-            .OrderByDescending(c => c.ClassroomStudents.Count())
-            .ThenBy(c => c.Id)
+            .OrderByDescending(c => (c.ClassroomStudents.Count < c.MaxStudents
+                                  && (!c.RegistrationDeadline.HasValue || c.RegistrationDeadline.Value >= todayVn)
+                                  && (!c.StartDate.HasValue || c.StartDate.Value >= todayVn)
+                                  && !c.ClassSessions.Any(s => s.Status == SessionStatus.Done || s.Status == SessionStatus.InProgress)) ? 1 : 0)
+            .ThenByDescending(c => c.Id)
+            .ThenByDescending(c => c.ClassroomStudents.Count())
             .Skip(skip)
             .Take(size)
             .Select(c => new ClassCardDto

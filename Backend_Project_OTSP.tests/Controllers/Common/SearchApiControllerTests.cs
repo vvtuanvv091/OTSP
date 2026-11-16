@@ -268,4 +268,133 @@ public class SearchApiControllerTests
         var okResult = Assert.IsType<OkObjectResult>(result);
         Assert.NotNull(okResult.Value);
     }
+
+    [Fact]
+    public async Task SearchClassesAsync_PrioritizesAvailableClassesAndOrdersByNewestIdFirst()
+    {
+        using var db = TestDbContextFactory.Create();
+        var cache = new Microsoft.Extensions.Caching.Memory.MemoryCache(new Microsoft.Extensions.Caching.Memory.MemoryCacheOptions());
+        var searchService = new SearchService(db, cache);
+
+        var tutorUser = new ApplicationUser
+        {
+            Id = "tutor-search-user",
+            FullName = "Gia Sư Kiểm Tra",
+            Status = AccountStatus.Active
+        };
+        var tutor = new TutorProfile
+        {
+            Id = 50,
+            UserId = tutorUser.Id,
+            User = tutorUser,
+            VerificationStatus = VerificationStatus.Approved,
+            AverageRating = 5.0
+        };
+        var studentUser = new ApplicationUser { Id = "student-search-user", FullName = "Học Viên" };
+        var student = new StudentProfile { Id = 60, UserId = studentUser.Id, User = studentUser };
+
+        var subject = new Subject { Id = 101, Code = "VATLY", Name = "Vật Lý" };
+        var gradeLevel = new GradeLevel { Id = 201, Name = "Lớp 12" };
+
+        var today = Backend_Project_OTSP.Services.Common.ClassroomLifecycleHelper.GetVietnamToday();
+
+        // Lớp 1: 1 kèm 1 đã đủ học viên (Id 10)
+        var classFullOneToOne = new Classroom
+        {
+            Id = 10,
+            NameClass = "Lớp 1 kèm 1 Đã Đủ",
+            Fee = 100000,
+            Type = ClassroomType.OneToOne,
+            Status = ClassroomStatus.Active,
+            MaxStudents = 1,
+            TutorId = tutor.Id,
+            Tutor = tutor,
+            SubjectId = subject.Id,
+            Subject = subject,
+            GradeLevelId = gradeLevel.Id,
+            GradeLevel = gradeLevel,
+            StartDate = today.AddDays(5),
+            RegistrationDeadline = today.AddDays(2),
+            ClassroomStudents = new List<ClassroomStudent> { new ClassroomStudent { StudentId = student.Id } }
+        };
+
+        // Lớp 2: Lớp nhóm đã đủ sĩ số (Id 20)
+        var classFullGroup = new Classroom
+        {
+            Id = 20,
+            NameClass = "Lớp Nhóm Đã Đủ",
+            Fee = 100000,
+            Type = ClassroomType.Group,
+            Status = ClassroomStatus.Active,
+            MaxStudents = 1,
+            TutorId = tutor.Id,
+            Tutor = tutor,
+            SubjectId = subject.Id,
+            Subject = subject,
+            GradeLevelId = gradeLevel.Id,
+            GradeLevel = gradeLevel,
+            StartDate = today.AddDays(5),
+            RegistrationDeadline = today.AddDays(2),
+            ClassroomStudents = new List<ClassroomStudent> { new ClassroomStudent { StudentId = student.Id } }
+        };
+
+        // Lớp 3: Lớp nhóm còn chỗ, tạo cũ hơn (Id 15)
+        var classAvailableOlder = new Classroom
+        {
+            Id = 15,
+            NameClass = "Lớp Nhóm Còn Chỗ Cũ Hơn",
+            Fee = 100000,
+            Type = ClassroomType.Group,
+            Status = ClassroomStatus.Active,
+            MaxStudents = 5,
+            TutorId = tutor.Id,
+            Tutor = tutor,
+            SubjectId = subject.Id,
+            Subject = subject,
+            GradeLevelId = gradeLevel.Id,
+            GradeLevel = gradeLevel,
+            StartDate = today.AddDays(5),
+            RegistrationDeadline = today.AddDays(2),
+            ClassroomStudents = new List<ClassroomStudent>()
+        };
+
+        // Lớp 4: Lớp nhóm mới tạo nhất, còn chỗ (Id 37 - tương tự 'Tiếng Anh Cơ Bản' của user)
+        var classAvailableNewest = new Classroom
+        {
+            Id = 37,
+            NameClass = "Tiếng Anh Cơ Bản Mới Tạo",
+            Fee = 100000,
+            Type = ClassroomType.Group,
+            Status = ClassroomStatus.Active,
+            MaxStudents = 5,
+            TutorId = tutor.Id,
+            Tutor = tutor,
+            SubjectId = subject.Id,
+            Subject = subject,
+            GradeLevelId = gradeLevel.Id,
+            GradeLevel = gradeLevel,
+            StartDate = today.AddDays(5),
+            RegistrationDeadline = today.AddDays(2),
+            ClassroomStudents = new List<ClassroomStudent>()
+        };
+
+        db.Users.AddRange(tutorUser, studentUser);
+        db.TutorProfiles.Add(tutor);
+        db.StudentProfiles.Add(student);
+        db.Subjects.Add(subject);
+        db.GradeLevels.Add(gradeLevel);
+        db.Classrooms.AddRange(classFullOneToOne, classFullGroup, classAvailableOlder, classAvailableNewest);
+        await db.SaveChangesAsync();
+
+        var result = await searchService.SearchClassesAsync(new SearchQuery { Page = 1, PageSize = 10 });
+
+        Assert.Equal(4, result.Total);
+        // Lớp còn chỗ mới nhất (Id 37) phải đứng ĐẦU TIÊN
+        Assert.Equal(37, result.Items[0].Id);
+        // Lớp còn chỗ (Id 15) phải đứng THỨ HAI
+        Assert.Equal(15, result.Items[1].Id);
+        // Các lớp đã đủ học viên (Id 20, 10) phải XẾP SAU
+        Assert.Equal(20, result.Items[2].Id);
+        Assert.Equal(10, result.Items[3].Id);
+    }
 }

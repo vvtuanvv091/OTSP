@@ -40,7 +40,7 @@ public class HomeApiController : ControllerBase
     {
         var vm = await _cache.GetOrCreateAsync(HomeCacheKey, async entry =>
         {
-            entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(10);
+            entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(1);
 
             var enforceRole = await _db.Roles.AsNoTracking().AnyAsync(cancellationToken);
 
@@ -51,18 +51,20 @@ public class HomeApiController : ControllerBase
                              ur.UserId == t.UserId && _db.Roles.Any(r => r.Id == ur.RoleId && r.Name == "Tutor"))));
 
             var todayVn = Backend_Project_OTSP.Services.Common.ClassroomLifecycleHelper.GetVietnamToday();
+            // Lớp học mở trên Trang chủ:
+            // 1. Phải còn chỗ đăng ký (chưa đủ sĩ số cho cả 1-1 lẫn nhóm).
+            // 2. Chưa bắt đầu buổi học nào.
+            // 3. Chưa hết hạn đăng ký và chưa quá ngày khai giảng.
             var openClasses = _db.Classrooms.AsNoTracking()
                 .Where(c => c.Status == ClassroomStatus.Active
                          && c.Tutor.VerificationStatus == VerificationStatus.Approved
                          && c.Tutor.User.Status == AccountStatus.Active
                          && (!enforceRole || _db.UserRoles.Any(ur =>
                              ur.UserId == c.Tutor.UserId && _db.Roles.Any(r => r.Id == ur.RoleId && r.Name == "Tutor")))
-                         && (c.Type != ClassroomType.Group
-                             || (c.ClassroomStudents.Count < c.MaxStudents
-                                 && !c.ClassSessions.Any(s => s.Status == SessionStatus.Done || s.Status == SessionStatus.InProgress)
-                                 && (c.RegistrationDeadline.HasValue
-                                     ? c.RegistrationDeadline.Value >= todayVn && (!c.StartDate.HasValue || c.StartDate.Value >= todayVn)
-                                     : (!c.StartDate.HasValue || c.StartDate.Value > todayVn)))));
+                         && c.ClassroomStudents.Count < c.MaxStudents
+                         && !c.ClassSessions.Any(s => s.Status == SessionStatus.Done || s.Status == SessionStatus.InProgress)
+                         && (!c.RegistrationDeadline.HasValue || c.RegistrationDeadline.Value >= todayVn)
+                         && (!c.StartDate.HasValue || c.StartDate.Value >= todayVn));
 
             return new HomeViewModel
             {
@@ -137,9 +139,10 @@ public class HomeApiController : ControllerBase
 
     private async Task<List<ClassCardDto>> LoadClassesAsync(IQueryable<Classroom> openClasses)
     {
+        // Ưu tiên lớp có nhiều người đăng ký chọn, đồng thời ưu tiên thời gian mới tạo nhất (Id giảm dần)
         var classes = await openClasses
             .OrderByDescending(c => c.ClassroomStudents.Count())
-            .ThenBy(c => c.Id)
+            .ThenByDescending(c => c.Id)
             .Take(MaxClasses)
             .Select(c => new ClassCardDto
             {
@@ -178,10 +181,14 @@ public class HomeApiController : ControllerBase
 
     private async Task<List<TutorCardDto>> LoadTutorsAsync(IQueryable<TutorProfile> approvedTutors)
     {
+        // Phân tầng đánh giá cao (>= 4.5 sao, >= 4.0 sao) và ưu tiên thời gian mới nhất (CreatedAt / Id giảm dần)
+        // để gia sư mới hoạt động / được đánh giá mới sẽ hiển thị thay thế người cũ lâu ngày
         var tutors = await approvedTutors
-            .OrderByDescending(t => t.AverageRating)
+            .OrderByDescending(t => t.AverageRating >= 4.5 ? 2 : (t.AverageRating >= 4.0 ? 1 : 0))
+            .ThenByDescending(t => t.User.CreatedAt)
+            .ThenByDescending(t => t.AverageRating)
             .ThenByDescending(t => t.Qualifications.Count(q => q.Status == VerificationStatus.Approved))
-            .ThenBy(t => t.Id)
+            .ThenByDescending(t => t.Id)
             .Take(MaxTutors)
             .Select(t => new TutorCardDto
             {

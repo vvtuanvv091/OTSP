@@ -5,6 +5,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
+using Backend_Project_OTSP.Controllers.Common;
 using Backend_Project_OTSP.Data;
 using Backend_Project_OTSP.Dtos;
 using Backend_Project_OTSP.Dtos.Common;
@@ -31,6 +33,7 @@ public class TutorClassroomApiController : ControllerBase
     private readonly IHubContext<ConnectionRequestHub>? _hubContext;
     private readonly IHubContext<AppHub>? _appHub;
     private readonly IConfiguration? _configuration;
+    private readonly IMemoryCache? _cache;
 
     public TutorClassroomApiController(
         ApplicationDbContext db,
@@ -40,7 +43,8 @@ public class TutorClassroomApiController : ControllerBase
         IEmailSenderService? emailSender = null,
         IHubContext<ConnectionRequestHub>? hubContext = null,
         IConfiguration? configuration = null,
-        IHubContext<AppHub>? appHub = null)
+        IHubContext<AppHub>? appHub = null,
+        IMemoryCache? cache = null)
     {
         _db = db;
         _imageStorage = imageStorage;
@@ -50,6 +54,7 @@ public class TutorClassroomApiController : ControllerBase
         _hubContext = hubContext;
         _configuration = configuration;
         _appHub = appHub;
+        _cache = cache;
     }
 
     private string FrontendBaseUrl =>
@@ -672,6 +677,7 @@ public class TutorClassroomApiController : ControllerBase
             await _db.SaveChangesAsync(cancellationToken);
         }
 
+        _cache?.Remove(HomeApiController.HomeCacheKey);
         return Ok(new { success = true, message = "Đã tạo lớp học thành công.", classroomId = classroom.Id });
     }
 
@@ -1026,6 +1032,7 @@ public class TutorClassroomApiController : ControllerBase
             }
         }
 
+        _cache?.Remove(HomeApiController.HomeCacheKey);
         return Ok(new { success = true, message = "Cập nhật lớp học thành công." });
     }
 
@@ -1054,6 +1061,7 @@ public class TutorClassroomApiController : ControllerBase
             _db.ClassroomWeeklySchedules.RemoveRange(schedules);
             _db.Classrooms.Remove(classroom);
             await _db.SaveChangesAsync(cancellationToken);
+            _cache?.Remove(HomeApiController.HomeCacheKey);
             return Ok(new { success = true, message = "Đã xóa vĩnh viễn lớp học." });
         }
 
@@ -1144,6 +1152,7 @@ public class TutorClassroomApiController : ControllerBase
             }
         }
 
+        _cache?.Remove(HomeApiController.HomeCacheKey);
         return Ok(new { success = true, message = "Đã đóng/hủy lớp học thành công." });
     }
 

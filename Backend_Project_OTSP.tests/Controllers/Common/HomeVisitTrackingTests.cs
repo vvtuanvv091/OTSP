@@ -7,6 +7,7 @@ using Microsoft.Extensions.Caching.Memory;
 using Backend_Project_OTSP.Controllers.Api.Admin;
 using Backend_Project_OTSP.Controllers.Common;
 using Backend_Project_OTSP.Data;
+using Backend_Project_OTSP.Dtos;
 using Backend_Project_OTSP.Dtos.Common.Home;
 using Backend_Project_OTSP.Models;
 using Backend_Project_OTSP.tests.Helpers;
@@ -138,6 +139,109 @@ public class HomeVisitTrackingTests
         var todayMetric = metrics[^1];
         Assert.Equal(1, yesterdayMetric.GetProperty("visits").GetInt32());
         Assert.Equal(2, todayMetric.GetProperty("visits").GetInt32());
+    }
+
+    [Fact]
+    public async Task GetHomeData_ExcludesFullClassesAndPrioritizesNewestClassesAndTutors()
+    {
+        using var db = TestDbContextFactory.Create();
+        var cache = new MemoryCache(new MemoryCacheOptions());
+
+        var today = Backend_Project_OTSP.Services.Common.ClassroomLifecycleHelper.GetVietnamToday();
+
+        // 2 Gia sư: Cũ (5 sao, tạo từ 1 năm trước), Mới (4.8 sao, tạo hôm nay)
+        var oldTutorUser = new ApplicationUser
+        {
+            Id = "tutor-old",
+            FullName = "Gia Sư Cũ",
+            CreatedAt = DateTime.UtcNow.AddYears(-1),
+            Status = Enums.AccountStatus.Active
+        };
+        var oldTutor = new TutorProfile
+        {
+            Id = 4,
+            UserId = oldTutorUser.Id,
+            User = oldTutorUser,
+            VerificationStatus = Enums.VerificationStatus.Approved,
+            AverageRating = 5.0
+        };
+
+        var newTutorUser = new ApplicationUser
+        {
+            Id = "tutor-new",
+            FullName = "Gia Sư Mới",
+            CreatedAt = DateTime.UtcNow,
+            Status = Enums.AccountStatus.Active
+        };
+        var newTutor = new TutorProfile
+        {
+            Id = 30,
+            UserId = newTutorUser.Id,
+            User = newTutorUser,
+            VerificationStatus = Enums.VerificationStatus.Approved,
+            AverageRating = 4.8
+        };
+
+        var studentUser = new ApplicationUser { Id = "student-1", FullName = "Học Viên A" };
+        var student = new StudentProfile { Id = 1, UserId = studentUser.Id, User = studentUser };
+
+        var subject = new Subject { Id = 10, Code = "TOAN", Name = "Toán Học" };
+        var grade = new GradeLevel { Id = 20, Name = "Lớp 10" };
+
+        // Lớp 1-1 đã đủ (1/1 học viên) -> KHÔNG ĐƯỢC HIỆN TRÊN TRANG CHỦ
+        var fullOneToOneClass = new Classroom
+        {
+            Id = 2,
+            NameClass = "Lớp 1-1 Đã Đủ 1/1",
+            Type = Enums.ClassroomType.OneToOne,
+            Status = Enums.ClassroomStatus.Active,
+            MaxStudents = 1,
+            TutorId = oldTutor.Id,
+            Tutor = oldTutor,
+            SubjectId = subject.Id,
+            GradeLevelId = grade.Id,
+            StartDate = today.AddDays(5),
+            RegistrationDeadline = today.AddDays(2),
+            ClassroomStudents = new List<ClassroomStudent> { new ClassroomStudent { StudentId = student.Id } }
+        };
+
+        // Lớp nhóm còn chỗ mới tạo (0/5 học viên) -> PHẢI HIỆN TRÊN TRANG CHỦ
+        var openNewGroupClass = new Classroom
+        {
+            Id = 37,
+            NameClass = "Lớp Nhóm Mới Mở",
+            Type = Enums.ClassroomType.Group,
+            Status = Enums.ClassroomStatus.Active,
+            MaxStudents = 5,
+            TutorId = newTutor.Id,
+            Tutor = newTutor,
+            SubjectId = subject.Id,
+            GradeLevelId = grade.Id,
+            StartDate = today.AddDays(5),
+            RegistrationDeadline = today.AddDays(2),
+            ClassroomStudents = new List<ClassroomStudent>()
+        };
+
+        db.Users.AddRange(oldTutorUser, newTutorUser, studentUser);
+        db.TutorProfiles.AddRange(oldTutor, newTutor);
+        db.StudentProfiles.Add(student);
+        db.Subjects.Add(subject);
+        db.GradeLevels.Add(grade);
+        db.Classrooms.AddRange(fullOneToOneClass, openNewGroupClass);
+        await db.SaveChangesAsync();
+
+        var controller = CreateHomeController(db, cache);
+        var result = await controller.GetHomeData(CancellationToken.None);
+        var ok = Assert.IsType<OkObjectResult>(result);
+        var vm = Assert.IsType<HomeViewModel>(ok.Value);
+
+        // Lớp 1-1 đã đủ (1/1) không được hiển thị, chỉ lớp còn chỗ (Id 37) hiển thị
+        Assert.Single(vm.Classes);
+        Assert.Equal(37, vm.Classes[0].Id);
+
+        // Gia sư tiêu biểu: gia sư mới (4.8 sao) thuộc nhóm đánh giá cao và mới hơn nên đứng trước
+        Assert.NotEmpty(vm.FeaturedTutors);
+        Assert.Equal(30, vm.FeaturedTutors[0].Id);
     }
 }
 
