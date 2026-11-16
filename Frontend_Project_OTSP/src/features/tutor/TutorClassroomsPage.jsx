@@ -210,9 +210,9 @@ export default function TutorClassroomsPage() {
                 return (
                   <div key={c.id} className="col min-w-0" style={{ maxWidth: classrooms.length === 1 ? 460 : undefined }}>
                     <div className="card tutor-classroom-card h-100 rounded-3 p-3 p-sm-3.5 d-flex flex-column justify-content-between shadow-sm overflow-hidden min-w-0">
-                      <div className="min-w-0">
+                      <div className="min-w-0 w-100">
                         {/* Phần đầu thẻ: biểu tượng, tên lớp và nhãn trạng thái */}
-                        <div className="d-flex align-items-start gap-3 min-w-0">
+                        <div className="d-flex align-items-start gap-3 min-w-0 w-100">
                           {c.coverImageUrl ? (
                             <div className="position-relative flex-shrink-0" style={{ width: 56, height: 56 }}>
                               <img
@@ -231,33 +231,33 @@ export default function TutorClassroomsPage() {
                             </div>
                           )}
 
-                          <div className="flex-grow-1 min-w-0">
-                            <h3 className="h6 fw-bold mb-1 text-dark text-truncate" title={cleanDisplayName} style={{ fontSize: '1rem', lineHeight: 1.3 }}>
+                          <div className="flex-grow-1 min-w-0" style={{ minWidth: 0, overflow: 'hidden' }}>
+                            <h3 className="h6 fw-bold mb-1 text-dark text-truncate d-block w-100" title={cleanDisplayName} style={{ fontSize: '1rem', lineHeight: 1.3 }}>
                               {cleanDisplayName}
                             </h3>
 
                             {/* Hàng nhãn phân loại lớp */}
-                            <div className="d-flex align-items-center gap-1 flex-wrap mt-1 min-w-0">
-                              <span className="badge fw-semibold d-inline-flex align-items-center gap-1 px-2 py-1 rounded-pill text-white" style={{ backgroundColor: '#dc2626', fontSize: '0.72rem' }}>
+                            <div className="d-flex align-items-center gap-1 flex-wrap mt-1 min-w-0 w-100">
+                              <span className="badge fw-semibold d-inline-flex align-items-center gap-1 px-2 py-1 rounded-pill text-white flex-shrink-0" style={{ backgroundColor: '#dc2626', fontSize: '0.72rem' }}>
                                 <i className="bi bi-tag-fill" style={{ fontSize: '0.65rem' }}></i>
                                 {formatPrice(c.fee)} đ
                               </span>
 
                               <span
-                                className="badge fw-semibold d-inline-flex align-items-center gap-1 px-2 py-1 rounded-pill text-white text-truncate"
-                                style={{ backgroundColor: '#0284c7', fontSize: '0.72rem', maxWidth: '100%' }}
+                                className="badge fw-semibold d-inline-flex align-items-center gap-1 px-2 py-1 rounded-pill text-white"
+                                style={{ backgroundColor: '#0284c7', fontSize: '0.72rem', maxWidth: '100%', minWidth: 0, overflow: 'hidden' }}
                                 title={`${c.subjectName} - ${c.gradeLevelName || 'Tiểu học'}`}
                               >
                                 <i className="bi bi-book-half flex-shrink-0" style={{ fontSize: '0.65rem' }}></i>
-                                <span className="text-truncate">{c.subjectName} - {c.gradeLevelName || 'Tiểu học'}</span>
+                                <span className="text-truncate min-w-0" style={{ minWidth: 0 }}>{c.subjectName} - {c.gradeLevelName || 'Tiểu học'}</span>
                               </span>
 
-                              <span className="badge fw-semibold d-inline-flex align-items-center gap-1 px-2 py-1 rounded-pill text-white" style={{ backgroundColor: '#6366f1', fontSize: '0.72rem' }}>
+                              <span className="badge fw-semibold d-inline-flex align-items-center gap-1 px-2 py-1 rounded-pill text-white flex-shrink-0" style={{ backgroundColor: '#6366f1', fontSize: '0.72rem' }}>
                                 <i className="bi bi-people-fill" style={{ fontSize: '0.65rem' }}></i>
                                 {isGroup ? 'Lớp nhóm' : 'Lớp 1-1'}
                               </span>
 
-                              <span className="badge fw-semibold d-inline-flex align-items-center gap-1 px-2 py-1 rounded-pill text-white" style={{ backgroundColor: c.status === 'Active' ? '#16a34a' : '#64748b', fontSize: '0.72rem' }}>
+                              <span className="badge fw-semibold d-inline-flex align-items-center gap-1 px-2 py-1 rounded-pill text-white flex-shrink-0" style={{ backgroundColor: c.status === 'Active' ? '#16a34a' : '#64748b', fontSize: '0.72rem' }}>
                                 <i className="bi bi-check-circle-fill" style={{ fontSize: '0.65rem' }}></i>
                                 {statusLabel}
                               </span>

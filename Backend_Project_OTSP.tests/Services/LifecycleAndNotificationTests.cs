@@ -1341,9 +1341,9 @@ public class LifecycleAndNotificationTests
         Assert.True(docRes.Success);
 
         var (reqHub, _) = CreateHubMock();
-        var chatHub = new Mock<IHubContext<ChatHub>>();
-        chatHub.Setup(h => h.Clients).Returns(CreateHubMock().Clients.Object);
-        var notifSvc = new NotificationService(db, reqHub.Object, chatHub.Object, Mock.Of<ILogger<NotificationService>>(), emailQueue: queueMock.Object);
+        var appHub = new Mock<IHubContext<AppHub>>();
+        appHub.Setup(h => h.Clients).Returns(CreateHubMock().Clients.Object);
+        var notifSvc = new NotificationService(db, reqHub.Object, appHub.Object, Mock.Of<ILogger<NotificationService>>(), emailQueue: queueMock.Object);
         await notifSvc.DispatchBookingAcceptedAsync(new BookingAcceptedNotificationEvent(
             studentUser.Id,
             studentUser.Email,
@@ -1677,5 +1677,102 @@ public class LifecycleAndNotificationTests
         var result = await service.AcceptRequestAsync(601, "tu2-g12");
         Assert.True(result.SlotConflict);
         Assert.False(db.ClassroomStudents.Any(cs => cs.ClassroomId == 202 && cs.StudentId == 103));
+    }
+
+    private sealed class CapturingHttpHandler(Func<HttpRequestMessage, Task<HttpResponseMessage>> handler) : HttpMessageHandler
+    {
+        public List<HttpRequestMessage> Requests { get; } = [];
+        public List<string> Bodies { get; } = [];
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            Requests.Add(request);
+            Bodies.Add(request.Content != null ? await request.Content.ReadAsStringAsync(cancellationToken) : string.Empty);
+            return await handler(request);
+        }
+    }
+
+    [Fact]
+    public void T12_NotificationService_ResolvesFromDiContainer_WithoutAmbiguity()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddSignalR();
+        services.AddDbContext<ApplicationDbContext>(opt => opt.UseInMemoryDatabase($"di_notif_{Guid.NewGuid():N}"));
+        services.AddScoped<INotificationService, NotificationService>();
+        services.AddScoped<INotificationDispatcher>(sp => (NotificationService)sp.GetRequiredService<INotificationService>());
+
+        using var provider = services.BuildServiceProvider();
+        using var scope = provider.CreateScope();
+
+        var notifService = scope.ServiceProvider.GetRequiredService<INotificationService>();
+        var dispatcher = scope.ServiceProvider.GetRequiredService<INotificationDispatcher>();
+
+        Assert.NotNull(notifService);
+        Assert.Same(notifService, dispatcher);
+    }
+
+    [Fact]
+    public async Task T13_EmailSender_PrefersHttpProvidersAndGuardsResendGmailFallback()
+    {
+        // 1. Brevo được ưu tiên gọi trước SMTP (không chờ timeout SMTP khi Render chặn port)
+        var brevoHandler = new CapturingHttpHandler(_ => Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.Created)));
+        var brevoFactory = new Mock<IHttpClientFactory>();
+        brevoFactory.Setup(f => f.CreateClient(It.IsAny<string>())).Returns(new HttpClient(brevoHandler));
+
+        var brevoConfig = BuildConfig(new()
+        {
+            ["Smtp:Host"] = "127.0.0.1",
+            ["Smtp:Port"] = "1",
+            ["Smtp:Username"] = "tongngoctuan09@gmail.com",
+            ["Smtp:Password"] = "secret",
+            ["Smtp:From"] = "tongngoctuan09@gmail.com",
+            ["Brevo:ApiKey"] = "xkeysib-test-123"
+        });
+        var brevoSender = new EmailSenderService(brevoConfig, Mock.Of<ILogger<EmailSenderService>>(), brevoFactory.Object);
+        var brevoOk = await brevoSender.SendNotificationEmailAsync("student@gmail.com", "Chào", "<p>OK</p>");
+
+        Assert.True(brevoOk);
+        Assert.Single(brevoHandler.Requests);
+        Assert.Equal("https://api.brevo.com/v3/smtp/email", brevoHandler.Requests[0].RequestUri!.ToString());
+        Assert.Equal("xkeysib-test-123", brevoHandler.Requests[0].Headers.GetValues("api-key").Single());
+        Assert.Contains("\"email\":\"tongngoctuan09@gmail.com\"", brevoHandler.Bodies[0]);
+
+        // 2. Resend không dùng Smtp:From là @gmail.com nếu Resend:From để trống
+        var resendHandler = new CapturingHttpHandler(_ => Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK)));
+        var resendFactory = new Mock<IHttpClientFactory>();
+        resendFactory.Setup(f => f.CreateClient(It.IsAny<string>())).Returns(new HttpClient(resendHandler));
+
+        var resendConfig = BuildConfig(new()
+        {
+            ["Smtp:From"] = "tongngoctuan09@gmail.com",
+            ["Resend:ApiKey"] = "re_test_123",
+            ["Resend:From"] = ""
+        });
+        var resendSender = new EmailSenderService(resendConfig, Mock.Of<ILogger<EmailSenderService>>(), resendFactory.Object);
+        var resendOk = await resendSender.SendNotificationEmailAsync("student@gmail.com", "Chào", "<p>OK</p>");
+
+        Assert.True(resendOk);
+        Assert.Single(resendHandler.Requests);
+        Assert.Contains("onboarding@resend.dev", resendHandler.Bodies[0]);
+        Assert.DoesNotContain("tongngoctuan09@gmail.com", resendHandler.Bodies[0]);
+
+        // 3. EmailWebhook gửi kèm X-Webhook-Secret
+        var hookHandler = new CapturingHttpHandler(_ => Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK)));
+        var hookFactory = new Mock<IHttpClientFactory>();
+        hookFactory.Setup(f => f.CreateClient(It.IsAny<string>())).Returns(new HttpClient(hookHandler));
+
+        var hookConfig = BuildConfig(new()
+        {
+            ["EmailWebhook:Url"] = "https://script.google.com/macros/s/demo/exec",
+            ["EmailWebhook:Secret"] = "otsp-hook-secret"
+        });
+        var hookSender = new EmailSenderService(hookConfig, Mock.Of<ILogger<EmailSenderService>>(), hookFactory.Object);
+        var hookOk = await hookSender.SendNotificationEmailAsync("student@gmail.com", "Chào", "<p>OK</p>");
+
+        Assert.True(hookOk);
+        Assert.Single(hookHandler.Requests);
+        Assert.Equal("otsp-hook-secret", hookHandler.Requests[0].Headers.GetValues("X-Webhook-Secret").Single());
+        Assert.Contains("otsp-hook-secret", hookHandler.Bodies[0]);
     }
 }

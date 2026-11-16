@@ -2402,4 +2402,16 @@ i.bi {
     background-color: var(--otsp-surface-subtle, #f1f5f9);
 }
 
+/* Các lớp tiện ích tương thích Bootstrap 5 để co giãn flex và cắt chuỗi "..." gọn trong lề thẻ */
+.min-w-0 { min-width: 0 !important; }
+.mt-0\.5 { margin-top: 0.125rem !important; }
+.p-2\.5 { padding: 0.625rem !important; }
+.px-2\.5 { padding-left: 0.625rem !important; padding-right: 0.625rem !important; }
+.py-1\.5 { padding-top: 0.375rem !important; padding-bottom: 0.375rem !important; }
+.gap-1\.5 { gap: 0.375rem !important; }
+.gap-2\.5 { gap: 0.625rem !important; }
+@media (min-width: 576px) {
+    .p-sm-3\.5 { padding: 1.125rem !important; }
+}
+
 

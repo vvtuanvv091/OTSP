@@ -12,8 +12,7 @@ public class NotificationService : INotificationService, INotificationDispatcher
 {
     private readonly ApplicationDbContext _db;
     private readonly IHubContext<ConnectionRequestHub> _connectionRequestHub;
-    private readonly IHubContext<AppHub>? _appHub;
-    private readonly IHubContext<ChatHub>? _legacyChatHub;
+    private readonly IHubContext<AppHub> _appHub;
     private readonly IEmailQueue? _emailQueue;
     private readonly IEmailSenderService? _emailSender;
     private readonly ILogger<NotificationService> _logger;
@@ -40,37 +39,9 @@ public class NotificationService : INotificationService, INotificationDispatcher
         _scopeFactory = scopeFactory;
     }
 
-    // Hàm overload giữ lại để tương thích với unit test và code cũ
-    public NotificationService(
-        ApplicationDbContext db,
-        IHubContext<ConnectionRequestHub> connectionRequestHub,
-        IHubContext<ChatHub> chatHub,
-        ILogger<NotificationService> logger,
-        IEmailQueue? emailQueue = null,
-        IEmailSenderService? emailSender = null,
-        IConfiguration? configuration = null,
-        IServiceScopeFactory? scopeFactory = null)
-    {
-        _db = db;
-        _connectionRequestHub = connectionRequestHub;
-        _legacyChatHub = chatHub;
-        _logger = logger;
-        _emailQueue = emailQueue;
-        _emailSender = emailSender;
-        _configuration = configuration;
-        _scopeFactory = scopeFactory;
-    }
-
     private async Task SendToAppHubGroupAsync(string groupName, string method, object arg, CancellationToken ct = default)
     {
-        if (_appHub != null)
-        {
-            await _appHub.Clients.Group(groupName).SendAsync(method, arg, ct);
-        }
-        else if (_legacyChatHub != null)
-        {
-            await _legacyChatHub.Clients.Group(groupName).SendAsync(method, arg, ct);
-        }
+        await _appHub.Clients.Group(groupName).SendAsync(method, arg, ct);
     }
 
     private string FrontendBaseUrl =>
