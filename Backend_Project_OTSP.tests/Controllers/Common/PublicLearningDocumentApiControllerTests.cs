@@ -124,5 +124,51 @@ public class PublicLearningDocumentApiControllerTests
         Assert.IsType<NotFoundObjectResult>(await controller.Download(999, CancellationToken.None));
         Assert.IsType<NotFoundObjectResult>(await controller.Download(16, CancellationToken.None));
     }
+
+    [Fact]
+    public async Task GetPublicDocuments_PaginatesCorrectlyAcrossPages()
+    {
+        using var db = TestDbContextFactory.Create();
+        var tutorUser = new ApplicationUser { Id = "pub-tutor-page", FullName = "Thầy Minh" };
+        var tutor = new TutorProfile { Id = 1, UserId = tutorUser.Id, User = tutorUser };
+        var subject = new Subject { Id = 1, Code = "TOAN", Name = "Toán học" };
+        var grade = new GradeLevel { Id = 1, Code = "THPT", Name = "THPT" };
+
+        db.AddRange(tutorUser, tutor, subject, grade);
+        for (int i = 1; i <= 10; i++)
+        {
+            db.LearningDocuments.Add(new LearningDocument
+            {
+                Title = $"Tài liệu số {i}",
+                FileUrl = $"https://res.cloudinary.com/demo/raw/upload/doc-{i}.pdf",
+                TutorId = 1,
+                SubjectId = 1,
+                GradeLevelId = 1,
+                Scope = DocumentScope.Public,
+                Status = VerificationStatus.Approved,
+                UploadedAt = DateTime.UtcNow.AddMinutes(-i)
+            });
+        }
+        await db.SaveChangesAsync();
+
+        var controller = new PublicLearningDocumentApiController(db);
+
+        var page1Result = Assert.IsType<OkObjectResult>(await controller.GetPublicDocuments(page: 1));
+        var page1Val = page1Result.Value!;
+        Assert.Equal(10, page1Val.GetType().GetProperty("totalItems")?.GetValue(page1Val));
+        Assert.Equal(2, page1Val.GetType().GetProperty("totalPages")?.GetValue(page1Val));
+        Assert.Equal(1, page1Val.GetType().GetProperty("currentPage")?.GetValue(page1Val));
+        Assert.Equal(8, page1Val.GetType().GetProperty("pageSize")?.GetValue(page1Val));
+        var page1Items = Assert.IsAssignableFrom<System.Collections.ICollection>(
+            page1Val.GetType().GetProperty("items")?.GetValue(page1Val));
+        Assert.Equal(8, page1Items.Count);
+
+        var page2Result = Assert.IsType<OkObjectResult>(await controller.GetPublicDocuments(page: 2));
+        var page2Val = page2Result.Value!;
+        Assert.Equal(2, page2Val.GetType().GetProperty("currentPage")?.GetValue(page2Val));
+        var page2Items = Assert.IsAssignableFrom<System.Collections.ICollection>(
+            page2Val.GetType().GetProperty("items")?.GetValue(page2Val));
+        Assert.Equal(2, page2Items.Count);
+    }
 }
 

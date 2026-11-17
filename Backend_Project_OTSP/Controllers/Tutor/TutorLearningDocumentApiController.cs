@@ -190,7 +190,7 @@ public class TutorLearningDocumentApiController : ControllerBase
             request.GradeLevelId = classroom.GradeLevelId;
         }
 
-        if (request.SubjectId <= 0 || request.GradeLevelId <= 0)
+        if (scope == DocumentScope.Public && (request.SubjectId <= 0 || request.GradeLevelId <= 0))
         {
             var firstPair = await _db.TutorSubjects.FirstOrDefaultAsync(ts => ts.TutorId == tutor.Id, cancellationToken);
             if (firstPair != null)
@@ -201,7 +201,8 @@ public class TutorLearningDocumentApiController : ControllerBase
         }
 
         if (request.SubjectId <= 0 || request.GradeLevelId <= 0 ||
-            !await _db.TutorSubjects.AnyAsync(pair => pair.TutorId == tutor.Id && pair.SubjectId == request.SubjectId && pair.GradeLevelId == request.GradeLevelId, cancellationToken))
+            (scope == DocumentScope.Public &&
+             !await _db.TutorSubjects.AnyAsync(pair => pair.TutorId == tutor.Id && pair.SubjectId == request.SubjectId && pair.GradeLevelId == request.GradeLevelId, cancellationToken)))
         {
             return BadRequest(new { message = "Hãy chọn môn học và cấp học trong hồ sơ giảng dạy của bạn." });
         }
@@ -230,7 +231,7 @@ public class TutorLearningDocumentApiController : ControllerBase
             SubjectId = request.SubjectId,
             GradeLevelId = request.GradeLevelId,
             Scope = scope,
-            ClassroomId = request.ClassroomId,
+            ClassroomId = scope == DocumentScope.Classroom ? request.ClassroomId : null,
             FileUrl = stored.Url,
             Status = scope == DocumentScope.Public ? VerificationStatus.Pending : VerificationStatus.Approved,
             UploadedAt = DateTime.UtcNow
@@ -239,8 +240,8 @@ public class TutorLearningDocumentApiController : ControllerBase
         _db.LearningDocuments.Add(doc);
         await _db.SaveChangesAsync(cancellationToken);
 
-        // Tự động gửi thông báo cho học viên trong lớp khi gia sư tải tài liệu
-        if (doc.ClassroomId.HasValue)
+        // Tự động gửi thông báo cho học viên trong lớp hoặc Admin khi gia sư tải tài liệu
+        if (doc.Scope == DocumentScope.Classroom && doc.ClassroomId.HasValue)
         {
             var classroomStudents = await _db.ClassroomStudents
                 .AsNoTracking()
@@ -255,12 +256,45 @@ public class TutorLearningDocumentApiController : ControllerBase
                 {
                     UserId = cs.Student.UserId,
                     Title = "Tài liệu học tập mới",
-                    Content = $"Gia sư vừa tải lên tài liệu mới: '{doc.Title}' cho lớp học của bạn. [url:/Student_Parent/StudentDocuments]",
+                    Content = $"Gia sư vừa tải lên tài liệu mới: '{doc.Title}' cho lớp học của bạn. [url:/student/documents]",
                     CreatedAt = DateTime.UtcNow,
                     IsRead = false
                 });
             }
             await _db.SaveChangesAsync(cancellationToken);
+        }
+        else if (doc.Scope == DocumentScope.Public)
+        {
+            var adminRoleIds = await _db.Roles.AsNoTracking()
+                .Where(r => r.Name == "Admin" || r.NormalizedName == "ADMIN")
+                .Select(r => r.Id)
+                .ToListAsync(cancellationToken);
+
+            if (adminRoleIds.Count > 0)
+            {
+                var adminUserIds = await _db.UserRoles.AsNoTracking()
+                    .Where(ur => adminRoleIds.Contains(ur.RoleId))
+                    .Select(ur => ur.UserId)
+                    .Distinct()
+                    .ToListAsync(cancellationToken);
+
+                foreach (var adminUserId in adminUserIds)
+                {
+                    _db.Notifications.Add(new Notification
+                    {
+                        UserId = adminUserId,
+                        Title = "Tài liệu công khai mới chờ duyệt",
+                        Content = $"Gia sư vừa đăng tài liệu công khai '{doc.Title}' chờ phê duyệt. [url:/admin/learning-documents]",
+                        CreatedAt = DateTime.UtcNow,
+                        IsRead = false
+                    });
+                }
+
+                if (adminUserIds.Count > 0)
+                {
+                    await _db.SaveChangesAsync(cancellationToken);
+                }
+            }
         }
 
         var message = scope == DocumentScope.Public

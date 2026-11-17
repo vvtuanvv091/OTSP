@@ -14,6 +14,7 @@ export default function LearningDocumentPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
+  const [pageSize, setPageSize] = useState(8);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -30,9 +31,12 @@ export default function LearningDocumentPage() {
 
     try {
       const res = await commonApi.getPublicDocuments(params);
-      setDocuments(res.data?.items || []);
-      setTotalItems(res.data?.totalItems || res.data?.items?.length || 0);
+      const items = res.data?.items || [];
+      setDocuments(items);
+      setTotalItems(res.data?.totalItems ?? items.length);
       setTotalPages(res.data?.totalPages || 1);
+      setCurrentPage(res.data?.currentPage || pageVal);
+      if (res.data?.pageSize) setPageSize(res.data.pageSize);
       if (res.data?.subjects) setSubjects(res.data.subjects);
       if (res.data?.gradeLevels) setGradeLevels(res.data.gradeLevels);
     } catch (err) {
@@ -66,6 +70,26 @@ export default function LearningDocumentPage() {
     e.preventDefault();
     setCurrentPage(1);
     fetchDocuments(search.trim(), subjectId, gradeLevelId, 1);
+  };
+
+  const handleSubjectChange = (nextSubjectId) => {
+    setSubjectId(nextSubjectId);
+    setCurrentPage(1);
+    fetchDocuments(search.trim(), nextSubjectId, gradeLevelId, 1);
+  };
+
+  const handleGradeChange = (nextGradeId) => {
+    setGradeLevelId(nextGradeId);
+    setCurrentPage(1);
+    fetchDocuments(search.trim(), subjectId, nextGradeId, 1);
+  };
+
+  const handleResetFilters = () => {
+    setSearch('');
+    setSubjectId('');
+    setGradeLevelId('');
+    setCurrentPage(1);
+    fetchDocuments('', '', '', 1);
   };
 
   const handlePageChange = (page) => {
@@ -136,7 +160,7 @@ export default function LearningDocumentPage() {
               <select
                 className="form-select form-select-sm"
                 value={subjectId}
-                onChange={(e) => setSubjectId(e.target.value)}
+                onChange={(e) => handleSubjectChange(e.target.value)}
               >
                 <option value="">-- Tất cả môn học --</option>
                 {subjects.map((s) => (
@@ -151,7 +175,7 @@ export default function LearningDocumentPage() {
               <select
                 className="form-select form-select-sm"
                 value={gradeLevelId}
-                onChange={(e) => setGradeLevelId(e.target.value)}
+                onChange={(e) => handleGradeChange(e.target.value)}
               >
                 <option value="">-- Tất cả cấp học --</option>
                 {gradeLevels.map((g) => (
@@ -162,10 +186,20 @@ export default function LearningDocumentPage() {
               </select>
             </div>
 
-            <div className="col-12 col-md-2 d-grid">
-              <button type="submit" className="btn btn-sm btn-danger fw-semibold" style={{ backgroundColor: '#DB303A' }}>
+            <div className="col-12 col-md-2 d-flex gap-1">
+              <button type="submit" className="btn btn-sm btn-danger fw-semibold flex-grow-1" style={{ backgroundColor: '#DB303A' }}>
                 Lọc tài liệu
               </button>
+              {(search || subjectId || gradeLevelId) && (
+                <button
+                  type="button"
+                  className="btn btn-sm btn-outline-secondary"
+                  onClick={handleResetFilters}
+                  title="Xóa bộ lọc"
+                >
+                  <i className="bi bi-x-lg"></i>
+                </button>
+              )}
             </div>
           </form>
         </div>
@@ -196,10 +230,15 @@ export default function LearningDocumentPage() {
                   <tr key={d.id}>
                     <td>
                       <div className="d-flex align-items-center gap-3">
-                        <i className={`bi ${getFileIconClass(d.fileName)} fs-3`}></i>
+                        <i className={`bi ${getFileIconClass(d.fileExtension || d.fileName)} fs-3`}></i>
                         <div>
                           <strong className="d-block">{repairMojibake(d.title)}</strong>
-                          <small className="text-muted">{repairMojibake(d.fileName)}</small>
+                          <small className="text-muted">
+                            {d.subjectName || ''}
+                            {d.gradeLevelName ? ` · ${d.gradeLevelName}` : ''}
+                            {d.fileExtension ? ` · ${d.fileExtension.replace('.', '').toUpperCase()}` : ''}
+                            {d.description ? ` · ${repairMojibake(d.description)}` : ''}
+                          </small>
                         </div>
                       </div>
                     </td>
@@ -217,8 +256,9 @@ export default function LearningDocumentPage() {
                     <td className="text-end">
                       <a
                         href={commonApi.downloadPublicDocumentUrl(d.id)}
+                        target="_blank"
+                        rel="noopener noreferrer"
                         className="btn btn-sm btn-outline-danger rounded-pill px-3"
-                        download
                       >
                         <i className="bi bi-download me-1"></i>Tải về
                       </a>
@@ -236,13 +276,14 @@ export default function LearningDocumentPage() {
         )}
 
         {/* Phân trang tài liệu */}
-        {!loading && documents.length > 0 && totalPages > 1 && (
+        {!loading && totalItems > 0 && (
           <div className="mt-4 pt-3 border-top">
             <OtspPagination
-              currentPage={currentPage}
+              page={currentPage}
               totalPages={totalPages}
-              onPageChange={handlePageChange}
-              totalItems={totalItems}
+              total={totalItems}
+              pageSize={pageSize}
+              onChange={handlePageChange}
             />
           </div>
         )}
