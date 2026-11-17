@@ -181,12 +181,13 @@ export default function AiAssistantWidget() {
 
   const renderFormattedText = (rawText) => {
     if (!rawText) return null;
-    const lines = rawText.split('\n');
+    const lines = rawText.split(/\r?\n/);
     return lines.map((line, lineIdx) => {
-      const headingMatch = line.match(/^#{2,4}\s+(.*)$/);
-      const normalizedLine = headingMatch
+      const trimmedLine = line.trim();
+      const headingMatch = trimmedLine.match(/^#{1,6}\s+(.*)$/);
+      let normalizedLine = headingMatch
         ? headingMatch[1]
-        : line.replace(/^\*\s+/, '• ');
+        : trimmedLine.replace(/^[*•-]\s+/, '• ');
 
       const parts = [];
       const linkRegex = /\[(.*?)\]\((.*?)\)/g;

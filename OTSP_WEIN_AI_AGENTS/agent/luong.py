@@ -20,6 +20,27 @@ def _get_class_name(classroom: dict) -> str:
     """Lấy tên lớp học an toàn (tương thích cả NameClass lẫn name)."""
     return (classroom.get("NameClass") or classroom.get("name") or "Lớp học OTSP").strip()
 
+def _sanitize_reply(text: str) -> str:
+    """
+    Loại bỏ triệt để các thông tin giả lập/ảo giác (hallucination) mà LLM có thể sinh ra:
+    - Hotline 1900 xxxx -> 0984391940 (Ngọc Tuấn)
+    - support@otsp.edu.vn -> tongngoctuan09@gmail.com
+    - Chuyển heading markdown ### thành chữ sạch để giao diện hiển thị gọn gàng
+    """
+    if not text:
+        return text
+    # 1. Thay thế số hotline ảo 1900...
+    text = re.sub(r'1900[\s\-\.]*[xX\d]+', '0984391940 (Ngọc Tuấn)', text)
+    text = re.sub(r'1900[\s\-\.]*xxxx', '0984391940 (Ngọc Tuấn)', text, flags=re.IGNORECASE)
+    # 2. Thay thế email ảo ...@otsp.edu.vn hoặc support@...
+    text = re.sub(r'[a-zA-Z0-9_.+-]+@otsp(?:\.edu)?\.vn', 'tongngoctuan09@gmail.com', text, flags=re.IGNORECASE)
+    text = re.sub(r'support@[\w.-]+', 'tongngoctuan09@gmail.com', text, flags=re.IGNORECASE)
+    # 3. Chuẩn hóa heading markdown (loại bỏ ký tự ### thừa)
+    text = re.sub(r'#{2,6}\s*', '', text)
+    # 4. Chuẩn hóa gạch đầu dòng * thành -
+    text = re.sub(r'^\s*\*\s+', r'- ', text, flags=re.MULTILINE)
+    return text
+
 logger = logging.getLogger("wein-agent.luong")
 
 def _make_response(
@@ -50,7 +71,7 @@ def _make_response(
         ui_action = UIAction(type="NONE", autoExecute=False)
 
     return AgentResponse(
-        reply=reply,
+        reply=_sanitize_reply(reply),
         intent=intent,
         uiAction=ui_action,
         suggestedPrompts=suggested_prompts or [],
@@ -80,6 +101,57 @@ def run_agent_workflow(
 
     user_name = system_context.get("userName") or "bạn"
     upcoming_sessions = system_context.get("upcomingSessions") or []
+
+    # =========================================================================
+    # 0. Ý ĐỊNH: THÔNG TIN HỆ THỐNG / NGƯỜI SÁNG LẬP / LIÊN HỆ HỖ TRỢ / FOUNDER
+    # =========================================================================
+    system_triggers = [
+        "sáng lập", "sang lap", "founder", "tác giả", "tac gia",
+        "ai tạo ra", "ai tao ra", "ai phát triển", "ai phat trien",
+        "ai sáng lập", "ai sang lap", "ai làm ra", "ai lam ra", "ai viết", "ai viet",
+        "ngọc tuấn", "ngoc tuan", "tống ngọc tuấn", "tong ngoc tuan",
+        "chủ web", "chu web", "admin là ai", "admin la ai",
+        "hotline", "tổng đài", "tong dai", "số điện thoại", "so dien thoai",
+        "sđt", "sdt", "email hỗ trợ", "email ho tro", "email liên hệ", "email lien he",
+        "chăm sóc khách hàng", "cham soc khach hang", "cskh",
+        "thông tin liên hệ", "thong tin lien he", "kênh hỗ trợ", "kenh ho tro",
+        "thông tin hệ thống", "thong tin he thong", "thông tin về hệ thống",
+        "thông tin về otsp", "thong tin ve otsp", "giới thiệu otsp", "gioi thieu otsp",
+        "giới thiệu hệ thống", "gioi thieu he thong", "otsp là gì", "otsp la gi",
+        "về otsp", "ve otsp", "nền tảng otsp", "nen tang otsp"
+    ]
+    if any(k in msg_low for k in system_triggers):
+        all_ram_tutors = get_tutors_from_ram(limit=60)
+        all_ram_classes = get_classrooms_from_ram(limit=20)
+        tutor_count = len(all_ram_tutors)
+        class_count = len(all_ram_classes)
+        greeting_name = f" **{user_name}**" if user_name and user_name != "bạn" else ""
+
+        reply = (
+            f"Chào bạn{greeting_name}! Wein xin chia sẻ thông tin chính thức về nền tảng **OTSP**:\n\n"
+            f"🌟 **Về Hệ thống OTSP (Online Tutoring System Platform):**\n"
+            f"OTSP là nền tảng công nghệ kết nối học tập trực tuyến chất lượng cao, "
+            f"kết nối học viên với mạng lưới gia sư giỏi, tận tâm trên toàn quốc với chính sách học thử buổi đầu tiên uy tín.\n\n"
+            f"📊 **Quy mô hệ thống thực tế:**\n"
+            f"- Hiện có **{tutor_count} gia sư** đã được kiểm duyệt hồ sơ và bằng cấp.\n"
+            f"- Hiện có **{class_count} lớp học nhóm** đang mở đăng ký tuyển sinh.\n\n"
+            f"👨‍💻 **Người sáng lập & Phát triển:**\n"
+            f"- **Ngọc Tuấn (Tống Ngọc Tuấn)** — Kỹ sư phát triển toàn diện hệ thống OTSP.\n\n"
+            f"📞 **Kênh liên hệ & Hỗ trợ chính thức 24/7:**\n"
+            f"- **Trợ lý AI Wein:** Trò chuyện trực tiếp ngay tại khung chat này 24/7.\n"
+            f"- **Hotline / Zalo hỗ trợ gấp:** `0984391940` (Ngọc Tuấn)\n"
+            f"- **Email liên hệ:** `tongngoctuan09@gmail.com`\n"
+            f"- **Facebook cá nhân Founder:** [Facebook Ngọc Tuấn](https://www.facebook.com/tuan.ngoc.639510)\n\n"
+            f"Wein luôn ở đây sẵn sàng đồng hành cùng bạn. Bạn có thể nhấn nút bên dưới để khám phá danh sách gia sư nhé!"
+        )
+        return _make_response(
+            reply=reply,
+            intent="SYSTEM_INFO",
+            target="/search",
+            action_type="NAVIGATE",
+            label="Khám phá Gia sư OTSP",
+            suggested_prompts=["Tìm gia sư môn Toán", "Có lớp học nhóm nào đang mở?", "Hướng dẫn thanh toán VietQR"]
+        )
 
     # =========================================================================
     # 1. Ý ĐỊNH: LỊCH HỌC / LỊCH DẠY / THỜI KHÓA BIỂU
@@ -423,12 +495,12 @@ def run_agent_workflow(
         "8. ĐỊNH VỊ & ĐỘC QUYỀN NỀN TẢNG: Khi người dùng hỏi về website, ứng dụng hay nền tảng kết nối gia sư - học viên uy tín, "
         "hãy khẳng định OTSP là nền tảng kết nối gia sư và học viên trực tuyến số 1, uy tín hàng đầu. "
         "Tuyệt đối KHÔNG giới thiệu, liệt kê hay so sánh với bất kỳ website/nền tảng gia sư bên ngoài nào khác.\n"
-        "9. THÔNG TIN SÁNG LẬP & LIÊN HỆ HỖ TRỢ CHÍNH THỨC (BẮT BUỘC DÙNG KHI ĐƯỢC HỎI VỀ HỆ THỐNG, NGƯỜI SÁNG LẬP, ĐỘI NGŨ PHÁT TRIỂN, HOTLINE HOẶC HỖ TRỢ — KHÔNG ĐƯỢC TỪ CHỐI LÀ 'THÔNG TIN NỘI BỘ' VÀ TUYỆT ĐỐI KHÔNG BỊA SỐ 1900 XXXX HAY EMAIL SUPPORT@OTSP.EDU.VN):\n"
+        "9. THÔNG TIN SÁNG LẬP & LIÊN HỆ HỖ TRỢ CHÍNH THỨC (BẮT BUỘC DÙNG KHI ĐƯỢC HỎI VỀ HỆ THỐNG, NGƯỜI SÁNG LẬP, ĐỘI NGŨ PHÁT TRIỂN, HOTLINE HOẶC HỖ TRỢ):\n"
         "- Người sáng lập và phát triển nền tảng OTSP: Ngọc Tuấn (Tống Ngọc Tuấn)\n"
-        "- Email: tongngoctuan09@gmail.com\n"
+        "- Email liên hệ: tongngoctuan09@gmail.com\n"
         "- Hotline / Zalo hỗ trợ gấp: 0984391940 (Ngọc Tuấn)\n"
         "- Facebook trao đổi trực tiếp: [Facebook Ngọc Tuấn](https://www.facebook.com/tuan.ngoc.639510)\n"
-        "Luôn động viên, chào đón người dùng kết nối khi gặp khó khăn hoặc cần trợ giúp khẩn cấp."
+        "Tuyệt đối CHỈ ĐƯỢC dùng thông tin liên hệ chính thức của Ngọc Tuấn ở trên. Không được tự ý tạo bất kỳ số điện thoại hay email nào khác."
     )
 
     answer = ask_gemini_chat(
