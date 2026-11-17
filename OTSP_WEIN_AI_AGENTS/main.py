@@ -42,7 +42,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.ALLOWED_ORIGINS,
     allow_credentials=False,
-    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_methods=["GET", "HEAD", "POST", "OPTIONS"],
     allow_headers=["Content-Type", "X-Internal-Key"],
 )
 
@@ -73,7 +73,7 @@ def on_startup():
     logger.info("Server đang khởi động: Nạp trước dữ liệu vào RAM...")
     warmup_cache()
 
-@app.get("/")
+@app.api_route("/", methods=["GET", "HEAD"])
 def root():
     return {
         "status": "online",
@@ -81,7 +81,7 @@ def root():
         "version": "1.0.0"
     }
 
-@app.get("/health")
+@app.api_route("/health", methods=["GET", "HEAD"])
 def health():
     return {"status": "healthy"}
 

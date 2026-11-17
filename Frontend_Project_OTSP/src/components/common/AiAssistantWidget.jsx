@@ -150,18 +150,52 @@ export default function AiAssistantWidget() {
     }
   };
 
+  const renderInlineStyles = (text, keyPrefix) => {
+    const boldSplit = text.split(/\*\*(.*?)\*\*/g);
+    return boldSplit.map((frag, fIdx) => {
+      if (fIdx % 2 === 1) {
+        return <strong key={`${keyPrefix}-b-${fIdx}`}>{frag}</strong>;
+      }
+      const codeSplit = frag.split(/`(.*?)`/g);
+      return codeSplit.map((cFrag, cIdx) => {
+        if (cIdx % 2 === 1) {
+          return (
+            <code
+              key={`${keyPrefix}-c-${fIdx}-${cIdx}`}
+              className="bg-light text-danger px-1 py-0 rounded border"
+              style={{ fontSize: '0.88em' }}
+            >
+              {cFrag}
+            </code>
+          );
+        }
+        const italicSplit = cFrag.split(/\*([^\s*](?:[^*]*[^\s*])?)\*/g);
+        return italicSplit.map((iFrag, iIdx) => (
+          iIdx % 2 === 1
+            ? <em key={`${keyPrefix}-i-${fIdx}-${cIdx}-${iIdx}`}>{iFrag}</em>
+            : iFrag
+        ));
+      });
+    });
+  };
+
   const renderFormattedText = (rawText) => {
     if (!rawText) return null;
     const lines = rawText.split('\n');
     return lines.map((line, lineIdx) => {
+      const headingMatch = line.match(/^#{2,4}\s+(.*)$/);
+      const normalizedLine = headingMatch
+        ? headingMatch[1]
+        : line.replace(/^\*\s+/, '• ');
+
       const parts = [];
       const linkRegex = /\[(.*?)\]\((.*?)\)/g;
       let lastIdx = 0;
       let match;
 
-      while ((match = linkRegex.exec(line)) !== null) {
+      while ((match = linkRegex.exec(normalizedLine)) !== null) {
         if (match.index > lastIdx) {
-          parts.push(line.substring(lastIdx, match.index));
+          parts.push(normalizedLine.substring(lastIdx, match.index));
         }
         const linkText = match[1];
         const linkUrl = match[2];
@@ -184,34 +218,23 @@ export default function AiAssistantWidget() {
         );
         lastIdx = match.index + match[0].length;
       }
-      if (lastIdx < line.length) {
-        parts.push(line.substring(lastIdx));
+      if (lastIdx < normalizedLine.length) {
+        parts.push(normalizedLine.substring(lastIdx));
       }
 
-      const renderedParts = parts.map((part, pIdx) => {
-        if (typeof part !== 'string') return part;
-        const boldSplit = part.split(/\*\*(.*?)\*\*/g);
-        return boldSplit.map((frag, fIdx) => {
-          if (fIdx % 2 === 1) {
-            return <strong key={`b-${lineIdx}-${pIdx}-${fIdx}`}>{frag}</strong>;
-          }
-          const codeSplit = frag.split(/`(.*?)`/g);
-          return codeSplit.map((cFrag, cIdx) => {
-            if (cIdx % 2 === 1) {
-              return (
-                <code
-                  key={`c-${lineIdx}-${pIdx}-${fIdx}-${cIdx}`}
-                  className="bg-light text-danger px-1 py-0 rounded border"
-                  style={{ fontSize: '0.88em' }}
-                >
-                  {cFrag}
-                </code>
-              );
-            }
-            return cFrag;
-          });
-        });
-      });
+      const renderedParts = parts.map((part, pIdx) => (
+        typeof part === 'string'
+          ? renderInlineStyles(part, `${lineIdx}-${pIdx}`)
+          : part
+      ));
+
+      if (headingMatch) {
+        return (
+          <strong key={`line-${lineIdx}`} className="d-block text-danger mt-2 mb-1">
+            {renderedParts}
+          </strong>
+        );
+      }
 
       return (
         <Fragment key={`line-${lineIdx}`}>

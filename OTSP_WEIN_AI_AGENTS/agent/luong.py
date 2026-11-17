@@ -7,8 +7,18 @@ from agent.tool import (
     search_news_tool,
     search_documents_tool
 )
-from database.memory import get_tutors_from_ram, get_classrooms_from_ram
-from llm.client import ask_gemini_chat, ask_gemini_json
+from database.memory import (
+    get_tutors_from_ram,
+    get_classrooms_from_ram,
+    get_news_from_ram,
+    get_documents_from_ram,
+)
+from llm.client import ask_gemini_chat, ask_gemini_json, CHAT_UNAVAILABLE_FALLBACK
+
+
+def _get_class_name(classroom: dict) -> str:
+    """Lấy tên lớp học an toàn (tương thích cả NameClass lẫn name)."""
+    return (classroom.get("NameClass") or classroom.get("name") or "Lớp học OTSP").strip()
 
 logger = logging.getLogger("wein-agent.luong")
 
@@ -280,9 +290,9 @@ def run_agent_workflow(
     if any(k in msg_low for k in group_class_keywords):
         classes = search_classrooms_tool()
         card_text = "\n".join([
-            f"- 🏫 **{c['name']}** (GV: **{c['tutorName']}**) | Môn: `{c['subject']}` | Học phí: `{c['fee']:,} đ`"
+            f"- 🏫 **{_get_class_name(c)}** (GV: **{c['tutorName']}**) | Môn: `{c['subject']}` | Học phí: `{c['fee']:,} đ` | Còn `{c.get('availableSeats', 0)}` chỗ"
             for c in classes
-        ])
+        ]) if classes else "Hiện tại chưa có lớp học nhóm nào đang mở tuyển sinh."
         return _make_response(
             reply=f"Wein đang chuyển bạn sang **Tab Lớp học nhóm**:\n\n{card_text}",
             intent="SWITCH_TAB",
@@ -337,9 +347,11 @@ def run_agent_workflow(
     # =========================================================================
     # 9. CHAT TỰ DO / GIẢI TOÁN / HỎI ĐÁP ĐA LƯỢT VỚI GEMINI
     # =========================================================================
-    # Lấy danh sách gia sư và lớp học từ cache trong RAM để làm ngữ cảnh cho AI
+    # Lấy dữ liệu hệ thống thực tế từ cache trong RAM để làm ngữ cảnh cho AI
     all_ram_tutors = get_tutors_from_ram(limit=60)
     all_ram_classes = get_classrooms_from_ram(limit=20)
+    all_ram_news = get_news_from_ram(limit=5)
+    all_ram_docs = get_documents_from_ram(limit=5)
 
     def _strip_vn(text: str) -> str:
         import unicodedata
@@ -357,17 +369,43 @@ def run_agent_workflow(
         elif any(s.strip().lower() in msg_low or _strip_vn(s.strip()) in msg_unaccent for s in (t.get("subjects") or "").split(",")):
             matched_tutors.append(t)
 
-    context_db = f"\n[Dữ liệu thực tế hệ thống OTSP]:\n- Tổng số gia sư đã kiểm duyệt: {len(all_ram_tutors)} gia sư.\n- Tổng số lớp học đang mở: {len(all_ram_classes)} lớp.\n"
+    context_lines = [
+        "[Dữ liệu thực tế hệ thống OTSP (lấy trực tiếp từ CSDL)]:",
+        f"- Tổng số gia sư đã kiểm duyệt: {len(all_ram_tutors)} gia sư.",
+        f"- Tổng số lớp học nhóm đang mở: {len(all_ram_classes)} lớp.",
+        f"- Số tin tức mới nhất trong cache: {len(all_ram_news)} bài viết.",
+        f"- Số tài liệu công khai trong cache: {len(all_ram_docs)} tài liệu.",
+    ]
+    if upcoming_sessions:
+        session_lines = [
+            f"  + {s.get('subject', 'Môn học')} lúc {s.get('time', '')} ngày {s.get('date', '')} (GV: {s.get('tutorName', 'Gia sư OTSP')})"
+            for s in upcoming_sessions[:3]
+        ]
+        context_lines.append("- Buổi học sắp tới của người dùng:\n" + "\n".join(session_lines))
+
     if matched_tutors:
-        context_db += "[Gia sư thực tế phù hợp]:\n" + "\n".join([
+        context_lines.append("[Gia sư thực tế phù hợp]:\n" + "\n".join([
             f"- Gia sư: {t['fullName']} | Môn dạy: {t['subjects']} | Học phí: {t['hourlyFee']:,} đ/giờ | Đánh giá: {t['rating']}★ | Cấp học: {t.get('grades', 'Phổ thông')}"
             for t in matched_tutors[:10]
-        ])
-    else:
+        ]))
+    elif all_ram_tutors:
         sample_names = ", ".join([f"{t['fullName']} ({t['subjects']})" for t in all_ram_tutors[:6]])
-        context_db += f"- Một số gia sư tiêu biểu: {sample_names} (Hệ thống có nhiều gia sư khác, người dùng có thể tìm theo tên hoặc môn bất kỳ)."
+        context_lines.append(f"- Một số gia sư tiêu biểu: {sample_names}.")
 
-    role_desc = "học viên" if user_role == "Student" else ("gia sư" if user_role == "Tutor" else "khách")
+    if all_ram_classes:
+        context_lines.append("[Lớp học nhóm thực tế đang mở]:\n" + "\n".join([
+            f"- Lớp: {_get_class_name(c)} | Môn: {c['subject']} ({c.get('grade', 'Phổ thông')}) | GV: {c['tutorName']} | Học phí: {c['fee']:,} đ | Còn trống: {c.get('availableSeats', 0)} chỗ"
+            for c in all_ram_classes[:5]
+        ]))
+
+    if all_ram_news:
+        context_lines.append("[Tin tức OTSP mới nhất]: " + "; ".join([n["title"] for n in all_ram_news[:3]]))
+    if all_ram_docs:
+        context_lines.append("[Tài liệu học tập mới]: " + "; ".join([f"{d['title']} ({d['subject']})" for d in all_ram_docs[:3]]))
+
+    context_db = "\n".join(context_lines)
+
+    role_desc = "học viên" if user_role == "Student" else ("gia sư" if user_role == "Tutor" else ("quản trị viên" if user_role == "Admin" else "khách"))
     system_prompt = (
         f"Bạn là WEIN - Trợ lý AI thông minh và thân thiện của nền tảng dạy kèm trực tuyến OTSP.\n"
         f"Bạn đang nói chuyện với {user_name} (vai trò: {role_desc}).\n"
@@ -377,19 +415,19 @@ def run_agent_workflow(
         "dùng cú pháp LaTeX $công thức$ để hiển thị công thức toán học đẹp mắt.\n"
         "3. Nếu người dùng hỏi quy định học thử: OTSP cam kết buổi học thử đầu tiên giúp học viên đánh giá sự phù hợp trước khi thanh toán chính thức.\n"
         "4. Nếu chỉ chào hỏi hoặc hỏi kiến thức thông thường: Trả lời tự nhiên, KHÔNG tự ý ép người dùng chuyển trang.\n"
-        "5. Giữ định dạng Markdown rõ ràng, dễ nhìn trên thiết bị di động và máy tính.\n"
-        f"6. Dữ liệu thực tế của hệ thống:\n{context_db}\n"
+        "5. Trình bày gọn gàng bằng **in đậm**, danh sách gạch đầu dòng `-`, liên kết `[Tên](/đường-dẫn)` (hạn chế dùng ký tự heading `###`).\n"
+        f"6. Dữ liệu thực tế của hệ thống (CHỈ ĐƯỢC dùng dữ liệu thật bên dưới, tuyệt đối KHÔNG tự bịa tên gia sư, tên lớp, học phí, số liệu hoặc kênh liên hệ không có trong prompt):\n{context_db}\n"
         "Tuyệt đối KHÔNG khẳng định hệ thống chỉ có một vài người nếu bạn chỉ nhìn thấy một phần danh sách tìm kiếm. "
-        "Nếu người dùng hỏi gia sư có trong danh sách trên (ví dụ: Phạm Anh Hào, Tống Ngọc...), hãy giới thiệu thông tin chính xác về môn dạy và học phí.\n"
-        "7. BẢO MẬT: Tuyệt đối không bao giờ tiết lộ thông tin nhạy cảm của người dùng (mật khẩu, CCCD, số điện thoại riêng, số tài khoản ngân hàng chi tiết, lịch sử giao dịch cá nhân).\n"
+        "Nếu người dùng hỏi gia sư có trong danh sách trên, hãy giới thiệu thông tin chính xác về môn dạy và học phí.\n"
+        "7. BẢO MẬT: Tuyệt đối không bao giờ tiết lộ thông tin nhạy cảm cá nhân của người dùng (mật khẩu, CCCD, số điện thoại riêng của học viên/gia sư, số tài khoản ngân hàng chi tiết, lịch sử giao dịch cá nhân) — NGOẠI TRỪ thông tin liên hệ hỗ trợ công khai chính thức của Founder ở mục 9.\n"
         "8. ĐỊNH VỊ & ĐỘC QUYỀN NỀN TẢNG: Khi người dùng hỏi về website, ứng dụng hay nền tảng kết nối gia sư - học viên uy tín, "
         "hãy khẳng định OTSP là nền tảng kết nối gia sư và học viên trực tuyến số 1, uy tín hàng đầu. "
         "Tuyệt đối KHÔNG giới thiệu, liệt kê hay so sánh với bất kỳ website/nền tảng gia sư bên ngoài nào khác.\n"
-        "9. THÔNG TIN SÁNG LẬP & LIÊN HỆ HỖ TRỢ: Người sáng lập và phát triển nền tảng OTSP là Ngọc Tuấn (Tống Ngọc Tuấn).\n"
-        "Khi người dùng muốn liên hệ hợp tác, góp ý hoặc cần người hỗ trợ gấp, hãy cung cấp đầy đủ và thân thiện các kênh liên hệ chính thức sau:\n"
+        "9. THÔNG TIN SÁNG LẬP & LIÊN HỆ HỖ TRỢ CHÍNH THỨC (BẮT BUỘC DÙNG KHI ĐƯỢC HỎI VỀ HỆ THỐNG, NGƯỜI SÁNG LẬP, ĐỘI NGŨ PHÁT TRIỂN, HOTLINE HOẶC HỖ TRỢ — KHÔNG ĐƯỢC TỪ CHỐI LÀ 'THÔNG TIN NỘI BỘ' VÀ TUYỆT ĐỐI KHÔNG BỊA SỐ 1900 XXXX HAY EMAIL SUPPORT@OTSP.EDU.VN):\n"
+        "- Người sáng lập và phát triển nền tảng OTSP: Ngọc Tuấn (Tống Ngọc Tuấn)\n"
         "- Email: tongngoctuan09@gmail.com\n"
         "- Hotline / Zalo hỗ trợ gấp: 0984391940 (Ngọc Tuấn)\n"
-        "- Facebook trao đổi trực tiếp: https://www.facebook.com/tuan.ngoc.639510 (hoặc Markdown: [Facebook Ngọc Tuấn](https://www.facebook.com/tuan.ngoc.639510))\n"
+        "- Facebook trao đổi trực tiếp: [Facebook Ngọc Tuấn](https://www.facebook.com/tuan.ngoc.639510)\n"
         "Luôn động viên, chào đón người dùng kết nối khi gặp khó khăn hoặc cần trợ giúp khẩn cấp."
     )
 
@@ -398,6 +436,24 @@ def run_agent_workflow(
         conversation_history=conversation_history,
         user_message=user_message
     )
+
+    # Nếu Gemini quá tải 503 mà người dùng đang hỏi về thông tin hệ thống / Founder, trả ngay dữ liệu thật từ system
+    system_info_keywords = [
+        "hệ thống", "he thong", "sáng lập", "sang lap", "founder", "ngọc tuấn",
+        "tống ngọc tuấn", "liên hệ", "lien he", "hotline", "hỗ trợ", "ho tro",
+        "chủ web", "ai tạo", "ai phát triển", "giới thiệu otsp", "về otsp", "thong tin"
+    ]
+    if answer == CHAT_UNAVAILABLE_FALLBACK and any(k in msg_low for k in system_info_keywords):
+        greeting_name = "" if user_name == "bạn" else f" **{user_name}**"
+        answer = (
+            f"Chào bạn{greeting_name}! Đây là thông tin chính thức từ hệ thống **OTSP**:\n\n"
+            f"- **Quy mô hiện tại:** **{len(all_ram_tutors)} gia sư** đã kiểm duyệt và **{len(all_ram_classes)} lớp học nhóm** đang mở tuyển sinh.\n"
+            "- **Người sáng lập & phát triển:** **Ngọc Tuấn (Tống Ngọc Tuấn)**\n"
+            "- **Email hỗ trợ:** `tongngoctuan09@gmail.com`\n"
+            "- **Hotline / Zalo hỗ trợ gấp:** `0984391940` (Ngọc Tuấn)\n"
+            "- **Facebook trực tiếp:** [Facebook Ngọc Tuấn](https://www.facebook.com/tuan.ngoc.639510)\n\n"
+            "Bạn có thể tra cứu trực tiếp danh sách gia sư tại [Tìm gia sư](/search) nhé!"
+        )
 
     prompts = [
         "Xem lịch học sắp tới",

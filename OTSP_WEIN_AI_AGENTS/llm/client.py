@@ -1,11 +1,14 @@
 import json
 import logging
+import time
 from typing import Any
 from google import genai
 from google.genai import types
 from core.config import settings
 
 logger = logging.getLogger("wein-agent.llm")
+
+CHAT_UNAVAILABLE_FALLBACK = "Xin lỗi bạn, Wein đang gặp gián đoạn tạm thời khi kết nối. Bạn hãy hỏi lại nhé!"
 
 # Biến singleton giữ kết nối Client tới Google Gemini
 _client: genai.Client | None = None
@@ -87,22 +90,34 @@ def ask_gemini_chat(
         )
     )
 
-    try:
-        response = client.models.generate_content(
-            model=settings.GEMINI_MODEL,
-            contents=contents,
-            config=types.GenerateContentConfig(
-                system_instruction=system_prompt,
-                max_output_tokens=max_tokens,
-                temperature=0.7,
-            ),
-        )
-        if response.text and response.text.strip():
-            return response.text.strip()
-    except Exception as exc:
-        logger.error("Lỗi khi gọi Gemini đa lượt: %s", exc)
+    started = time.monotonic()
+    for attempt in range(2):
+        try:
+            response = client.models.generate_content(
+                model=settings.GEMINI_MODEL,
+                contents=contents,
+                config=types.GenerateContentConfig(
+                    system_instruction=system_prompt,
+                    max_output_tokens=max_tokens,
+                    temperature=0.7,
+                ),
+            )
+            if response.text and response.text.strip():
+                return response.text.strip()
+        except Exception as exc:
+            err_str = str(exc)
+            is_transient = any(
+                code in err_str
+                for code in ("503", "UNAVAILABLE", "504", "DEADLINE_EXCEEDED", "429", "RESOURCE_EXHAUSTED")
+            )
+            if attempt == 0 and is_transient and (time.monotonic() - started) < 10.0:
+                logger.warning("Gemini tạm thời quá tải (%s), tự động thử lại lần 2...", err_str)
+                time.sleep(0.8)
+                continue
+            logger.error("Lỗi khi gọi Gemini đa lượt: %s", exc)
+            break
 
-    return "Xin lỗi bạn, Wein đang gặp gián đoạn tạm thời khi kết nối. Bạn hãy hỏi lại nhé!"
+    return CHAT_UNAVAILABLE_FALLBACK
 
 def safe_parse_json(text: str) -> dict[str, Any]:
     """
